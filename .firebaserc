@@ -1,6 +1,6 @@
 {
   "projects": {
-    "default": "aimkt-dev",
-    "dev": "aimkt-dev"
+    "default": "brainwise-ai-marketing-engine",
+    "dev": "brainwise-ai-marketing-engine"
   }
 }
