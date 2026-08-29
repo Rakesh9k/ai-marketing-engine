@@ -1,13 +1,11 @@
-import type { FirebaseApp } from 'firebase/app';
-import { initializeApp, getApps } from 'firebase/app';
-import type { Auth } from 'firebase/auth';
-import { getAuth } from 'firebase/auth';
-import type { Firestore } from 'firebase/firestore';
-import { getFirestore } from 'firebase/firestore';
-import type { FirebaseStorage } from 'firebase/storage';
-import { getStorage } from 'firebase/storage';
-import type { Functions } from 'firebase/functions';
-import { getFunctions } from 'firebase/functions';
+import { initializeApp, getApps, type FirebaseApp } from 'firebase/app';
+import { getAuth, type Auth } from 'firebase/auth';
+import { getFirestore, type Firestore } from 'firebase/firestore';
+import { getStorage, type FirebaseStorage } from 'firebase/storage';
+import { getFunctions, type Functions, connectFunctionsEmulator } from 'firebase/functions';
+import { connectAuthEmulator } from 'firebase/auth';
+import { connectFirestoreEmulator } from 'firebase/firestore';
+import { connectStorageEmulator } from 'firebase/storage';
 
 const firebaseConfig = {
   apiKey: process.env['NEXT_PUBLIC_FIREBASE_API_KEY'],
@@ -25,7 +23,23 @@ let db: Firestore | undefined;
 let storage: FirebaseStorage | undefined;
 let functions: Functions | undefined;
 
-if (typeof window !== 'undefined') {
+function initializeFirebase(): {
+  app: FirebaseApp | undefined;
+  auth: Auth | undefined;
+  db: Firestore | undefined;
+  storage: FirebaseStorage | undefined;
+  functions: Functions | undefined;
+} {
+  if (typeof window === 'undefined') {
+    return {
+      app: undefined,
+      auth: undefined,
+      db: undefined,
+      storage: undefined,
+      functions: undefined,
+    };
+  }
+
   if (!getApps().length) {
     app = initializeApp(firebaseConfig);
   } else {
@@ -39,18 +53,40 @@ if (typeof window !== 'undefined') {
     functions = getFunctions(app, 'asia-south1');
 
     if (process.env['NEXT_PUBLIC_USE_EMULATORS'] === 'true') {
-      const host = 'localhost';
-      const { connectAuthEmulator } = await import('firebase/auth');
-      const { connectFirestoreEmulator } = await import('firebase/firestore');
-      const { connectStorageEmulator } = await import('firebase/storage');
-      const { connectFunctionsEmulator } = await import('firebase/functions');
-
-      if (auth) connectAuthEmulator(auth, `http://${host}:9099`);
-      if (db) connectFirestoreEmulator(db, host, 8080);
-      if (storage) connectStorageEmulator(storage, host, 9199);
-      if (functions) connectFunctionsEmulator(functions, host, 5001);
+      connectAuthEmulator(auth, 'http://localhost:9099');
+      connectFirestoreEmulator(db, 'localhost', 8080);
+      connectStorageEmulator(storage, 'localhost', 9199);
+      connectFunctionsEmulator(functions, 'localhost', 5001);
     }
   }
+
+  return { app, auth, db, storage, functions };
 }
 
-export { app, auth, db, storage, functions };
+const firebaseInstances = initializeFirebase();
+
+export const firebaseApp = firebaseInstances.app;
+export const firebaseAuth = firebaseInstances.auth;
+export const firebaseDb = firebaseInstances.db;
+export const firebaseStorage = firebaseInstances.storage;
+export const firebaseFunctions = firebaseInstances.functions;
+
+export function getFirebaseApp(): FirebaseApp | undefined {
+  return firebaseApp;
+}
+
+export function getFirebaseAuth(): Auth | undefined {
+  return firebaseAuth;
+}
+
+export function getFirebaseDb(): Firestore | undefined {
+  return firebaseDb;
+}
+
+export function getFirebaseStorage(): FirebaseStorage | undefined {
+  return firebaseStorage;
+}
+
+export function getFirebaseFunctions(): Functions | undefined {
+  return firebaseFunctions;
+}
