@@ -1,7 +1,4 @@
 {
-  "projects": {
-    "default": "ai-marketing-engine"
-  },
   "functions": [
     {
       "source": "functions",
