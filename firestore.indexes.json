@@ -1,6 +1,33 @@
 {
   "indexes": [
     {
+      "collectionGroup": "businesses",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "userId", "order": "ASCENDING" },
+        { "fieldPath": "status", "order": "ASCENDING" },
+        { "fieldPath": "createdAt", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "businesses",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "agencyId", "order": "ASCENDING" },
+        { "fieldPath": "status", "order": "ASCENDING" },
+        { "fieldPath": "createdAt", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "businesses",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "category", "order": "ASCENDING" },
+        { "fieldPath": "city", "order": "ASCENDING" },
+        { "fieldPath": "status", "order": "ASCENDING" }
+      ]
+    },
+    {
       "collectionGroup": "campaigns",
       "queryScope": "COLLECTION",
       "fields": [
@@ -82,6 +109,11 @@
     {
       "collectionGroup": "transactions",
       "queryScope": "COLLECTION",
+      "fields": [{ "fieldPath": "razorpayPaymentId", "order": "ASCENDING" }]
+    },
+    {
+      "collectionGroup": "transactions",
+      "queryScope": "COLLECTION",
       "fields": [
         { "fieldPath": "campaignId", "order": "ASCENDING" },
         { "fieldPath": "type", "order": "ASCENDING" }
@@ -96,12 +128,22 @@
       ]
     },
     {
+      "collectionGroup": "subscriptions",
+      "queryScope": "COLLECTION",
+      "fields": [{ "fieldPath": "razorpaySubscriptionId", "order": "ASCENDING" }]
+    },
+    {
       "collectionGroup": "partner_referrals",
       "queryScope": "COLLECTION",
       "fields": [
         { "fieldPath": "partnerId", "order": "ASCENDING" },
         { "fieldPath": "status", "order": "ASCENDING" }
       ]
+    },
+    {
+      "collectionGroup": "partner_referrals",
+      "queryScope": "COLLECTION",
+      "fields": [{ "fieldPath": "referredUserId", "order": "ASCENDING" }]
     },
     {
       "collectionGroup": "analytics_events",

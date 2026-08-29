@@ -16,18 +16,18 @@ This phase establishes the development foundation only. Product functionality wi
 
 ## Technology Stack
 
-| Layer | Technology |
-|-------|------------|
-| **Frontend** | Next.js 15 (App Router), React 18, TypeScript, Tailwind CSS |
-| **Backend** | Firebase Cloud Functions (Gen 2, Node.js 20, TypeScript) |
-| **Database** | Cloud Firestore (Native mode, `asia-south1`) |
-| **Auth** | Firebase Authentication (Email/Password, Phone OTP, Google) |
-| **Storage** | Firebase Storage |
-| **Payments** | Razorpay (INR subscriptions) |
+| Layer            | Technology                                                      |
+| ---------------- | --------------------------------------------------------------- |
+| **Frontend**     | Next.js 15 (App Router), React 18, TypeScript, Tailwind CSS     |
+| **Backend**      | Firebase Cloud Functions (Gen 2, Node.js 20, TypeScript)        |
+| **Database**     | Cloud Firestore (Native mode, `asia-south1`)                    |
+| **Auth**         | Firebase Authentication (Email/Password, Phone OTP, Google)     |
+| **Storage**      | Firebase Storage                                                |
+| **Payments**     | Razorpay (INR subscriptions)                                    |
 | **AI Providers** | NVIDIA Nemotron, Gemini 1.5 Pro, GPT-4o (via abstraction layer) |
-| **Deployment** | Vercel (Frontend), Firebase (Backend) |
-| **Testing** | Jest, React Testing Library |
-| **Code Quality** | ESLint, Prettier, TypeScript (strict) |
+| **Deployment**   | Vercel (Frontend), Firebase (Backend)                           |
+| **Testing**      | Jest, React Testing Library                                     |
+| **Code Quality** | ESLint, Prettier, TypeScript (strict)                           |
 
 ---
 
@@ -35,14 +35,14 @@ This phase establishes the development foundation only. Product functionality wi
 
 Before you begin, ensure you have the following installed:
 
-| Tool | Version | Installation |
-|------|---------|--------------|
-| **Node.js** | 20.x (LTS) | [nodejs.org](https://nodejs.org/) or `nvm install 20` |
-| **npm** | 10.x+ | Included with Node.js |
-| **Git** | 2.x+ | [git-scm.com](https://git-scm.com/) |
-| **Firebase CLI** | 13.x+ | `npm install -g firebase-tools` |
-| **Cursor / VS Code** | Latest | [cursor.sh](https://cursor.sh/) / [code.visualstudio.com](https://code.visualstudio.com/) |
-| **GitHub CLI** | 2.x+ | `winget install GitHub.cli` (Windows) |
+| Tool                 | Version    | Installation                                                                              |
+| -------------------- | ---------- | ----------------------------------------------------------------------------------------- |
+| **Node.js**          | 20.x (LTS) | [nodejs.org](https://nodejs.org/) or `nvm install 20`                                     |
+| **npm**              | 10.x+      | Included with Node.js                                                                     |
+| **Git**              | 2.x+       | [git-scm.com](https://git-scm.com/)                                                       |
+| **Firebase CLI**     | 13.x+      | `npm install -g firebase-tools`                                                           |
+| **Cursor / VS Code** | Latest     | [cursor.sh](https://cursor.sh/) / [code.visualstudio.com](https://code.visualstudio.com/) |
+| **GitHub CLI**       | 2.x+       | `winget install GitHub.cli` (Windows)                                                     |
 
 ---
 
@@ -104,27 +104,27 @@ Visit `http://localhost:3000` to see the application.
 
 ## Development Commands
 
-| Command | Description |
-|---------|-------------|
-| `npm run dev` | Start Next.js development server |
-| `npm run build` | Build for production |
-| `npm run start` | Start production server |
-| `npm run lint` | Run ESLint |
-| `npm run lint:fix` | Run ESLint with auto-fix |
-| `npm run typecheck` | Run TypeScript type checking |
-| `npm run test` | Run tests |
-| `npm run test:watch` | Run tests in watch mode |
-| `npm run test:coverage` | Run tests with coverage report |
-| `npm run format` | Format code with Prettier |
-| `npm run format:check` | Check code formatting |
-| `npm run dev:emulators` | Start Firebase Emulators |
-| `npm run functions:build` | Build Cloud Functions |
-| `npm run functions:serve` | Build and serve Functions locally |
-| `npm run functions:deploy` | Deploy Functions to Firebase |
-| `npm run functions:logs` | View Functions logs |
-| `npm run functions:lint` | Lint Functions code |
-| `npm run functions:typecheck` | Type check Functions code |
-| `npm run functions:test` | Run Functions tests |
+| Command                       | Description                       |
+| ----------------------------- | --------------------------------- |
+| `npm run dev`                 | Start Next.js development server  |
+| `npm run build`               | Build for production              |
+| `npm run start`               | Start production server           |
+| `npm run lint`                | Run ESLint                        |
+| `npm run lint:fix`            | Run ESLint with auto-fix          |
+| `npm run typecheck`           | Run TypeScript type checking      |
+| `npm run test`                | Run tests                         |
+| `npm run test:watch`          | Run tests in watch mode           |
+| `npm run test:coverage`       | Run tests with coverage report    |
+| `npm run format`              | Format code with Prettier         |
+| `npm run format:check`        | Check code formatting             |
+| `npm run dev:emulators`       | Start Firebase Emulators          |
+| `npm run functions:build`     | Build Cloud Functions             |
+| `npm run functions:serve`     | Build and serve Functions locally |
+| `npm run functions:deploy`    | Deploy Functions to Firebase      |
+| `npm run functions:logs`      | View Functions logs               |
+| `npm run functions:lint`      | Lint Functions code               |
+| `npm run functions:typecheck` | Type check Functions code         |
+| `npm run functions:test`      | Run Functions tests               |
 
 ---
 
@@ -132,19 +132,19 @@ Visit `http://localhost:3000` to see the application.
 
 ### Client-Side (Public) — `.env.local`
 
-| Variable | Description | Required |
-|----------|-------------|----------|
-| `NEXT_PUBLIC_FIREBASE_API_KEY` | Firebase Web API Key | ✅ |
-| `NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN` | Firebase Auth Domain | ✅ |
-| `NEXT_PUBLIC_FIREBASE_PROJECT_ID` | Firebase Project ID | ✅ |
-| `NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET` | Firebase Storage Bucket | ✅ |
-| `NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID` | Firebase Messaging Sender ID | ✅ |
-| `NEXT_PUBLIC_FIREBASE_APP_ID` | Firebase App ID | ✅ |
-| `NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID` | Firebase Analytics Measurement ID | ❌ |
-| `NEXT_PUBLIC_RAZORPAY_KEY_ID` | Razorpay Public Key | ✅ |
-| `NEXT_PUBLIC_APP_URL` | Application URL | ✅ |
-| `NEXT_PUBLIC_APP_NAME` | Application Name | ✅ |
-| `NEXT_PUBLIC_USE_EMULATORS` | Use Firebase Emulators (`true`/`false`) | ❌ |
+| Variable                                   | Description                             | Required |
+| ------------------------------------------ | --------------------------------------- | -------- |
+| `NEXT_PUBLIC_FIREBASE_API_KEY`             | Firebase Web API Key                    | ✅       |
+| `NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN`         | Firebase Auth Domain                    | ✅       |
+| `NEXT_PUBLIC_FIREBASE_PROJECT_ID`          | Firebase Project ID                     | ✅       |
+| `NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET`      | Firebase Storage Bucket                 | ✅       |
+| `NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID` | Firebase Messaging Sender ID            | ✅       |
+| `NEXT_PUBLIC_FIREBASE_APP_ID`              | Firebase App ID                         | ✅       |
+| `NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID`      | Firebase Analytics Measurement ID       | ❌       |
+| `NEXT_PUBLIC_RAZORPAY_KEY_ID`              | Razorpay Public Key                     | ✅       |
+| `NEXT_PUBLIC_APP_URL`                      | Application URL                         | ✅       |
+| `NEXT_PUBLIC_APP_NAME`                     | Application Name                        | ✅       |
+| `NEXT_PUBLIC_USE_EMULATORS`                | Use Firebase Emulators (`true`/`false`) | ❌       |
 
 ### Server-Side (Secrets) — Firebase Functions Secrets
 
@@ -152,25 +152,25 @@ Visit `http://localhost:3000` to see the application.
 
 Set via: `firebase functions:secrets:set SECRET_NAME`
 
-| Secret | Description |
-|--------|-------------|
-| `FIREBASE_ADMIN_PROJECT_ID` | Firebase Admin Project ID |
+| Secret                        | Description                  |
+| ----------------------------- | ---------------------------- |
+| `FIREBASE_ADMIN_PROJECT_ID`   | Firebase Admin Project ID    |
 | `FIREBASE_ADMIN_CLIENT_EMAIL` | Service Account Client Email |
-| `FIREBASE_ADMIN_PRIVATE_KEY` | Service Account Private Key |
-| `GEMINI_API_KEY` | Google Gemini API Key |
-| `OPENAI_API_KEY` | OpenAI API Key |
-| `NVIDIA_API_KEY` | NVIDIA API Key |
-| `RAZORPAY_KEY_SECRET` | Razorpay Secret Key |
-| `RAZORPAY_WEBHOOK_SECRET` | Razorpay Webhook Secret |
+| `FIREBASE_ADMIN_PRIVATE_KEY`  | Service Account Private Key  |
+| `GEMINI_API_KEY`              | Google Gemini API Key        |
+| `OPENAI_API_KEY`              | OpenAI API Key               |
+| `NVIDIA_API_KEY`              | NVIDIA API Key               |
+| `RAZORPAY_KEY_SECRET`         | Razorpay Secret Key          |
+| `RAZORPAY_WEBHOOK_SECRET`     | Razorpay Webhook Secret      |
 
 ### Feature Flags
 
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `NEXT_PUBLIC_ENABLE_SALON_VERTICAL` | `false` | Enable Salon vertical (Post-MVP) |
-| `NEXT_PUBLIC_ENABLE_REAL_ESTATE_VERTICAL` | `false` | Enable Real Estate vertical (Post-MVP) |
-| `NEXT_PUBLIC_ENABLE_WHATSAPP_API` | `false` | Enable WhatsApp Business API (Post-MVP) |
-| `NEXT_PUBLIC_ENABLE_AGENCY_WORKSPACE` | `false` | Enable Agency workspace (Post-MVP) |
+| Variable                                  | Default | Description                             |
+| ----------------------------------------- | ------- | --------------------------------------- |
+| `NEXT_PUBLIC_ENABLE_SALON_VERTICAL`       | `false` | Enable Salon vertical (Post-MVP)        |
+| `NEXT_PUBLIC_ENABLE_REAL_ESTATE_VERTICAL` | `false` | Enable Real Estate vertical (Post-MVP)  |
+| `NEXT_PUBLIC_ENABLE_WHATSAPP_API`         | `false` | Enable WhatsApp Business API (Post-MVP) |
+| `NEXT_PUBLIC_ENABLE_AGENCY_WORKSPACE`     | `false` | Enable Agency workspace (Post-MVP)      |
 
 ---
 
@@ -265,12 +265,12 @@ firebase emulators:start --only auth,firestore,storage,functions
 
 Emulator UI: `http://localhost:4000`
 
-| Emulator | Port |
-|----------|------|
-| Auth | 9099 |
-| Firestore | 8080 |
-| Storage | 9199 |
-| Functions | 5001 |
+| Emulator    | Port |
+| ----------- | ---- |
+| Auth        | 9099 |
+| Firestore   | 8080 |
+| Storage     | 9199 |
+| Functions   | 5001 |
 | Emulator UI | 4000 |
 
 When using emulators, set `NEXT_PUBLIC_USE_EMULATORS=true` in `.env.local`.
@@ -300,16 +300,16 @@ firebase deploy --only functions
 
 ### Secret Classification
 
-| Variable | Location | Secret? |
-|----------|----------|---------|
-| `GEMINI_API_KEY` | Functions Secrets | ✅ |
-| `OPENAI_API_KEY` | Functions Secrets | ✅ |
-| `NVIDIA_API_KEY` | Functions Secrets | ✅ |
-| `RAZORPAY_KEY_SECRET` | Functions Secrets | ✅ |
-| `RAZORPAY_WEBHOOK_SECRET` | Functions Secrets | ✅ |
-| `RAZORPAY_KEY_ID` | Vercel (public) | ❌ |
-| `APP_URL` | Vercel + Functions | ❌ |
-| `NEXT_PUBLIC_*` | Vercel (public) | ❌ |
+| Variable                  | Location           | Secret? |
+| ------------------------- | ------------------ | ------- |
+| `GEMINI_API_KEY`          | Functions Secrets  | ✅      |
+| `OPENAI_API_KEY`          | Functions Secrets  | ✅      |
+| `NVIDIA_API_KEY`          | Functions Secrets  | ✅      |
+| `RAZORPAY_KEY_SECRET`     | Functions Secrets  | ✅      |
+| `RAZORPAY_WEBHOOK_SECRET` | Functions Secrets  | ✅      |
+| `RAZORPAY_KEY_ID`         | Vercel (public)    | ❌      |
+| `APP_URL`                 | Vercel + Functions | ❌      |
+| `NEXT_PUBLIC_*`           | Vercel (public)    | ❌      |
 
 ---
 
@@ -377,6 +377,7 @@ git commit -m "chore: initialize project foundation"
 **NO PRODUCT FEATURES WERE IMPLEMENTED IN PHASE 1.**
 
 The following are explicitly OUT OF SCOPE for Phase 1:
+
 - ❌ Authentication UI
 - ❌ Business onboarding
 - ❌ Business Brain
@@ -422,11 +423,11 @@ After setup, verify:
 
 ## Problems & Resolutions
 
-| Problem | Resolution |
-|---------|------------|
-| Firebase init is interactive | Created config files manually |
+| Problem                         | Resolution                           |
+| ------------------------------- | ------------------------------------ |
+| Firebase init is interactive    | Created config files manually        |
 | PowerShell doesn't support `&&` | Used semicolons or separate commands |
-| Next.js 15 with Tailwind v4 | Updated globals.css for v4 syntax |
+| Next.js 15 with Tailwind v4     | Updated globals.css for v4 syntax    |
 
 ---
 
@@ -449,6 +450,7 @@ After setup, verify:
 ## Next Steps
 
 When Phase 1 is validated, proceed to **Phase 2** for:
+
 1. Firebase project setup and deployment
 2. Authentication implementation
 3. Business onboarding flow

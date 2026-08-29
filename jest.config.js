@@ -5,7 +5,8 @@ module.exports = {
   testMatch: ['**/*.test.{ts,tsx}'],
   moduleNameMapper: {
     '^@/(.*)$': '<rootDir>/src/$1',
-    '^@functions/(.*)$': '<rootDir>/functions/src/$1'
+    '^@functions/(.*)$': '<rootDir>/functions/src/$1',
+    '^@features/(.*)$': '<rootDir>/src/features/$1',
   },
   setupFilesAfterEnv: ['<rootDir>/tests/setup.ts'],
   collectCoverageFrom: [
@@ -14,12 +15,12 @@ module.exports = {
     '!src/**/*.d.ts',
     '!functions/src/**/*.d.ts',
     '!src/app/**/*.tsx',
-    '!src/**/*.stories.tsx'
+    '!src/**/*.stories.tsx',
   ],
   coverageDirectory: 'coverage',
   coverageReporters: ['text', 'lcov', 'html'],
   moduleFileExtensions: ['ts', 'tsx', 'js', 'jsx', 'json', 'node'],
   transform: {
-    '^.+\\.(ts|tsx)$': ['ts-jest', { tsconfig: 'tsconfig.json' }]
+    '^.+\\.(ts|tsx)$': ['ts-jest', { tsconfig: 'tsconfig.json' }],
   },
 };

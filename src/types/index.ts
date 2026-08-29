@@ -44,6 +44,8 @@ export type CampaignStatus =
   | 'generating_copy'
   | 'generating_creatives'
   | 'validating_output'
+  | 'generated'
+  | 'verified'
   | 'completed'
   | 'failed';
 
@@ -240,6 +242,45 @@ export interface Product {
   updatedAt: string;
 }
 
+export type TruthCheckStatus = 'PASS' | 'FAIL' | 'REVIEW_REQUIRED';
+
+export interface TruthCheckItem {
+  category: 'business' | 'product' | 'price' | 'offer' | 'location' | 'contact' | 'operations' | 'claim';
+  status: TruthCheckStatus;
+  generatedValue?: string;
+  expectedValue?: string;
+  reason?: string;
+}
+
+export interface TruthCheckResult {
+  status: TruthCheckStatus;
+  checkedAt: string;
+  checks: TruthCheckItem[];
+  summary: string;
+}
+
+export interface ExtractedPrice {
+  amount: number;
+  currency: string;
+  rawText: string;
+  isOriginalPrice?: boolean;
+  isDiscount?: boolean;
+}
+
+export interface ExtractedFacts {
+  businessNames: string[];
+  productNames: string[];
+  prices: ExtractedPrice[];
+  discounts: string[];
+  offers: string[];
+  locations: string[];
+  phoneNumbers: string[];
+  whatsappNumbers: string[];
+  dates: string[];
+  operationalClaims: string[];
+  marketingClaims: string[];
+}
+
 export interface Campaign {
   campaignId: string;
   businessId: string;
@@ -286,6 +327,9 @@ export interface Campaign {
     idempotencyKey: string;
     generationTimeMs?: number;
     aiCostEstimateINR?: number;
+    truthCheckStatus?: 'PASS' | 'FAIL' | 'REVIEW_REQUIRED';
+    truthCheckSummary?: string;
+    truthCheckResult?: TruthCheckResult;
   };
   createdAt: string;
   updatedAt: string;
@@ -335,6 +379,7 @@ export interface Usage {
   periodStart: string;
   periodEnd: string;
   planId: SubscriptionPlan;
+  creditsIncluded: number;
   campaignsCreated: number;
   creditsUsed: number;
   imagesGenerated: number;
@@ -360,4 +405,175 @@ export interface Transaction {
   status: TransactionStatus;
   metadata?: Record<string, unknown>;
   createdAt: string;
+}
+
+export interface User {
+  userId: string;
+  email: string;
+  phone?: string;
+  displayName?: string;
+  photoURL?: string;
+  role: UserRole;
+  businessIds: string[];
+  agencyId?: string;
+  subscriptionId?: string;
+  settings: {
+    notifications: boolean;
+    language: 'en' | 'te' | 'hi';
+    timezone: string;
+  };
+  createdAt: string;
+  updatedAt: string;
+  lastLoginAt?: string;
+  deletedAt?: string;
+}
+
+export interface Business {
+  businessId: string;
+  userId: string;
+  agencyId?: string;
+  name: string;
+  category: BusinessCategory;
+  description?: string;
+  location: BusinessLocation;
+  contact: BusinessContact;
+  businessBrain: BusinessBrain;
+  settings: BusinessSettings;
+  status: BusinessStatus;
+  createdAt: string;
+  updatedAt: string;
+  deletedAt?: string;
+}
+
+export interface AnalyticsEvent {
+  eventId: string;
+  userId: string;
+  businessId?: string;
+  campaignId?: string;
+  creativeId?: string;
+  eventType: string;
+  timestamp: string;
+  metadata?: Record<string, unknown>;
+}
+
+export interface GenerationLog {
+  logId: string;
+  campaignId: string;
+  stage: string;
+  provider: string;
+  model: string;
+  inputHash: string;
+  inputTokens?: number;
+  outputTokens?: number;
+  latencyMs: number;
+  costEstimateUSD?: number;
+  costEstimateINR?: number;
+  status: 'success' | 'failed' | 'retry';
+  error?: Record<string, unknown>;
+  retryCount: number;
+  createdAt: string;
+}
+
+export interface Asset {
+  assetId: string;
+  userId: string;
+  businessId: string;
+  name: string;
+  description?: string;
+  storagePath: string;
+  fileName: string;
+  mimeType: string;
+  size: number;
+  width: number;
+  height: number;
+  assetType: AssetType;
+  status: AssetStatus;
+  previewUrl?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface BusinessProfile {
+  businessId: string;
+  businessName: string;
+  businessCategory: BusinessCategory;
+  city: string;
+  state: string;
+  locality?: string;
+  phone: string;
+  whatsapp: string;
+  operatingModes:
+    | 'dine-in'
+    | 'takeaway'
+    | 'delivery'
+    | 'dine-in & takeaway'
+    | 'dine-in & delivery'
+    | 'takeaway & delivery'
+    | 'dine-in & takeaway & delivery';
+}
+
+export interface BrandProfile {
+  businessId: string;
+  brandName?: string;
+  tagline?: string;
+  brandTone: BrandTone;
+  brandPersonality: string;
+  visualPreferences: string;
+  colors: {
+    primary: string;
+    secondary?: string;
+    accent?: string;
+    background?: string;
+    text: string;
+  };
+  fonts: {
+    heading: string;
+    body: string;
+  };
+}
+
+export interface BusinessRules {
+  factuality: {
+    allowCreativeFraming: boolean;
+    requireExplicitPricing: boolean;
+    prohibitInventedProducts: boolean;
+    prohibitInventedClaims: boolean;
+  };
+  availability: {
+    displayUnavailableItems: boolean;
+    minimumOrderRequired: boolean;
+    deliveryRadiusKm: number;
+  };
+  communication: {
+    contactInformationAllowed: boolean;
+    operatingHoursRespectRequired: boolean;
+    brandRestrictions: string[];
+  };
+}
+
+export interface BusinessBrainContext {
+  business: BusinessProfile;
+  brand: BrandProfile;
+  localization: LocalizationProfile;
+  products: Product[];
+  rules: BusinessRules;
+}
+
+export interface Asset {
+  assetId: string;
+  userId: string;
+  businessId: string;
+  name: string;
+  description?: string;
+  storagePath: string;
+  fileName: string;
+  mimeType: string;
+  size: number;
+  width: number;
+  height: number;
+  assetType: AssetType;
+  status: AssetStatus;
+  previewUrl?: string;
+  createdAt: string;
+  updatedAt: string;
 }
