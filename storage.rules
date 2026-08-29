@@ -1,0 +1,18 @@
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+    // Business assets — owner or agency member
+    match /businesses/{businessId}/{allPaths=**} {
+      allow read, write: if request.auth != null && 
+        (request.auth.token.businessIds.has(businessId) ||
+         (request.auth.token.role == 'agency_member' && 
+           request.auth.token.agencyId == resource.metadata.agencyId));
+    }
+    
+    // Temp uploads — owner only, TTL enforced by Cloud Function
+    match /temp/{userId}/{fileName} {
+      allow write: if request.auth != null && request.auth.uid == userId;
+      allow read: if request.auth != null && request.auth.uid == userId;
+    }
+  }
+}

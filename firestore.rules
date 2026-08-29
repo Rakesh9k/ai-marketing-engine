@@ -1,0 +1,131 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Helper functions
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+    
+    function hasBusinessAccess(businessId) {
+      return isAuthenticated() && 
+        request.auth.token.businessIds.has(businessId);
+    }
+    
+    function isAgencyMember(agencyId) {
+      return isAuthenticated() && 
+        request.auth.token.role == 'agency_member' &&
+        request.auth.token.agencyId == agencyId;
+    }
+
+    // Users collection - own document only
+    match /users/{userId} {
+      allow read, write: if isOwner(userId);
+      allow read: if isAuthenticated() && request.auth.token.role == 'admin';
+    }
+
+    // Businesses collection
+    match /businesses/{businessId} {
+      allow read: if isAuthenticated() && 
+        (resource.data.userId == request.auth.uid || 
+         hasBusinessAccess(businessId) ||
+         (request.auth.token.role == 'agency_member' && resource.data.agencyId == request.auth.token.agencyId));
+      allow create: if isAuthenticated() && request.resource.data.userId == request.auth.uid;
+      allow update: if isAuthenticated() && resource.data.userId == request.auth.uid;
+      allow delete: if false; // Soft delete only
+    }
+
+    // Brand Kits collection (1:1 with business)
+    match /brand_kits/{businessId} {
+      allow read, write: if isAuthenticated() && 
+        exists(/databases/$(database)/documents/businesses/$(businessId)) &&
+        (get(/databases/$(database)/documents/businesses/$(businessId)).data.userId == request.auth.uid ||
+         hasBusinessAccess(businessId));
+    }
+
+    // Products collection
+    match /products/{productId} {
+      allow read: if isAuthenticated() && 
+        get(/databases/$(database)/documents/businesses/$(resource.data.businessId)).data.userId == request.auth.uid;
+      allow create: if isAuthenticated() && 
+        request.resource.data.businessId in request.auth.token.businessIds;
+      allow update, delete: if isAuthenticated() && 
+        get(/databases/$(database)/documents/businesses/$(resource.data.businessId)).data.userId == request.auth.uid;
+    }
+
+    // Campaigns collection
+    match /campaigns/{campaignId} {
+      allow read: if isAuthenticated() && 
+        (resource.data.userId == request.auth.uid || resource.data.businessId in request.auth.token.businessIds);
+      allow create: if isAuthenticated() && 
+        request.resource.data.userId == request.auth.uid &&
+        request.resource.data.businessId in request.auth.token.businessIds;
+      allow update: if isAuthenticated() && resource.data.userId == request.auth.uid;
+      allow delete: if false;
+    }
+
+    // Campaign Assets collection
+    match /campaign_assets/{assetId} {
+      allow read: if isAuthenticated() && 
+        (resource.data.userId == request.auth.uid || resource.data.businessId in request.auth.token.businessIds);
+      // Write only via Cloud Functions
+      allow write: if false;
+    }
+
+    // Subscriptions collection
+    match /subscriptions/{subscriptionId} {
+      allow read: if isAuthenticated() && resource.data.userId == request.auth.uid;
+      allow write: if false; // Cloud Functions only
+    }
+
+    // Usage collection
+    match /usage/{usageId} {
+      allow read: if isAuthenticated() && resource.data.userId == request.auth.uid;
+      allow write: if false; // Cloud Functions only
+    }
+
+    // Transactions collection
+    match /transactions/{transactionId} {
+      allow read: if isAuthenticated() && resource.data.userId == request.auth.uid;
+      allow write: if false; // Cloud Functions only
+    }
+
+    // Analytics Events collection
+    match /analytics_events/{eventId} {
+      allow read: if isAuthenticated() && resource.data.userId == request.auth.uid;
+      allow write: if false; // Cloud Functions only
+    }
+
+    // Generation Logs collection
+    match /generation_logs/{logId} {
+      allow read: if isAuthenticated() && resource.data.userId == request.auth.uid;
+      allow write: if false; // Cloud Functions only
+    }
+
+    // Post-MVP collections (rules exist, no MVP access)
+    match /partners/{partnerId} {
+      allow read: if isAuthenticated() && resource.data.userId == request.auth.uid;
+      allow write: if false;
+    }
+
+    match /partner_referrals/{referralId} {
+      allow read: if isAuthenticated() && resource.data.partnerId == request.auth.uid;
+      allow write: if false;
+    }
+
+    match /campaign_performance/{campaignId} {
+      allow read: if isAuthenticated() && 
+        get(/databases/$(database)/documents/campaigns/$(campaignId)).data.userId == request.auth.uid;
+      allow write: if false;
+    }
+
+    match /whatsapp_leads/{leadId} {
+      allow read: if isAuthenticated() && 
+        get(/databases/$(database)/documents/businesses/$(resource.data.businessId)).data.userId == request.auth.uid;
+      allow write: if false;
+    }
+  }
+}

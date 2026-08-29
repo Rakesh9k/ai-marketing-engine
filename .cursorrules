@@ -1,0 +1,67 @@
+# AI Development Instructions — AI Marketing Engine
+
+## Before Modifying Code
+
+1. **Read relevant `/docs` files** — Understand the frozen specification before implementing
+2. **Identify the current implementation phase** — Phase 1: Foundation only, no product features
+3. **Never implement Post-MVP features** — Check `MVP_SCOPE.md` for scope boundaries
+4. **Never invent product requirements** — All requirements are in `/docs`
+5. **Never expose secrets** — AI keys, Razorpay secrets only in Cloud Functions
+6. **Prefer the simplest implementation** — YAGNI, no premature abstraction
+7. **Test changes before moving to the next phase** — Run lint, typecheck, tests
+8. **Do not refactor unrelated code** — Stay focused on the task
+9. **Do not install dependencies without justification** — Every dependency must have a reason
+10. **Stop and ask when a product decision is genuinely unresolved** — Check open decisions in specs
+
+## Phase 1 Constraints
+
+- **DO NOT BUILD**: Authentication UI, Business Brain, Campaign Wizard, AI generation, Dashboard, Billing, WhatsApp, Razorpay, Creative generation, Onboarding
+- **ONLY ESTABLISH**: Next.js + TypeScript + Firebase + Cloud Functions development environment
+- **Repository**: `ai-marketing-engine/` with clean Git history
+
+## Architecture References
+
+- `PRODUCT.md` — Product vision, user journey, campaign pack specification
+- `ARCHITECTURE.md` — System architecture, function categories, data flow
+- `DATABASE.md` — Firestore collections, security rules, indexes
+- `AI_ARCHITECTURE.md` — AI pipeline stages, provider abstraction, validation
+- `DESIGN_SYSTEM.md` — Design tokens, components, responsive system
+- `SECURITY.md` — Auth, authorization, secrets, rate limiting
+- `MVP_SCOPE.md` — Must-build vs should-build vs must-not-build
+- `TEST_PLAN.md` — Testing strategy, unit/integration/E2E
+- `PROMPT_SYSTEM.md` — Prompt stages, contracts, versioning
+
+## Code Style
+
+- **TypeScript**: Strict mode, no `any`, explicit return types for public APIs
+- **React**: Server Components by default, Client Components only when needed
+- **Firebase**: All reads/writes via Cloud Functions (not direct Firestore)
+- **AI**: Provider abstraction, structured outputs (Zod), credit reservation
+- **Security**: Ownership checks on every function, Firestore rules enforce isolation
+
+## File Conventions
+
+- Components: PascalCase (`CampaignCard.tsx`)
+- Utilities: camelCase (`formatINR.ts`)
+- Types: PascalCase interfaces (`Campaign.ts`)
+- Constants: UPPER_SNAKE_CASE (`CAMPAIGN_OBJECTIVES.ts`)
+- Tests: `*.test.ts` or `*.test.tsx` co-located or in `tests/`
+
+## Git Commit Format
+
+```
+<type>(<scope>): <description>
+
+Types: feat, fix, docs, style, refactor, test, chore, build, ci
+```
+
+## When Stuck
+
+1. Check `/docs` for the answer
+2. Check `MVP_SCOPE.md` for scope boundaries
+3. If genuinely unresolved, stop and ask for clarification
+4. Do not guess or invent requirements
+
+---
+
+**Remember**: This is Phase 1 — Foundation only. Product features start in Phase 2.
