@@ -83,3 +83,44 @@ CUSTOM DOMAIN: NOT STARTED
 AI: NOT VERIFIED
 RAZORPAY: NOT VERIFIED
 OVERALL: BLOCKED (on the GitHub push scope and Vercel access); the repo itself is ready for preview verification
+
+---
+
+# Update — GitHub push → Vercel handoff attempt (2026-09-21, second run)
+
+Earlier sections above are preserved unchanged as historical evidence. Status words: PASS / PARTIAL / BLOCKED / FAIL / NOT VERIFIED / NOT STARTED.
+
+## Repository State
+Branch `master`; `origin` = `https://github.com/Rakesh9k/ai-marketing-engine.git`; local `master` **ahead 6** of `origin/master` (`b5a2485`, confirmed with `git ls-remote`); tip `e250ac2`. Only uncommitted items are the two intentionally excluded untracked files (`golden-path-manual.mjs`, `functions/tsconfig.eslint.json`; neither tracked). `.env.local` git-ignored (`.gitignore:21`), untracked. Secret scan of the whole unpushed diff: only the known fake test fixtures/prose. Deployment commits reviewed: `d882dbb` (293 files: `vercel.json` valid with no `projectName`, `metadataBase` + `openGraph.url` = `https://brain-wise.com`, `.firebaserc` hosting-target cleanup, docs) and `e250ac2` (docs only).
+
+## Local validation (LOCAL only — not Vercel evidence)
+`npm run lint` exit 0 · `npm run typecheck` exit 0 · `npm test` 31 suites, 298 passed / 7 skipped / 0 failed · `npm run functions:build` exit 0 · `npm run build` PASS (22 pages, `ƒ /campaigns/[campaignId]`), built with temporary git-ignored `.env.production.local` (emulators off, no debug token; deleted afterwards). Bundle scan: emulator endpoints 0, `USE_EMULATORS` 0, secret patterns 0.
+
+## GitHub Push — BLOCKED
+Push retried (prompts disabled): rejected again — `refusing to allow a Personal Access Token to create or update workflow .github/workflows/ci-cd.yml without workflow scope`. Cause: the stored token lacks `workflow`; the workflow file is in earlier local commit `b9087c8`. Not worked around: workflow kept, no history rewrite, no force push, stored credential not modified (the session cannot enter a new token interactively; `gh` on this machine is a broken npm package). `origin/master` unchanged.
+
+## Vercel Project / Deployment / Preview URL — NOT VERIFIED / NOT STARTED
+No Vercel access from this session; no project, deployment or URL exists to report. None invented.
+
+## Environment Variables
+Source of truth `docs/VERCEL_ENVIRONMENT_VARIABLES.md`. Not to be added on Vercel: `NEXT_PUBLIC_USE_EMULATORS`, `NEXT_PUBLIC_APPCHECK_DEBUG_TOKEN`, any AI/Razorpay/Admin/webhook secret.
+
+## Firebase Auth, App Check, Functions, Firestore, Storage, next/image, Security Headers, Dynamic Routes — NOT VERIFIED
+No preview exists. (Backend deployment count re-verified previously: 36 functions asia-south1 + 2 auth triggers us-central1.) Preview host must be added to Firebase Auth authorized domains and to the reCAPTCHA Enterprise key's allowed domains — NOT VERIFIED (console-only).
+
+## AI / Razorpay — NOT VERIFIED
+## Custom Domain — NOT STARTED (DNS, Firebase Hosting and Vercel domains untouched; `brain-wise.com` still Firebase Hosting 404)
+
+## Remaining Blockers
+1. GitHub token without `workflow` scope [ACCESS].
+2. No Vercel project [ACCESS].
+3. Preview host not yet authorized in Firebase Auth / reCAPTCHA [ACCESS].
+
+## Manual Actions
+1. Create a token: classic PAT with `repo` + `workflow`, or fine-grained with Contents RW + Workflows RW on `Rakesh9k/ai-marketing-engine`.
+2. In your own terminal: `printf "protocol=https\nhost=github.com\n\n" | git credential reject`, then `git push origin master`; enter your GitHub username and the token as the password. (Never paste the token into a file or chat.)
+3. Vercel → Add New Project → import `Rakesh9k/ai-marketing-engine` → Next.js, production branch `master`, Node 20, env vars per the doc → Deploy. Do not add the custom domain.
+4. Add the resulting `*.vercel.app` host to Firebase Auth authorized domains and the reCAPTCHA Enterprise key domains.
+
+## Next Step
+Push `master`; then send the real `*.vercel.app` URL for the preview verification run.
