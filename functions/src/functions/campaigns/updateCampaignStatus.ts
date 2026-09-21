@@ -1,7 +1,7 @@
 import { onCall, HttpsError } from 'firebase-functions/v2/https';
 import { z } from 'zod';
 
-import { verifyAuthAndBusinessAccess } from '../../middleware/auth';
+import { verifyBusinessAccess } from '../../middleware/auth';
 import { validatedCallable } from '../../middleware/validation';
 import {
   getCampaignDoc,
@@ -9,34 +9,23 @@ import {
 } from '../../services/firestore';
 import { logFunctionStart, logFunctionComplete, logFunctionError } from '../../utils/logging';
 import { mapErrorToHttpsError } from '../../utils/errors';
-import type { Campaign, CampaignStatus } from '../../types';
-
+/**
+ * This callable was publicly invokable (onCall, ownership-checked only) and
+ * accepted the entire CampaignStatus enum, including 'completed'/'failed' —
+ * every pipeline-internal and verification-implying status. It is not
+ * called anywhere in the frontend (confirmed by search), but as a live
+ * public Cloud Function, any authenticated user could have called it
+ * directly to mark any of their own campaigns 'completed' with zero Truth
+ * Check ever having run. generateCampaignStrategy.ts and regenerateAsset.ts
+ * already set status transitions themselves via direct Admin SDK writes —
+ * they never call this endpoint. Restricted to 'draft' only: the sole
+ * client-meaningful status transition (resetting/un-drafting a campaign)
+ * that carries no verification claim. See Phase 6 Truth Check report.
+ */
 const updateCampaignStatusSchema = z.object({
   campaignId: z.string().min(1),
   businessId: z.string().min(1),
-  status: z.enum([
-    'draft',
-    'validating',
-    'queued',
-    'analyzing',
-    'strategizing',
-    'generating_copy',
-    'generating_creatives',
-    'validating_output',
-    'completed',
-    'failed',
-  ]),
-  creditsUsed: z.number().nonnegative().optional(),
-  error: z
-    .object({
-      code: z.string(),
-      message: z.string(),
-      stage: z.string(),
-      retryable: z.boolean(),
-    })
-    .optional(),
-  generationTimeMs: z.number().optional(),
-  aiCostEstimateINR: z.number().optional(),
+  status: z.enum(['draft']),
 });
 
 export const updateCampaignStatus = onCall(
@@ -49,8 +38,8 @@ export const updateCampaignStatus = onCall(
     });
 
     try {
-      const { campaignId, businessId, status, ...additionalData } = data;
-      await verifyAuthAndBusinessAccess(context as any, businessId);
+      const { campaignId, businessId, status } = data;
+      await verifyBusinessAccess(context.userId, businessId);
 
       const existingCampaign = await getCampaignDoc(campaignId);
       if (!existingCampaign) {
@@ -61,7 +50,7 @@ export const updateCampaignStatus = onCall(
         throw new HttpsError('permission-denied', 'Campaign does not belong to this business');
       }
 
-      await updateCampaignStatusService(campaignId, status, additionalData);
+      await updateCampaignStatusService(campaignId, status);
 
       logFunctionComplete(logger, startTime, { success: true });
       return { success: true };

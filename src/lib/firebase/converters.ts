@@ -18,6 +18,7 @@ import type {
   AnalyticsEvent,
   GenerationLog,
   Asset,
+  ReelProject,
 } from '@/types';
 
 function serverTimestampToISO(timestamp: Timestamp | string | undefined): string | undefined {
@@ -569,6 +570,56 @@ export const assetConverter: FirestoreDataConverter<Asset> = {
   },
 };
 
+export const reelConverter: FirestoreDataConverter<ReelProject> = {
+  toFirestore(reel: ReelProject): DocumentData {
+    return {
+      reelId: reel.reelId,
+      businessId: reel.businessId,
+      userId: reel.userId,
+      status: reel.status,
+      goal: reel.goal,
+      style: reel.style,
+      durationSeconds: reel.durationSeconds,
+      inputClipIds: reel.inputClipIds || [],
+      offer: reel.offer,
+      cta: reel.cta,
+      additionalMessage: reel.additionalMessage,
+      outputUrl: reel.outputUrl,
+      thumbnailUrl: reel.thumbnailUrl,
+      creditsReserved: reel.creditsReserved,
+      creditsUsed: reel.creditsUsed,
+      error: reel.error,
+      createdAt: reel.createdAt ? isoToTimestamp(reel.createdAt) : Timestamp.now(),
+      updatedAt: Timestamp.now(),
+      completedAt: reel.completedAt ? isoToTimestamp(reel.completedAt) : undefined,
+    };
+  },
+  fromFirestore(snapshot: QueryDocumentSnapshot, _options?: SnapshotOptions): ReelProject {
+    const data = getData<any>(snapshot);
+    return {
+      reelId: data.reelId,
+      businessId: data.businessId,
+      userId: data.userId,
+      status: data.status,
+      goal: data.goal,
+      style: data.style,
+      durationSeconds: data.durationSeconds,
+      inputClipIds: data.inputClipIds || [],
+      offer: data.offer,
+      cta: data.cta,
+      additionalMessage: data.additionalMessage,
+      outputUrl: data.outputUrl,
+      thumbnailUrl: data.thumbnailUrl,
+      creditsReserved: data.creditsReserved,
+      creditsUsed: data.creditsUsed,
+      error: data.error,
+      createdAt: serverTimestampToISO(data.createdAt)!,
+      updatedAt: serverTimestampToISO(data.updatedAt)!,
+      completedAt: serverTimestampToISO(data.completedAt),
+    };
+  },
+};
+
 export type {
   User,
   Business,
@@ -582,6 +633,7 @@ export type {
   AnalyticsEvent,
   GenerationLog,
   Asset,
+  ReelProject,
   BusinessBrain,
   BusinessLocation,
   BusinessContact,

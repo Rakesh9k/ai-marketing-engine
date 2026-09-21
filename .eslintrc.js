@@ -45,6 +45,11 @@ module.exports = {
     'coverage/',
     'functions/lib/',
     'functions/node_modules/',
+    // services/reel-renderer is a separately deployed Cloud Run service with
+    // its own package.json/tsconfig.json/lint — not part of this project's
+    // root TS project (see tsconfig.json's exclude), so it can't be linted
+    // through this config's parserOptions.project either.
+    'services/',
     'firebase-debug.log',
     '*.log',
     '.env',

@@ -6,6 +6,8 @@ import { businessService, campaignService } from '@/services/database';
 import type { Business, Campaign, CampaignStatus } from '@/types';
 import Link from 'next/link';
 import { BusinessSelector } from '@/components/shared/BusinessSelector';
+import { MascotScene } from '@/components/mascot/MascotScene';
+import { PosterIllustration, SparkIllustration } from '@/components/illustrations/Illustrations';
 
 function CampaignCard({ campaign }: { campaign: Campaign }) {
   const statusColors: Record<CampaignStatus, string> = {
@@ -56,38 +58,37 @@ function CampaignCard({ campaign }: { campaign: Campaign }) {
 function CampaignsList({ campaigns }: { campaigns: Campaign[] }) {
   if (campaigns.length === 0) {
     return (
-      <div className="rounded-lg border border-neutral-200 bg-white p-8 text-center">
-        <svg
-          className="mx-auto h-12 w-12 text-neutral-400"
-          fill="none"
-          stroke="currentColor"
-          viewBox="0 0 24 24"
-          aria-hidden="true"
+      <div className="flex justify-center py-8">
+        <MascotScene
+          pose="point"
+          align="center"
+          message="No campaigns yet."
+          supporting="Let's make your first one."
+          decoration={<SparkIllustration size={20} />}
         >
-          <rect x="3" y="3" width="18" height="18" rx="2" />
-          <path d="M9 9h6M9 15h4" />
-        </svg>
-        <h3 className="mt-4 text-lg font-medium text-neutral-900">No campaigns yet</h3>
-        <p className="mt-1 text-sm text-neutral-500">Create your first campaign to get started</p>
-        <Link href="/campaigns/new" className="mt-6 inline-block">
-          <button className="bg-brand-600 hover:bg-brand-700 inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium text-white transition-colors">
-            <svg
-              className="h-4 w-4"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-              aria-hidden="true"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M12 4v16m8-8H4"
-              />
-            </svg>
-            Create Campaign
-          </button>
-        </Link>
+          <div className="mt-2 flex justify-center">
+            <PosterIllustration size={64} className="opacity-80" />
+          </div>
+          <Link href="/campaigns/new" className="mt-6 inline-block">
+            <button className="bg-brand-600 hover:bg-brand-700 inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium text-white transition-colors">
+              <svg
+                className="h-4 w-4"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+                aria-hidden="true"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M12 4v16m8-8H4"
+                />
+              </svg>
+              Create Campaign
+            </button>
+          </Link>
+        </MascotScene>
       </div>
     );
   }
@@ -237,7 +238,7 @@ export default function CampaignsPage() {
           title="No business set up yet"
           description="Create your first business to start generating campaigns"
           action={
-            <Link href="/onboarding/business">
+            <Link href="/onboarding">
               <button className="bg-brand-600 hover:bg-brand-700 inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium text-white transition-colors">
                 <svg
                   className="h-4 w-4"

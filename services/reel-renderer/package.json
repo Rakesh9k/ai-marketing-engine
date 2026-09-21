@@ -1,0 +1,30 @@
+{
+  "name": "reel-renderer",
+  "description": "Cloud Run ffmpeg rendering service for Mitra 'Create a Reel' — implements the VideoRenderer HTTP contract defined in functions/src/services/videoRenderer.ts.",
+  "private": true,
+  "version": "1.0.0",
+  "engines": {
+    "node": ">=20"
+  },
+  "main": "lib/index.js",
+  "scripts": {
+    "build": "tsc",
+    "build:watch": "tsc --watch",
+    "start": "node lib/index.js",
+    "dev": "npm run build && node lib/index.js",
+    "typecheck": "tsc --noEmit",
+    "smoke-test": "npm run build && node lib/smokeTest.js"
+  },
+  "dependencies": {
+    "express": "^4.21.1",
+    "firebase-admin": "^12.7.0",
+    "ffmpeg-static": "^5.2.0",
+    "ffprobe-static": "^3.1.0",
+    "fontkit": "^2.0.4"
+  },
+  "devDependencies": {
+    "@types/express": "^4.17.21",
+    "@types/node": "^20.14.9",
+    "typescript": "^5.5.4"
+  }
+}

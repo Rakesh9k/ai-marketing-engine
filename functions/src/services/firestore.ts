@@ -1,4 +1,5 @@
 import * as admin from 'firebase-admin';
+import { FieldValue, Timestamp } from 'firebase-admin/firestore';
 import type {
   User,
   Business,
@@ -12,12 +13,14 @@ import type {
   AnalyticsEvent,
   GenerationLog,
   Asset,
+  CampaignPerformance,
+  ReelProject,
 } from '../types';
 
 const db = admin.firestore();
 
 function serverTimestamp() {
-  return admin.firestore.FieldValue.serverTimestamp();
+  return FieldValue.serverTimestamp();
 }
 
 export async function createUserDoc(user: User): Promise<void> {
@@ -51,7 +54,7 @@ export async function addBusinessIdToUser(userId: string, businessId: string): P
     .collection('users')
     .doc(userId)
     .update({
-      businessIds: admin.firestore.FieldValue.arrayUnion(businessId),
+      businessIds: FieldValue.arrayUnion(businessId),
       updatedAt: serverTimestamp(),
     });
 }
@@ -61,7 +64,7 @@ export async function removeBusinessIdFromUser(userId: string, businessId: strin
     .collection('users')
     .doc(userId)
     .update({
-      businessIds: admin.firestore.FieldValue.arrayRemove(businessId),
+      businessIds: FieldValue.arrayRemove(businessId),
       updatedAt: serverTimestamp(),
     });
 }
@@ -199,6 +202,48 @@ export async function updateCampaignDoc(
     });
 }
 
+/**
+ * Phase 34 — reads the single, server-authoritative performance aggregate
+ * for a campaign. Returns null when no event has ever been recorded for
+ * this campaign (a real "no data yet" state, not a fabricated zero — the
+ * caller decides how to represent that, e.g. getCampaignPerformance.ts
+ * still reports whatsappClicks: 0 there since "zero real clicks recorded"
+ * is a known, true fact, but inquiries always stays null/unavailable).
+ */
+export async function getCampaignPerformanceDoc(
+  campaignId: string
+): Promise<CampaignPerformance | null> {
+  const snap = await db.collection('campaign_performance').doc(campaignId).get();
+  return snap.exists ? (snap.data() as CampaignPerformance) : null;
+}
+
+/**
+ * Atomically increments a campaign's real whatsappClicks count by 1.
+ * FieldValue.increment is applied server-side by Firestore itself, so this
+ * is safe under concurrent calls without a read-modify-write race — no
+ * transaction needed for a single-field, single-document increment.
+ * `inquiries` is only ever set to null here (once, on first creation,
+ * preserved by `merge: true` afterward) — this function has no path that
+ * could ever turn a click into an inquiry.
+ */
+export async function incrementCampaignWhatsAppClicks(
+  campaignId: string,
+  businessId: string
+): Promise<void> {
+  const ref = db.collection('campaign_performance').doc(campaignId);
+  await ref.set(
+    {
+      campaignId,
+      businessId,
+      whatsappClicks: FieldValue.increment(1),
+      inquiries: null,
+      updatedAt: serverTimestamp(),
+      lastEventAt: serverTimestamp(),
+    },
+    { merge: true }
+  );
+}
+
 export async function updateCampaignStatus(
   campaignId: string,
   status: Campaign['status'],
@@ -285,6 +330,24 @@ export async function getCampaignAssets(campaignId: string): Promise<CampaignAss
   return snap.docs.map((doc) => doc.data() as CampaignAsset);
 }
 
+export async function getCampaignAssetDoc(assetId: string): Promise<CampaignAsset | null> {
+  const snap = await db.collection('campaign_assets').doc(assetId).get();
+  return snap.exists ? (snap.data() as CampaignAsset) : null;
+}
+
+export async function updateCampaignAssetDoc(
+  assetId: string,
+  data: Partial<CampaignAsset>
+): Promise<void> {
+  await db
+    .collection('campaign_assets')
+    .doc(assetId)
+    .update({
+      ...data,
+      updatedAt: serverTimestamp(),
+    });
+}
+
 export async function createSubscriptionDoc(subscription: Subscription): Promise<void> {
   await db
     .collection('subscriptions')
@@ -360,7 +423,7 @@ export async function incrementUsageField(
     .collection('usage')
     .doc(usageId)
     .update({
-      [field]: admin.firestore.FieldValue.increment(amount),
+      [field]: FieldValue.increment(amount),
       updatedAt: serverTimestamp(),
     });
 }
@@ -400,10 +463,60 @@ export async function reserveCredits(
   campaignId?: string,
   businessId?: string
 ): Promise<void> {
-  const usageRef = db.collection('usage').doc(getUsageDocId(userId, new Date()));
-  const transactionRef = db.collection('transactions').doc(idempotencyKey);
+  // Phase 15: previously keyed by getUsageDocId(userId, new Date()) — i.e.
+  // TODAY's exact calendar date — while the auto-creation branch just
+  // below writes to getUsageDocId(userId, periodStart) — the 1ST of the
+  // month, the convention every other caller (usageControl.ts,
+  // onUserCreated.ts, razorpayWebhook.ts) actually uses. Those two IDs
+  // only coincide on the 1st of the month, so on every other day this
+  // read the transaction below performs found nothing, however recently
+  // the "ensure it exists" block had just created the (differently-keyed)
+  // doc — reserveCredits threw "Usage document not found" on effectively
+  // every real call. usageControl.ts's own equivalent (currentPeriodStart())
+  // already gets this right; reserveCredits is brought in line with it.
+  const now = new Date();
+  const periodStart = new Date(now.getFullYear(), now.getMonth(), 1);
+  const usageRef = db.collection('usage').doc(getUsageDocId(userId, periodStart));
+
+  // Ensure usage document exists (create if missing)
+  const usageSnap = await usageRef.get();
+  if (!usageSnap.exists) {
+    const periodEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+
+    const newUsage: Usage = {
+      usageId: getUsageDocId(userId, periodStart),
+      userId,
+      periodStart: periodStart.toISOString(),
+      periodEnd: periodEnd.toISOString(),
+      planId: 'free',
+      campaignsCreated: 0,
+      creditsUsed: 0,
+      imagesGenerated: 0,
+      copyGenerations: 0,
+      regenerations: 0,
+      failedGenerations: 0,
+      updatedAt: FieldValue.serverTimestamp().toString(),
+    };
+    await db.collection('usage').doc(getUsageDocId(userId, periodStart)).set(newUsage);
+  }
 
   await db.runTransaction(async (tx) => {
+    // Phase 15: this transaction previously wrote the idempotencyKey
+    // transaction doc and incremented creditsUsed unconditionally, with no
+    // check for whether this idempotencyKey had already been reserved —
+    // unlike services/usageControl.ts's reserveCreditsForOperation (Phase
+    // 10), which correctly no-ops on a repeat operationId. A retried or
+    // double-submitted request with the same idempotencyKey (a genuine
+    // duplicate-click, or a client retry after a dropped response) would
+    // silently reserve credits a second time. This function is reachable
+    // via the deployed `createCampaign` Cloud Function even though the
+    // current frontend calls `generateCampaignStrategy` instead — any
+    // caller invoking it directly still hits this path.
+    const existingReservation = await tx.get(db.collection('transactions').doc(idempotencyKey));
+    if (existingReservation.exists) {
+      return;
+    }
+
     const usageSnap = await tx.get(usageRef);
     if (!usageSnap.exists) {
       throw new Error('Usage document not found');
@@ -414,7 +527,7 @@ export async function reserveCredits(
       throw new Error('Insufficient credits');
     }
 
-    tx.set(transactionRef, {
+    tx.set(db.collection('transactions').doc(idempotencyKey), {
       transactionId: idempotencyKey,
       userId,
       businessId,
@@ -430,7 +543,7 @@ export async function reserveCredits(
     });
 
     tx.update(usageRef, {
-      creditsUsed: admin.firestore.FieldValue.increment(amount),
+      creditsUsed: FieldValue.increment(amount),
       updatedAt: serverTimestamp(),
     });
   });
@@ -451,12 +564,16 @@ export async function refundCredits(
 ): Promise<void> {
   const usageRef = db.collection('usage').doc(getUsageDocId(userId, new Date()));
   const refundRef = db.collection('transactions').doc(`refund_${originalTransactionId}`);
+  const originalRef = db.collection('transactions').doc(originalTransactionId);
 
   await db.runTransaction(async (tx) => {
+    // Decrement creditsUsed
     tx.update(usageRef, {
-      creditsUsed: admin.firestore.FieldValue.increment(-amount),
+      creditsUsed: FieldValue.increment(-amount),
       updatedAt: serverTimestamp(),
     });
+
+    // Create refund transaction record
     tx.set(refundRef, {
       transactionId: `refund_${originalTransactionId}`,
       userId,
@@ -469,6 +586,12 @@ export async function refundCredits(
       status: 'completed',
       metadata: { originalKey: originalTransactionId },
       createdAt: serverTimestamp(),
+    });
+
+    // Mark original reservation as refunded
+    tx.update(originalRef, {
+      status: 'refunded' as const,
+      updatedAt: serverTimestamp(),
     });
   });
 }
@@ -545,4 +668,56 @@ export async function deleteAssetDoc(assetId: string): Promise<void> {
     deletedAt: serverTimestamp(),
     updatedAt: serverTimestamp(),
   });
+}
+
+// Reel project functions ("Create a Reel")
+export async function createReelProjectDoc(reel: ReelProject): Promise<void> {
+  await db
+    .collection('reels')
+    .doc(reel.reelId)
+    .set({
+      ...reel,
+      createdAt: serverTimestamp(),
+      updatedAt: serverTimestamp(),
+    });
+}
+
+export async function getReelProjectDoc(reelId: string): Promise<ReelProject | null> {
+  const snap = await db.collection('reels').doc(reelId).get();
+  return snap.exists ? (snap.data() as ReelProject) : null;
+}
+
+export async function updateReelProjectDoc(
+  reelId: string,
+  data: Partial<ReelProject>
+): Promise<void> {
+  await db
+    .collection('reels')
+    .doc(reelId)
+    .update({
+      ...data,
+      updatedAt: serverTimestamp(),
+    });
+}
+
+export async function getReelProjectsByBusiness(
+  businessId: string,
+  limitCount = 20,
+  startAfterDoc?: admin.firestore.DocumentSnapshot
+): Promise<{ reels: ReelProject[]; lastDoc: admin.firestore.DocumentSnapshot | null }> {
+  let query: admin.firestore.Query = db
+    .collection('reels')
+    .where('businessId', '==', businessId)
+    .orderBy('createdAt', 'desc')
+    .limit(limitCount);
+
+  if (startAfterDoc) {
+    query = query.startAfter(startAfterDoc);
+  }
+
+  const snap = await query.get();
+  return {
+    reels: snap.docs.map((doc) => doc.data() as ReelProject),
+    lastDoc: snap.docs[snap.docs.length - 1] || null,
+  };
 }

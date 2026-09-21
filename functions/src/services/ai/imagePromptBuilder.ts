@@ -1,5 +1,10 @@
-import { CreativeBrief, VISUAL_DIRECTION_PRESETS } from './creativeBrief';
-import type { CreativeBriefInput, CampaignStrategyReference, CopyPackReference } from './creativeBrief';
+import { VISUAL_DIRECTION_PRESETS } from './creativeBrief';
+import type {
+  CreativeBriefInput,
+  CampaignStrategyReference,
+  CopyPackReference,
+  CreativeBrief,
+} from './creativeBrief';
 
 /**
  * ImagePromptBuilder - Centralized prompt builder for image generation
@@ -75,18 +80,33 @@ function buildSubjectSection(brief: CreativeBrief): string {
 
   let subject = `MAIN SUBJECT: ${product.name}`;
 
-  if (product.visualAttributes) {
-    const va = product.visualAttributes;
-    subject += `\n- Dish: ${va.dishName}`;
-    subject += `\n- Plating: ${va.platingStyle}`;
-    subject += `\n- Container: ${va.colorPalette.join(', ')} color palette`;
+  // product.visualAttributes is only ever populated by AI vision analysis
+  // (analyzeProductImages) run against an uploaded product image with
+  // newProduct.images — a product created through the standard product form
+  // (no vision analysis ever run on it) has no such data, and its
+  // .attributes field (veg/spiceLevel/etc, a completely different shape)
+  // must never be force-cast into this shape and trusted at face value.
+  // Every field here is optional-chained with a safe fallback so a partial
+  // or entirely absent visualAttributes object can never crash prompt
+  // building — this used to throw for any product without full
+  // vision-derived data, i.e. most products in practice.
+  const va = product.visualAttributes;
+  if (va) {
+    if (va.dishName) subject += `\n- Dish: ${va.dishName}`;
+    if (va.platingStyle) subject += `\n- Plating: ${va.platingStyle}`;
+    if (va.colorPalette && va.colorPalette.length > 0) {
+      subject += `\n- Container: ${va.colorPalette.join(', ')} color palette`;
+    }
     if (va.garnish && va.garnish.length > 0) {
       subject += `\n- Garnish: ${va.garnish.join(', ')}`;
     }
-    subject += `\n- Key visual elements: ${va.keyVisualElements.join(', ')}`;
+    if (va.keyVisualElements && va.keyVisualElements.length > 0) {
+      subject += `\n- Key visual elements: ${va.keyVisualElements.join(', ')}`;
+    }
   }
 
-  subject += '\n\nCRITICAL: Use the uploaded product image as the EXACT visual reference. The generated image must preserve the product identity, packaging, dish appearance, quantity, and color. Do NOT change the product to a different dish or style.';
+  subject +=
+    '\n\nCRITICAL: Use the uploaded product image as the EXACT visual reference. The generated image must preserve the product identity, packaging, dish appearance, quantity, and color. Do NOT change the product to a different dish or style.';
 
   return subject;
 }
@@ -98,9 +118,11 @@ function buildCompositionSection(brief: CreativeBrief): string {
   const { visualDirection, generationMode, aspectRatio } = brief;
 
   const compositions = {
-    product_ad: 'Vertical 4:5 Instagram post composition. Product centered or rule-of-thirds. Space for headline at top, offer price prominent, CTA button at bottom.',
+    product_ad:
+      'Vertical 4:5 Instagram post composition. Product centered or rule-of-thirds. Space for headline at top, offer price prominent, CTA button at bottom.',
     social_post: 'Square or 4:5 composition. Balanced layout with product, branding, and copy.',
-    story: 'Vertical 9:16 full-screen Story frame. Product prominent in upper 2/3. Safe zones for profile pic (top-left) and CTA (bottom).',
+    story:
+      'Vertical 9:16 full-screen Story frame. Product prominent in upper 2/3. Safe zones for profile pic (top-left) and CTA (bottom).',
     campaign_creative: 'Flexible composition for campaign hero asset. Strong visual hierarchy.',
   } as const;
 
@@ -131,13 +153,15 @@ function buildLightingMoodSection(brief: CreativeBrief): string {
   if (visualDirection.lighting) {
     lighting += `\n- Lighting: ${visualDirection.lighting}`;
   } else {
-    lighting += '\n- Lighting: Warm, appetizing natural light. Soft shadows. Steam visible for hot dishes. Golden hour warmth.';
+    lighting +=
+      '\n- Lighting: Warm, appetizing natural light. Soft shadows. Steam visible for hot dishes. Golden hour warmth.';
   }
 
   if (visualDirection.mood) {
     lighting += `\n- Mood: ${visualDirection.mood}`;
   } else {
-    lighting += '\n- Mood: Crave-inducing, authentic, local pride. Makes viewer want to order immediately.';
+    lighting +=
+      '\n- Mood: Crave-inducing, authentic, local pride. Makes viewer want to order immediately.';
   }
 
   return lighting;
@@ -186,17 +210,22 @@ function buildLocalizationSection(brief: CreativeBrief): string {
   if (localization.region) locSection += `\n- Region: ${localization.region}`;
   if (localization.regionalStyle) locSection += `\n- Regional style: ${localization.regionalStyle}`;
   if (localization.contentStyle) locSection += `\n- Content style: ${localization.contentStyle}`;
-  if (localization.audienceDescription) locSection += `\n- Target audience: ${localization.audienceDescription}`;
+  if (localization.audienceDescription)
+    locSection += `\n- Target audience: ${localization.audienceDescription}`;
 
   // Regional style specific guidance
   if (localization.regionalStyle === 'hyderabadi') {
     locSection += '\n\nHYDERABADI STYLE REQUIREMENTS:';
-    locSection += '\n- Visual cues: Copper handi (biryani pot), banana leaf serving, charcoal/wood fire hints';
+    locSection +=
+      '\n- Visual cues: Copper handi (biryani pot), banana leaf serving, charcoal/wood fire hints';
     locSection += '\n- Garnish: Fried onions (birista), fresh mint, coriander, lemon wedge';
     locSection += '\n- Accompaniments: Mirchi ka salan, raita, baghaar-e-baingan visible in frame';
-    locSection += '\n- Color palette: Saffron/orange, deep red, fresh green, warm gold, copper tones';
-    locSection += '\n- Ambiance: Traditional Hyderabadi kitchen or modern restaurant with local character';
-    locSection += '\n- Cultural references: Charminar silhouette (subtle), Nizami heritage hints, "Dum" steam';
+    locSection +=
+      '\n- Color palette: Saffron/orange, deep red, fresh green, warm gold, copper tones';
+    locSection +=
+      '\n- Ambiance: Traditional Hyderabadi kitchen or modern restaurant with local character';
+    locSection +=
+      '\n- Cultural references: Charminar silhouette (subtle), Nizami heritage hints, "Dum" steam';
   }
 
   if (localization.contentStyle === 'funny') {
@@ -221,16 +250,15 @@ function buildTextOverlay(brief: CreativeBrief): ImagePrompt['textOverlay'] {
   const { copyPack, campaignStrategy, offer, brand, cta } = brief;
 
   // Use copy pack headlines if available, otherwise generate from strategy
-  const headline = copyPack?.headlines?.[0]
-    || campaignStrategy?.hook
-    || offer?.title
-    || brief.product.name;
+  const headline =
+    copyPack?.headlines?.[0] || campaignStrategy?.hook || offer?.title || brief.product.name;
 
   const offerText = offer
     ? `₹${offer.price}${offer.originalPrice ? ` (was ₹${offer.originalPrice})` : ''}`
     : '';
 
-  const ctaText = copyPack?.cta || campaignStrategy?.ctaStrategy?.primary || formatCTAForOverlay(cta);
+  const ctaText =
+    copyPack?.cta || campaignStrategy?.ctaStrategy?.primary || formatCTAForOverlay(cta);
 
   return {
     headline,
@@ -258,9 +286,11 @@ function buildTechnicalSection(brief: CreativeBrief): string {
   const { aspectRatio, generationMode } = brief;
 
   const techSpecs = {
-    product_ad: 'Professional food photography quality. Sharp focus on product. Instagram-ready 4:5 vertical.',
+    product_ad:
+      'Professional food photography quality. Sharp focus on product. Instagram-ready 4:5 vertical.',
     social_post: 'High-quality social media creative. Balanced composition. Platform-agnostic.',
-    story: 'Full-screen 9:16 vertical. Safe zones: 14% top, 20% bottom. Interactive elements space.',
+    story:
+      'Full-screen 9:16 vertical. Safe zones: 14% top, 20% bottom. Interactive elements space.',
     campaign_creative: 'Campaign hero quality. Versatile for multiple formats.',
   } as const;
 
@@ -285,15 +315,18 @@ function buildStyleGuidance(brief: CreativeBrief): string {
 
   // Apply visual direction preset if available
   const presets = VISUAL_DIRECTION_PRESETS as Record<string, Record<string, string>>;
-  const presetKey = Object.keys(presets).find((key) =>
-    visualDirection.styleGuidance?.toLowerCase().includes(key) ||
-    brand.visualStyle?.toLowerCase().includes(key) ||
-    generationMode === key
+  const presetKey = Object.keys(presets).find(
+    (key) =>
+      visualDirection.styleGuidance?.toLowerCase().includes(key) ||
+      brand.visualStyle?.toLowerCase().includes(key) ||
+      generationMode === key
   );
 
   if (presetKey && presets[presetKey]) {
     const preset = presets[presetKey];
-    guidance += `- Preset (${presetKey}): ${Object.entries(preset).map(([k, v]) => `${k}: ${v}`).join('; ')}\n`;
+    guidance += `- Preset (${presetKey}): ${Object.entries(preset)
+      .map(([k, v]) => `${k}: ${v}`)
+      .join('; ')}\n`;
   }
 
   guidance += '- Professional food photography aesthetic\n';
@@ -334,14 +367,19 @@ function buildNegativePrompt(brief: CreativeBrief): string {
 
   // Brand-specific negatives
   if (brand.colors) {
-    const nonBrandColors = ['neon pink', 'electric blue', 'toxic green', 'bright purple']
-      .filter((c) => !brand.colors?.some((bc) => bc.toLowerCase().includes(c)));
+    const nonBrandColors = ['neon pink', 'electric blue', 'toxic green', 'bright purple'].filter(
+      (c) => !brand.colors?.some((bc) => bc.toLowerCase().includes(c))
+    );
     negatives.push(...nonBrandColors.map((c) => `${c} background`));
   }
 
   // Localization-specific negatives
   if (localization.regionalStyle === 'hyderabadi') {
-    negatives.push('north indian style plating (white plate only)', 'punjabi dhaba style', 'generic restaurant look');
+    negatives.push(
+      'north indian style plating (white plate only)',
+      'punjabi dhaba style',
+      'generic restaurant look'
+    );
   }
 
   return negatives.join(', ');
@@ -350,10 +388,7 @@ function buildNegativePrompt(brief: CreativeBrief): string {
 /**
  * Build multiple prompts for a campaign (5 posters, story frames, reel frames)
  */
-export function buildImagePromptPack(
-  brief: CreativeBrief,
-  count: number = 5
-): ImagePrompt[] {
+export function buildImagePromptPack(brief: CreativeBrief, count: number = 5): ImagePrompt[] {
   const prompts: ImagePrompt[] = [];
 
   for (let i = 0; i < count; i++) {
@@ -399,7 +434,11 @@ export function buildStoryFramePrompts(
   const frames: ImagePrompt[] = [];
 
   const storyArc = [
-    { focus: 'hook', description: 'Attention-grabbing opening', visual: 'Problem/craving scenario' },
+    {
+      focus: 'hook',
+      description: 'Attention-grabbing opening',
+      visual: 'Problem/craving scenario',
+    },
     { focus: 'product reveal', description: 'Introduce the product', visual: 'Hero product shot' },
     { focus: 'benefit', description: 'Show benefit/experience', visual: 'Enjoyment/consumption' },
     { focus: 'cta', description: 'Call to action', visual: 'WhatsApp/ordering flow' },
@@ -425,18 +464,35 @@ export function buildStoryFramePrompts(
 /**
  * Build reel frame prompts (sequential scenes)
  */
-export function buildReelFramePrompts(
-  brief: CreativeBrief,
-  frameCount: number = 5
-): ImagePrompt[] {
+export function buildReelFramePrompts(brief: CreativeBrief, frameCount: number = 5): ImagePrompt[] {
   const frames: ImagePrompt[] = [];
 
   const reelArc = [
-    { scene: 'hook', description: 'Scroll-stopping visual hook (0-3s)', visual: 'Problem/craving/relatable moment' },
-    { scene: 'process', description: 'Behind the scenes / preparation (3-8s)', visual: 'Kitchen action, dum process, plating' },
-    { scene: 'reveal', description: 'Product hero reveal (8-12s)', visual: 'Steaming product, garnish, portions' },
-    { scene: 'enjoyment', description: 'Tasting/enjoyment (12-18s)', visual: 'First bite, satisfied expression' },
-    { scene: 'cta', description: 'Offer + WhatsApp CTA (18-30s)', visual: 'Offer graphic, WhatsApp number, location' },
+    {
+      scene: 'hook',
+      description: 'Scroll-stopping visual hook (0-3s)',
+      visual: 'Problem/craving/relatable moment',
+    },
+    {
+      scene: 'process',
+      description: 'Behind the scenes / preparation (3-8s)',
+      visual: 'Kitchen action, dum process, plating',
+    },
+    {
+      scene: 'reveal',
+      description: 'Product hero reveal (8-12s)',
+      visual: 'Steaming product, garnish, portions',
+    },
+    {
+      scene: 'enjoyment',
+      description: 'Tasting/enjoyment (12-18s)',
+      visual: 'First bite, satisfied expression',
+    },
+    {
+      scene: 'cta',
+      description: 'Offer + WhatsApp CTA (18-30s)',
+      visual: 'Offer graphic, WhatsApp number, location',
+    },
   ];
 
   for (let i = 0; i < Math.min(frameCount, reelArc.length); i++) {

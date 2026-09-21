@@ -14,5 +14,15 @@ service firebase.storage {
       allow write: if request.auth != null && request.auth.uid == userId;
       allow read: if request.auth != null && request.auth.uid == userId;
     }
+
+    // Shared, curated "Create a Reel" background music library (see
+    // functions/src/config/reels.ts REEL_MUSIC_LIBRARY) — deployment-time
+    // assets, never user-uploaded. Read-only for any authenticated user;
+    // written only via the Firebase CLI/console during deployment, never by
+    // a client or Cloud Function.
+    match /shared/reel-music/{fileName} {
+      allow read: if request.auth != null;
+      allow write: if false;
+    }
   }
 }

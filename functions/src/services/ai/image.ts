@@ -9,11 +9,31 @@ const config = getEnvConfig();
  * Primary provider for image generation via provider abstraction
  */
 export class OpenAIImageProvider {
-  private client: OpenAI;
+  private client: OpenAI | null = null;
 
-  constructor() {
-    const apiKey = config.OPENAI_API_KEY || '';
-    this.client = new OpenAI({ apiKey });
+  /**
+   * Phase 20: the OpenAI SDK's constructor throws synchronously
+   * ("Missing credentials...") when no API key resolves — unlike
+   * @google/generative-ai's constructor, which accepts an empty key and
+   * only fails later on an actual API call. Because this provider is
+   * exported as an eager module-scope singleton (see the bottom of this
+   * file) that singleton construction previously ran `new OpenAI(...)`
+   * at IMPORT time. Any Cloud Functions boot (a real deployment cold
+   * start, or the local emulator) with OPENAI_API_KEY unset crashed
+   * before a single function — not just image generation — could load,
+   * confirmed live: `firebase emulators:start` failed with "Functions
+   * codebase could not be analyzed successfully" and zero functions were
+   * served. The client is now constructed lazily, on first actual use,
+   * so a missing key only fails the specific image-generation call that
+   * needs it (already handled by this method's existing try/catch),
+   * exactly like the Gemini providers already do.
+   */
+  private getClient(): OpenAI {
+    if (!this.client) {
+      const apiKey = config.OPENAI_API_KEY || '';
+      this.client = new OpenAI({ apiKey });
+    }
+    return this.client;
   }
 
   /**
@@ -25,7 +45,7 @@ export class OpenAIImageProvider {
       const size = this.mapAspectRatioToSize(request.aspectRatio);
 
       // DALL-E 3 doesn't support negative_prompt, so we omit it
-      const response = await this.client.images.generate({
+      const response = await this.getClient().images.generate({
         model: 'dall-e-3',
         prompt: request.prompt,
         size,

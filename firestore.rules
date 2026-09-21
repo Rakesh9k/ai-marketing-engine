@@ -5,32 +5,64 @@ service cloud.firestore {
     function isAuthenticated() {
       return request.auth != null;
     }
-    
+
     function isOwner(userId) {
       return isAuthenticated() && request.auth.uid == userId;
     }
-    
+
     function hasBusinessAccess(businessId) {
-      return isAuthenticated() && 
+      return isAuthenticated() &&
         request.auth.token.businessIds.has(businessId);
     }
-    
+
     function isAgencyMember(agencyId) {
-      return isAuthenticated() && 
+      return isAuthenticated() &&
         request.auth.token.role == 'agency_member' &&
         request.auth.token.agencyId == agencyId;
     }
 
     // Users collection - own document only
     match /users/{userId} {
-      allow read, write: if isOwner(userId);
+      allow read: if isOwner(userId);
       allow read: if isAuthenticated() && request.auth.token.role == 'admin';
+
+      // The users/{uid} document is only ever created server-side (the
+      // onUserCreated Auth trigger, via the Admin SDK, which bypasses these
+      // rules entirely) — the client never creates its own user doc.
+      allow create: if false;
+
+      // CRITICAL: role, businessIds, agencyId, and subscriptionId must
+      // never be client-writable. functions/src/functions/business/
+      // createBusiness.ts re-reads this exact document to refresh the
+      // user's Firebase Auth custom claims (role/businessIds/agencyId) on
+      // every business creation. Before this fix, "allow write: if
+      // isOwner(userId)" had no field restriction at all, so any
+      // authenticated user could write role: 'admin' or
+      // agencyId: '<any other agency's id>' directly to their own
+      // document via the client SDK, then call createBusiness to have
+      // that forged value baked into their real, cryptographically
+      // verified custom-claims token — after which every rule and backend
+      // check in this project that trusts request.auth.token.role /
+      // .agencyId / .businessIds would treat them as an admin and/or a
+      // legitimate member of an arbitrary target agency, granting full
+      // cross-tenant read/write access to that agency's businesses,
+      // brand kits, products, campaigns, assets, and Storage files. This
+      // was found and confirmed exploitable via a real Firestore-emulator
+      // test before being fixed here (see firestore-security.phase11.test.ts).
+      allow update: if isOwner(userId) &&
+        request.resource.data.userId == resource.data.userId &&
+        request.resource.data.role == resource.data.role &&
+        request.resource.data.businessIds == resource.data.businessIds &&
+        request.resource.data.get('agencyId', null) == resource.data.get('agencyId', null) &&
+        request.resource.data.get('subscriptionId', null) == resource.data.get('subscriptionId', null);
+
+      allow delete: if false;
     }
 
     // Businesses collection
     match /businesses/{businessId} {
-      allow read: if isAuthenticated() && 
-        (resource.data.userId == request.auth.uid || 
+      allow read: if isAuthenticated() &&
+        (resource.data.userId == request.auth.uid ||
          hasBusinessAccess(businessId) ||
          (request.auth.token.role == 'agency_member' && resource.data.agencyId == request.auth.token.agencyId));
       allow create: if isAuthenticated() && request.resource.data.userId == request.auth.uid;
@@ -38,54 +70,100 @@ service cloud.firestore {
       allow delete: if false; // Soft delete only
     }
 
+    // Agency collection — agency administrators and members can read their own agency
+    match /agencies/{agencyId} {
+      allow read, write: if isAuthenticated() &&
+        (request.auth.uid == resource.data.ownerUserId ||
+         isAgencyMember(agencyId));
+      allow create: if false; // Agencies created onboarding flow only
+    }
+
+    // Clients collection — managed within an agency workspace
+    match /clients/{clientId} {
+      allow read: if isAuthenticated() &&
+        (resource.data.userId == request.auth.uid ||
+         hasBusinessAccess(resource.data.businessIds[0]) ||
+         (request.auth.token.role == 'agency_member' &&
+          resource.data.agencyId == request.auth.token.agencyId));
+      allow create: if isAuthenticated() && request.resource.data.userId == request.auth.uid &&
+        request.resource.data.agencyId in request.auth.token.businessIds;
+      allow update: if isAuthenticated() && resource.data.userId == request.auth.uid;
+      allow delete: if false;
+    }
+
     // Brand Kits collection (1:1 with business)
     match /brand_kits/{businessId} {
-      allow read, write: if isAuthenticated() && 
+      allow read, write: if isAuthenticated() &&
         exists(/databases/$(database)/documents/businesses/$(businessId)) &&
         (get(/databases/$(database)/documents/businesses/$(businessId)).data.userId == request.auth.uid ||
-         hasBusinessAccess(businessId));
+         hasBusinessAccess(businessId) ||
+         (request.auth.token.role == 'agency_member' &&
+          get(/databases/$(database)/documents/businesses/$(businessId)).data.agencyId == request.auth.token.agencyId));
     }
 
     // Products collection
     match /products/{productId} {
-      allow read: if isAuthenticated() && 
-        get(/databases/$(database)/documents/businesses/$(resource.data.businessId)).data.userId == request.auth.uid;
-      allow create: if isAuthenticated() && 
+      allow read: if isAuthenticated() &&
+        get(/databases/$(database)/documents/businesses/$(resource.data.businessId)).data.userId == request.auth.uid ||
+        hasBusinessAccess(resource.data.businessId) ||
+        (request.auth.token.role == 'agency_member' &&
+         get(/databases/$(database)/documents/businesses/$(resource.data.businessId)).data.agencyId == request.auth.token.agencyId);
+      allow create: if isAuthenticated() &&
         request.resource.data.businessId in request.auth.token.businessIds;
-      allow update, delete: if isAuthenticated() && 
+      allow update, delete: if isAuthenticated() &&
         get(/databases/$(database)/documents/businesses/$(resource.data.businessId)).data.userId == request.auth.uid;
     }
 
     // Campaigns collection
     match /campaigns/{campaignId} {
-      allow read: if isAuthenticated() && 
-        (resource.data.userId == request.auth.uid || resource.data.businessId in request.auth.token.businessIds);
-      allow create: if isAuthenticated() && 
+      allow read: if isAuthenticated() &&
+        (resource.data.userId == request.auth.uid ||
+         resource.data.businessId in request.auth.token.businessIds ||
+         (request.auth.token.role == 'agency_member' &&
+          get(/databases/$(database)/documents/businesses/$(resource.data.businessId)).data.agencyId == request.auth.token.agencyId));
+      allow create: if isAuthenticated() &&
         request.resource.data.userId == request.auth.uid &&
         request.resource.data.businessId in request.auth.token.businessIds;
-      
-      // Users can update their own campaigns, but NOT the Truth Check verification fields
-      // Truth Check status must be set by Cloud Functions only
+
+      // Users can update their own campaigns, but NOT the authoritative
+      // verification/credit fields. Truth Check status, campaign status
+      // (which itself includes the value 'verified'), and credit accounting
+      // must be set by Cloud Functions (Admin SDK, which bypasses these
+      // rules) only — a client-supplied write can never move a campaign into
+      // or out of a verified/completed state, and can never touch
+      // metadata.truthCheckStatus, regardless of what value it sends.
       allow update: if isAuthenticated() && resource.data.userId == request.auth.uid &&
-        // Prevent clients from manually setting truth check verification
-        (!request.resource.data.metadata.keys().hasAny(['truthCheckStatus']) || 
+        request.resource.data.status == resource.data.status &&
+        request.resource.data.creditsReserved == resource.data.creditsReserved &&
+        (!('creditsUsed' in request.resource.data) ||
+         !('creditsUsed' in resource.data) ||
+         request.resource.data.creditsUsed == resource.data.creditsUsed) &&
+        (!('metadata' in request.resource.data) ||
+         !('metadata' in resource.data) ||
+         !request.resource.data.metadata.keys().hasAny(['truthCheckStatus']) ||
          request.resource.data.metadata.truthCheckStatus == resource.data.metadata.truthCheckStatus);
       allow delete: if false;
     }
 
     // Campaign Assets collection
     match /campaign_assets/{assetId} {
-      allow read: if isAuthenticated() && 
-        (resource.data.userId == request.auth.uid || resource.data.businessId in request.auth.token.businessIds);
+      allow read: if isAuthenticated() &&
+        (resource.data.userId == request.auth.uid ||
+         resource.data.businessId in request.auth.token.businessIds ||
+         (request.auth.token.role == 'agency_member' &&
+          get(/databases/$(database)/documents/businesses/$(resource.data.businessId)).data.agencyId == request.auth.token.agencyId));
       // Write only via Cloud Functions
       allow write: if false;
     }
 
     // Assets collection (general user/business asset uploads)
     match /assets/{assetId} {
-      allow read: if isAuthenticated() && 
-        (resource.data.userId == request.auth.uid || resource.data.businessId in request.auth.token.businessIds);
-      allow create: if isAuthenticated() && 
+      allow read: if isAuthenticated() &&
+        (resource.data.userId == request.auth.uid ||
+         resource.data.businessId in request.auth.token.businessIds ||
+         (request.auth.token.role == 'agency_member' &&
+          get(/databases/$(database)/documents/businesses/$(resource.data.businessId)).data.agencyId == request.auth.token.agencyId));
+      allow create: if isAuthenticated() &&
         request.resource.data.userId == request.auth.uid &&
         request.resource.data.businessId in request.auth.token.businessIds;
       allow update: if isAuthenticated() && resource.data.userId == request.auth.uid;
@@ -134,15 +212,34 @@ service cloud.firestore {
     }
 
     match /campaign_performance/{campaignId} {
-      allow read: if isAuthenticated() && 
+      allow read: if isAuthenticated() &&
         get(/databases/$(database)/documents/campaigns/$(campaignId)).data.userId == request.auth.uid;
       allow write: if false;
     }
 
     match /whatsapp_leads/{leadId} {
-      allow read: if isAuthenticated() && 
+      allow read: if isAuthenticated() &&
         get(/databases/$(database)/documents/businesses/$(resource.data.businessId)).data.userId == request.auth.uid;
       allow write: if false;
+    }
+
+    // Reels collection ("Create a Reel"). Same locked-field pattern as
+    // campaigns: status, credits, editPlan, and output fields are
+    // authoritative only via Cloud Functions (Admin SDK bypasses these
+    // rules) — a client can never self-certify a reel as completed, forge
+    // an output URL, or manipulate credit accounting.
+    match /reels/{reelId} {
+      allow read: if isAuthenticated() &&
+        (resource.data.userId == request.auth.uid ||
+         resource.data.businessId in request.auth.token.businessIds ||
+         (request.auth.token.role == 'agency_member' &&
+          get(/databases/$(database)/documents/businesses/$(resource.data.businessId)).data.agencyId == request.auth.token.agencyId));
+      // Reel projects are only ever created via createReelProject (Cloud
+      // Function, Admin SDK) — the client never writes this collection
+      // directly, matching campaigns' create-then-server-owns-status model.
+      allow create: if false;
+      allow update: if false;
+      allow delete: if false;
     }
   }
 }

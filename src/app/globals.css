@@ -1,14 +1,18 @@
 @import 'tailwindcss';
 
 :root {
-  /* Brand Colors */
+  /* Brand Colors — warm, controlled orange. Used as punctuation, not paint. */
   --color-brand-50: #fff4ed;
   --color-brand-100: #ffe8d6;
   --color-brand-500: #e84d1a;
   --color-brand-600: #d63d15;
   --color-brand-700: #b83212;
 
-  /* Neutral Colors */
+  /* Neutral Colors — kept as the app's existing literal utility scale
+     (bg-neutral-*, border-neutral-*, text-neutral-*). Left untouched here
+     because it's consumed directly across many existing components; it is
+     not yet theme-aware. Dark mode instead flows through the semantic
+     surface/text tokens below, which the newer screens (landing, auth) use. */
   --color-neutral-0: #ffffff;
   --color-neutral-50: #fafafa;
   --color-neutral-100: #f5f5f5;
@@ -22,21 +26,25 @@
   --color-neutral-900: #171717;
   --color-neutral-950: #0a0a0a;
 
-  /* Semantic Colors */
-  --color-bg-primary: var(--color-neutral-0);
-  --color-bg-secondary: var(--color-neutral-50);
-  --color-bg-tertiary: var(--color-neutral-100);
-  --color-bg-inverse: var(--color-neutral-900);
+  /* Semantic Colors — theme-aware. Redefined under the dark-mode blocks
+     further down; every component using these (rather than raw neutral-*)
+     adapts automatically when the theme changes. */
+  --color-bg-primary: #fdfbf8; /* warm ivory, not pure white */
+  --color-bg-secondary: #f7f3ee; /* soft ivory */
+  --color-bg-tertiary: #f0ebe3; /* warm light neutral */
+  --color-bg-inverse: #201c18;
+  --color-surface: #ffffff; /* raised surfaces (cards, sheets) on top of bg-primary */
+  --color-surface-secondary: #faf7f3;
 
-  --color-text-primary: var(--color-neutral-900);
-  --color-text-secondary: var(--color-neutral-600);
-  --color-text-tertiary: var(--color-neutral-400);
-  --color-text-inverse: var(--color-neutral-0);
+  --color-text-primary: #1c1815; /* deep warm charcoal, not pure black */
+  --color-text-secondary: #6b6259;
+  --color-text-tertiary: #a39a8f;
+  --color-text-inverse: #fdfbf8;
   --color-text-link: var(--color-brand-600);
   --color-text-link-hover: var(--color-brand-700);
 
-  --color-border-light: var(--color-neutral-200);
-  --color-border-medium: var(--color-neutral-300);
+  --color-border-light: #e9e2d8;
+  --color-border-medium: #d8cec0;
   --color-border-focus: var(--color-brand-500);
 
   /* Status Colors */
@@ -58,14 +66,17 @@
   --color-credits-medium: var(--color-warning-500);
   --color-credits-high: var(--color-success-500);
 
-  /* Font Stack */
+  /* Font Stack — --font-geist-sans is injected by next/font in layout.tsx;
+     the literal fallback stack keeps this file (and Storybook/tests, if any)
+     working even before that variable is present. */
   --font-sans:
-    ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto,
-    'Helvetica Neue', Arial, sans-serif;
+    var(--font-geist-sans), ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont,
+    'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
   --font-sans-indic: 'Noto Sans Telugu', 'Noto Sans Devanagari', var(--font-sans);
   --font-mono: ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, monospace;
 
-  /* Type Scale */
+  /* Type Scale — xs through 4xl are established UI sizes; 5xl-7xl are
+     editorial display sizes for the occasional huge headline moment. */
   --text-xs: clamp(0.7rem, 0.68rem + 0.1vw, 0.75rem);
   --text-sm: clamp(0.81rem, 0.78rem + 0.15vw, 0.88rem);
   --text-base: clamp(0.94rem, 0.9rem + 0.2vw, 1rem);
@@ -74,6 +85,9 @@
   --text-2xl: clamp(1.56rem, 1.38rem + 0.9vw, 2rem);
   --text-3xl: clamp(1.95rem, 1.65rem + 1.5vw, 3rem);
   --text-4xl: clamp(2.44rem, 1.95rem + 2.45vw, 4rem);
+  --text-5xl: clamp(2.75rem, 2.1rem + 3.2vw, 5rem);
+  --text-6xl: clamp(3.25rem, 2.3rem + 4.5vw, 6.25rem);
+  --text-7xl: clamp(3.75rem, 2.4rem + 6vw, 7.5rem);
 
   /* Font Weights */
   --font-normal: 400;
@@ -82,10 +96,15 @@
   --font-bold: 700;
 
   /* Line Heights */
+  --leading-none: 1;
   --leading-tight: 1.25;
   --leading-snug: 1.375;
   --leading-normal: 1.5;
   --leading-relaxed: 1.625;
+
+  /* Letter Spacing — display headlines pull tighter as they get larger. */
+  --tracking-tight: -0.02em;
+  --tracking-tighter: -0.04em;
 
   /* Spacing */
   --space-1: 0.25rem;
@@ -122,6 +141,74 @@
   --transition-fast: 150ms ease;
   --transition-normal: 200ms ease;
   --transition-slow: 300ms ease;
+
+  /* Motion — shared durations/easings for the brand's animated primitives
+     and page-level transitions (kept within the 300-700ms range so
+     navigation never feels like it's waiting on animation). */
+  --duration-instant: 100ms;
+  --duration-fast: 200ms;
+  --duration-normal: 400ms;
+  --duration-slow: 600ms;
+  --ease-standard: cubic-bezier(0.4, 0, 0.2, 1);
+  --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-out-back: cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+/* Dark Mode — system preference by default, explicit [data-theme] wins.
+   Two expressions of one brand: warm black instead of pure black, orange
+   nudged slightly more luminous to stay legible without turning neon. */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) {
+    --color-brand-50: #2b1a10;
+    --color-brand-100: #452414;
+    --color-brand-500: #ff6a35;
+    --color-brand-600: #ff8557;
+    --color-brand-700: #ffa47d;
+
+    --color-bg-primary: #17130f;
+    --color-bg-secondary: #1e1a15;
+    --color-bg-tertiary: #262019;
+    --color-bg-inverse: #fdfbf8;
+    --color-surface: #211c17;
+    --color-surface-secondary: #29231c;
+
+    --color-text-primary: #f3ede4;
+    --color-text-secondary: #b3a89b;
+    --color-text-tertiary: #7d7466;
+    --color-text-inverse: #1c1815;
+    --color-text-link: var(--color-brand-600);
+    --color-text-link-hover: var(--color-brand-700);
+
+    --color-border-light: #322b22;
+    --color-border-medium: #433a2e;
+    --color-border-focus: var(--color-brand-500);
+  }
+}
+
+:root[data-theme='dark'] {
+  --color-brand-50: #2b1a10;
+  --color-brand-100: #452414;
+  --color-brand-500: #ff6a35;
+  --color-brand-600: #ff8557;
+  --color-brand-700: #ffa47d;
+
+  --color-bg-primary: #17130f;
+  --color-bg-secondary: #1e1a15;
+  --color-bg-tertiary: #262019;
+  --color-bg-inverse: #fdfbf8;
+  --color-surface: #211c17;
+  --color-surface-secondary: #29231c;
+
+  --color-text-primary: #f3ede4;
+  --color-text-secondary: #b3a89b;
+  --color-text-tertiary: #7d7466;
+  --color-text-inverse: #1c1815;
+  --color-text-link: var(--color-brand-600);
+  --color-text-link-hover: var(--color-brand-700);
+
+  --color-border-light: #322b22;
+  --color-border-medium: #433a2e;
+  --color-border-focus: var(--color-brand-500);
 }
 
 @theme inline {
@@ -148,6 +235,8 @@
   --color-bg-secondary: var(--color-bg-secondary);
   --color-bg-tertiary: var(--color-bg-tertiary);
   --color-bg-inverse: var(--color-bg-inverse);
+  --color-surface: var(--color-surface);
+  --color-surface-secondary: var(--color-surface-secondary);
 
   --color-text-primary: var(--color-text-primary);
   --color-text-secondary: var(--color-text-secondary);
@@ -185,16 +274,23 @@
   --text-2xl: var(--text-2xl);
   --text-3xl: var(--text-3xl);
   --text-4xl: var(--text-4xl);
+  --text-5xl: var(--text-5xl);
+  --text-6xl: var(--text-6xl);
+  --text-7xl: var(--text-7xl);
 
   --font-normal: var(--font-normal);
   --font-medium: var(--font-medium);
   --font-semibold: var(--font-semibold);
   --font-bold: var(--font-bold);
 
+  --leading-none: var(--leading-none);
   --leading-tight: var(--leading-tight);
   --leading-snug: var(--leading-snug);
   --leading-normal: var(--leading-normal);
   --leading-relaxed: var(--leading-relaxed);
+
+  --tracking-tight: var(--tracking-tight);
+  --tracking-tighter: var(--tracking-tighter);
 
   --space-1: var(--space-1);
   --space-2: var(--space-2);
@@ -227,6 +323,14 @@
   --transition-fast: var(--transition-fast);
   --transition-normal: var(--transition-normal);
   --transition-slow: var(--transition-slow);
+
+  --duration-instant: var(--duration-instant);
+  --duration-fast: var(--duration-fast);
+  --duration-normal: var(--duration-normal);
+  --duration-slow: var(--duration-slow);
+  --ease-standard: var(--ease-standard);
+  --ease-out-expo: var(--ease-out-expo);
+  --ease-out-back: var(--ease-out-back);
 }
 
 /* Localization Typography Rules */
@@ -248,6 +352,7 @@ html {
   font-size: 16px;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  color-scheme: light dark;
 }
 
 body {
@@ -259,6 +364,22 @@ body {
   font-weight: var(--font-normal);
   margin: 0;
   padding: 0;
+  transition:
+    background-color var(--duration-normal) var(--ease-standard),
+    color var(--duration-normal) var(--ease-standard);
+}
+
+/* Reduced Motion — the brand's animated primitives and page transitions
+   collapse to simple fades/no motion; nothing structural is lost. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }
 
 /* Focus Styles */
@@ -293,6 +414,22 @@ body {
 }
 
 /* Utility Classes */
+.text-display-hero {
+  font-size: var(--text-7xl);
+  font-weight: var(--font-bold);
+  line-height: var(--leading-none);
+  letter-spacing: var(--tracking-tighter);
+  color: var(--color-text-primary);
+}
+
+.text-display-lg {
+  font-size: var(--text-6xl);
+  font-weight: var(--font-bold);
+  line-height: var(--leading-none);
+  letter-spacing: var(--tracking-tighter);
+  color: var(--color-text-primary);
+}
+
 .text-display {
   font-size: var(--text-3xl);
   font-weight: var(--font-bold);
@@ -372,4 +509,98 @@ body {
   font-size: var(--text-sm);
   font-weight: var(--font-medium);
   color: var(--color-success-600);
+}
+
+/* Mitra Brand Motion — the M mark's animated states (MitraMark `state`
+   prop). Kept to transform/opacity so they stay cheap, and collapse under
+   the global prefers-reduced-motion rule above. */
+@keyframes mitra-pulse {
+  0%,
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.45;
+    transform: scale(0.82);
+  }
+}
+
+@keyframes mitra-orbit {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes mitra-ring {
+  from {
+    r: 20;
+    opacity: 0.5;
+  }
+  to {
+    r: 94;
+    opacity: 0;
+  }
+}
+
+.animate-mitra-pulse {
+  transform-origin: 100px 18px;
+  animation: mitra-pulse 1.4s var(--ease-standard) infinite;
+}
+
+.animate-mitra-orbit {
+  transform-origin: 100px 40px;
+  animation: mitra-orbit 2.2s linear infinite;
+}
+
+.animate-mitra-ring {
+  animation: mitra-ring 900ms var(--ease-out-expo) forwards;
+}
+
+/* Mascot Motion — deliberately quiet. The idle loop is a few pixels of
+   drift, not a bounce; scene entrances are a short settle, not a slide
+   show. Both collapse under the global prefers-reduced-motion rule above. */
+@keyframes mascot-idle {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-3px);
+  }
+}
+
+@keyframes scene-enter {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* The 'thinking' pose's three small orbiting dots — the only mascot prop
+   that spins, because it's standing in for active AI processing. Slow and
+   quiet on purpose; the M mark remains the primary intelligence indicator. */
+@keyframes mascot-orbit {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.animate-mascot-idle {
+  animation: mascot-idle 4.5s var(--ease-standard) infinite;
+}
+
+.animate-mascot-orbit {
+  animation: mascot-orbit 6s linear infinite;
+}
+
+.animate-scene-enter {
+  animation: scene-enter 420ms var(--ease-out-expo) both;
 }

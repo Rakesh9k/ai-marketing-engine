@@ -9,7 +9,13 @@ export type CampaignObjective =
 
 export type OfferType = 'percentage' | 'fixed' | 'bogo' | 'combo' | 'free_delivery' | 'loyalty';
 
-export type CTAType = 'order_whatsapp' | 'book_table' | 'view_menu' | 'call_now' | 'get_directions';
+export type CTAType =
+  | 'order_whatsapp'
+  | 'book_table'
+  | 'view_menu'
+  | 'call_now'
+  | 'get_directions'
+  | 'book_appointment';
 
 export type LanguageCode = 'en' | 'te' | 'hi' | 'te_en' | 'hi_en';
 

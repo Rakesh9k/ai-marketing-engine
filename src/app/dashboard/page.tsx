@@ -12,6 +12,8 @@ import type { Business, Usage, Campaign, Subscription } from '@/types';
 import { Button } from '@/components/ui/Button';
 import Link from 'next/link';
 import { formatINR } from '@/lib/utils';
+import { MascotScene } from '@/components/mascot/MascotScene';
+import { PosterIllustration, WrenchIllustration } from '@/components/illustrations/Illustrations';
 
 function StatCard({
   title,
@@ -239,8 +241,14 @@ export default function DashboardPage() {
 
   if (error) {
     return (
-      <div className="p-8 text-center">
-        <p className="text-error-600">{error}</p>
+      <div className="flex justify-center p-8">
+        <MascotScene
+          pose="concerned"
+          align="center"
+          message="Something got in the way."
+          supporting={error}
+          decoration={<WrenchIllustration size={20} />}
+        />
       </div>
     );
   }
@@ -321,12 +329,25 @@ export default function DashboardPage() {
         </div>
       </div>
 
+      {businesses.length > 0 && (
+        <MascotScene
+          pose="curious"
+          size="sm"
+          message="What should we create today?"
+          className="mb-8"
+        >
+          <Link href="/campaigns/new" className="mt-2 inline-block">
+            <Button size="sm">Start a campaign</Button>
+          </Link>
+        </MascotScene>
+      )}
+
       {businesses.length === 0 ? (
         <EmptyState
           title="No business set up yet"
           description="Create your first business to start generating campaigns"
           action={
-            <Link href="/onboarding/business">
+            <Link href="/onboarding">
               <Button>Create Business</Button>
             </Link>
           }
@@ -383,11 +404,21 @@ export default function DashboardPage() {
               </div>
               <div className="divide-y divide-neutral-200">
                 {campaigns.length === 0 ? (
-                  <div className="p-8 text-center">
-                    <p className="text-neutral-500">No campaigns yet</p>
-                    <Link href="/campaigns">
-                      <Button className="mt-4">Create your first campaign</Button>
-                    </Link>
+                  <div className="flex justify-center p-8">
+                    <MascotScene
+                      pose="point"
+                      size="sm"
+                      align="center"
+                      message="No campaigns yet."
+                      supporting="Let's make your first one."
+                    >
+                      <div className="mt-1 flex justify-center">
+                        <PosterIllustration size={40} className="opacity-80" />
+                      </div>
+                      <Link href="/campaigns" className="mt-4 inline-block">
+                        <Button size="sm">Create your first campaign</Button>
+                      </Link>
+                    </MascotScene>
                   </div>
                 ) : (
                   <CampaignsList campaigns={campaigns} />
@@ -408,6 +439,19 @@ export default function DashboardPage() {
                     <div>
                       <p className="font-medium text-neutral-900">Create Campaign</p>
                       <p className="text-sm text-neutral-500">Generate a new marketing campaign</p>
+                    </div>
+                  </Button>
+                </Link>
+                <Link href="/reels/new">
+                  <Button variant="outline" className="w-full justify-start gap-3">
+                    <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-neutral-100 text-lg">
+                      🎥
+                    </span>
+                    <div>
+                      <p className="font-medium text-neutral-900">Create a Reel</p>
+                      <p className="text-sm text-neutral-500">
+                        Turn your raw phone clips into an Instagram Reel
+                      </p>
                     </div>
                   </Button>
                 </Link>

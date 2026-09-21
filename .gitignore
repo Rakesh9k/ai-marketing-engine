@@ -8,8 +8,13 @@ out/
 build/
 dist/
 
+# Functions build output
+functions/lib/
+
 # Testing
 coverage/
+playwright-report/
+test-results/
 
 # Environment files
 .env

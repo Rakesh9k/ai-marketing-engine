@@ -15,8 +15,6 @@ import {
   type Firestore,
   type CollectionReference,
   type DocumentReference,
-  runTransaction,
-  increment,
   serverTimestamp,
   type FirestoreDataConverter,
 } from 'firebase/firestore';
@@ -30,7 +28,6 @@ import type {
   CampaignAsset,
   Subscription,
   Usage,
-  Transaction,
   AnalyticsEvent,
   GenerationLog,
 } from '@/types';
@@ -43,7 +40,6 @@ import {
   campaignAssetConverter,
   subscriptionConverter,
   usageConverter,
-  transactionConverter,
   analyticsEventConverter,
   generationLogConverter,
 } from '@/lib/firebase/converters';
@@ -409,173 +405,25 @@ export const usageService = {
     const snap = await getDocs(q);
     return snap.docs.map((doc) => doc.data());
   },
-
-  async create(usage: Usage): Promise<void> {
-    const ref = getDocRef<Usage>('usage', usage.usageId, usageConverter);
-    await setDoc(ref, usage);
-  },
-
-  async incrementCreditsUsed(usageId: string, amount: number): Promise<void> {
-    const ref = getDocRef<Usage>('usage', usageId, usageConverter);
-    await updateDoc(ref, { creditsUsed: increment(amount), updatedAt: serverTimestamp() });
-  },
-
-  async incrementCampaignsCreated(usageId: string): Promise<void> {
-    const ref = getDocRef<Usage>('usage', usageId, usageConverter);
-    await updateDoc(ref, { campaignsCreated: increment(1), updatedAt: serverTimestamp() });
-  },
-
-  async incrementImagesGenerated(usageId: string, count: number): Promise<void> {
-    const ref = getDocRef<Usage>('usage', usageId, usageConverter);
-    await updateDoc(ref, {
-      imagesGenerated: increment(count),
-      updatedAt: serverTimestamp(),
-    });
-  },
-
-  async incrementCopyGenerations(usageId: string): Promise<void> {
-    const ref = getDocRef<Usage>('usage', usageId, usageConverter);
-    await updateDoc(ref, { copyGenerations: increment(1), updatedAt: serverTimestamp() });
-  },
-
-  async incrementRegenerations(usageId: string): Promise<void> {
-    const ref = getDocRef<Usage>('usage', usageId, usageConverter);
-    await updateDoc(ref, { regenerations: increment(1), updatedAt: serverTimestamp() });
-  },
-
-  async incrementFailedGenerations(usageId: string): Promise<void> {
-    const ref = getDocRef<Usage>('usage', usageId, usageConverter);
-    await updateDoc(ref, { failedGenerations: increment(1), updatedAt: serverTimestamp() });
-  },
 };
 
-export const transactionService = {
-  async get(transactionId: string): Promise<Transaction | null> {
-    const ref = getDocRef<Transaction>('transactions', transactionId, transactionConverter);
-    const snap = await getDoc(ref);
-    return snap.exists() ? snap.data() : null;
-  },
-
-  async listByUser(userId: string, limitCount = 50): Promise<Transaction[]> {
-    const q = query(
-      getCollectionRef<Transaction>('transactions', transactionConverter),
-      where('userId', '==', userId),
-      orderBy('createdAt', 'desc'),
-      limit(limitCount)
-    );
-    const snap = await getDocs(q);
-    return snap.docs.map((doc) => doc.data());
-  },
-
-  async listByCampaign(campaignId: string): Promise<Transaction[]> {
-    const q = query(
-      getCollectionRef<Transaction>('transactions', transactionConverter),
-      where('campaignId', '==', campaignId),
-      orderBy('createdAt', 'desc')
-    );
-    const snap = await getDocs(q);
-    return snap.docs.map((doc) => doc.data());
-  },
-
-  async create(transaction: Transaction): Promise<void> {
-    const ref = getDocRef<Transaction>(
-      'transactions',
-      transaction.transactionId,
-      transactionConverter
-    );
-    await setDoc(ref, transaction);
-  },
-
-  async createReservation(
-    userId: string,
-    amount: number,
-    idempotencyKey: string,
-    campaignId?: string,
-    businessId?: string
-  ): Promise<void> {
-    const usageRef = getDocRef<Usage>(
-      'usage',
-      usageService.getUsageDocId(userId, new Date()),
-      usageConverter
-    );
-    const transactionRef = getDocRef<Transaction>(
-      'transactions',
-      idempotencyKey,
-      transactionConverter
-    );
-
-    // eslint-disable-next-line @typescript-eslint/require-await
-    await runTransaction(getDb(), async (tx) => {
-      const usageSnap = await tx.get(usageRef);
-      if (!usageSnap.exists()) {
-        throw new Error('Usage document not found');
-      }
-      const usageData = usageSnap.data();
-      const creditsRemaining = usageData.creditsIncluded - usageData.creditsUsed;
-      if (creditsRemaining < amount) {
-        throw new Error('Insufficient credits');
-      }
-
-      tx.set(transactionRef, {
-        transactionId: idempotencyKey,
-        userId,
-        businessId,
-        campaignId,
-        type: 'reservation',
-        amount: -amount,
-        currency: 'INR',
-        balanceAfter: creditsRemaining - amount,
-        description: `Credit reservation for campaign generation`,
-        status: 'pending',
-        metadata: { idempotencyKey },
-        createdAt: serverTimestamp(),
-      });
-
-      tx.update(usageRef, { creditsUsed: increment(amount), updatedAt: serverTimestamp() });
-    });
-  },
-
-  async confirmReservation(transactionId: string): Promise<void> {
-    const ref = getDocRef<Transaction>('transactions', transactionId, transactionConverter);
-    await updateDoc(ref, { type: 'deduction', status: 'completed', updatedAt: serverTimestamp() });
-  },
-
-  async refundReservation(
-    userId: string,
-    amount: number,
-    originalTransactionId: string,
-    campaignId?: string
-  ): Promise<void> {
-    const usageRef = getDocRef<Usage>(
-      'usage',
-      usageService.getUsageDocId(userId, new Date()),
-      usageConverter
-    );
-    const refundRef = getDocRef<Transaction>(
-      'transactions',
-      `refund_${originalTransactionId}`,
-      transactionConverter
-    );
-
-    // eslint-disable-next-line @typescript-eslint/require-await
-    await runTransaction(getDb(), async (tx) => {
-      tx.update(usageRef, { creditsUsed: increment(-amount), updatedAt: serverTimestamp() });
-      tx.set(refundRef, {
-        transactionId: `refund_${originalTransactionId}`,
-        userId,
-        campaignId,
-        type: 'refund',
-        amount: +amount,
-        currency: 'INR',
-        balanceAfter: 0,
-        description: `Refund for failed campaign generation`,
-        status: 'completed',
-        metadata: { originalKey: originalTransactionId },
-        createdAt: serverTimestamp(),
-      });
-    });
-  },
-};
+// Phase 10: this file previously also exported `transactionService` (get,
+// list, create, createReservation, confirmReservation, refundReservation)
+// and six `usageService.increment*` methods that mutated `usage.creditsUsed`
+// directly from the browser via the client Firestore SDK — a complete,
+// parallel, client-side reimplementation of the server-authoritative credit
+// reservation/finalization/refund state machine that already exists in
+// functions/src/services/usageControl.ts. firestore.rules already denies
+// all client writes to `usage`/`transactions` ("Cloud Functions only"), so
+// these were dead code — confirmed unused anywhere in src/ — that could
+// only ever fail with permission-denied if invoked. They were removed
+// rather than fixed: per the explicit "the client must NOT grant itself
+// credits" rule, no client-writable path to financial state should exist
+// at all, even an inert one that a future change to firestore.rules could
+// accidentally reactivate as a real credit-manipulation vector. Read access
+// to usage/transactions documents (`usageService.get`/`getCurrentPeriod`/
+// `listByUser` above) is retained — it's informational display only, not a
+// mutation path, and is genuinely used by the dashboard/usage pages.
 
 export const analyticsService = {
   async log(event: AnalyticsEvent): Promise<void> {

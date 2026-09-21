@@ -2,7 +2,7 @@ import { onCall, HttpsError } from 'firebase-functions/v2/https';
 import { z } from 'zod';
 import { v7 as uuidv7 } from 'uuid';
 
-import { verifyAuthAndBusinessAccess } from '../../middleware/auth';
+import { verifyBusinessAccess } from '../../middleware/auth';
 import { validatedCallable } from '../../middleware/validation';
 import { createProductDoc, getProductsByBusiness } from '../../services/firestore';
 import { logFunctionStart, logFunctionComplete, logFunctionError } from '../../utils/logging';
@@ -61,7 +61,7 @@ export const createProduct = onCall(
     });
 
     try {
-      await verifyAuthAndBusinessAccess(context as any, data.businessId);
+      await verifyBusinessAccess(context.userId, data.businessId);
 
       const productId = uuidv7();
       const now = new Date().toISOString();

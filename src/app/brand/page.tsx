@@ -472,7 +472,7 @@ export default function BrandPage() {
           title="No business set up yet"
           description="Create your first business to configure your brand kit"
           action={
-            <a href="/onboarding/business">
+            <a href="/onboarding">
               <button className="bg-brand-600 hover:bg-brand-700 inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium text-white transition-colors">
                 <svg
                   className="h-4 w-4"

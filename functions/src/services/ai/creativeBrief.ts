@@ -179,7 +179,18 @@ export interface CreativeBriefInput {
  * Build a CreativeBrief from structured input
  */
 export function buildCreativeBrief(input: CreativeBriefInput): CreativeBrief {
-  const { product, offer, localizationProfile, brandProfile, businessProfile, campaignStrategy, copyPack, visualDirection, generationMode, aspectRatio } = input;
+  const {
+    product,
+    offer,
+    localizationProfile,
+    brandProfile,
+    businessProfile,
+    campaignStrategy,
+    copyPack,
+    visualDirection,
+    generationMode,
+    aspectRatio,
+  } = input;
 
   // Determine primary product image
   const primaryImage = product.images?.find((img) => img.isPrimary) || product.images?.[0];
@@ -287,8 +298,11 @@ function buildRequiredElements(input: CreativeBriefInput): readonly string[] {
     elements.push(`Location: ${input.businessProfile.locality}`);
   }
 
-  // Brand colors
-  if (input.brandProfile.colors.primary) {
+  // Brand colors — brandProfile can be {} when a business has no Brand Kit
+  // set up yet (generateCampaignStrategy.ts passes `brandKit || {}`); this
+  // unguarded access used to throw for every such business, crashing the
+  // entire generation at the image stage.
+  if (input.brandProfile.colors?.primary) {
     elements.push(`Brand primary color: ${input.brandProfile.colors.primary}`);
   }
 
@@ -359,6 +373,7 @@ function formatCTA(cta: CTAType): string {
     view_menu: 'View Menu',
     call_now: 'Call Now',
     get_directions: 'Get Directions',
+    book_appointment: 'Book Appointment',
   };
   return ctaMap[cta] || cta;
 }

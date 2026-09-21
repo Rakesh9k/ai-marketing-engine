@@ -1,243 +1,214 @@
 'use client';
 
 import type { ReactNode } from 'react';
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useAuth } from '@/features/auth/hooks/useAuth';
+import { usageService, subscriptionService } from '@/services/database';
+import { MitraMark } from '@/components/ui/MitraMark';
+import { ThemeToggle } from '@/components/ui/ThemeToggle';
 
 interface SidebarProps {
   children: ReactNode;
 }
 
-const navigation = [
-  { name: 'Dashboard', href: '/dashboard', icon: DashboardIcon },
+/**
+ * The primary creative workflow — kept to five destinations so the floating
+ * nav pill stays quiet. Usage/Billing are account-adjacent, not creative
+ * work, so they live in the profile menu instead (see PRIMARY_NAV below).
+ */
+const PRIMARY_NAV = [
+  { name: 'Home', href: '/dashboard', icon: HomeIcon },
+  { name: 'Create', href: '/campaigns/new', icon: CreateIcon },
   { name: 'Campaigns', href: '/campaigns', icon: CampaignsIcon },
   { name: 'Brand', href: '/brand', icon: BrandIcon },
   { name: 'Products', href: '/products', icon: ProductsIcon },
-  { name: 'Usage', href: '/usage', icon: UsageIcon },
-  { name: 'Billing', href: '/billing', icon: BillingIcon },
 ] as const;
 
-function DashboardIcon({ className }: { className?: string }) {
+const ACCOUNT_NAV = [
+  { name: 'Business Profile', href: '/business-profile' },
+  { name: 'Analytics', href: '/analytics' },
+  { name: 'Usage & credits', href: '/usage' },
+  { name: 'Billing', href: '/billing' },
+] as const;
+
+function HomeIcon({ className }: { className?: string }) {
   return (
-    <svg
-      className={className}
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      aria-hidden="true"
-    >
-      <rect x="3" y="3" width="7" height="7" rx="1" />
-      <rect x="14" y="3" width="7" height="7" rx="1" />
-      <rect x="3" y="14" width="7" height="7" rx="1" />
-      <rect x="14" y="14" width="7" height="7" rx="1" />
+    <svg className={className} viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <path
+        d="M4 11.5 12 4l8 7.5M6 9.5V20h12V9.5"
+        stroke="currentColor"
+        strokeWidth="1.75"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
+function CreateIcon({ className }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <path d="M12 5v14M5 12h14" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" />
     </svg>
   );
 }
 
 function CampaignsIcon({ className }: { className?: string }) {
   return (
-    <svg
-      className={className}
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      aria-hidden="true"
-    >
-      <rect x="3" y="3" width="18" height="18" rx="2" />
-      <path d="M9 9h6M9 15h4" />
+    <svg className={className} viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <rect
+        x="3.5"
+        y="4.5"
+        width="17"
+        height="15"
+        rx="2.5"
+        stroke="currentColor"
+        strokeWidth="1.75"
+      />
+      <path d="M8 9.5h8M8 14h5" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" />
     </svg>
   );
 }
 
 function BrandIcon({ className }: { className?: string }) {
   return (
-    <svg
-      className={className}
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      aria-hidden="true"
-    >
-      <circle cx="12" cy="12" r="10" />
-      <path d="M12 8v8M8 12h8" />
+    <svg className={className} viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <circle cx="12" cy="12" r="7.5" stroke="currentColor" strokeWidth="1.75" />
+      <circle cx="12" cy="12" r="2.5" fill="currentColor" />
     </svg>
   );
 }
 
 function ProductsIcon({ className }: { className?: string }) {
   return (
-    <svg
-      className={className}
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      aria-hidden="true"
-    >
-      <path d="M20 6L12 2L4 6L4 18L12 22L20 18L20 6Z" />
-      <path d="M12 22V12" />
+    <svg className={className} viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <path
+        d="M12 3.5 20 8v8l-8 4.5L4 16V8l8-4.5ZM4 8l8 4.5M20 8l-8 4.5v8.5"
+        stroke="currentColor"
+        strokeWidth="1.75"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
     </svg>
   );
 }
 
-function UsageIcon({ className }: { className?: string }) {
-  return (
-    <svg
-      className={className}
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      aria-hidden="true"
-    >
-      <circle cx="12" cy="12" r="10" />
-      <path d="M12 6v6l4 2" />
-    </svg>
-  );
-}
+function useCredits(userId: string | undefined) {
+  const [creditsRemaining, setCreditsRemaining] = useState<number | null>(null);
 
-function BillingIcon({ className }: { className?: string }) {
-  return (
-    <svg
-      className={className}
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      aria-hidden="true"
-    >
-      <rect x="2" y="5" width="20" height="14" rx="2" />
-      <line x1="2" y1="10" x2="22" y2="10" />
-      <path d="M6 14v4a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2v-4" />
-    </svg>
-  );
+  useEffect(() => {
+    if (!userId) return;
+    let cancelled = false;
+
+    void (async () => {
+      try {
+        const [usage, subscription] = await Promise.all([
+          usageService.getCurrentPeriod(userId),
+          subscriptionService.getByUserId(userId),
+        ]);
+        if (cancelled) return;
+        const included = subscription?.creditsIncluded ?? 100;
+        const used = usage?.creditsUsed ?? 0;
+        setCreditsRemaining(Math.max(0, included - used));
+      } catch {
+        // Quiet failure — the credits pill just doesn't render. Never blocks navigation.
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [userId]);
+
+  return creditsRemaining;
 }
 
 export function Sidebar({ children }: SidebarProps) {
-  const [isOpen, setIsOpen] = useState(false);
-  const [userMenuOpen, setUserMenuOpen] = useState(false);
+  const [profileOpen, setProfileOpen] = useState(false);
   const pathname = usePathname();
   const { user, logout } = useAuth();
+  const creditsRemaining = useCredits(user?.uid);
+  const profileRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!profileOpen) return;
+    const handleClickOutside = (e: MouseEvent) => {
+      if (profileRef.current && !profileRef.current.contains(e.target as Node)) {
+        setProfileOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [profileOpen]);
 
   const handleLogout = async () => {
     await logout();
     window.location.href = '/login';
   };
 
+  const initial = (user?.displayName || user?.email || '?').charAt(0).toUpperCase();
+
   return (
-    <div className="bg-bg-primary flex min-h-screen">
-      <aside
-        className={`fixed inset-y-0 left-0 z-50 w-64 transform border-r border-neutral-200 bg-white transition-transform duration-200 ease-in-out lg:translate-x-0 ${
-          isOpen ? 'translate-x-0' : '-translate-x-full'
-        }`}
-        aria-label="Main navigation"
-      >
-        <div className="flex h-16 items-center justify-between border-b border-neutral-200 px-4">
-          <Link href="/dashboard" className="flex items-center gap-2" aria-label="Go to dashboard">
-            <svg
-              className="text-brand-600 h-8 w-8"
-              viewBox="0 0 32 32"
-              fill="none"
-              xmlns="http://www.w3.org/2000/svg"
-              aria-hidden="true"
-            >
-              <rect width="32" height="32" rx="8" fill="currentColor" />
-              <path
-                d="M8 16L14 22L24 10"
-                stroke="white"
-                strokeWidth="3"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              />
-            </svg>
-            <span className="text-brand-600 hidden text-xl font-bold lg:block">
-              AI Marketing Engine
-            </span>
+    <div className="bg-bg-primary min-h-screen">
+      {/* Top bar — brand mark, credits, theme, profile. Quiet, not a toolbar. */}
+      <header className="bg-bg-primary/90 fixed inset-x-0 top-0 z-40 backdrop-blur">
+        <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-4 sm:px-6 lg:px-8">
+          <Link href="/dashboard" aria-label="Mitra — Home">
+            <MitraMark size="md" decorative />
           </Link>
-          <button
-            className="rounded-md p-2 text-neutral-500 hover:bg-neutral-100 lg:hidden"
-            onClick={() => setIsOpen(false)}
-            aria-label="Close sidebar"
-          >
-            <svg
-              className="h-6 w-6"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-              aria-hidden="true"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M6 18L18 6M6 6l12 12"
-              />
-            </svg>
-          </button>
-        </div>
 
-        <nav className="flex-1 space-y-1 overflow-y-auto px-3 py-4" aria-label="Main navigation">
-          {navigation.map((item) => {
-            const isActive = pathname === item.href;
-            return (
+          <div className="flex items-center gap-2 sm:gap-3">
+            {creditsRemaining !== null && (
               <Link
-                key={item.name}
-                href={item.href}
-                className={`flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors ${
-                  isActive
-                    ? 'bg-brand-50 text-brand-700'
-                    : 'text-neutral-600 hover:bg-neutral-50 hover:text-neutral-900'
-                }`}
-                aria-current={isActive ? 'page' : undefined}
+                href="/usage"
+                className="border-border-light text-text-secondary hover:text-text-primary hover:border-border-medium hidden items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-medium transition-colors sm:inline-flex"
               >
-                <item.icon className="h-5 w-5 flex-shrink-0" />
-                <span>{item.name}</span>
+                <span className="bg-brand-500 h-1.5 w-1.5 rounded-full" aria-hidden="true" />
+                {creditsRemaining} credits
               </Link>
-            );
-          })}
-        </nav>
+            )}
 
-        <div className="border-t border-neutral-200 p-4">
-          <div className="flex items-center gap-3">
-            <div className="min-w-0 flex-1">
-              <p className="truncate text-sm font-medium text-neutral-900">
-                {user?.displayName || user?.email}
-              </p>
-              <p className="truncate text-xs text-neutral-500">{user?.email}</p>
-            </div>
-            <div className="relative">
+            <ThemeToggle />
+
+            <div className="relative" ref={profileRef}>
               <button
-                onClick={() => setUserMenuOpen(!userMenuOpen)}
-                className="rounded-full p-1.5 text-neutral-500 hover:bg-neutral-100 hover:text-neutral-700"
-                aria-label="User menu"
-                aria-expanded={userMenuOpen}
+                onClick={() => setProfileOpen((open) => !open)}
+                className="bg-bg-tertiary text-text-primary hover:bg-border-light flex h-9 w-9 items-center justify-center rounded-full text-sm font-semibold transition-colors"
+                aria-label="Account menu"
+                aria-expanded={profileOpen}
                 aria-haspopup="true"
               >
-                <svg
-                  className="h-5 w-5"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                  aria-hidden="true"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z"
-                  />
-                </svg>
+                {initial}
               </button>
-              {userMenuOpen && (
-                <div className="absolute top-full right-0 z-10 mt-1 w-40 rounded-md border border-neutral-200 bg-white py-1 shadow-lg">
+
+              {profileOpen && (
+                <div
+                  role="menu"
+                  className="border-border-light bg-surface absolute top-full right-0 z-10 mt-2 w-56 rounded-xl border p-1.5 shadow-lg"
+                >
+                  <div className="border-border-light mb-1 border-b px-3 py-2">
+                    <p className="text-text-primary truncate text-sm font-medium">
+                      {user?.displayName || 'Your account'}
+                    </p>
+                    <p className="text-text-tertiary truncate text-xs">{user?.email}</p>
+                  </div>
+                  {ACCOUNT_NAV.map((item) => (
+                    <Link
+                      key={item.href}
+                      href={item.href}
+                      role="menuitem"
+                      onClick={() => setProfileOpen(false)}
+                      className="text-text-secondary hover:bg-bg-secondary hover:text-text-primary block rounded-lg px-3 py-2 text-sm transition-colors"
+                    >
+                      {item.name}
+                    </Link>
+                  ))}
                   <button
+                    role="menuitem"
                     onClick={handleLogout}
-                    className="text-error-600 hover:bg-error-50 w-full px-3 py-2 text-left text-sm"
+                    className="text-error-600 hover:bg-error-50 mt-1 w-full rounded-lg px-3 py-2 text-left text-sm transition-colors"
                   >
                     Log out
                   </button>
@@ -246,42 +217,46 @@ export function Sidebar({ children }: SidebarProps) {
             </div>
           </div>
         </div>
-      </aside>
+      </header>
 
-      <div
-        className="fixed inset-0 z-40 bg-black/50 lg:hidden"
-        onClick={() => setIsOpen(false)}
-        aria-hidden="true"
-      />
+      <main className="mx-auto max-w-6xl px-4 pt-24 pb-28 sm:px-6 lg:px-8 lg:pt-28">
+        {children}
+      </main>
 
-      <div className="flex-1 lg:ml-64">
-        <header className="sticky top-0 z-30 h-16 border-b border-neutral-200 bg-white">
-          <div className="flex h-full items-center justify-between px-4 sm:px-6">
-            <button
-              className="rounded-md p-2 text-neutral-500 hover:bg-neutral-100 lg:hidden"
-              onClick={() => setIsOpen(true)}
-              aria-label="Open sidebar"
+      {/* Floating navigation pill — the whole workflow, always one tap away. */}
+      <nav
+        aria-label="Main navigation"
+        className="border-border-light bg-surface/95 fixed inset-x-0 bottom-4 z-40 mx-auto flex w-fit items-center gap-0.5 rounded-full border p-1.5 shadow-lg backdrop-blur sm:bottom-6 sm:gap-1"
+      >
+        {PRIMARY_NAV.map((item) => {
+          // "/campaigns/new" belongs to Create, not Campaigns, even though
+          // it's nested under the campaigns route — checked first so the
+          // more specific match wins instead of both pills lighting up.
+          const isActive =
+            item.href === '/campaigns/new'
+              ? pathname?.startsWith('/campaigns/new')
+              : item.href === '/campaigns'
+                ? pathname === '/campaigns' || /^\/campaigns\/(?!new)/.test(pathname || '')
+                : item.href === '/dashboard'
+                  ? pathname === '/dashboard'
+                  : pathname?.startsWith(item.href);
+          return (
+            <Link
+              key={item.name}
+              href={item.href}
+              aria-current={isActive ? 'page' : undefined}
+              className={`flex items-center gap-2 rounded-full px-3 py-2.5 text-sm font-medium transition-colors sm:px-4 ${
+                isActive
+                  ? 'bg-brand-500 text-white'
+                  : 'text-text-secondary hover:bg-bg-secondary hover:text-text-primary'
+              }`}
             >
-              <svg
-                className="h-6 w-6"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-                aria-hidden="true"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M4 6h16M4 12h16M4 18h16"
-                />
-              </svg>
-            </button>
-            <div className="flex-1 lg:flex-none" />
-          </div>
-        </header>
-        <main className="flex-1 p-4 sm:p-6 lg:p-8">{children}</main>
-      </div>
+              <item.icon className="h-[18px] w-[18px] flex-shrink-0" />
+              <span className="hidden sm:inline">{item.name}</span>
+            </Link>
+          );
+        })}
+      </nav>
     </div>
   );
 }

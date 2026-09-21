@@ -3,7 +3,7 @@ import { z } from 'zod';
 import * as admin from 'firebase-admin';
 import { v7 as uuidv7 } from 'uuid';
 
-import { verifyAuthAndBusinessAccess } from '../../middleware/auth';
+import { verifyBusinessAccess } from '../../middleware/auth';
 import { validatedCallable } from '../../middleware/validation';
 import { checkRateLimit } from '../../middleware/rateLimit';
 import { createAssetDoc, getAssetDoc } from '../../services/firestore';
@@ -15,7 +15,20 @@ const confirmUploadSchema = z.object({
   businessId: z.string().min(1),
   storagePath: z.string().min(1),
   assetType: z
-    .enum(['poster', 'headline', 'ad_copy', 'caption', 'story', 'reel', 'whatsapp', 'cta'])
+    .enum([
+      'poster',
+      'headline',
+      'ad_copy',
+      'caption',
+      'story',
+      'reel',
+      'whatsapp',
+      'cta',
+      'product',
+      'campaign',
+      'brand-kit',
+      'logo',
+    ])
     .optional(),
   metadata: z
     .object({
@@ -40,7 +53,7 @@ export const confirmUpload = onCall(
     });
 
     try {
-      await verifyAuthAndBusinessAccess(context as any, data.businessId);
+      await verifyBusinessAccess(context.userId, data.businessId);
       await checkRateLimit(context.userId, 'confirmUpload');
 
       const { storagePath, assetType = 'product', metadata } = data;
@@ -75,12 +88,16 @@ export const confirmUpload = onCall(
         'reel',
         'whatsapp',
         'cta',
+        'product',
+        'campaign',
+        'brand-kit',
+        'logo',
       ] as const;
       const validAssetType = allowedAssetTypes.includes(
         assetType as (typeof allowedAssetTypes)[number]
       )
         ? (assetType as AssetType)
-        : ('poster' as AssetType);
+        : ('product' as AssetType);
       const asset: Asset = {
         assetId,
         userId,

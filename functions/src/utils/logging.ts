@@ -12,6 +12,31 @@ export interface LogContext {
   [key: string]: any;
 }
 
+// Phase 14: a defensive, generic safety net — not a substitute for careful
+// error construction at each call site. Some AI provider SDKs (Gemini in
+// particular sends its API key as a `?key=...` query parameter) can embed
+// the full request URL, including the credential, inside a thrown error's
+// own .message when the underlying HTTP client formats a network error as
+// "request to <url> failed". Every error that reaches this logger — from
+// any provider, present or future — is redacted the same way before it
+// ever reaches functions.logger, rather than trusting each individual
+// provider file to never leak this.
+const SECRET_PATTERNS: RegExp[] = [
+  /([?&](?:key|api_key|apikey|token|access_token)=)[^&\s"']+/gi,
+  /(Authorization:\s*Bearer\s+)\S+/gi,
+  /\bsk-[A-Za-z0-9]{16,}\b/g,
+  /\bAIza[0-9A-Za-z_-]{20,}\b/g,
+  /\brzp_(live|test)_[A-Za-z0-9]{10,}\b/g,
+];
+
+function redactSecrets(value: string): string {
+  return SECRET_PATTERNS.reduce(
+    (text, pattern) =>
+      text.replace(pattern, (match, prefix) => (prefix ? `${prefix}[REDACTED]` : '[REDACTED]')),
+    value
+  );
+}
+
 export function createLogger(context: LogContext = {}) {
   const baseContext = {
     ...context,
@@ -29,8 +54,11 @@ export function createLogger(context: LogContext = {}) {
     error: (message: string, error: Error | unknown, extra: Record<string, any> = {}) => {
       const errorInfo =
         error instanceof Error
-          ? { message: error.message, stack: error.stack }
-          : { message: String(error) };
+          ? {
+              message: redactSecrets(error.message),
+              stack: error.stack ? redactSecrets(error.stack) : undefined,
+            }
+          : { message: redactSecrets(String(error)) };
       functions.logger.error(message, { ...baseContext, error: errorInfo, ...extra });
     },
     debug: (message: string, extra: Record<string, any> = {}) => {

@@ -30,21 +30,24 @@ export async function runTruthValidation(
     productContext,
     campaignInput
   );
-  return generateStructuredText(prompt, {
-    passed: z.boolean(),
-    violations: z.array(
-      z.object({
-        assetId: z.string(),
-        assetType: z.string(),
-        field: z.string(),
-        expected: z.string(),
-        actual: z.string(),
-        severity: z.enum(['critical', 'major', 'minor']),
-        suggestion: z.string(),
-      })
-    ),
-    assetStatus: z.record(z.enum(['passed', 'failed', 'warning'])),
-  });
+  return generateStructuredText(
+    prompt,
+    z.object({
+      passed: z.boolean(),
+      violations: z.array(
+        z.object({
+          assetId: z.string(),
+          assetType: z.string(),
+          field: z.string(),
+          expected: z.string(),
+          actual: z.string(),
+          severity: z.enum(['critical', 'major', 'minor']),
+          suggestion: z.string(),
+        })
+      ),
+      assetStatus: z.record(z.enum(['passed', 'failed', 'warning'])),
+    })
+  );
 }
 
 function buildTruthValidationPrompt(
@@ -109,19 +112,22 @@ export async function runQualityValidation(
     brandKit,
     campaignStrategy
   );
-  return generateStructuredText(prompt, {
-    passed: z.boolean(),
-    issues: z.array(
-      z.object({
-        assetId: z.string(),
-        assetType: z.string(),
-        issue: z.string(),
-        severity: z.enum(['high', 'medium', 'low']),
-        suggestion: z.string(),
-      })
-    ),
-    assetScores: z.record(z.number()),
-  });
+  return generateStructuredText(
+    prompt,
+    z.object({
+      passed: z.boolean(),
+      issues: z.array(
+        z.object({
+          assetId: z.string(),
+          assetType: z.string(),
+          issue: z.string(),
+          severity: z.enum(['high', 'medium', 'low']),
+          suggestion: z.string(),
+        })
+      ),
+      assetScores: z.record(z.number()),
+    })
+  );
 }
 
 function buildQualityValidationPrompt(
@@ -160,28 +166,31 @@ OUTPUT FORMAT: Must match the provided JSON schema exactly.`;
  */
 export async function runSafetyValidation(copyPack: any, generatedImages: any): Promise<any> {
   const prompt = buildSafetyValidationPrompt(copyPack, generatedImages);
-  return generateStructuredText(prompt, {
-    passed: z.boolean(),
-    violations: z.array(
-      z.object({
-        assetId: z.string(),
-        assetType: z.string(),
-        category: z.enum([
-          'medical',
-          'misleading',
-          'copyright',
-          'hate',
-          'adult',
-          'illegal',
-          'pii',
-          'political',
-        ]),
-        description: z.string(),
-        excerpt: z.string(),
-        severity: z.enum(['critical', 'high', 'medium']),
-      })
-    ),
-  });
+  return generateStructuredText(
+    prompt,
+    z.object({
+      passed: z.boolean(),
+      violations: z.array(
+        z.object({
+          assetId: z.string(),
+          assetType: z.string(),
+          category: z.enum([
+            'medical',
+            'misleading',
+            'copyright',
+            'hate',
+            'adult',
+            'illegal',
+            'pii',
+            'political',
+          ]),
+          description: z.string(),
+          excerpt: z.string(),
+          severity: z.enum(['critical', 'high', 'medium']),
+        })
+      ),
+    })
+  );
 }
 
 function buildSafetyValidationPrompt(copyPack: any, generatedImages: any): string {

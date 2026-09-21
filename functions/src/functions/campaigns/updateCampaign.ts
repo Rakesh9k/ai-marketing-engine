@@ -1,12 +1,12 @@
 import { onCall, HttpsError } from 'firebase-functions/v2/https';
 import { z } from 'zod';
 
-import { verifyAuthAndBusinessAccess } from '../../middleware/auth';
+import { verifyBusinessAccess } from '../../middleware/auth';
 import { validatedCallable } from '../../middleware/validation';
 import { getCampaignDoc, updateCampaignDoc } from '../../services/firestore';
 import { logFunctionStart, logFunctionComplete, logFunctionError } from '../../utils/logging';
 import { mapErrorToHttpsError } from '../../utils/errors';
-import type { Campaign, CampaignStatus } from '../../types';
+import type { Campaign } from '../../types';
 
 const updateCampaignSchema = z.object({
   campaignId: z.string().min(1),
@@ -97,30 +97,15 @@ const updateCampaignSchema = z.object({
       contentFormat: z.enum(['poster', 'story', 'reel', 'caption', 'whatsapp']),
     })
     .optional(),
-  status: z
-    .enum([
-      'draft',
-      'validating',
-      'queued',
-      'analyzing',
-      'strategizing',
-      'generating_copy',
-      'generating_creatives',
-      'validating_output',
-      'completed',
-      'failed',
-    ])
-    .optional(),
-  creditsReserved: z.number().positive().optional(),
-  creditsUsed: z.number().nonnegative().optional(),
-  error: z
-    .object({
-      code: z.string(),
-      message: z.string(),
-      stage: z.string(),
-      retryable: z.boolean(),
-    })
-    .optional(),
+  // Deliberately NOT exposed to this client-facing "edit campaign details"
+  // endpoint: status, creditsReserved, creditsUsed, error. These are
+  // authoritative fields only the generation pipeline (generateCampaignStrategy,
+  // regenerateAsset) may set via direct Admin SDK writes — a status of
+  // 'verified'/'completed' asserts the deterministic Truth Check passed,
+  // which this endpoint has no way to know or re-verify. Accepting them
+  // here would let any campaign owner set status:'completed' (or forge
+  // credit fields) through a legitimate API call with zero Truth Check
+  // gating. See Phase 6 Truth Check report.
   metadata: z
     .object({
       idempotencyKey: z.string().uuid(),
@@ -141,7 +126,7 @@ export const updateCampaign = onCall(
 
     try {
       const { campaignId, businessId, ...updateData } = data;
-      await verifyAuthAndBusinessAccess(context as any, businessId);
+      await verifyBusinessAccess(context.userId, businessId);
 
       const existingCampaign = await getCampaignDoc(campaignId);
       if (!existingCampaign) {

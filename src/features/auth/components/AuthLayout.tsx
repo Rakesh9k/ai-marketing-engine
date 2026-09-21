@@ -2,6 +2,8 @@
 
 import type { ReactNode } from 'react';
 import Link from 'next/link';
+import { MitraMark } from '@/components/ui/MitraMark';
+import { MitraLogo } from '@/components/ui/MitraLogo';
 
 interface AuthLayoutProps {
   children: ReactNode;
@@ -16,42 +18,23 @@ export function AuthLayout({
 }: AuthLayoutProps) {
   return (
     <div className="flex min-h-screen flex-col">
-      <header className="border-b border-neutral-200 bg-white">
+      <header className="border-border-light bg-bg-primary border-b">
         <div className="mx-auto flex h-16 max-w-md items-center justify-between px-4">
-          <Link
-            href="/"
-            className="text-brand-600 flex items-center gap-2 text-xl font-bold"
-            aria-label="AI Marketing Engine Home"
-          >
-            <svg
-              className="h-8 w-8"
-              viewBox="0 0 32 32"
-              fill="none"
-              xmlns="http://www.w3.org/2000/svg"
-              aria-hidden="true"
-            >
-              <rect width="32" height="32" rx="8" fill="currentColor" />
-              <path
-                d="M8 16L14 22L24 10"
-                stroke="white"
-                strokeWidth="3"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              />
-            </svg>
-            <span className="hidden sm:block">AI Marketing Engine</span>
+          <Link href="/" aria-label="AI Marketing Engine Home">
+            <MitraMark size="lg" decorative />
           </Link>
         </div>
       </header>
 
       <main className="flex flex-1 items-center justify-center px-4 py-12">
         <div className="w-full max-w-md">
+          <MitraLogo size="md" className="mb-8" />
           <div className="mb-8 text-center">
             <h1 className="text-h2 text-text-primary font-bold">{title}</h1>
             <p className="text-body text-text-secondary mt-2">{description}</p>
           </div>
 
-          <div className="rounded-2xl border border-neutral-200 bg-white p-8 shadow-sm">
+          <div className="border-border-light bg-surface rounded-2xl border p-8 shadow-sm">
             {children}
           </div>
 
@@ -68,7 +51,7 @@ export function AuthLayout({
         </div>
       </main>
 
-      <footer className="border-t border-neutral-200 bg-white">
+      <footer className="border-border-light bg-bg-primary border-t">
         <div className="text-caption text-text-tertiary mx-auto max-w-md px-4 py-4 text-center">
           © {new Date().getFullYear()} AI Marketing Engine. All rights reserved.
         </div>

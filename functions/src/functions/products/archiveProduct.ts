@@ -1,7 +1,7 @@
 import { onCall, HttpsError } from 'firebase-functions/v2/https';
 import { z } from 'zod';
 
-import { verifyAuthAndBusinessAccess } from '../../middleware/auth';
+import { verifyBusinessAccess } from '../../middleware/auth';
 import { validatedCallable } from '../../middleware/validation';
 import { getProductDoc, updateProductDoc } from '../../services/firestore';
 import { logFunctionStart, logFunctionComplete, logFunctionError } from '../../utils/logging';
@@ -23,7 +23,7 @@ export const archiveProduct = onCall(
     });
 
     try {
-      await verifyAuthAndBusinessAccess(context as any, data.businessId);
+      await verifyBusinessAccess(context.userId, data.businessId);
 
       const existingProduct = await getProductDoc(data.productId);
       if (!existingProduct) {

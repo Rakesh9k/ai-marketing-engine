@@ -1,7 +1,6 @@
 import { onCall, HttpsError } from 'firebase-functions/v2/https';
 import { z } from 'zod';
 
-import { verifyAuth } from '../../middleware/auth';
 import { validatedCallable } from '../../middleware/validation';
 import { getBusinessesByUser } from '../../services/firestore';
 import { logFunctionStart, logFunctionComplete, logFunctionError } from '../../utils/logging';
@@ -19,7 +18,11 @@ export const listBusinesses = onCall(
     const { logger, startTime } = logFunctionStart('listBusinesses', { userId: context.userId });
 
     try {
-      await verifyAuth(context as any);
+      // Auth is already verified by validatedCallable — context.userId is
+      // the real, authenticated uid. A prior call here to
+      // verifyAuth(context as any) always threw (context is {userId,
+      // token}, not a CallableRequest with an .auth property), so this
+      // function could never actually succeed for any caller.
       const businesses = await getBusinessesByUser(context.userId);
 
       logFunctionComplete(logger, startTime, { success: true, count: businesses.length });

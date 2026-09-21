@@ -158,9 +158,21 @@ jobs:
           FIREBASE_STORAGE_EMULATOR_HOST: localhost:9199
           FIREBASE_FUNCTIONS_EMULATOR_HOST: localhost:5001
 
-  # Deploy to staging
-  deploy-staging:
-    name: Deploy to Staging
+  # Deploy backend (Cloud Functions) to staging.
+  #
+  # Phase 19A: this job previously also ran FirebaseExtended/action-hosting-
+  # deploy@v0 to deploy the Next.js frontend to Firebase Hosting. That could
+  # never have worked: firebase.json has no `hosting` block at all (no
+  # `public` dir, no Next.js framework config), and this app has no
+  # `output: "export"`/`"standalone"` — it's a standard server-rendered
+  # Next.js build, not something a bare Firebase Hosting deploy can serve.
+  # vercel.json (present, correct, Next.js-framework-aware) is this
+  # repository's actual frontend deployment config; Vercel deploys the
+  # frontend itself via its own Git integration on push, independent of
+  # this workflow. This job is scoped to what Firebase actually serves:
+  # the backend (Cloud Functions).
+  deploy-backend-staging:
+    name: Deploy Backend to Staging
     needs: [frontend-lint, functions-lint, test]
     if: github.ref == 'refs/heads/develop'
     runs-on: ubuntu-latest
@@ -174,29 +186,13 @@ jobs:
           node-version: ${{ env.NODE_VERSION }}
           cache: 'npm'
 
-      - name: Install dependencies
-        run: npm ci
-        working-directory: ./ai-marketing-engine
-
       - name: Install functions dependencies
         run: npm ci
         working-directory: ./ai-marketing-engine/functions
 
-      - name: Build frontend
-        run: npm run build
-        working-directory: ./ai-marketing-engine
-
       - name: Build functions
         run: npm run build
         working-directory: ./ai-marketing-engine/functions
-
-      - name: Deploy to Firebase Staging
-        uses: FirebaseExtended/action-hosting-deploy@v0
-        with:
-          repoToken: ${{ secrets.GITHUB_TOKEN }}
-          firebaseServiceAccount: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_STAGING }}
-          projectId: ${{ secrets.FIREBASE_PROJECT_ID_STAGING }}
-          channelId: staging
 
       - name: Deploy Functions to Staging
         run: |
@@ -205,9 +201,11 @@ jobs:
         env:
           FIREBASE_TOKEN: ${{ secrets.FIREBASE_TOKEN }}
 
-  # Deploy to production
-  deploy-production:
-    name: Deploy to Production
+  # Deploy backend (Cloud Functions) to production. See the comment on
+  # deploy-backend-staging above — the frontend is deployed by Vercel, not
+  # this workflow.
+  deploy-backend-production:
+    name: Deploy Backend to Production
     needs: [frontend-lint, functions-lint, test]
     if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
@@ -222,28 +220,13 @@ jobs:
           node-version: ${{ env.NODE_VERSION }}
           cache: 'npm'
 
-      - name: Install dependencies
-        run: npm ci
-        working-directory: ./ai-marketing-engine
-
       - name: Install functions dependencies
         run: npm ci
         working-directory: ./ai-marketing-engine/functions
 
-      - name: Build frontend
-        run: npm run build
-        working-directory: ./ai-marketing-engine
-
       - name: Build functions
         run: npm run build
         working-directory: ./ai-marketing-engine/functions
-
-      - name: Deploy to Firebase Production
-        uses: FirebaseExtended/action-hosting-deploy@v0
-        with:
-          repoToken: ${{ secrets.GITHUB_TOKEN }}
-          firebaseServiceAccount: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_PROD }}
-          projectId: ${{ secrets.FIREBASE_PROJECT_ID_PROD }}
 
       - name: Deploy Functions to Production
         run: |

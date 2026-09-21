@@ -1,5 +1,36 @@
 import { GoogleGenerativeAI } from '@google/generative-ai';
+import { z } from 'zod';
 import { getEnvConfig } from '../../config/env';
+import { getVerticalConfigOrDefault } from '../../config/verticals';
+import { createLogger } from '../../utils/logging';
+
+const logger = createLogger({ function: 'vision' });
+
+/**
+ * Runtime contract for the vision analysis response. Previously the parsed
+ * JSON.parse() output was returned directly, typed only via the function's
+ * declared return type (an unchecked cast) — malformed/partial Gemini
+ * output would silently flow into image-prompt building with missing
+ * fields instead of failing here where the problem originates.
+ */
+const VisionAnalysisResultSchema = z.object({
+  dishName: z.string(),
+  confidence: z.number(),
+  visualAttributes: z.object({
+    platingStyle: z.string(),
+    container: z.string(),
+    garnish: z.array(z.string()),
+    colorPalette: z.array(z.string()),
+    lighting: z.string(),
+    background: z.string(),
+    portionSize: z.enum(['small', 'medium', 'large', 'family']),
+    steamVisible: z.boolean(),
+    textureCues: z.array(z.string()),
+  }),
+  ambianceCues: z.array(z.string()),
+  suggestedCompositions: z.array(z.string()),
+  qualityFlags: z.array(z.string()),
+});
 
 const config = getEnvConfig();
 
@@ -8,13 +39,13 @@ const config = getEnvConfig();
  * Analyzes product images for marketing campaign generation
  */
 export class GeminiVisionProvider {
-  private client: GoogleGenerativeAI;
-  private model: any;
+  protected client: GoogleGenerativeAI;
+  protected model: any;
 
   constructor() {
     const apiKey = config.GEMINI_API_KEY || '';
     this.client = new GoogleGenerativeAI(apiKey);
-    this.model = this.client.getGenerativeModel({ model: 'gemini-1.5-pro' });
+    this.model = this.client.getGenerativeModel({ model: 'gemini-flash-latest' });
   }
 
   /**
@@ -53,7 +84,7 @@ export class GeminiVisionProvider {
   /**
    * Prepare images for Gemini API
    */
-  private async prepareImages(imageUrls: string[]): Promise<any[]> {
+  protected async prepareImages(imageUrls: string[]): Promise<any[]> {
     const parts = [];
     for (const url of imageUrls) {
       try {
@@ -71,7 +102,18 @@ export class GeminiVisionProvider {
           },
         });
       } catch (error) {
-        console.warn(`Failed to load image ${url}:`, error);
+        // Storage URLs carry access tokens/signatures as query params (e.g.
+        // Firebase Storage's `?token=...`) — only the path is logged, never
+        // the full URL, so a fetch failure log can't leak a live download
+        // credential.
+        const safePath = (() => {
+          try {
+            return new URL(url).pathname;
+          } catch {
+            return '[unparseable-url]';
+          }
+        })();
+        logger.error('Failed to load image for vision analysis', error, { path: safePath });
       }
     }
     return parts;
@@ -93,7 +135,10 @@ export class GeminiVisionProvider {
       location: { city: string; state: string; locality?: string };
     }
   ): string {
-    return `You are an expert food/product analyst for Indian restaurant marketing campaigns. Analyze the provided product images and return a detailed structured analysis.
+    const verticalPrefix = getVerticalConfigOrDefault(businessContext.category).promptContext
+      .imageAnalystPersona;
+
+    return `${verticalPrefix}
 
 BUSINESS CONTEXT:
 - Business: ${businessContext.name}
@@ -135,37 +180,98 @@ Be specific and descriptive for image prompt generation. Focus on visual details
    * Parse the vision response from Gemini
    */
   private parseVisionResponse(response: string): VisionAnalysisResult {
+    // Extract JSON from response (Gemini might include markdown code blocks)
+    const jsonMatch = response.match(/\{[\s\S]*\}/);
+    const jsonStr = jsonMatch ? jsonMatch[0] : response;
+
+    let parsed: unknown;
     try {
-      // Extract JSON from response (Gemini might include markdown code blocks)
-      const jsonMatch = response.match(/\{[\s\S]*\}/);
-      const jsonStr = jsonMatch ? jsonMatch[0] : response;
-      return JSON.parse(jsonStr);
+      parsed = JSON.parse(jsonStr);
     } catch (error) {
       throw new Error(
         `Failed to parse vision response: ${error instanceof Error ? error.message : 'Invalid JSON'}`
       );
     }
+
+    const result = VisionAnalysisResultSchema.safeParse(parsed);
+    if (!result.success) {
+      throw new Error(`Vision response schema validation failed: ${result.error.message}`);
+    }
+    return result.data;
   }
 }
 
-export interface VisionAnalysisResult {
-  dishName: string;
-  confidence: number;
-  visualAttributes: {
-    platingStyle: string;
-    container: string;
-    garnish: string[];
-    colorPalette: string[];
-    lighting: string;
-    background: string;
-    portionSize: 'small' | 'medium' | 'large' | 'family';
-    steamVisible: boolean;
-    textureCues: string[];
-  };
-  ambianceCues: string[];
-  suggestedCompositions: string[];
-  qualityFlags: string[];
+export type VisionAnalysisResult = z.infer<typeof VisionAnalysisResultSchema>;
+
+const ReelClipClassificationSchema = z.object({
+  classifications: z.array(
+    z.object({
+      clipId: z.string(),
+      sceneType: z.enum([
+        'food',
+        'preparation',
+        'cooking',
+        'chef',
+        'interior',
+        'customer',
+        'product',
+        'unknown',
+      ]),
+      relevanceScore: z.number().min(0).max(1),
+      description: z.string(),
+    })
+  ),
+});
+
+export type ReelClipClassificationResult = z.infer<typeof ReelClipClassificationSchema>;
+
+/**
+ * Scene classification for "Create a Reel" clip thumbnails. Deliberately a
+ * SINGLE batched Gemini call for up to 10 thumbnails (one prompt, all
+ * images attached) rather than one call per clip — see AGENTS.md section 38
+ * "COST CONTROL" ("one clip-analysis batch where possible").
+ */
+export class GeminiReelVisionProvider extends GeminiVisionProvider {
+  async classifyReelClipThumbnails(
+    clips: Array<{ clipId: string; thumbnailUrl: string }>,
+    businessContext: { name: string; category: string; goal: string }
+  ): Promise<ReelClipClassificationResult> {
+    const imageParts = await this.prepareImages(clips.map((c) => c.thumbnailUrl));
+
+    const prompt = `You are Mitra's short-form social video editor. You will see ${clips.length} still thumbnails, each extracted from one raw video clip a local business owner uploaded, in this order: ${clips
+      .map((c, i) => `${i + 1}. clipId="${c.clipId}"`)
+      .join(', ')}.
+
+Business: ${businessContext.name} (${businessContext.category}). Reel goal: ${businessContext.goal}.
+
+For EACH thumbnail, in the same order, classify what it shows and how strong a moment it is for a vertical Instagram Reel.
+
+Return JSON:
+{
+  "classifications": [
+    {
+      "clipId": "string - must exactly match one of the given clipIds, one entry per thumbnail",
+      "sceneType": "food|preparation|cooking|chef|interior|customer|product|unknown",
+      "relevanceScore": "number 0-1 - how strong/usable this moment is (clear, well-lit, interesting > blurry, dark, empty)",
+      "description": "short phrase describing what's visible, max 12 words"
+    }
+  ]
+}`;
+
+    const result = await this.model.generateContent([prompt, ...imageParts]);
+    const responseText = result.response.text();
+    const jsonMatch = responseText.match(/\{[\s\S]*\}/);
+    const parsed = JSON.parse(jsonMatch ? jsonMatch[0] : responseText);
+    const validated = ReelClipClassificationSchema.safeParse(parsed);
+    if (!validated.success) {
+      throw new Error(
+        `Reel clip classification schema validation failed: ${validated.error.message}`
+      );
+    }
+    return validated.data;
+  }
 }
 
-// Export singleton instance
+// Export singleton instances
 export const geminiVisionProvider = new GeminiVisionProvider();
+export const geminiReelVisionProvider = new GeminiReelVisionProvider();

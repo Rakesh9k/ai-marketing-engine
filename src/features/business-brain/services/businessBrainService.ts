@@ -10,7 +10,6 @@ import type {
   BusinessRules,
   BusinessBrain,
   BusinessBrainContext,
-  CampaignStyle,
 } from '@/types';
 import { businessService } from '@/services/database';
 import { brandKitService } from '@/services/database';
@@ -94,19 +93,20 @@ export async function getBusinessBrainContext(
   };
 
   // 3. Build LocalizationProfile
+  const bbLoc = businessData.businessBrain?.localization;
   const localizationProfile: LocalizationProfile = {
     country: 'India',
     state: businessData.location?.state || '',
     city: businessData.location?.city || '',
     locality: businessData.location?.locality || '',
-    primaryLanguage: 'en',
-    secondaryLanguage: 'te',
-    languageMixing: 'minimal',
-    regionalStyle: 'neutral',
-    slangPreference: 'none',
-    audienceDescription: '',
+    primaryLanguage: bbLoc?.primaryLanguage || 'en',
+    secondaryLanguage: bbLoc?.secondaryLanguage || 'te',
+    languageMixing: bbLoc?.languageMixing || 'minimal',
+    regionalStyle: bbLoc?.regionalStyle || 'neutral',
+    slangPreference: bbLoc?.slangIntensity || 'none',
+    audienceDescription: businessData.businessBrain?.audience?.targetCustomer || '',
     brandTone: brandProfile.brandTone,
-    campaignStyle: 'business' as unknown as CampaignStyle,
+    campaignStyle: (businessData.businessBrain?.brand?.personality as any) || 'business',
     contentFormat: 'poster',
   };
 

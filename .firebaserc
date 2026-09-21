@@ -2,5 +2,6 @@
   "projects": {
     "default": "brainwise-ai-marketing-engine",
     "dev": "brainwise-ai-marketing-engine"
-  }
+  },
+  "etags": {}
 }

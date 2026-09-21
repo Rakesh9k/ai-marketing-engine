@@ -158,8 +158,22 @@ const uploadImage = async (
     updatedAt: new Date().toISOString(),
   };
 
-  // 9. Save asset record to Firestore
-  await saveAssetRecord(finalAsset);
+  // 9. Patch the asset record with real dimensions (best-effort only).
+  // The authoritative asset record was ALREADY created server-side by
+  // confirmUpload above (Admin SDK, createAssetDoc) — this client-side
+  // write only refines width/height, which confirmUpload initially wrote
+  // as 0/0 since the server never inspects image pixels. Phase 12: a
+  // failure here must not be reported as an upload failure — the asset
+  // genuinely exists and is usable; without this guard, a transient
+  // failure of this client-side patch (network blip, a rules edge case)
+  // would surface as "Upload failed" to the user even though the upload
+  // fully succeeded, inviting a wasteful duplicate re-upload/asset record
+  // via Retry for something that was never actually broken.
+  try {
+    await saveAssetRecord(finalAsset);
+  } catch (err) {
+    console.error('Failed to patch asset dimensions after a successful upload:', err);
+  }
 
   return finalAsset;
 };

@@ -1,8 +1,10 @@
 import * as admin from 'firebase-admin';
 import { HttpsError } from 'firebase-functions/v2/https';
 import type { CallableRequest } from 'firebase-functions/v2/https';
+import { createLogger } from '../utils/logging';
 
 const db = admin.firestore();
+const authzLogger = createLogger({ function: 'verifyBusinessAccess' });
 
 export async function verifyAuth<T>(
   request: CallableRequest<T>
@@ -19,6 +21,7 @@ export async function verifyAuth<T>(
 export async function verifyBusinessAccess(userId: string, businessId: string): Promise<void> {
   const businessDoc = await db.collection('businesses').doc(businessId).get();
   if (!businessDoc.exists) {
+    authzLogger.warn('Business access denied: business not found', { userId, businessId });
     throw new HttpsError('not-found', 'Business not found');
   }
   const businessData = businessDoc.data() as { userId: string; agencyId?: string } | undefined;
@@ -26,6 +29,15 @@ export async function verifyBusinessAccess(userId: string, businessId: string): 
     const userDoc = await db.collection('users').doc(userId).get();
     const userData = userDoc.data() as { role?: string; agencyId?: string } | undefined;
     if (userData?.role !== 'agency_member' || userData?.agencyId !== businessData?.agencyId) {
+      // Phase 11 hardened this exact check against role/agencyId
+      // self-escalation. Logging every denial (never the two agencyIds
+      // being compared, only that they mismatched) gives operators a way
+      // to see a spike of these and recognize a probing attempt, not just
+      // legitimate accidental cross-business access.
+      authzLogger.warn('Business access denied: insufficient permissions', {
+        userId,
+        businessId,
+      });
       throw new HttpsError('permission-denied', 'Access denied to business');
     }
   }

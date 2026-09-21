@@ -5,11 +5,29 @@ export type BusinessCategory = 'restaurant' | 'salon' | 'real_estate';
 export type BusinessStatus = 'active' | 'archived';
 
 export type CampaignObjective =
-  'weekend_offer' | 'new_dish' | 'festival' | 'discount' | 'brand_awareness';
+  | 'weekend_offer'
+  | 'new_dish'
+  | 'festival'
+  | 'discount'
+  | 'brand_awareness'
+  | 'service_promotion'
+  | 'package_promotion'
+  | 'appointment_promotion'
+  | 'new_service'
+  | 'property_promotion'
+  | 'new_listing'
+  | 'open_house'
+  | 'project_promotion';
 
 export type OfferType = 'percentage' | 'fixed' | 'bogo' | 'combo' | 'free_delivery' | 'loyalty';
 
-export type CTAType = 'order_whatsapp' | 'book_table' | 'view_menu' | 'call_now' | 'get_directions';
+export type CTAType =
+  | 'order_whatsapp'
+  | 'book_table'
+  | 'view_menu'
+  | 'call_now'
+  | 'get_directions'
+  | 'book_appointment';
 
 export type LanguageCode = 'en' | 'te' | 'hi' | 'te_en' | 'hi_en';
 
@@ -50,9 +68,20 @@ export type CampaignStatus =
   | 'failed';
 
 export type AssetType =
-  'poster' | 'headline' | 'ad_copy' | 'caption' | 'story' | 'reel' | 'whatsapp' | 'cta';
+  | 'poster'
+  | 'headline'
+  | 'ad_copy'
+  | 'caption'
+  | 'story'
+  | 'reel'
+  | 'whatsapp'
+  | 'cta'
+  | 'product'
+  | 'campaign'
+  | 'brand-kit'
+  | 'logo';
 
-export type AssetStatus = 'generating' | 'completed' | 'failed';
+export type AssetStatus = 'generating' | 'completed' | 'failed' | 'superseded';
 
 export type SubscriptionPlan = 'free' | 'starter' | 'business' | 'agency';
 
@@ -166,6 +195,51 @@ export interface BusinessBrain {
     minimumOrder: number;
     offerValidityRules: string;
     pricingRules: string;
+    operatingMode?: 'dine-in' | 'takeaway' | 'delivery';
+  };
+  // Phase 33 — mirrors functions/src/types/index.ts's BusinessBrain.verticalProfile
+  // exactly, so the customer-facing Business Profile page can read/edit
+  // salon services/packages or real-estate properties without inventing a
+  // separate shape.
+  verticalProfile?: {
+    vertical?: 'restaurant' | 'salon' | 'real_estate';
+    services?: Array<{
+      id: string;
+      name: string;
+      category: 'hair' | 'skin' | 'nails' | 'makeup' | 'bridal' | 'spa' | 'grooming' | 'other';
+      price: number;
+      durationMinutes?: number;
+      active: boolean;
+    }>;
+    packages?: Array<{
+      id: string;
+      name: string;
+      description?: string;
+      serviceIds: string[];
+      packagePrice: number;
+      originalPrice?: number;
+      validityDays?: number;
+      active: boolean;
+    }>;
+    appointmentSettings?: {
+      acceptInquiries: boolean;
+      preferredBookingChannel: 'whatsapp' | 'phone' | 'in_person';
+      bookingInstructions?: string;
+    };
+    properties?: Array<{
+      id: string;
+      title: string;
+      propertyType: 'apartment' | 'villa' | 'plot' | 'commercial' | 'other';
+      projectName?: string;
+      areaSqft?: number;
+      bedrooms?: number;
+      bathrooms?: number;
+      price: number;
+      possessionStatus: 'ready_to_move' | 'under_construction' | 'upcoming';
+      amenities: string[];
+      availability: 'available' | 'booked' | 'sold';
+      active: boolean;
+    }>;
   };
   campaignHistory: Array<{
     campaignId: string;
@@ -245,7 +319,8 @@ export interface Product {
 export type TruthCheckStatus = 'PASS' | 'FAIL' | 'REVIEW_REQUIRED';
 
 export interface TruthCheckItem {
-  category: 'business' | 'product' | 'price' | 'offer' | 'location' | 'contact' | 'operations' | 'claim';
+  category:
+    'business' | 'product' | 'price' | 'offer' | 'location' | 'contact' | 'operations' | 'claim';
   status: TruthCheckStatus;
   generatedValue?: string;
   expectedValue?: string;
@@ -257,6 +332,7 @@ export interface TruthCheckResult {
   checkedAt: string;
   checks: TruthCheckItem[];
   summary: string;
+  sourceFingerprint?: string;
 }
 
 export interface ExtractedPrice {
@@ -336,6 +412,48 @@ export interface Campaign {
   completedAt?: string;
 }
 
+export type ReelGoal =
+  | 'food_showcase'
+  | 'behind_the_scenes'
+  | 'offer_promotion'
+  | 'new_product'
+  | 'local_attraction'
+  | 'surprise_me';
+
+export type ReelStyle = 'fast_engaging' | 'premium' | 'local_fun' | 'minimal' | 'cinematic';
+
+export type ReelDurationSeconds = 15 | 30 | 45;
+
+export type ReelStatus =
+  'draft' | 'uploading' | 'analyzing' | 'planning' | 'rendering' | 'completed' | 'failed';
+
+export interface ReelProject {
+  reelId: string;
+  businessId: string;
+  userId: string;
+  status: ReelStatus;
+  goal: ReelGoal;
+  style: ReelStyle;
+  durationSeconds: ReelDurationSeconds;
+  inputClipIds: string[];
+  offer?: string;
+  cta?: string;
+  additionalMessage?: string;
+  outputUrl?: string;
+  thumbnailUrl?: string;
+  creditsReserved?: number;
+  creditsUsed?: number;
+  error?: {
+    code: string;
+    message: string;
+    stage: string;
+    retryable: boolean;
+  };
+  createdAt: string;
+  updatedAt: string;
+  completedAt?: string;
+}
+
 export interface CampaignAsset {
   assetId: string;
   campaignId: string;
@@ -351,7 +469,9 @@ export interface CampaignAsset {
   modelUsed?: string;
   generationLatencyMs?: number;
   validationResult?: Record<string, unknown>;
+  metadata?: Record<string, unknown>;
   createdAt: string;
+  updatedAt?: string;
 }
 
 export interface Subscription {

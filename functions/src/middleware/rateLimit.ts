@@ -1,5 +1,6 @@
 import { HttpsError } from 'firebase-functions/v2/https';
 import * as admin from 'firebase-admin';
+import { FieldValue, Timestamp } from 'firebase-admin/firestore';
 
 const db = admin.firestore();
 
@@ -49,7 +50,7 @@ export async function checkRateLimit(
     tx.set(ref, {
       count: count + 1,
       resetTime,
-      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      updatedAt: FieldValue.serverTimestamp(),
     });
   });
 }
@@ -60,4 +61,6 @@ export const rateLimitConfigs = {
   createCampaign: { maxRequests: 50, windowSeconds: 3600 },
   upload: { maxRequests: 30, windowSeconds: 3600 },
   createRazorpayOrder: { maxRequests: 5, windowSeconds: 3600 },
+  reelClipUpload: { maxRequests: 60, windowSeconds: 3600 },
+  generateReel: { maxRequests: 10, windowSeconds: 3600 },
 } as const;

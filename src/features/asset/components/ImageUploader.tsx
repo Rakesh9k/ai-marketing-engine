@@ -2,7 +2,7 @@
 
 import { useState, useCallback, useRef } from 'react';
 import { Button } from '@/components/ui/Button';
-import { useToast } from '@/components/ui/Toast';
+import { useToast } from '@/hooks/useToast';
 import {
   uploadImage,
   validateFile,
@@ -89,7 +89,7 @@ export function ImageUploader({
       const validationError = validateFile(file);
       if (validationError) {
         setUploadState((prev) => ({ ...prev, error: validationError, status: 'error' }));
-        showToast('error', validationError);
+        showToast(validationError, 'error');
         return;
       }
 
@@ -137,7 +137,7 @@ export function ImageUploader({
   const handleUpload = useCallback(async () => {
     const { file } = uploadStateRef.current;
     if (!file) {
-      showToast('error', 'No file selected');
+      showToast('No file selected', 'error');
       return;
     }
 
@@ -154,7 +154,7 @@ export function ImageUploader({
         asset,
       }));
 
-      showToast('success', 'Image uploaded successfully');
+      showToast('Image uploaded successfully', 'success');
       onUploadComplete?.(asset);
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Upload failed';
@@ -164,7 +164,7 @@ export function ImageUploader({
         error: message,
         progress: 0,
       }));
-      showToast('error', message);
+      showToast(message, 'error');
       onUploadError?.(error instanceof Error ? error : new Error(message));
     }
   }, [userId, businessId, assetType, showToast, onUploadComplete, onUploadError, setUploadState]);

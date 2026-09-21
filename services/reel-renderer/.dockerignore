@@ -1,0 +1,8 @@
+node_modules
+lib
+*.log
+.env
+tmp
+work
+.git
+.gitignore

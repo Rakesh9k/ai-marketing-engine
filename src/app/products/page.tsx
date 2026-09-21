@@ -6,6 +6,8 @@ import { businessService, productService } from '@/services/database';
 import type { Business, Product } from '@/types';
 import { Button } from '@/components/ui/Button';
 import Link from 'next/link';
+import { MascotScene } from '@/components/mascot/MascotScene';
+import { CameraIllustration } from '@/components/illustrations/Illustrations';
 
 function EmptyState({
   title,
@@ -225,7 +227,7 @@ export default function ProductsPage() {
           title="No business set up yet"
           description="Create your first business to start adding products"
           action={
-            <a href="/onboarding/business">
+            <a href="/onboarding">
               <button className="bg-brand-600 hover:bg-brand-700 inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium text-white transition-colors">
                 <svg
                   className="h-4 w-4"
@@ -254,31 +256,19 @@ export default function ProductsPage() {
             </Link>
           </div>
           {products.length === 0 ? (
-            <EmptyState
-              title="No products yet"
-              description="Add your first product to start creating campaigns"
-              action={
-                <Link href="/products/new">
-                  <button className="bg-brand-600 hover:bg-brand-700 inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium text-white transition-colors">
-                    <svg
-                      className="h-4 w-4"
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
-                      aria-hidden="true"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M12 4v16m8-8H4"
-                      />
-                    </svg>
-                    Add Product
-                  </button>
+            <div className="flex justify-center rounded-lg border border-neutral-200 bg-white p-8">
+              <MascotScene
+                pose="explain"
+                align="center"
+                message="No products yet."
+                supporting="Add your first product to start creating campaigns."
+                decoration={<CameraIllustration size={20} />}
+              >
+                <Link href="/products/new" className="mt-4 inline-block">
+                  <Button size="sm">Add Product</Button>
                 </Link>
-              }
-            />
+              </MascotScene>
+            </div>
           ) : (
             productsList
           )}

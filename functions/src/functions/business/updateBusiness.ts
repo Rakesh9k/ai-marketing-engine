@@ -1,7 +1,7 @@
 import { onCall, HttpsError } from 'firebase-functions/v2/https';
 import { z } from 'zod';
 
-import { verifyAuthAndBusinessAccess } from '../../middleware/auth';
+import { verifyBusinessAccess } from '../../middleware/auth';
 import { validatedCallable } from '../../middleware/validation';
 import { getBusinessDoc, updateBusinessDoc } from '../../services/firestore';
 import { logFunctionStart, logFunctionComplete, logFunctionError } from '../../utils/logging';
@@ -55,7 +55,7 @@ export const updateBusiness = onCall(
 
     try {
       const { businessId, ...updateData } = data;
-      await verifyAuthAndBusinessAccess(context as any, businessId);
+      await verifyBusinessAccess(context.userId, businessId);
 
       const existingBusiness = await getBusinessDoc(businessId);
       if (!existingBusiness) {

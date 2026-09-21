@@ -22,7 +22,6 @@
       "@/*": ["./src/*"],
       "@functions/*": ["./functions/src/*"]
     },
-    "baseUrl": ".",
     "forceConsistentCasingInFileNames": true,
     "noUncheckedIndexedAccess": true,
     "noImplicitOverride": true,
@@ -38,5 +37,14 @@
     "functions/src/**/*.ts",
     "tests/**/*.ts"
   ],
-  "exclude": ["node_modules", "functions/lib", "functions/node_modules"]
+  "exclude": [
+    "node_modules",
+    "functions/lib",
+    "functions/node_modules",
+    // services/reel-renderer is a separately deployed Cloud Run service with
+    // its own package.json/tsconfig.json/build — it deliberately does not
+    // share types with the main app (see its src/types.ts), so it has no
+    // business being swept into the root app's typecheck via **/*.ts.
+    "services/reel-renderer"
+  ]
 }

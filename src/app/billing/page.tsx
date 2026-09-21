@@ -1,70 +1,26 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '@/features/auth/hooks/useAuth';
 import { subscriptionService } from '@/services/database';
 import type { Subscription, SubscriptionPlan } from '@/types';
 import { formatINR } from '@/lib/utils';
+import { PLAN_DETAILS } from '@/features/billing/planDetails';
+import { callFunction } from '@/services/api';
+import { loadRazorpayCheckout, type RazorpaySuccessResponse } from '@/lib/razorpay/loadCheckout';
+import { useToast } from '@/hooks/useToast';
 
-const PLAN_DETAILS: Record<
-  SubscriptionPlan,
-  { name: string; price: number; credits: number; campaigns: number; features: string[] }
-> = {
-  free: {
-    name: 'Free',
-    price: 0,
-    credits: 100,
-    campaigns: 1,
-    features: [
-      '1 campaign per month',
-      '100 credits/month',
-      'Basic templates',
-      'Watermark on creatives',
-      '1 business',
-    ],
-  },
-  starter: {
-    name: 'Starter',
-    price: 499,
-    credits: 500,
-    campaigns: 5,
-    features: [
-      '5 campaigns per month',
-      '500 credits/month',
-      'Basic templates',
-      'No watermark',
-      '1 business',
-    ],
-  },
-  business: {
-    name: 'Business',
-    price: 999,
-    credits: 1200,
-    campaigns: 12,
-    features: [
-      '12 campaigns per month',
-      '1,200 credits/month',
-      'Premium templates',
-      'Brand Kit access',
-      'Priority generation',
-      '1 business',
-    ],
-  },
-  agency: {
-    name: 'Agency',
-    price: 2499,
-    credits: 3000,
-    campaigns: 30,
-    features: [
-      '30 campaigns per month',
-      '3,000 credits/month',
-      'Multi-business',
-      'Client management',
-      'Partner dashboard',
-      'White-label path',
-    ],
-  },
-};
+interface CreateSubscriptionResponse {
+  subscriptionId: string;
+  shortUrl: string;
+  planId: SubscriptionPlan;
+  price: number;
+}
+
+interface VerifyPaymentResponse {
+  success: boolean;
+  status: string;
+}
 
 const TOP_UP_PACKS = [
   { credits: 500, price: 499, label: 'Small Pack' },
@@ -74,8 +30,20 @@ const TOP_UP_PACKS = [
 
 export default function BillingPage() {
   const { user } = useAuth();
+  const { showToast } = useToast();
   const [subscription, setSubscription] = useState<Subscription | null>(null);
   const [loading, setLoading] = useState(true);
+  const [purchasingPlan, setPurchasingPlan] = useState<SubscriptionPlan | null>(null);
+
+  const refreshSubscription = useCallback(async () => {
+    if (!user) return;
+    try {
+      const subscriptionData = await subscriptionService.getByUserId(user.uid);
+      setSubscription(subscriptionData);
+    } catch (err) {
+      console.error(err);
+    }
+  }, [user]);
 
   useEffect(() => {
     async function loadSubscription() {
@@ -92,6 +60,99 @@ export default function BillingPage() {
     }
     void loadSubscription();
   }, [user]);
+
+  // Phase 19A: wires the billing UI to the existing, already-tested backend
+  // payment infrastructure (createSubscription + verifyPayment Cloud
+  // Functions, Razorpay's own webhook) rather than a new payment system.
+  // Credits themselves are granted exclusively by razorpayWebhook.ts once
+  // Razorpay confirms the payment server-side — verifyPayment here only
+  // updates the subscription's status so the UI can reflect it quickly;
+  // it deliberately never grants credits itself (see verifyPayment.ts's
+  // own comment and Phase 15's regression test for that exact boundary).
+  const handleUpgrade = useCallback(
+    async (plan: SubscriptionPlan) => {
+      if (plan === 'free' || plan === subscription?.planId) {
+        return;
+      }
+
+      const razorpayKeyId = process.env['NEXT_PUBLIC_RAZORPAY_KEY_ID'];
+      if (!razorpayKeyId) {
+        showToast('Payments are not configured yet. Please try again later.', 'error');
+        return;
+      }
+
+      setPurchasingPlan(plan);
+      try {
+        const order = await callFunction<{ planId: SubscriptionPlan }, CreateSubscriptionResponse>({
+          functionName: 'createSubscription',
+          data: { planId: plan },
+        });
+
+        await loadRazorpayCheckout();
+
+        if (!window.Razorpay) {
+          throw new Error('Razorpay Checkout failed to load');
+        }
+
+        const checkout = new window.Razorpay({
+          key: razorpayKeyId,
+          subscription_id: order.subscriptionId,
+          name: 'Mitra',
+          description: `${PLAN_DETAILS[plan].name} plan`,
+          prefill: { email: user?.email || undefined },
+          theme: { color: '#E84D1A' },
+          handler: (response: RazorpaySuccessResponse) => {
+            void (async () => {
+              try {
+                await callFunction<
+                  {
+                    razorpaySubscriptionId: string;
+                    razorpayPaymentId: string;
+                    razorpaySignature: string;
+                  },
+                  VerifyPaymentResponse
+                >({
+                  functionName: 'verifyPayment',
+                  data: {
+                    razorpaySubscriptionId:
+                      response.razorpay_subscription_id || order.subscriptionId,
+                    razorpayPaymentId: response.razorpay_payment_id,
+                    razorpaySignature: response.razorpay_signature,
+                  },
+                });
+                showToast(
+                  'Payment successful! Your credits will reflect within a few moments.',
+                  'success'
+                );
+                await refreshSubscription();
+              } catch (verifyError) {
+                console.error(verifyError);
+                showToast(
+                  'Payment received, but we could not confirm it automatically. Contact support if your credits do not update shortly.',
+                  'warning'
+                );
+              } finally {
+                setPurchasingPlan(null);
+              }
+            })();
+          },
+          modal: {
+            ondismiss: () => setPurchasingPlan(null),
+          },
+        });
+
+        checkout.open();
+      } catch (err) {
+        console.error(err);
+        showToast(
+          err instanceof Error ? err.message : 'Could not start checkout. Please try again.',
+          'error'
+        );
+        setPurchasingPlan(null);
+      }
+    },
+    [subscription, user, showToast, refreshSubscription]
+  );
 
   if (loading) {
     return (
@@ -169,7 +230,8 @@ export default function BillingPage() {
 
           <div className="border-t border-neutral-200 pt-4">
             <p className="mb-2 text-sm text-neutral-500">
-              Credit Top-Up Packs (No Subscription Required)
+              Credit Top-Up Packs (No Subscription Required) — purchasable one-time packs are coming
+              soon; subscription plans below are available now
             </p>
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
               {TOP_UP_PACKS.map((pack) => (
@@ -266,20 +328,21 @@ export default function BillingPage() {
                   </div>
 
                   <button
-                    onClick={() => {
-                      console.log('Upgrade to:', plan);
-                      alert(
-                        `Upgrade to ${PLAN_DETAILS[plan].name} - Razorpay integration coming soon!`
-                      );
-                    }}
-                    disabled={plan === currentPlan}
+                    onClick={() => void handleUpgrade(plan)}
+                    disabled={plan === currentPlan || isFree || purchasingPlan !== null}
                     className={`mt-6 w-full rounded-lg px-4 py-3 font-medium transition-colors ${
-                      plan === currentPlan
+                      plan === currentPlan || isFree
                         ? 'cursor-not-allowed bg-neutral-100 text-neutral-600'
-                        : 'bg-brand-600 hover:bg-brand-700 text-white'
+                        : 'bg-brand-600 hover:bg-brand-700 text-white disabled:opacity-60'
                     }`}
                   >
-                    {plan === currentPlan ? 'Current Plan' : 'Upgrade to this Plan'}
+                    {plan === currentPlan
+                      ? 'Current Plan'
+                      : isFree
+                        ? 'Free Plan'
+                        : purchasingPlan === plan
+                          ? 'Opening checkout…'
+                          : 'Upgrade to this Plan'}
                   </button>
                 </div>
               </div>

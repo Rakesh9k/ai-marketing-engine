@@ -3,7 +3,7 @@ import { z } from 'zod';
 import * as admin from 'firebase-admin';
 import { v7 as uuidv7 } from 'uuid';
 
-import { verifyAuthAndBusinessAccess } from '../../middleware/auth';
+import { verifyBusinessAccess } from '../../middleware/auth';
 import { validatedCallable } from '../../middleware/validation';
 import { checkRateLimit } from '../../middleware/rateLimit';
 import { logFunctionStart, logFunctionComplete, logFunctionError } from '../../utils/logging';
@@ -29,7 +29,7 @@ export const getUploadUrl = onCall(
     });
 
     try {
-      await verifyAuthAndBusinessAccess(context as any, data.businessId);
+      await verifyBusinessAccess(context.userId, data.businessId);
       await checkRateLimit(context.userId, 'getUploadUrl');
 
       const { fileName, contentType, fileSize, assetType = 'product' } = data;

@@ -1,6 +1,7 @@
 import { HttpsError } from 'firebase-functions/v2/https';
 import type { CallableRequest } from 'firebase-functions/v2/https';
 import * as admin from 'firebase-admin';
+import { FieldValue, Timestamp } from 'firebase-admin/firestore';
 
 const db = admin.firestore();
 
@@ -33,7 +34,7 @@ export async function setIdempotencyProcessing(
   const ref = db.collection('idempotency_keys').doc(idempotencyKey);
   await ref.set({
     status: 'processing',
-    createdAt: admin.firestore.FieldValue.serverTimestamp(),
+    createdAt: FieldValue.serverTimestamp(),
     ttl: options.ttlSeconds || 3600,
   });
 }
@@ -47,7 +48,7 @@ export async function setIdempotencyCompleted(
   await ref.set({
     status: 'completed',
     result,
-    completedAt: admin.firestore.FieldValue.serverTimestamp(),
+    completedAt: FieldValue.serverTimestamp(),
     ttl: options.ttlSeconds || 3600,
   });
 }
@@ -61,7 +62,7 @@ export async function setIdempotencyFailed(
   await ref.set({
     status: 'failed',
     error: error.message,
-    failedAt: admin.firestore.FieldValue.serverTimestamp(),
+    failedAt: FieldValue.serverTimestamp(),
     ttl: options.ttlSeconds || 3600,
   });
 }

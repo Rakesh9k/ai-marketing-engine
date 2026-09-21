@@ -8,9 +8,17 @@ AI Marketing Engine is a marketing platform that helps Indian local businesses (
 
 ## Current Phase
 
-**PHASE 1 — LOCAL DEVELOPMENT**
+**PHASE 36 — FINAL INTEGRATION, REGRESSION & PRODUCTION READINESS**
 
-This phase establishes the development foundation only. Product functionality will be implemented incrementally in later phases.
+The sections below ("Phase Boundary", feature-flag defaults, "Remaining Issues") describe Phase 1
+(local development scaffolding only) and are now historical — kept for the record, not current
+status. As of Phase 36, the product is functionally complete for all three verticals (restaurant,
+salon, real estate): onboarding, Business Brain, product/service/property management, AI campaign
+generation, Truth Check fact verification, regeneration, download, WhatsApp CTA + click tracking,
+credits, Razorpay billing, and analytics are all implemented and tested. See
+`docs/PHASE_36_FINAL_MITRA_READINESS_REPORT.md` for the authoritative, evidence-based status of
+every area (PASS/PARTIAL/BLOCKED/FAIL/NOT IMPLEMENTED per area, not a summary claim) and
+`docs/PHASE_*_*.md` for the detailed report of each phase that built a given area.
 
 ---
 
@@ -165,12 +173,19 @@ Set via: `firebase functions:secrets:set SECRET_NAME`
 
 ### Feature Flags
 
-| Variable                                  | Default | Description                             |
-| ----------------------------------------- | ------- | --------------------------------------- |
-| `NEXT_PUBLIC_ENABLE_SALON_VERTICAL`       | `false` | Enable Salon vertical (Post-MVP)        |
-| `NEXT_PUBLIC_ENABLE_REAL_ESTATE_VERTICAL` | `false` | Enable Real Estate vertical (Post-MVP)  |
-| `NEXT_PUBLIC_ENABLE_WHATSAPP_API`         | `false` | Enable WhatsApp Business API (Post-MVP) |
-| `NEXT_PUBLIC_ENABLE_AGENCY_WORKSPACE`     | `false` | Enable Agency workspace (Post-MVP)      |
+**As of Phase 36, none of the flags below are read anywhere in `src/` or `functions/src/`**
+(confirmed by repo-wide search) — they were Phase 1 planning placeholders. Salon and real estate
+verticals are fully implemented and always-on (Phases 29–31), not flag-gated. WhatsApp Business
+API integration and a dedicated agency workspace UI remain genuinely not implemented (see
+`docs/PHASE_36_FINAL_MITRA_READINESS_REPORT.md`), but not because a flag disables them — the code
+simply doesn't exist yet. Kept here only as a historical record; setting these has no effect.
+
+| Variable                                  | Default | Description (Phase 1 plan — not wired to any code)    |
+| ------------------------------------------ | ------- | ------------------------------------------------------- |
+| `NEXT_PUBLIC_ENABLE_SALON_VERTICAL`       | `false` | Superseded — salon is implemented and always-on          |
+| `NEXT_PUBLIC_ENABLE_REAL_ESTATE_VERTICAL` | `false` | Superseded — real estate is implemented and always-on    |
+| `NEXT_PUBLIC_ENABLE_WHATSAPP_API`         | `false` | Still accurate — not implemented                         |
+| `NEXT_PUBLIC_ENABLE_AGENCY_WORKSPACE`     | `false` | Still accurate — no dedicated agency UI exists            |
 
 ---
 
@@ -180,16 +195,15 @@ Set via: `firebase functions:secrets:set SECRET_NAME`
 ai-marketing-engine/
 │
 ├── .github/                    # GitHub Actions workflows
-├── docs/                       # Product specifications (Phase 0 - frozen)
-│   ├── PRODUCT.md
-│   ├── ARCHITECTURE.md
-│   ├── DATABASE.md
-│   ├── AI_ARCHITECTURE.md
-│   ├── DESIGN_SYSTEM.md
-│   ├── SECURITY.md
-│   ├── MVP_SCOPE.md
-│   ├── TEST_PLAN.md
-│   └── PROMPT_SYSTEM.md
+├── docs/                       # Per-phase implementation + verification reports
+│   ├── PHASE_4_CAMPAIGN_CREATION_REPORT.md ... PHASE_35_FRONTEND_TEST_HARDENING_REPORT.md
+│   ├── PHASE_36_FINAL_MITRA_READINESS_REPORT.md   # current, evidence-based status
+│   ├── PERFORMANCE_ENGINE.md / PERFORMANCE_DATA_READINESS.md
+│   # Note: the Phase-0-era planning docs this tree once listed (PRODUCT.md,
+│   # ARCHITECTURE.md, DATABASE.md, AI_ARCHITECTURE.md, DESIGN_SYSTEM.md,
+│   # SECURITY.md, MVP_SCOPE.md, TEST_PLAN.md, PROMPT_SYSTEM.md) were never
+│   # actually created — the per-phase reports above are this project's real
+│   # source-of-truth documentation instead.
 │
 ├── functions/                  # Firebase Cloud Functions (TypeScript)
 │   ├── src/
@@ -372,31 +386,31 @@ git commit -m "chore: initialize project foundation"
 
 ---
 
-## Phase Boundary
+## Phase Boundary (historical — Phase 1 only)
 
-**NO PRODUCT FEATURES WERE IMPLEMENTED IN PHASE 1.**
+**NO PRODUCT FEATURES WERE IMPLEMENTED IN PHASE 1.** This list described what was out of scope at
+that point. It is entirely historical now — every item below was implemented in a later phase.
+See `docs/PHASE_36_FINAL_MITRA_READINESS_REPORT.md` for the current, evidence-based status of each.
 
-The following are explicitly OUT OF SCOPE for Phase 1:
-
-- ❌ Authentication UI
-- ❌ Business onboarding
-- ❌ Business Brain
-- ❌ Brand Kit
-- ❌ Campaign Wizard
-- ❌ AI campaign generation
-- ❌ Image generation
-- ❌ Telugu/Hyderabadi generation
-- ❌ WhatsApp campaign generation
-- ❌ Razorpay integration
-- ❌ Subscription system
-- ❌ Credit system
-- ❌ Dashboard
-- ❌ Campaign history
-- ❌ Content calendar
-- ❌ Analytics
-- ❌ Agency functionality
-
-These belong to later phases according to the frozen specification.
+- ✅ Authentication UI — implemented (Phase 2/3-era)
+- ✅ Business onboarding — implemented, all 3 verticals (Phases 4, 29–31)
+- ✅ Business Brain — implemented, plus a customer-facing edit UI (Phases 4–6, 33)
+- ✅ Brand Kit — implemented (`/brand`)
+- ✅ Campaign Wizard — implemented, vertical-aware (Phase 4, hardened Phase 35)
+- ✅ AI campaign generation — implemented (Phase 5)
+- ✅ Image generation — implemented (Phase 7)
+- ✅ Telugu/Hyderabadi generation — implemented (localization pipeline)
+- ✅ WhatsApp campaign generation — implemented (CTA + Phase 34 click tracking)
+- ✅ Razorpay integration — implemented (Phase 19A)
+- ✅ Subscription system — implemented
+- ✅ Credit system — implemented, with concurrency/idempotency tests (Phase 10+)
+- ✅ Dashboard — implemented
+- ✅ Campaign history — implemented (campaign list/detail)
+- ✅ Analytics — implemented (Phase 32), performance pipeline (Phase 34)
+- ⚠️ Content calendar — **not implemented** (never built in any phase)
+- ⚠️ Agency functionality — **partial**: agency-member authorization/isolation exists and is
+  tested (`verifyBusinessAccess`, `tests/phase27-authz.test.ts`), but there is no dedicated agency
+  workspace UI
 
 ---
 
@@ -431,31 +445,35 @@ After setup, verify:
 
 ---
 
-## Remaining Issues
+## Remaining Issues (as of Phase 36)
 
-- [ ] Firebase project creation (requires `firebase projects:create` or console)
-- [ ] Vercel project connection (requires GitHub repo)
-- [ ] Domain configuration
-- [ ] Sentry error tracking setup
-- [ ] GitHub Actions CI/CD workflows
+Historical Phase 1 setup items (Firebase project creation, GitHub Actions CI/CD) are done — a
+`.github/workflows/ci-cd.yml` exists and a real Firebase project is configured. What's actually
+still open, per `docs/PHASE_36_FINAL_MITRA_READINESS_REPORT.md`:
 
----
-
-## Phase Boundary Confirmation
-
-**NO PRODUCT FEATURES WERE IMPLEMENTED.**
+- [ ] Domain configuration / production deployment (this repo has not been deployed to a live
+      production environment — see the Phase 36 report's verdict)
+- [ ] Sentry (or equivalent) error tracking setup
+- [ ] Content calendar (never built — not a regression, never in scope for any phase so far)
+- [ ] Dedicated agency workspace UI (agency-member authorization exists and is tested; no UI)
+- [ ] Real inquiry/outcome data source for the Performance Engine (`docs/PERFORMANCE_ENGINE.md`
+      and `docs/PERFORMANCE_DATA_READINESS.md` — status remains "DATA NOT YET SUFFICIENT" for any
+      learning/optimization use)
+- [ ] `npm run functions:lint` still fails on pre-existing unused-import lint debt across ~30
+      backend files predating Phase 28 (not a regression from any phase in this project's history;
+      see the Phase 36 report for the full file list)
 
 ---
 
 ## Next Steps
 
-When Phase 1 is validated, proceed to **Phase 2** for:
-
-1. Firebase project setup and deployment
-2. Authentication implementation
-3. Business onboarding flow
-4. Brand Kit setup
-5. Campaign creation wizard
+Per the user's own stated roadmap (see `docs/PHASE_36_FINAL_MITRA_READINESS_REPORT.md`'s closing
+section for the full two-track breakdown): the next step is **customer validation** — deploying
+the restaurant MVP to real restaurants and gathering actual usage/payment/feedback data — not
+further feature phases. Product-expansion work (salon, real estate, analytics, Business Brain UI,
+performance pipeline, frontend tests) is complete through Phase 35; the Performance Engine
+specifically still needs a real behavioral-outcome data source (not a schema) before it can learn
+from anything, per `docs/PERFORMANCE_ENGINE.md`.
 
 ---
 

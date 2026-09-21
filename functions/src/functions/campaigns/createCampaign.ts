@@ -2,7 +2,7 @@ import { onCall, HttpsError } from 'firebase-functions/v2/https';
 import { z } from 'zod';
 import { v7 as uuidv7 } from 'uuid';
 
-import { verifyAuthAndBusinessAccess } from '../../middleware/auth';
+import { verifyBusinessAccess } from '../../middleware/auth';
 import { validatedCallable } from '../../middleware/validation';
 import { checkRateLimit } from '../../middleware/rateLimit';
 import {
@@ -103,7 +103,7 @@ export const createCampaign = onCall(
     });
 
     try {
-      await verifyAuthAndBusinessAccess(context as any, data.businessId);
+      await verifyBusinessAccess(context.userId, data.businessId);
       await checkRateLimit(context.userId, 'createCampaign');
 
       // Calculate credits required based on campaign input

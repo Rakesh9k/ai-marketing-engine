@@ -1,4 +1,5 @@
 functions/
+services/
 node_modules/
 .next/
 dist/

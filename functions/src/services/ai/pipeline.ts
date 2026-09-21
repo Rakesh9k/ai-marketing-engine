@@ -1,8 +1,47 @@
 import { analyzeProductImages, generateStructuredText, generateImage } from './index';
-import { buildCreativeBrief, type CreativeBriefInput } from './creativeBrief';
-import { buildImagePromptPack, buildStoryFramePrompts, buildReelFramePrompts, type ImagePrompt } from './imagePromptBuilder';
+import { buildCreativeBrief, type CreativeBrief, type CreativeBriefInput } from './creativeBrief';
+import { buildImagePromptPack } from './imagePromptBuilder';
 import { runDeterministicTruthCheck } from './truthCheck';
+import {
+  composeCreativeSVG,
+  DEFAULT_BRAND_STYLE,
+  type CreativeTextOverlay,
+  type CreativeBrandStyle,
+} from './compositor';
+import { fetchAsBuffer, uploadGeneratedAsset } from './generatedAssetStorage';
+import { MAX_IMAGE_GENERATION_CALLS_PER_CAMPAIGN } from '../../config/pricing';
+import { getVerticalConfigOrDefault } from '../../config/verticals';
 import { z } from 'zod';
+import type { BusinessRules } from '../../types';
+import { createLogger, logFunctionStage } from '../../utils/logging';
+
+/**
+ * businessBrain.businessRules (as stored in Firestore) only carries operational
+ * settings (opening hours, delivery radius, etc.), not the CreativeBrief's
+ * factuality/availability/communication rules — and legacy business docs may be
+ * missing businessRules entirely. This always returns a well-formed BusinessRules
+ * object so downstream prompt-building never dereferences undefined fields.
+ */
+function toCreativeBriefBusinessRules(stored?: { deliveryRadiusKm?: number }): BusinessRules {
+  return {
+    factuality: {
+      allowCreativeFraming: true,
+      requireExplicitPricing: true,
+      prohibitInventedProducts: true,
+      prohibitInventedClaims: true,
+    },
+    availability: {
+      displayUnavailableItems: false,
+      minimumOrderRequired: false,
+      deliveryRadiusKm: stored?.deliveryRadiusKm ?? 5,
+    },
+    communication: {
+      contactInformationAllowed: true,
+      operatingHoursRespectRequired: true,
+      brandRestrictions: [],
+    },
+  };
+}
 
 /**
  * Campaign Generation Pipeline
@@ -409,56 +448,81 @@ export class GenerationPipeline {
       campaignPack?: any;
     } = {};
 
+    // Phase 14: every stage marker and the top-level failure here previously
+    // used bare console.log/console.error with no campaignId/businessId
+    // context attached — an operator seeing "Pipeline failed: Error: ..."
+    // in the logs had no way to correlate it to a specific customer's
+    // campaign without cross-referencing timestamps. Reusing the existing
+    // structured logger (functions/src/utils/logging.ts, already used
+    // throughout the Cloud Functions layer) and logFunctionStage (defined
+    // there since an earlier phase but never actually called anywhere)
+    // instead. currentStage is tracked so the catch block can report
+    // exactly which stage was running when the pipeline failed.
+    const logger = createLogger({ businessId: input.businessId, campaignId: input.campaignId });
+    let currentStage = 'business_understanding';
+
     try {
       // Stage 1: Business Understanding
-      console.log('Stage 1: Business Understanding');
+      currentStage = 'business_understanding';
+      logFunctionStage(logger, currentStage);
       stageResults.businessUnderstanding = await this.runStage1(input);
 
       // Stage 2: Product/Image Understanding
-      console.log('Stage 2: Product/Image Understanding');
+      currentStage = 'product_understanding';
+      logFunctionStage(logger, currentStage);
       stageResults.productUnderstanding = await this.runStage2(
         input,
         stageResults['businessUnderstanding']
       );
 
       // Stage 3: Campaign Strategy
-      console.log('Stage 3: Campaign Strategy');
+      currentStage = 'campaign_strategy';
+      logFunctionStage(logger, currentStage);
       stageResults.campaignStrategy = await this.runStage3(input, stageResults);
 
       // Stage 4: Localization Strategy
-      console.log('Stage 4: Localization Strategy');
+      currentStage = 'localization_strategy';
+      logFunctionStage(logger, currentStage);
       stageResults.localizationStrategy = await this.runStage4(input, stageResults);
 
       // Stage 5: Copy Generation
-      console.log('Stage 5: Copy Generation');
+      currentStage = 'copy_generation';
+      logFunctionStage(logger, currentStage);
       stageResults.copyPack = await this.runStage5(input, stageResults);
 
       // Stage 6: Creative Direction / Image Prompts
-      console.log('Stage 6: Creative Direction');
+      currentStage = 'creative_direction';
+      logFunctionStage(logger, currentStage);
       stageResults.imagePrompts = await this.runStage6(input, stageResults);
 
       // Stage 7: Image Generation (AI provider)
-      console.log('Stage 7: Image Generation');
+      currentStage = 'image_generation';
+      logFunctionStage(logger, currentStage);
       stageResults.generatedImages = await this.runStage7(input, stageResults);
 
       // Stage 8: Truth Validation (AI-based)
-      console.log('Stage 8: Truth Validation');
+      currentStage = 'truth_validation';
+      logFunctionStage(logger, currentStage);
       stageResults.truthValidation = await this.runStage8(input, stageResults);
 
       // Stage 9: Quality Validation (AI-based)
-      console.log('Stage 9: Quality Validation');
+      currentStage = 'quality_validation';
+      logFunctionStage(logger, currentStage);
       stageResults.qualityValidation = await this.runStage9(input, stageResults);
 
       // Stage 10: Safety Validation (AI-based)
-      console.log('Stage 10: Safety Validation');
+      currentStage = 'safety_validation';
+      logFunctionStage(logger, currentStage);
       stageResults.safetyValidation = await this.runStage10(input, stageResults);
 
       // Stage 11: Truth Check (Deterministic - Phase 16)
-      console.log('Stage 11: Truth Check (Deterministic)');
+      currentStage = 'truth_check';
+      logFunctionStage(logger, currentStage);
       stageResults.truthCheck = await this.runStage11(input, stageResults);
 
       // Stage 12: Campaign Assembly
-      console.log('Stage 12: Campaign Assembly');
+      currentStage = 'campaign_assembly';
+      logFunctionStage(logger, currentStage);
       stageResults.campaignPack = await this.runStage12(input, stageResults);
 
       // Stage 13: Save Results (handled by caller)
@@ -469,7 +533,7 @@ export class GenerationPipeline {
         campaignPack: stageResults.campaignPack,
       };
     } catch (error) {
-      console.error('Pipeline failed:', error);
+      logger.error('Pipeline failed', error, { stage: currentStage });
       throw error;
     }
   }
@@ -532,138 +596,277 @@ export class GenerationPipeline {
     return generateStructuredText(prompt, ImagePromptPackSchema);
   }
 
+  /**
+   * Phase 7: previously made up to 32 sequential AI image-provider calls per
+   * campaign (5 posters + 3 stories x 4 frames + 3 reels x 5 frames — that
+   * exact count was confirmed against the prior implementation, not assumed)
+   * while credits were only ever charged for ~2 images' worth, and the AI
+   * model's own negative prompt explicitly instructed it NOT to render text/
+   * prices — yet no deterministic step ever added that text afterward, so
+   * every "poster" shipped with no price, offer, CTA, or phone on it at all.
+   * Also: generated image URLs were the raw temporary OpenAI CDN URL,
+   * persisted directly into Firestore, expiring within roughly an hour.
+   *
+   * Fixed with a hybrid architecture: exactly one AI image call per campaign
+   * (MAX_IMAGE_GENERATION_CALLS_PER_CAMPAIGN) produces a clean hero visual;
+   * that image is downloaded and re-hosted in Firebase Storage (permanent
+   * URL); poster/story variants are then produced by deterministically
+   * compositing verified campaign facts (price, offer, CTA, phone, business
+   * name — never AI-invented text) onto that same hero image via
+   * compositor.ts. Reel output is a deterministic text storyboard reusing
+   * the hero image as its cover — no per-scene AI image/video generation,
+   * since no source-of-truth doc in this repo requires it and the task
+   * explicitly instructs against building that.
+   */
   private async runStage7(input: GenerationPipelineInput, previousResults: any): Promise<any> {
-    // Build creative brief from all previous stages
     const creativeBrief = this.buildCreativeBriefFromResults(input, previousResults);
-
-    // Generate poster images (5)
-    const posterPrompts = buildImagePromptPack(creativeBrief, 5);
-    const posterUrls: string[] = [];
     const generationMetadata: any[] = [];
 
-    for (let i = 0; i < posterPrompts.length; i++) {
-      const prompt = posterPrompts[i];
-      if (!prompt) continue;
+    const heroPrompts = buildImagePromptPack(
+      creativeBrief,
+      MAX_IMAGE_GENERATION_CALLS_PER_CAMPAIGN
+    );
+    const heroPrompt = heroPrompts[0];
+
+    let heroImageUrl: string | null = null;
+    const campaignId = input.campaignId || 'draft';
+
+    if (heroPrompt) {
       const startTime = Date.now();
-      const result = await generateImage(prompt);
+      const result = await generateImage(heroPrompt);
       const latencyMs = Date.now() - startTime;
 
       if (result.success && result.imageUrl) {
-        posterUrls.push(result.imageUrl);
-        generationMetadata.push({
-          assetType: 'poster',
-          index: i,
-          prompt: prompt.prompt,
-          provider: result.provider || 'unknown',
-          model: result.model || 'unknown',
-          latencyMs,
-        });
+        try {
+          const { buffer, contentType } = await fetchAsBuffer(result.imageUrl);
+          const uploaded = await uploadGeneratedAsset(
+            input.businessId,
+            campaignId,
+            'poster',
+            buffer,
+            contentType
+          );
+          heroImageUrl = uploaded.url;
+          generationMetadata.push({
+            assetType: 'hero',
+            prompt: heroPrompt.prompt,
+            provider: result.provider || 'unknown',
+            model: result.model || 'unknown',
+            latencyMs,
+            storagePath: uploaded.storagePath,
+          });
+        } catch (error) {
+          generationMetadata.push({
+            assetType: 'hero',
+            prompt: heroPrompt.prompt,
+            provider: result.provider || 'unknown',
+            model: result.model || 'unknown',
+            latencyMs,
+            error:
+              error instanceof Error
+                ? error.message
+                : 'Failed to persist generated image to Storage',
+          });
+        }
       } else {
-        // Fallback: use placeholder or retry logic
-        console.warn(`Poster ${i} generation failed:`, result.error);
-        // For MVP, we'll use a placeholder - in production, implement retry
-        posterUrls.push(`https://via.placeholder.com/1024x1280/E84D1A/FFFFFF?text=Poster+${i+1}`);
+        createLogger({ businessId: input.businessId, campaignId: input.campaignId }).warn(
+          'Hero image generation failed',
+          {
+            stage: 'image_generation',
+            provider: result.provider || 'unknown',
+            failureCode: 'AI_PROVIDER_ERROR',
+            // The provider's own error message is a safe, short diagnostic
+            // string (e.g. "content policy violation") — never the prompt
+            // or any business data.
+            providerError: result.error?.message,
+          }
+        );
         generationMetadata.push({
-          assetType: 'poster',
-          index: i,
-          prompt: prompt.prompt,
-          provider: 'placeholder',
-          model: 'placeholder',
+          assetType: 'hero',
+          prompt: heroPrompt.prompt,
+          provider: 'none',
+          model: 'none',
           latencyMs,
-          error: result.error?.message,
+          error: result.error?.message || 'Image generation failed',
         });
       }
     }
 
-    // Generate story frames (3 stories × 4 frames)
-    const storyFramePrompts = buildStoryFramePrompts(creativeBrief, 4);
+    const posterUrls: string[] = [];
     const storyFrameUrls: string[][] = [];
+    let reelScript: {
+      coverImageUrl: string;
+      scenes: Array<{ sceneNumber: number; durationSeconds: number; text: string }>;
+    } | null = null;
 
-    for (let storyIdx = 0; storyIdx < 3; storyIdx++) {
-      const storyFrames: string[] = [];
-      for (let frameIdx = 0; frameIdx < 4; frameIdx++) {
-        const promptIndex = storyIdx * 4 + frameIdx;
-        const prompt = storyFramePrompts[promptIndex];
-        if (!prompt) continue;
-        const startTime = Date.now();
-        const result = await generateImage(prompt);
-        const latencyMs = Date.now() - startTime;
+    if (heroImageUrl) {
+      const textOverlay = this.buildCreativeTextOverlay(input, previousResults);
+      const brandStyle = this.buildBrandStyle(creativeBrief);
 
-          if (result.success && result.imageUrl) {
-            storyFrames.push(result.imageUrl);
-            generationMetadata.push({
-              assetType: 'story',
-              storyIndex: storyIdx,
-              frameIndex: frameIdx,
-              prompt: prompt.prompt,
-              provider: result.provider || 'unknown',
-              model: result.model || 'unknown',
-              latencyMs,
-            });
-          } else {
-            storyFrames.push(`https://via.placeholder.com/1080x1920/E84D1A/FFFFFF?text=Story+${storyIdx+1}+Frame+${frameIdx+1}`);
-            generationMetadata.push({
-              assetType: 'story',
-              storyIndex: storyIdx,
-              frameIndex: frameIdx,
-              prompt: prompt.prompt,
-              provider: 'placeholder',
-              model: 'placeholder',
-              latencyMs,
-              error: result.error?.message,
-            });
-          }
-        }
-        storyFrameUrls.push(storyFrames);
+      const posterSvg = composeCreativeSVG(heroImageUrl, textOverlay, brandStyle, 'poster');
+      const posterUpload = await uploadGeneratedAsset(
+        input.businessId,
+        campaignId,
+        'poster',
+        Buffer.from(posterSvg, 'utf-8'),
+        'image/svg+xml'
+      );
+      posterUrls.push(posterUpload.url);
+
+      const storyOverlays = this.buildStoryFrameOverlays(textOverlay);
+      const frameUrls: string[] = [];
+      for (const frameOverlay of storyOverlays) {
+        const svg = composeCreativeSVG(heroImageUrl, frameOverlay, brandStyle, 'story');
+        const upload = await uploadGeneratedAsset(
+          input.businessId,
+          campaignId,
+          'story',
+          Buffer.from(svg, 'utf-8'),
+          'image/svg+xml'
+        );
+        frameUrls.push(upload.url);
       }
+      storyFrameUrls.push(frameUrls);
 
-      // Generate reel frames (3 reels × 5 frames)
-    const reelFramePrompts = buildReelFramePrompts(creativeBrief, 5);
-    const reelFrameUrls: string[][] = [];
-
-    for (let reelIdx = 0; reelIdx < 3; reelIdx++) {
-      const reelFrames: string[] = [];
-      for (let frameIdx = 0; frameIdx < 5; frameIdx++) {
-        const promptIndex = reelIdx * 5 + frameIdx;
-        const prompt = reelFramePrompts[promptIndex];
-        if (!prompt) continue;
-        const startTime = Date.now();
-        const result = await generateImage(prompt);
-        const latencyMs = Date.now() - startTime;
-
-        if (result.success && result.imageUrl) {
-          reelFrames.push(result.imageUrl);
-          generationMetadata.push({
-            assetType: 'reel',
-            reelIndex: reelIdx,
-            frameIndex: frameIdx,
-            prompt: prompt.prompt,
-            provider: result.provider || 'unknown',
-            model: result.model || 'unknown',
-            latencyMs,
-          });
-        } else {
-          reelFrames.push(`https://via.placeholder.com/1080x1920/E84D1A/FFFFFF?text=Reel+${reelIdx+1}+Scene+${frameIdx+1}`);
-          generationMetadata.push({
-            assetType: 'reel',
-            reelIndex: reelIdx,
-            frameIndex: frameIdx,
-            prompt: prompt.prompt,
-            provider: 'placeholder',
-            model: 'placeholder',
-            latencyMs,
-            error: result.error?.message,
-          });
-        }
-      }
-      reelFrameUrls.push(reelFrames);
+      reelScript = this.buildReelStoryboard(textOverlay, heroImageUrl);
+    } else {
+      // The poster is this pipeline's primary deliverable (section 54: "Poster
+      // should be the primary reliable visual output"). Previously, a failed
+      // image generation would silently continue — the campaign would still
+      // reach Stage 12/finalize with zero visual assets, and
+      // executeWithUsageControl would finalize full credits for a customer
+      // who received a text-only "campaign" with no creative at all. Throwing
+      // here instead routes through the SAME reserve/refund machinery
+      // (executeWithUsageControl's catch block) already verified correct in
+      // Phase 5/6 — the whole generation is treated as failed, and credits
+      // are refunded rather than silently charged for missing work.
+      throw new Error(
+        `Image generation failed: no visual creative could be produced (${generationMetadata[0]?.error || 'unknown error'})`
+      );
     }
 
     return {
       posterUrls,
       storyFrameUrls,
-      reelFrameUrls,
+      reelScript,
       generationMetadata,
+    };
+  }
+
+  /**
+   * Builds the ONLY text that will ever appear on a generated creative.
+   * Every value here comes from server-verified campaign/business data
+   * (GenerationPipelineInput, already Truth-Check-relevant) — never from
+   * free-form AI output — so a creative composited from this can never
+   * display a price, discount, phone number, or CTA the business didn't
+   * actually provide.
+   */
+  private buildCreativeTextOverlay(
+    input: GenerationPipelineInput,
+    previousResults: any
+  ): CreativeTextOverlay {
+    const copyPack = previousResults?.copyPack;
+    const headline: string =
+      copyPack?.headlines?.[0] || input.offerHeadline || input.productName || '';
+
+    const priceText = `₹${input.offerPrice}`;
+    const originalPriceText =
+      input.offerOriginalPrice && input.offerOriginalPrice > input.offerPrice
+        ? `₹${input.offerOriginalPrice}`
+        : undefined;
+
+    let offerBadge: string | undefined;
+    if (
+      input.offerType === 'percentage' &&
+      input.offerOriginalPrice &&
+      input.offerOriginalPrice > input.offerPrice
+    ) {
+      const pct = Math.round(
+        ((input.offerOriginalPrice - input.offerPrice) / input.offerOriginalPrice) * 100
+      );
+      offerBadge = `${pct}% OFF`;
+    } else if (input.offerType === 'free_delivery') {
+      offerBadge = 'FREE DELIVERY';
+    } else if (input.offerType === 'bogo') {
+      offerBadge = 'BUY 1 GET 1';
+    } else if (input.offerType === 'combo') {
+      offerBadge = 'COMBO OFFER';
+    } else if (input.offerType === 'loyalty') {
+      offerBadge = 'LOYALTY REWARD';
+    }
+
+    const ctaMap: Record<string, string> = {
+      order_whatsapp: 'Order on WhatsApp',
+      book_table: 'Book Table',
+      view_menu: 'View Menu',
+      call_now: 'Call Now',
+      get_directions: 'Get Directions',
+    };
+    const ctaText = ctaMap[input.cta] || 'Order Now';
+
+    return {
+      businessName: input.businessName,
+      productName: input.productName,
+      headline,
+      priceText,
+      originalPriceText,
+      offerBadge,
+      ctaText,
+      phone:
+        input.cta === 'call_now'
+          ? input.businessPhone
+          : input.whatsappNumber || input.businessPhone,
+      locality: input.businessLocation?.locality || input.businessLocation?.city,
+    };
+  }
+
+  private buildBrandStyle(brief: CreativeBrief): CreativeBrandStyle {
+    const colors = brief.brand?.colors;
+    return {
+      primaryColor: colors?.[0] || DEFAULT_BRAND_STYLE.primaryColor,
+      accentColor: colors?.[1] || colors?.[0] || DEFAULT_BRAND_STYLE.accentColor,
+      textColor: DEFAULT_BRAND_STYLE.textColor,
+    };
+  }
+
+  /** 3 deterministic story frames from the SAME base overlay data — zero extra AI calls. */
+  private buildStoryFrameOverlays(base: CreativeTextOverlay): CreativeTextOverlay[] {
+    return [
+      { ...base },
+      {
+        ...base,
+        headline: base.offerBadge ? `${base.offerBadge} — ${base.priceText}` : base.priceText,
+      },
+      { ...base, headline: base.ctaText },
+    ];
+  }
+
+  /** Deterministic text storyboard — no per-scene AI image/video generation. */
+  private buildReelStoryboard(
+    overlay: CreativeTextOverlay,
+    coverImageUrl: string
+  ): {
+    coverImageUrl: string;
+    scenes: Array<{ sceneNumber: number; durationSeconds: number; text: string }>;
+  } {
+    return {
+      coverImageUrl,
+      scenes: [
+        { sceneNumber: 1, durationSeconds: 3, text: overlay.headline },
+        {
+          sceneNumber: 2,
+          durationSeconds: 4,
+          text: overlay.productName ? `Featuring ${overlay.productName}` : overlay.headline,
+        },
+        {
+          sceneNumber: 3,
+          durationSeconds: 4,
+          text: overlay.offerBadge
+            ? `${overlay.priceText} · ${overlay.offerBadge}`
+            : overlay.priceText,
+        },
+        { sceneNumber: 4, durationSeconds: 3, text: overlay.ctaText },
+      ],
     };
   }
 
@@ -706,7 +909,8 @@ export class GenerationPipeline {
         locality: input.businessLocation.locality,
         phone: '',
         whatsapp: input.whatsappNumber,
-        operatingModes: 'dine-in & takeaway & delivery',
+        operatingModes:
+          input.businessBrain?.businessRules?.operatingMode || 'dine-in & takeaway & delivery',
       },
       brandProfile: input.brandProfile,
       localizationProfile: input.localizationProfile,
@@ -721,7 +925,8 @@ export class GenerationPipeline {
         category: input.newProduct?.category || 'main',
         tags: [],
         variants: [],
-        images: input.newProduct?.images.map((url) => ({ url, storagePath: '', isPrimary: true })) || [],
+        images:
+          input.newProduct?.images.map((url) => ({ url, storagePath: '', isPrimary: true })) || [],
         attributes: {},
         status: 'active',
         createdAt: new Date().toISOString(),
@@ -743,7 +948,7 @@ export class GenerationPipeline {
       visualDirection: previousResults.campaignStrategy?.creativeDirection,
       generationMode: 'product_ad',
       aspectRatio: '4:5',
-      businessRules: input.businessBrain?.businessRules || {},
+      businessRules: toCreativeBriefBusinessRules(input.businessBrain?.businessRules),
       cta: input.cta as any,
     };
 
@@ -861,14 +1066,16 @@ export class GenerationPipeline {
         });
       });
 
-      // Story frames
+      // Story frames — 'story' is the AssetType the shared enum actually
+      // defines; 'story_frame'/'reel_frame' (previously used here) are not
+      // valid AssetType values at all.
       genImages.storyFrameUrls?.forEach((storyFrames: string[], storyIdx: number) => {
         storyFrames.forEach((url: string, frameIdx: number) => {
           assets.push({
             assetId: `asset_story_${storyIdx}_frame_${frameIdx}`,
-            type: 'story_frame',
+            type: 'story',
             index: frameIdx,
-            content: previousResults.imagePrompts?.storyFramePrompts?.[storyIdx]?.[frameIdx] || {},
+            content: {},
             imageUrl: url,
             status: 'completed',
             createdAt: now,
@@ -876,20 +1083,26 @@ export class GenerationPipeline {
         });
       });
 
-      // Reel frames
-      genImages.reelFrameUrls?.forEach((reelFrames: string[], reelIdx: number) => {
-        reelFrames.forEach((url: string, frameIdx: number) => {
-          assets.push({
-            assetId: `asset_reel_${reelIdx}_frame_${frameIdx}`,
-            type: 'reel_frame',
-            index: frameIdx,
-            content: previousResults.imagePrompts?.reelFramePrompts?.[reelIdx]?.[frameIdx] || {},
-            imageUrl: url,
-            status: 'completed',
-            createdAt: now,
-          });
+      // Reel storyboard — a deterministic text storyboard (see
+      // buildReelStoryboard), not per-scene AI-generated images. The cover
+      // image reuses the same hero image already generated for the
+      // poster/story — no extra AI provider call. assetId is deliberately
+      // 'asset_reel_storyboard' (not 'asset_reel_0') — copyPack.reelConcepts
+      // above already produces an asset with id 'asset_reel_0'; reusing that
+      // id here would silently overwrite the AI-written reel concept
+      // (hook/scenes/CTA/shooting tips) in Firestore, since
+      // createCampaignAssets persists one document per assetId.
+      if (genImages.reelScript) {
+        assets.push({
+          assetId: 'asset_reel_storyboard',
+          type: 'reel',
+          index: 0,
+          content: { scenes: genImages.reelScript.scenes },
+          imageUrl: genImages.reelScript.coverImageUrl,
+          status: 'completed',
+          createdAt: now,
         });
-      });
+      }
     }
 
     return {
@@ -920,11 +1133,12 @@ export class GenerationPipeline {
 
   // ... (prompt builder methods remain the same)
   private buildBusinessUnderstandingPrompt(input: GenerationPipelineInput): string {
+    const vertical = getVerticalConfigOrDefault(input.vertical ?? input.businessCategory);
     return `SYSTEM RULES:
 You are a business analyst for an Indian local marketing AI. Your job is to extract structured, verified facts from a Business Brain document. You must NEVER invent facts. If information is missing, explicitly flag it.
 
 BUSINESS BRAIN DATA:
-${JSON.stringify(input.businessBrain, null, 2)}
+${input.businessBrain ? JSON.stringify(input.businessBrain, null, 2) : '{}  // No Business Brain on file for this business'}
 
 TASK:
 Analyze the Business Brain and output structured JSON with:
@@ -932,7 +1146,7 @@ Analyze the Business Brain and output structured JSON with:
 2. businessFacts: Array of verified facts with category, fact, source, criticality
 3. missingInformation: Critical facts not provided (e.g., "No delivery radius defined", "No opening hours")
 4. constraints: Business rules that limit creative freedom (e.g., "Minimum order ₹200", "Delivery only within 5km")
-5. verticalContext: Restaurant-specific context (menu structure, service modes, time-parts, occasions, offer types)
+5. verticalContext: ${vertical.promptContext.businessUnderstandingVerticalContext}
 
 OUTPUT FORMAT: Must match the provided JSON schema exactly.`;
   }
@@ -949,9 +1163,10 @@ OUTPUT FORMAT: Must match the provided JSON schema exactly.`;
       category: 'main',
       images: [],
     };
+    const vertical = getVerticalConfigOrDefault(input.vertical ?? input.businessCategory);
 
     return `SYSTEM RULES:
-You are a product analyst for restaurant marketing. Extract structured facts from product metadata and images. Distinguish between metadata facts and visual observations. Flag missing critical information.
+You are ${vertical.promptContext.productAnalystPersona}. Extract structured facts from product metadata and images. Distinguish between metadata facts and visual observations. Flag missing critical information.
 
 BUSINESS CONTEXT:
 ${JSON.stringify(businessUnderstanding, null, 2)}
@@ -991,8 +1206,9 @@ OUTPUT FORMAT: Must match the provided JSON schema exactly.`;
     input: GenerationPipelineInput,
     previousResults: any
   ): string {
+    const vertical = getVerticalConfigOrDefault(input.vertical ?? input.businessCategory);
     return `SYSTEM RULES:
-You are a senior marketing strategist for Indian local restaurants. Create a campaign strategy that drives WhatsApp orders. Use ONLY facts from business/product context. Never invent offers, prices, or claims.
+${vertical.promptContext.campaignStrategistPersona} Use ONLY facts from business/product context. Never invent offers, prices, or claims.
 
 CONTEXT HIERARCHY (HIGHEST AUTHORITY FIRST):
 1. BUSINESS FACTS (TRUTH): ${JSON.stringify(previousResults.businessUnderstanding?.businessFacts || [], null, 2)}
@@ -1061,8 +1277,9 @@ OUTPUT FORMAT: Must match the provided JSON schema exactly.`;
   }
 
   private buildCopyGenerationPrompt(input: GenerationPipelineInput, previousResults: any): string {
+    const vertical = getVerticalConfigOrDefault(input.vertical ?? input.businessCategory);
     return `SYSTEM RULES:
-You are a Hyderabadi marketing copywriter. Generate a complete campaign pack for a Hyderabad restaurant. Use the localization strategy to write NATURAL Telugu-English-Hinglish copy. Every piece must drive WhatsApp action. Preserve ALL business facts exactly.
+${vertical.promptContext.copywriterSystemRules}
 
 CONTEXT HIERARCHY:
 1. BUSINESS FACTS (IMMUTABLE): ${JSON.stringify(previousResults.businessUnderstanding?.businessFacts || [], null, 2)}
@@ -1110,8 +1327,9 @@ OUTPUT FORMAT: Must match the provided JSON schema exactly.`;
     input: GenerationPipelineInput,
     previousResults: any
   ): string {
+    const vertical = getVerticalConfigOrDefault(input.vertical ?? input.businessCategory);
     return `SYSTEM RULES:
-You are a creative director for Instagram food marketing. Generate detailed, actionable image prompts for AI image generation. Each prompt must produce Instagram-ready vertical images (4:5 for posts, 9:16 for Stories/Reels). Include brand colors, logo placement, and offer text overlays.
+${vertical.promptContext.creativeDirectorSystemRules}
 
 NOTE: These prompts are used for ON-DEMAND AI image generation only (max 2/campaign). Primary creative composition uses deterministic templates with business photos.
 
@@ -1263,6 +1481,16 @@ export interface GenerationPipelineInput {
   businessCategory: string;
   businessLocation: { city: string; state: string; locality?: string };
   whatsappNumber: string;
+  // Phase 7: this local interface previously omitted businessPhone/Website/
+  // Instagram even though generateCampaignStrategy.ts always passes
+  // businessPhone — structurally allowed through since a variable typed
+  // against the richer functions/src/types/index.ts GenerationPipelineInput
+  // is assignable here, but invisible to this file's own methods until
+  // declared, which is exactly the bug that blocked buildCreativeTextOverlay
+  // from reading it.
+  businessPhone?: string;
+  businessWebsite?: string;
+  businessInstagram?: string;
   businessBrain: any;
   brandProfile: any;
 
@@ -1283,6 +1511,7 @@ export interface GenerationPipelineInput {
   cta: string;
   localizationProfile: any;
   campaignStyle: string;
+  vertical?: 'restaurant' | 'salon' | 'real_estate';
 
   // New product (if applicable)
   newProduct?: {

@@ -1,7 +1,7 @@
 import { onCall, HttpsError } from 'firebase-functions/v2/https';
 import { z } from 'zod';
 
-import { verifyAuthAndBusinessAccess } from '../../middleware/auth';
+import { verifyBusinessAccess } from '../../middleware/auth';
 import { validatedCallable } from '../../middleware/validation';
 import { getProductDoc, updateProductDoc } from '../../services/firestore';
 import { logFunctionStart, logFunctionComplete, logFunctionError } from '../../utils/logging';
@@ -65,7 +65,7 @@ export const updateProduct = onCall(
 
     try {
       const { productId, businessId, ...updateData } = data;
-      await verifyAuthAndBusinessAccess(context as any, businessId);
+      await verifyBusinessAccess(context.userId, businessId);
 
       const existingProduct = await getProductDoc(productId);
       if (!existingProduct) {

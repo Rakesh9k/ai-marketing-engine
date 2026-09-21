@@ -1,4 +1,5 @@
 import { HttpsError } from 'firebase-functions/v2/https';
+import { UnsupportedVerticalError } from '../config/verticals';
 
 export class AppError extends Error {
   constructor(
@@ -72,6 +73,12 @@ export class RateLimitError extends AppError {
 export function mapErrorToHttpsError(error: unknown): HttpsError {
   if (error instanceof AppError) {
     return error.toHttpsError();
+  }
+  // See UnsupportedVerticalError's own comment (config/verticals.ts) for why
+  // it isn't an AppError subclass: that file must stay free of any
+  // firebase-functions dependency.
+  if (error instanceof UnsupportedVerticalError) {
+    return new HttpsError('invalid-argument', error.message, { vertical: error.vertical });
   }
   if (error instanceof Error) {
     return new HttpsError('internal', error.message);
