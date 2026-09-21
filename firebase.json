@@ -7,6 +7,25 @@
       "predeploy": ["npm --prefix functions run build"]
     }
   ],
+  "apphosting": {
+    "backendId": "mitra-web",
+    "rootDir": "/",
+    "ignore": [
+      "node_modules",
+      "functions/node_modules",
+      "functions/lib",
+      ".git",
+      ".next",
+      ".env*",
+      ".firebase",
+      ".vercel",
+      "playwright-report",
+      "test-results",
+      "services/reel-renderer",
+      "firebase-debug.log",
+      "firebase-debug.*.log"
+    ]
+  },
   "emulators": {
     "auth": {
       "port": 9099

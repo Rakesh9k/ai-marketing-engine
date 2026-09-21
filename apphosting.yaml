@@ -1,0 +1,69 @@
+# Firebase App Hosting configuration for the Mitra Next.js frontend.
+#
+# Every variable below is a browser-safe NEXT_PUBLIC_* value (Firebase web config,
+# App Check site key, Razorpay publishable key id). NEXT_PUBLIC_* values are inlined
+# into the client bundle at build time, so they need BUILD availability.
+#
+# NOT here, by design: NEXT_PUBLIC_APPCHECK_DEBUG_TOKEN and every server secret
+# (Razorpay secret/webhook secret, AI provider keys, Firebase Admin credentials).
+# Those stay in Firebase Cloud Functions secrets.
+runConfig:
+  cpu: 1
+  memoryMiB: 512
+  minInstances: 0
+  maxInstances: 10
+  concurrency: 80
+
+env:
+  - variable: NEXT_PUBLIC_FIREBASE_API_KEY
+    value: "AIzaSyB4faySp9fYnSjkGW0TFt4y_9eFzn28SNE"
+    availability:
+      - BUILD
+      - RUNTIME
+  - variable: NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN
+    value: "brainwise-ai-marketing-engine.firebaseapp.com"
+    availability:
+      - BUILD
+      - RUNTIME
+  - variable: NEXT_PUBLIC_FIREBASE_PROJECT_ID
+    value: "brainwise-ai-marketing-engine"
+    availability:
+      - BUILD
+      - RUNTIME
+  - variable: NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET
+    value: "brainwise-ai-marketing-engine.firebasestorage.app"
+    availability:
+      - BUILD
+      - RUNTIME
+  - variable: NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID
+    value: "691254604957"
+    availability:
+      - BUILD
+      - RUNTIME
+  - variable: NEXT_PUBLIC_FIREBASE_APP_ID
+    value: "1:691254604957:web:caf76181c86efb6a7b5074"
+    availability:
+      - BUILD
+      - RUNTIME
+  - variable: NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID
+    value: "G-QZCPD9PG83"
+    availability:
+      - BUILD
+      - RUNTIME
+  - variable: NEXT_PUBLIC_RECAPTCHA_SITE_KEY
+    value: "6Lfrer4tAAAAAOhwU88DuXobbIT1sDKJkFtlGOE3"
+    availability:
+      - BUILD
+      - RUNTIME
+  - variable: NEXT_PUBLIC_RAZORPAY_KEY_ID
+    value: "rzp_test_placeholder_no_real_credentials"
+    availability:
+      - BUILD
+      - RUNTIME
+  # Production must never talk to the local emulators. Set explicitly so a stray
+  # .env.local can never switch emulator wiring on in a hosted build.
+  - variable: NEXT_PUBLIC_USE_EMULATORS
+    value: "false"
+    availability:
+      - BUILD
+      - RUNTIME
