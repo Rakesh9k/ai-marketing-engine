@@ -106,11 +106,17 @@ jobs:
         run: npm ci
         working-directory: .
 
-      - name: Run security rules tests
-        run: npm run test -- --testPathPattern="security"
+      - name: Install Firebase CLI
+        run: npm install -g firebase-tools@15.29.0
+
+      # Uses a fake "demo-" project id so this never depends on real Firebase
+      # credentials/secrets being configured in the repo - emulators run
+      # fully locally regardless. Previously this step set
+      # FIRESTORE_EMULATOR_HOST without ever starting an emulator, so every
+      # test hit a connection refused error.
+      - name: Run security rules tests against Firebase emulators
+        run: firebase emulators:exec --only firestore,auth,storage --project demo-mitra "npm run test -- --testPathPattern=\"security\" --coverage=false"
         working-directory: .
-        env:
-          FIRESTORE_EMULATOR_HOST: localhost:8080
 
   # Unit and integration tests
   test:
@@ -134,29 +140,20 @@ jobs:
         run: npm ci
         working-directory: ./functions
 
-      - name: Start Firebase Emulators
-        uses: firebase/firebase-tools@latest
-        with:
-          args: emulators:start --only auth,firestore,storage,functions
-          project: ${{ env.FIREBASE_PROJECT_ID }}
-        env:
-          FIREBASE_TOKEN: ${{ secrets.FIREBASE_TOKEN }}
+      - name: Install Firebase CLI
+        run: npm install -g firebase-tools@15.29.0
 
-      - name: Wait for emulators
-        run: sleep 30
-
-      - name: Run unit tests
-        run: npm run test:unit -- --coverage=false
+      # firebase/firebase-tools@latest is not a real GitHub Action (no
+      # action.yml) - the "Start Firebase Emulators" step this replaced
+      # always failed at job setup before checkout even ran. `test:unit`/
+      # `test:integration` also never existed as npm scripts (only `test`
+      # does). The functions test suite exercises Firestore/Auth/Storage
+      # directly via the Admin SDK against the emulators below - it does
+      # not need the emulators:start `functions` target, which would
+      # require a build step first.
+      - name: Run functions tests against Firebase emulators
+        run: firebase emulators:exec --only auth,firestore,storage --project demo-mitra "npm --prefix functions run test -- --coverage=false"
         working-directory: .
-
-      - name: Run integration tests
-        run: npm run test:integration -- --coverage=false
-        working-directory: .
-        env:
-          FIRESTORE_EMULATOR_HOST: localhost:8080
-          FIREBASE_AUTH_EMULATOR_HOST: localhost:9099
-          FIREBASE_STORAGE_EMULATOR_HOST: localhost:9199
-          FIREBASE_FUNCTIONS_EMULATOR_HOST: localhost:5001
 
   # Deploy backend (Cloud Functions) to staging.
   #
@@ -173,7 +170,7 @@ jobs:
   # the backend (Cloud Functions).
   deploy-backend-staging:
     name: Deploy Backend to Staging
-    needs: [frontend-lint, functions-lint, test]
+    needs: [frontend-lint, functions-lint, test, security-rules-test]
     if: github.ref == 'refs/heads/develop'
     runs-on: ubuntu-latest
     steps:
@@ -206,7 +203,7 @@ jobs:
   # this workflow.
   deploy-backend-production:
     name: Deploy Backend to Production
-    needs: [frontend-lint, functions-lint, test]
+    needs: [frontend-lint, functions-lint, test, security-rules-test]
     if: github.ref == 'refs/heads/master'
     runs-on: ubuntu-latest
     environment: production
