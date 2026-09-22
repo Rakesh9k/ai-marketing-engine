@@ -2,9 +2,9 @@ name: CI/CD Pipeline
 
 on:
   push:
-    branches: [main, develop]
+    branches: [master, develop]
   pull_request:
-    branches: [main, develop]
+    branches: [master, develop]
 
 env:
   NODE_VERSION: '20'
@@ -28,23 +28,23 @@ jobs:
 
       - name: Install dependencies
         run: npm ci
-        working-directory: ./ai-marketing-engine
+        working-directory: .
 
       - name: Run ESLint
         run: npm run lint
-        working-directory: ./ai-marketing-engine
+        working-directory: .
 
       - name: Run TypeScript type check
         run: npm run typecheck
-        working-directory: ./ai-marketing-engine
+        working-directory: .
 
       - name: Run tests
         run: npm run test -- --coverage=false
-        working-directory: ./ai-marketing-engine
+        working-directory: .
 
       - name: Build Next.js app
         run: npm run build
-        working-directory: ./ai-marketing-engine
+        working-directory: .
         env:
           NEXT_PUBLIC_FIREBASE_API_KEY: ${{ secrets.NEXT_PUBLIC_FIREBASE_API_KEY }}
           NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN: ${{ secrets.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN }}
@@ -70,23 +70,23 @@ jobs:
 
       - name: Install dependencies
         run: npm ci
-        working-directory: ./ai-marketing-engine/functions
+        working-directory: ./functions
 
       - name: Run ESLint
         run: npm run lint
-        working-directory: ./ai-marketing-engine/functions
+        working-directory: ./functions
 
       - name: Run TypeScript type check
         run: npm run typecheck
-        working-directory: ./ai-marketing-engine/functions
+        working-directory: ./functions
 
       - name: Run tests
         run: npm run test -- --coverage=false
-        working-directory: ./ai-marketing-engine/functions
+        working-directory: ./functions
 
       - name: Build Functions
         run: npm run build
-        working-directory: ./ai-marketing-engine/functions
+        working-directory: ./functions
 
   # Security rules testing
   security-rules-test:
@@ -104,11 +104,11 @@ jobs:
 
       - name: Install dependencies
         run: npm ci
-        working-directory: ./ai-marketing-engine
+        working-directory: .
 
       - name: Run security rules tests
         run: npm run test -- --testPathPattern="security"
-        working-directory: ./ai-marketing-engine
+        working-directory: .
         env:
           FIRESTORE_EMULATOR_HOST: localhost:8080
 
@@ -128,11 +128,11 @@ jobs:
 
       - name: Install dependencies
         run: npm ci
-        working-directory: ./ai-marketing-engine
+        working-directory: .
 
       - name: Install functions dependencies
         run: npm ci
-        working-directory: ./ai-marketing-engine/functions
+        working-directory: ./functions
 
       - name: Start Firebase Emulators
         uses: firebase/firebase-tools@latest
@@ -147,11 +147,11 @@ jobs:
 
       - name: Run unit tests
         run: npm run test:unit -- --coverage=false
-        working-directory: ./ai-marketing-engine
+        working-directory: .
 
       - name: Run integration tests
         run: npm run test:integration -- --coverage=false
-        working-directory: ./ai-marketing-engine
+        working-directory: .
         env:
           FIRESTORE_EMULATOR_HOST: localhost:8080
           FIREBASE_AUTH_EMULATOR_HOST: localhost:9099
@@ -188,16 +188,16 @@ jobs:
 
       - name: Install functions dependencies
         run: npm ci
-        working-directory: ./ai-marketing-engine/functions
+        working-directory: ./functions
 
       - name: Build functions
         run: npm run build
-        working-directory: ./ai-marketing-engine/functions
+        working-directory: ./functions
 
       - name: Deploy Functions to Staging
         run: |
           firebase deploy --only functions --project ${{ secrets.FIREBASE_PROJECT_ID_STAGING }}
-        working-directory: ./ai-marketing-engine/functions
+        working-directory: ./functions
         env:
           FIREBASE_TOKEN: ${{ secrets.FIREBASE_TOKEN }}
 
@@ -207,7 +207,7 @@ jobs:
   deploy-backend-production:
     name: Deploy Backend to Production
     needs: [frontend-lint, functions-lint, test]
-    if: github.ref == 'refs/heads/main'
+    if: github.ref == 'refs/heads/master'
     runs-on: ubuntu-latest
     environment: production
     steps:
@@ -222,16 +222,16 @@ jobs:
 
       - name: Install functions dependencies
         run: npm ci
-        working-directory: ./ai-marketing-engine/functions
+        working-directory: ./functions
 
       - name: Build functions
         run: npm run build
-        working-directory: ./ai-marketing-engine/functions
+        working-directory: ./functions
 
       - name: Deploy Functions to Production
         run: |
           firebase deploy --only functions --project ${{ secrets.FIREBASE_PROJECT_ID_PROD }}
-        working-directory: ./ai-marketing-engine/functions
+        working-directory: ./functions
         env:
           FIREBASE_TOKEN: ${{ secrets.FIREBASE_TOKEN }}
 
