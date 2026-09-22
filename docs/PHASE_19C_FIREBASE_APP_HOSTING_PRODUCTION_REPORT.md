@@ -89,3 +89,32 @@ Project already on Blaze (Cloud Functions v2 deployed). App Hosting adds Cloud B
 **GitHub link:** Firebase Console → App Hosting → `mitra-web` → Settings/Deployment → connect GitHub repo `Rakesh9k/ai-marketing-engine`, live branch `master`, root `/`, automatic rollouts on.
 **Rollback:** Console → App Hosting → `mitra-web` → rollout history → "Roll back to this build" (instant); or create a rollout for an earlier commit (`firebase apphosting:rollouts:create mitra-web`). Rollback controls not exercised.
 **Debugging path:** deploy failed → rollout page/Cloud Build log; runtime crash → Cloud Run logs for `mitra-web`; Auth/App Check → browser console (`appCheck/recaptcha-error` = key domains); Function errors → Functions logs; Storage → rules + network tab.
+
+---
+
+# Continuation — 2026-09-21 (re-run after user reported adding reCAPTCHA domains)
+
+Earlier sections are preserved unchanged. Real headless Chromium against `https://mitra-web--brainwise-ai-marketing-engine.asia-southeast1.hosted.app` (PRODUCTION Firebase project).
+
+## Result: still BLOCKED at signup — same external blocker
+Re-ran the E2E (two runs, ~14:52 and ~14:54 UTC): signup still fails with `auth/firebase-app-check-token-is-invalid`; `accounts:signUp` and `signInWithPassword` → 401; console `appCheck/recaptcha-error`. No test account created; no production data written.
+
+## Root cause, now proven (not inferred)
+Loaded the reCAPTCHA Enterprise anchor frame for the site key in `apphosting.yaml` (`6Lfrer4t…lGOE3`) and read its own page text: **"ERROR for site owner: Invalid domain for site key."** The anchor was requested with `co=` decoding to exactly `https://mitra-web--brainwise-ai-marketing-engine.asia-southeast1.hosted.app:443`, i.e. the origin the browser presents. The frame then posts an error report (`enterprise/clr`) and never requests a token, which is what App Check surfaces as `recaptcha-error`. Conclusion: for **this key ID, in this project**, the allowed-domain list does not currently contain that hostname. This is CONFIGURATION, not code, and not propagation-only (still failing minutes after the reported change).
+
+Likely causes (console-side, cannot be inspected from here): (a) the domain was added to a *different* reCAPTCHA key than `6Lfrer4t…lGOE3`; (b) the edit was not saved; (c) the entry is malformed — must be a bare hostname, no `https://`, no port, no trailing slash; (d) the key was edited in another Google Cloud project. Note also: the Firebase Console App Check screen does not hold the domain list — it lives on the key under Google Cloud → Security → reCAPTCHA Enterprise.
+
+## Phase status this run
+| Phase | Result |
+|---|---|
+| A App Check/Auth | BLOCKED (external: key domain) |
+| B–H Business, Storage, Product, Campaign, Truth Check, Credits, Razorpay, Analytics | NOT VERIFIED (need an authenticated session) |
+| I Security negative tests | PASS for unauthenticated / invalid-auth / invalid-App-Check (401 each, previous section); wrong-business & cross-tenant NOT VERIFIED |
+| J App Hosting / Next.js | PASS for routes, 404, headers, mobile layout (previous section); authenticated routes NOT VERIFIED |
+| K Production environment | PASS (bundle scan; 0 emulator/localhost requests in browser) |
+| L GitHub integration | NOT VERIFIED (console link pending) |
+| M Custom domain | NOT STARTED (DNS untouched — gating tests have not passed) |
+| N Vercel cleanup | NOT STARTED (by instruction, only after production verification) |
+
+## Final Verdict (this run)
+**PHASE 19C BLOCKED** — external blocker: reCAPTCHA Enterprise key `6Lfrer4t…lGOE3` reports "Invalid domain for site key" for the App Hosting origin.

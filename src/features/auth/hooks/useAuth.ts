@@ -17,11 +17,16 @@ export function useAuth(): AuthState & {
   });
 
   useEffect(() => {
+    // On a fresh page load `auth.currentUser` is null until Firebase has
+    // restored the persisted session, so a null here does NOT mean "signed
+    // out". Only a present user is trusted immediately; otherwise stay in
+    // 'loading' until onAuthStateChanged reports the resolved state (it always
+    // fires once, with the user or null). Declaring 'unauthenticated' early made
+    // ProtectedRoute bounce a signed-in user to /login on any direct load or
+    // refresh of a protected URL, which then dropped them on /dashboard.
     const initialUser = getCurrentUser();
     if (initialUser) {
       setState({ status: 'authenticated', user: initialUser });
-    } else {
-      setState({ status: 'unauthenticated', user: null });
     }
 
     const unsubscribe = subscribeToAuthState((user) => {
@@ -71,8 +76,11 @@ export function useAuthStatus(): AuthStatus {
   const [status, setStatus] = useState<AuthStatus>('loading');
 
   useEffect(() => {
-    const initialUser = getCurrentUser();
-    setStatus(initialUser ? 'authenticated' : 'unauthenticated');
+    // See useAuth: a null currentUser on first load is "not restored yet", not
+    // "signed out" — wait for the first onAuthStateChanged before deciding.
+    if (getCurrentUser()) {
+      setStatus('authenticated');
+    }
 
     const unsubscribe = subscribeToAuthState((user) => {
       setStatus(user ? 'authenticated' : 'unauthenticated');

@@ -390,7 +390,14 @@ export const usageService = {
 
   async getCurrentPeriod(userId: string): Promise<Usage | null> {
     const now = new Date();
-    const periodStart = new Date(now.getFullYear(), now.getMonth(), 1);
+    // The usage document ID is built server-side from the UTC month start
+    // (onUserCreated / the Razorpay webhook), so the client must derive the
+    // same UTC date. Using local time here produced the previous day's date
+    // for any timezone ahead of UTC (e.g. IST: 2026-08-31 instead of
+    // 2026-09-01), which points at a document that does not exist — and the
+    // usage read rule denies reads of missing documents, so every dashboard
+    // load failed with "Missing or insufficient permissions".
+    const periodStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
     const usageId = this.getUsageDocId(userId, periodStart);
     return this.get(usageId);
   },

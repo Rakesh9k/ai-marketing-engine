@@ -8,6 +8,7 @@ module.exports = {
     '^@functions/(.*)$': '<rootDir>/functions/src/$1',
     '^@features/(.*)$': '<rootDir>/src/features/$1',
   },
+  globalSetup: '<rootDir>/tests/globalSetup.js',
   setupFilesAfterEnv: ['<rootDir>/tests/setup.ts'],
   collectCoverageFrom: [
     'src/**/*.{ts,tsx}',
