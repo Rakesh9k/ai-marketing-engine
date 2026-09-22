@@ -3,7 +3,6 @@ import { getFirebaseDb } from '@/lib/firebase/client';
 import { httpsCallable } from 'firebase/functions';
 import {
   doc,
-  setDoc,
   getDoc,
   deleteDoc,
   query,
@@ -82,10 +81,15 @@ const uploadImage = async (
       ? compressedBlob
       : new File([compressedBlob], file.name, { type: file.type });
 
-  // 3. Generate unique asset ID
+  // 3. Read the real image dimensions up front so confirmUpload (below) can
+  // persist them on the asset record in a single write — the backend's
+  // validation schema requires width/height to be positive when provided.
+  const dimensions = await getImageDimensions(fileToUpload);
+
+  // 4. Generate unique asset ID
   const assetId = generateId();
 
-  // 4. Get signed upload URL from Cloud Function
+  // 5. Get signed upload URL from Cloud Function
   const functions = getFirebaseFunctions();
   if (!functions) {
     throw new Error('Firebase Functions not initialized');
@@ -101,7 +105,7 @@ const uploadImage = async (
 
   const { uploadUrl, storagePath } = uploadData;
 
-  // 5. Upload to Firebase Storage using signed URL
+  // 6. Upload to Firebase Storage using signed URL
   const uploadResponse = await fetch(uploadUrl, {
     method: 'PUT',
     body: fileToUpload,
@@ -114,7 +118,9 @@ const uploadImage = async (
     throw new Error(`Upload failed: ${uploadResponse.statusText}`);
   }
 
-  // 4. Confirm upload and create asset record
+  // 7. Confirm upload and create asset record, with the real dimensions
+  // read in step 3 — the backend persists the asset record in this single
+  // call, so no follow-up patch write is needed.
   const functions2 = getFirebaseFunctions();
   if (!functions2) {
     throw new Error('Firebase Functions not initialized');
@@ -128,18 +134,14 @@ const uploadImage = async (
       originalName: file.name,
       mimeType: fileToUpload.type,
       size: fileToUpload.size,
-      width: 0, // Will be calculated
-      height: 0,
+      width: dimensions.width,
+      height: dimensions.height,
     },
   })) as { data: { assetId: string; asset: any; downloadURL: string } };
 
   const { assetId: confirmedAssetId, downloadURL } = confirmData;
 
-  // 7. Calculate dimensions using Image element
-  const dimensions = await getImageDimensions(fileToUpload);
-
-  // 8. Update asset with dimensions
-  const finalAsset: Asset = {
+  return {
     assetId: confirmedAssetId || assetId,
     userId,
     businessId,
@@ -157,25 +159,6 @@ const uploadImage = async (
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
   };
-
-  // 9. Patch the asset record with real dimensions (best-effort only).
-  // The authoritative asset record was ALREADY created server-side by
-  // confirmUpload above (Admin SDK, createAssetDoc) — this client-side
-  // write only refines width/height, which confirmUpload initially wrote
-  // as 0/0 since the server never inspects image pixels. Phase 12: a
-  // failure here must not be reported as an upload failure — the asset
-  // genuinely exists and is usable; without this guard, a transient
-  // failure of this client-side patch (network blip, a rules edge case)
-  // would surface as "Upload failed" to the user even though the upload
-  // fully succeeded, inviting a wasteful duplicate re-upload/asset record
-  // via Retry for something that was never actually broken.
-  try {
-    await saveAssetRecord(finalAsset);
-  } catch (err) {
-    console.error('Failed to patch asset dimensions after a successful upload:', err);
-  }
-
-  return finalAsset;
 };
 
 // eslint-disable-next-line @typescript-eslint/no-floating-promises
@@ -185,45 +168,21 @@ const uploadImage = async (
 const getImageDimensions = async (file: File): Promise<{ width: number; height: number }> => {
   return new Promise((resolve) => {
     const img = new Image();
+    // Create object URL to avoid loading large files into memory
+    const objectUrl = URL.createObjectURL(file);
     img.onload = function () {
       // Use default dimensions if image has zero size
       const w = img.width > 0 ? img.width : 1024;
       const h = img.height > 0 ? img.height : 1024;
+      URL.revokeObjectURL(objectUrl);
       resolve({ width: w, height: h });
     };
     img.onerror = function () {
+      URL.revokeObjectURL(objectUrl);
       resolve({ width: 1024, height: 1024 });
     };
-    // Create object URL to avoid loading large files into memory
-    const objectUrl = URL.createObjectURL(file);
     img.src = objectUrl;
-    // Revoke object URL after load to free memory
-    img.onload = function () {
-      URL.revokeObjectURL(objectUrl);
-    };
   });
-};
-
-/**
- * Saves the asset record to Firestore.
- * Enforces ownership: user must own the business.
- */
-const saveAssetRecord = async (asset: Asset): Promise<void> => {
-  const userId = asset.userId;
-
-  // Verify user owns this business
-  const businesses = await businessService.getByUserId(userId);
-  const userBusinesses = businesses.filter(
-    (b: { businessId: string; status: string }) =>
-      b.businessId === asset.businessId && b.status !== 'archived'
-  );
-
-  if (userBusinesses.length === 0) {
-    throw new Error('You do not have access to this business');
-  }
-
-  const assetRef = getAssetRef(asset.assetId);
-  await setDoc(assetRef, asset);
 };
 
 /**

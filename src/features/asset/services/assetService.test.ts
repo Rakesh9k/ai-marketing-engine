@@ -1,4 +1,15 @@
 import { validateFile, compressImage } from '@/features/asset/services/assetValidation';
+import { uploadImage } from '@/features/asset/services/assetService';
+import { httpsCallable } from 'firebase/functions';
+
+jest.mock('@/lib/firebase/client', () => ({
+  getFirebaseFunctions: jest.fn(() => ({})),
+  getFirebaseDb: jest.fn(() => ({})),
+}));
+
+jest.mock('firebase/functions', () => ({
+  httpsCallable: jest.fn(),
+}));
 
 // Mock URL.createObjectURL and URL.revokeObjectURL for JSDOM
 global.URL.createObjectURL = jest.fn(() => 'blob:mock-url');
@@ -83,6 +94,90 @@ describe('Asset Service', () => {
       const largeFile = new File([largeContent], 'large.jpg', { type: 'image/jpeg' });
       const result = await compressImage(largeFile, { maxSizeMB: 2 });
       expect(result).toBeInstanceOf(Blob);
+    });
+  });
+
+  describe('uploadImage', () => {
+    const originalFetch = global.fetch;
+    const originalImage = global.Image;
+
+    beforeEach(() => {
+      jest.clearAllMocks();
+      global.Image = MockImage as any;
+      global.fetch = jest.fn().mockResolvedValue({ ok: true }) as unknown as typeof fetch;
+    });
+
+    afterAll(() => {
+      global.fetch = originalFetch;
+      global.Image = originalImage;
+    });
+
+    function mockCallables(confirmUploadMock: jest.Mock, getUploadUrlMock?: jest.Mock) {
+      const uploadUrlMock =
+        getUploadUrlMock ??
+        jest.fn().mockResolvedValue({
+          data: {
+            uploadUrl: 'https://storage.example/signed-put-url',
+            storagePath: 'businesses/biz1/products/asset1/photo.jpg',
+            assetId: 'asset1',
+            expiresAt: '',
+          },
+        });
+      (httpsCallable as jest.Mock).mockImplementation((_functions, name: string) => {
+        if (name === 'getUploadUrl') return uploadUrlMock;
+        if (name === 'confirmUpload') return confirmUploadMock;
+        throw new Error(`unexpected callable requested in test: ${name}`);
+      });
+      return uploadUrlMock;
+    }
+
+    it('sends the real, positive image dimensions to confirmUpload (not the 0/0 placeholder)', async () => {
+      const confirmUploadMock = jest.fn().mockResolvedValue({
+        data: { assetId: 'asset1', asset: {}, downloadURL: 'https://storage.example/photo.jpg' },
+      });
+      mockCallables(confirmUploadMock);
+
+      const file = new File(['content'], 'photo.jpg', { type: 'image/jpeg' });
+      const asset = await uploadImage(file, 'user1', 'biz1', 'product');
+
+      expect(confirmUploadMock).toHaveBeenCalledTimes(1);
+      const call = confirmUploadMock.mock.calls[0][0];
+      expect(call.metadata.width).toBeGreaterThan(0);
+      expect(call.metadata.height).toBeGreaterThan(0);
+      expect(call.metadata.width).toBe(100);
+      expect(call.metadata.height).toBe(100);
+      expect(asset.width).toBe(100);
+      expect(asset.height).toBe(100);
+    });
+
+    it('falls back to a positive default (1024x1024) when the image reports zero natural dimensions', async () => {
+      class ZeroDimImage {
+        onload: (() => void) | null = null;
+        onerror: (() => void) | null = null;
+        width = 0;
+        height = 0;
+        src = '';
+        constructor() {
+          setTimeout(() => {
+            if (this.onload) this.onload();
+          }, 0);
+        }
+      }
+      global.Image = ZeroDimImage as any;
+
+      const confirmUploadMock = jest.fn().mockResolvedValue({
+        data: { assetId: 'asset2', asset: {}, downloadURL: 'https://storage.example/zero-dim.jpg' },
+      });
+      mockCallables(confirmUploadMock);
+
+      const file = new File(['content'], 'zero-dim.jpg', { type: 'image/jpeg' });
+      const asset = await uploadImage(file, 'user1', 'biz1', 'product');
+
+      const call = confirmUploadMock.mock.calls[0][0];
+      expect(call.metadata.width).toBe(1024);
+      expect(call.metadata.height).toBe(1024);
+      expect(asset.width).toBe(1024);
+      expect(asset.height).toBe(1024);
     });
   });
 });
