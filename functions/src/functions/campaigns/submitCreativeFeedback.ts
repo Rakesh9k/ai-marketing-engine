@@ -66,7 +66,7 @@ export const submitCreativeFeedback = onCall(
       await createCreativeFeedbackDoc(feedback);
 
       // Phase 21: Track Approval/Rejection
-      const { trackCreativeEvent } = await import('../../services/analyticsService');
+      const { trackCreativeEvent } = await import('../../services/analyticsService.js');
       await trackCreativeEvent({
         eventType: data.sentiment === 'positive' ? 'creative_approved' : 'creative_rejected',
         userId: context.userId,
@@ -81,7 +81,7 @@ export const submitCreativeFeedback = onCall(
       });
 
       // Phase 17: Build Template Preference Memory
-      const { updateCreativePreferences } = await import('../../services/preferenceService');
+      const { updateCreativePreferences } = await import('../../services/preferenceService.js');
       await updateCreativePreferences(feedback);
 
       logFunctionComplete(logger, startTime, { success: true, feedbackId: feedback.feedbackId });
