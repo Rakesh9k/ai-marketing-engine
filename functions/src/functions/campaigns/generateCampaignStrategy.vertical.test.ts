@@ -32,6 +32,8 @@ const mockGetProductDoc = jest.fn().mockResolvedValue(null);
 const mockCreateCampaignDoc = jest.fn().mockResolvedValue(undefined);
 const mockUpdateCampaignDoc = jest.fn().mockResolvedValue(undefined);
 const mockCreateCampaignAssets = jest.fn().mockResolvedValue(undefined);
+const mockGetCreativePreferencesByBusiness = jest.fn().mockResolvedValue([]);
+const mockGetSavedStyleDoc = jest.fn().mockResolvedValue(null);
 jest.mock('../../services/firestore', () => ({
   createCampaignDoc: (...args: unknown[]) => mockCreateCampaignDoc(...args),
   updateCampaignDoc: (...args: unknown[]) => mockUpdateCampaignDoc(...args),
@@ -39,6 +41,8 @@ jest.mock('../../services/firestore', () => ({
   getBrandKitDoc: (...args: unknown[]) => mockGetBrandKitDoc(...args),
   getProductDoc: (...args: unknown[]) => mockGetProductDoc(...args),
   createCampaignAssets: (...args: unknown[]) => mockCreateCampaignAssets(...args),
+  getCreativePreferencesByBusiness: (...args: unknown[]) => mockGetCreativePreferencesByBusiness(...args),
+  getSavedStyleDoc: (...args: unknown[]) => mockGetSavedStyleDoc(...args),
 }));
 
 const mockExecuteWithUsageControl = jest.fn();
@@ -51,6 +55,7 @@ jest.mock('../../services/usageControl', () => ({
 const mockTrackEvent = jest.fn().mockResolvedValue(undefined);
 jest.mock('../../services/analyticsService', () => ({
   trackEvent: (...args: unknown[]) => mockTrackEvent(...args),
+  trackCreativeEvent: jest.fn().mockResolvedValue(undefined),
   ANALYTICS_EVENTS: {
     CAMPAIGN_STARTED: 'campaign_started',
     CAMPAIGN_GENERATED: 'campaign_generated',
@@ -177,7 +182,7 @@ describe('generateCampaignStrategy — vertical support gate (Phase 29)', () => 
 
   it('restaurant is unaffected: generation proceeds through credit reservation exactly as before', async () => {
     mockGetBusinessDoc.mockResolvedValue(makeBusiness('restaurant'));
-    mockExecute.mockResolvedValue({
+    mockExecute.mockResolvedValue({ 
       campaignPack: {
         assets: [],
         truthCheck: { status: 'PASS', summary: 'ok', checkedAt: new Date().toISOString(), checks: [] },
@@ -195,7 +200,7 @@ describe('generateCampaignStrategy — vertical support gate (Phase 29)', () => 
 
   it('Phase 30: salon proceeds through credit reservation and generation exactly like restaurant, using its own objective/CTA', async () => {
     mockGetBusinessDoc.mockResolvedValue(makeBusiness('salon'));
-    mockExecute.mockResolvedValue({
+    mockExecute.mockResolvedValue({ 
       campaignPack: {
         assets: [],
         truthCheck: { status: 'PASS', summary: 'ok', checkedAt: new Date().toISOString(), checks: [] },
@@ -255,7 +260,7 @@ describe('generateCampaignStrategy — vertical support gate (Phase 29)', () => 
 
   it('Phase 31: real_estate proceeds through credit reservation and generation exactly like restaurant/salon, using its own objective/CTA', async () => {
     mockGetBusinessDoc.mockResolvedValue(makeBusiness('real_estate'));
-    mockExecute.mockResolvedValue({
+    mockExecute.mockResolvedValue({ 
       campaignPack: {
         assets: [],
         truthCheck: { status: 'PASS', summary: 'ok', checkedAt: new Date().toISOString(), checks: [] },
@@ -313,3 +318,6 @@ describe('generateCampaignStrategy — vertical support gate (Phase 29)', () => 
     expect(mockExecuteWithUsageControl).not.toHaveBeenCalled();
   });
 });
+
+
+

@@ -6,6 +6,13 @@ import { Firestore } from 'firebase-admin/firestore';
  * Canonical event names for Phase 21 Analytics
  */
 export const ANALYTICS_EVENTS = {
+  CREATIVE_TEMPLATE_VIEWED: 'creative_template_viewed',
+  CREATIVE_TEMPLATE_SELECTED: 'creative_template_selected',
+  CREATIVE_GENERATED: 'creative_generated',
+  CREATIVE_APPROVED: 'creative_approved',
+  CREATIVE_REJECTED: 'creative_rejected',
+  CREATIVE_REGENERATED: 'creative_regenerated',
+  CREATIVE_STYLE_SAVED: 'creative_style_saved',
   SIGNUP: 'signup',
   ONBOARDING_COMPLETE: 'onboarding_complete',
   CAMPAIGN_STARTED: 'campaign_started',
@@ -184,3 +191,67 @@ export async function trackSubscriptionStarted(
     }
   );
 }
+
+export type CreativeAnalyticsEventType = 
+  | 'creative_template_viewed'
+  | 'creative_template_selected'
+  | 'creative_generated'
+  | 'creative_approved'
+  | 'creative_rejected'
+  | 'creative_regenerated'
+  | 'creative_style_saved';
+
+export interface CreativeEventPayload {
+  eventType: CreativeAnalyticsEventType;
+  userId: string;
+  businessId: string;
+  creativeId?: string;
+  campaignId?: string;
+  templateId?: string;
+  templateVersion?: number;
+  styleId?: string;
+  styleVersion?: number;
+  creativeType?: 'post' | 'reel';
+  objective?: string;
+  metadata?: Record<string, unknown>;
+}
+
+export async function trackCreativeEvent(payload: CreativeEventPayload): Promise<void> {
+  const {
+    eventType,
+    userId,
+    businessId,
+    creativeId,
+    campaignId,
+    templateId,
+    templateVersion,
+    styleId,
+    styleVersion,
+    creativeType,
+    objective,
+    metadata
+  } = payload;
+
+  const eventId = `${userId}_${eventType}_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
+  const adminDb = admin.firestore();
+  const ref = adminDb.doc(`analytics_events/${eventId}`);
+  
+  await ref.set({
+    eventId,
+    eventName: eventType,
+    userId,
+    businessId,
+    creativeId,
+    campaignId,
+    templateId,
+    templateVersion,
+    styleId,
+    styleVersion,
+    creativeType,
+    objective,
+    timestamp: new Date().toISOString(),
+    metadata: metadata || {},
+    createdAt: FieldValue.serverTimestamp(),
+  });
+}
+

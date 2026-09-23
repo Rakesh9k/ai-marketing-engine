@@ -3,7 +3,8 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/features/auth/hooks/useAuth';
-import { businessService } from '@/services/database';
+import { businessService, productService } from '@/services/database';
+import { callFunction } from '@/services/api';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { useToast } from '@/hooks/useToast';
@@ -16,20 +17,57 @@ import { ReelDurationSelector } from '@/features/reel/components/ReelDurationSel
 import { ReelClipUploader, type ClipEntry } from '@/features/reel/components/ReelClipUploader';
 import { ReelGenerationProgress } from '@/features/reel/components/ReelGenerationProgress';
 import { ReelPreview } from '@/features/reel/components/ReelPreview';
+import { SavedStylePicker } from '@/features/style/components/SavedStylePicker';
 import { createReelProject, generateReel } from '@/features/reel/services/reelService';
-import type { Business, ReelDurationSeconds, ReelGoal, ReelProject, ReelStyle } from '@/types';
+import type {
+  Business,
+  CreativeObjective,
+  Product,
+  ReelDurationSeconds,
+  ReelGoal,
+  ReelProject,
+  ReelStyle,
+} from '@/types';
 
-type WizardStep = 'goal' | 'style' | 'duration' | 'upload' | 'generating' | 'preview';
+type WizardStep = 'goal' | 'style' | 'template' | 'duration' | 'upload' | 'generating' | 'preview';
 
-const STEP_ORDER: WizardStep[] = ['goal', 'style', 'duration', 'upload', 'generating', 'preview'];
+const STEP_ORDER: WizardStep[] = [
+  'goal',
+  'style',
+  'template',
+  'duration',
+  'upload',
+  'generating',
+  'preview',
+];
 const STEP_LABELS: Record<WizardStep, string> = {
   goal: 'Goal',
   style: 'Style',
+  template: 'Template',
   duration: 'Duration',
   upload: 'Upload Clips',
   generating: 'Generate',
   preview: 'Preview',
 };
+
+function mapGoalToCreativeObjective(goal: ReelGoal): CreativeObjective {
+  switch (goal) {
+    case 'food_showcase':
+      return 'awareness';
+    case 'behind_the_scenes':
+      return 'engagement';
+    case 'offer_promotion':
+      return 'promotion';
+    case 'new_product':
+      return 'launch';
+    case 'local_attraction':
+      return 'awareness';
+    case 'surprise_me':
+      return 'engagement';
+    default:
+      return 'awareness';
+  }
+}
 
 function WizardStepper({ current }: { current: WizardStep }) {
   const currentIndex = STEP_ORDER.indexOf(current);
@@ -74,6 +112,14 @@ export function ReelWizard() {
   const [step, setStep] = useState<WizardStep>('goal');
   const [goal, setGoal] = useState<ReelGoal | null>(null);
   const [style, setStyle] = useState<ReelStyle | null>(null);
+  const [templateId, setTemplateId] = useState<string | null>(null);
+  const [savedStyleId, setSavedStyleId] = useState<string | null>(null);
+  const [selectedProductId, setSelectedProductId] = useState<string | null>(null);
+  const [templates, setTemplates] = useState<
+    Array<{ id: string; name: string; description: string }>
+  >([]);
+  const [products, setProducts] = useState<Product[]>([]);
+  const [loadingTemplates, setLoadingTemplates] = useState(false);
   const [durationSeconds, setDurationSeconds] = useState<ReelDurationSeconds>(
     REEL_DEFAULT_DURATION_SECONDS
   );
@@ -106,6 +152,71 @@ export function ReelWizard() {
     void loadBusinesses();
   }, [user, showToast]);
 
+  useEffect(() => {
+    async function loadTemplateOptions() {
+      if (!selectedBusinessId) return;
+      const selectedBusiness = businesses.find(
+        (business) => business.businessId === selectedBusinessId
+      );
+      if (!selectedBusiness) return;
+      const objective = goal ? mapGoalToCreativeObjective(goal) : undefined;
+      try {
+        setLoadingTemplates(true);
+        const response = await callFunction<
+          { type: 'reel'; objective?: CreativeObjective; vertical?: string },
+          {
+            templates: Array<{
+              id: string;
+              name: string;
+              description: string;
+              objectives: CreativeObjective[];
+            }>;
+          }
+        >({
+          functionName: 'listCreativeTemplates',
+          data: {
+            type: 'reel',
+            objective,
+            vertical: selectedBusiness.category,
+          },
+        });
+        const nextTemplates = response.templates || [];
+        setTemplates(nextTemplates);
+        setTemplateId((current) => {
+          if (current && nextTemplates.some((item) => item.id === current)) return current;
+          return nextTemplates[0]?.id ?? null;
+        });
+      } catch (err) {
+        console.error(err);
+        showToast('Failed to load reel templates', 'error');
+      } finally {
+        setLoadingTemplates(false);
+      }
+    }
+    void loadTemplateOptions();
+  }, [businesses, goal, selectedBusinessId, showToast]);
+
+  useEffect(() => {
+    async function loadProducts() {
+      if (!selectedBusinessId) {
+        setProducts([]);
+        return;
+      }
+      try {
+        const data = await productService.listByBusiness(selectedBusinessId);
+        setProducts(data);
+        setSelectedProductId((current) => {
+          if (current && data.some((product) => product.productId === current)) return current;
+          return data[0]?.productId ?? null;
+        });
+      } catch (err) {
+        console.error(err);
+        showToast('Failed to load products', 'error');
+      }
+    }
+    void loadProducts();
+  }, [selectedBusinessId, showToast]);
+
   const uploadedCount = clips.filter((c) => c.status === 'uploaded').length;
   const anyUploading = clips.some((c) => c.status === 'uploading');
   const canGenerate = uploadedCount >= REEL_MIN_CLIPS && !anyUploading;
@@ -114,6 +225,10 @@ export function ReelWizard() {
     setStep('goal');
     setGoal(null);
     setStyle(null);
+    setTemplateId(null);
+    setSavedStyleId(null);
+    setSelectedProductId(null);
+    setTemplates([]);
     setDurationSeconds(REEL_DEFAULT_DURATION_SECONDS);
     setOffer('');
     setCta('');
@@ -124,13 +239,24 @@ export function ReelWizard() {
   }, []);
 
   const handleProceedToUpload = useCallback(async () => {
-    if (!selectedBusinessId || !goal || !style) return;
+    if (!selectedBusinessId || !goal || !style || !templateId) {
+      showToast('Please finish the reel setup before continuing.', 'error');
+      return;
+    }
+    if (!selectedProductId) {
+      showToast('Please select a product for this reel.', 'error');
+      return;
+    }
     setCreatingProject(true);
     try {
       const { reelId: newReelId, reel: newReel } = await createReelProject({
         businessId: selectedBusinessId,
         goal,
         style,
+        templateId,
+        creativeObjective: mapGoalToCreativeObjective(goal),
+        productId: selectedProductId,
+        styleId: savedStyleId || undefined,
         durationSeconds,
         offer: offer.trim() || undefined,
         cta: cta.trim() || undefined,
@@ -145,7 +271,19 @@ export function ReelWizard() {
     } finally {
       setCreatingProject(false);
     }
-  }, [selectedBusinessId, goal, style, durationSeconds, offer, cta, additionalMessage, showToast]);
+  }, [
+    selectedBusinessId,
+    goal,
+    style,
+    templateId,
+    selectedProductId,
+    savedStyleId,
+    durationSeconds,
+    offer,
+    cta,
+    additionalMessage,
+    showToast,
+  ]);
 
   const handleGenerate = useCallback(async () => {
     if (!selectedBusinessId || !reelId) return;
@@ -232,7 +370,91 @@ export function ReelWizard() {
             <Button variant="ghost" onClick={() => setStep('goal')}>
               Back
             </Button>
-            <Button disabled={!style} onClick={() => setStep('duration')}>
+            <Button disabled={!style} onClick={() => setStep('template')}>
+              Next
+            </Button>
+          </div>
+        </div>
+      )}
+
+      {step === 'template' && (
+        <div className="space-y-6">
+          <h2 className="text-lg font-semibold text-neutral-900">Choose a reel template</h2>
+          <p className="text-sm text-neutral-500">
+            Mitra uses the selected template to shape the story and shot plan for this reel.
+          </p>
+
+          <div className="grid gap-3 sm:grid-cols-2">
+            {loadingTemplates && <p className="text-sm text-neutral-500">Loading templates...</p>}
+            {!loadingTemplates && templates.length === 0 && (
+              <p className="text-sm text-neutral-500">
+                No reel templates available for this business.
+              </p>
+            )}
+            {templates.map((item) => (
+              <button
+                key={item.id}
+                type="button"
+                onClick={() => setTemplateId(item.id)}
+                aria-pressed={templateId === item.id}
+                className={`rounded-lg border p-4 text-left transition-colors ${
+                  templateId === item.id
+                    ? 'border-brand-600 bg-brand-50'
+                    : 'border-neutral-200 hover:bg-neutral-50'
+                }`}
+              >
+                <p className="font-medium text-neutral-900">{item.name}</p>
+                <p className="mt-1 text-sm text-neutral-500">{item.description}</p>
+              </button>
+            ))}
+          </div>
+
+          <div className="space-y-4 rounded-lg border border-neutral-200 bg-neutral-50 p-4">
+            <div>
+              <h3 className="text-sm font-medium text-neutral-900">Select a product</h3>
+              {products.length === 0 ? (
+                <p className="mt-2 text-sm text-neutral-500">
+                  No products found for this business yet.
+                </p>
+              ) : (
+                <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                  {products.map((product) => (
+                    <button
+                      key={product.productId}
+                      type="button"
+                      onClick={() => setSelectedProductId(product.productId)}
+                      aria-pressed={selectedProductId === product.productId}
+                      className={`rounded-lg border p-3 text-left transition-colors ${
+                        selectedProductId === product.productId
+                          ? 'border-brand-600 bg-brand-50'
+                          : 'border-neutral-200 hover:bg-neutral-50'
+                      }`}
+                    >
+                      <p className="font-medium text-neutral-900">{product.name}</p>
+                      <p className="mt-1 text-sm text-neutral-500">
+                        ₹{product.price.toLocaleString('en-IN')}
+                      </p>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+
+          <SavedStylePicker
+            businessId={selectedBusinessId}
+            value={savedStyleId}
+            onChange={setSavedStyleId}
+          />
+
+          <div className="flex justify-between">
+            <Button variant="ghost" onClick={() => setStep('style')}>
+              Back
+            </Button>
+            <Button
+              disabled={!style || !templateId || !selectedProductId}
+              onClick={() => setStep('duration')}
+            >
               Next
             </Button>
           </div>
@@ -266,7 +488,7 @@ export function ReelWizard() {
           </div>
 
           <div className="flex justify-between">
-            <Button variant="ghost" onClick={() => setStep('style')}>
+            <Button variant="ghost" onClick={() => setStep('template')}>
               Back
             </Button>
             <Button

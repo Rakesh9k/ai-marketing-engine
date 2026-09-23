@@ -12,6 +12,7 @@ import { useToast } from '@/hooks/useToast';
 import { buildWhatsAppShareUrl } from '@/lib/utils/whatsapp';
 import { trackEvent, recordWhatsAppClick } from '@/lib/analytics/trackEvent';
 import { callFunction } from '@/services/api';
+import { CreativeFeedbackControls } from './CreativeFeedbackControls';
 
 /**
  * Phase 8: this used to render every non-poster asset as
@@ -502,6 +503,14 @@ export function CampaignDetailContent({
       </div>
 
       <div className="mx-auto max-w-4xl space-y-6 px-4 py-8 sm:px-6 lg:px-8">
+        <SectionCard title="Creative Feedback">
+          <CreativeFeedbackControls
+            businessId={campaign.businessId}
+            campaignId={campaign.campaignId}
+            creativeId={campaign.campaignId}
+            creativeType="post"
+          />
+        </SectionCard>
         {/* PERFORMANCE — Phase 34: only the metric with a real, observable
             source (whatsappClicks) shows a number. Inquiries has no
             integrated source anywhere in this system, so it always shows

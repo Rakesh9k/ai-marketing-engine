@@ -1,11 +1,11 @@
-import { onCall } from 'firebase-functions/v2/https';
+import { onCall, HttpsError } from 'firebase-functions/v2/https';
 import { z } from 'zod';
 import { v7 as uuidv7 } from 'uuid';
 
 import { verifyBusinessAccess } from '../../middleware/auth';
 import { validatedCallable } from '../../middleware/validation';
 import { checkRateLimit } from '../../middleware/rateLimit';
-import { createReelProjectDoc } from '../../services/firestore';
+import { createReelProjectDoc, getSavedStyleDoc } from '../../services/firestore';
 import { logFunctionStart, logFunctionComplete, logFunctionError } from '../../utils/logging';
 import { mapErrorToHttpsError } from '../../utils/errors';
 import { REEL_GOALS, REEL_STYLES } from '../../config/reels';
@@ -21,6 +21,9 @@ const createReelProjectSchema = z.object({
   additionalMessage: z.string().max(200).optional(),
   templateId: z.string().optional(),
   creativeObjective: z.string().optional(),
+  productId: z.string().optional(),
+  offerId: z.string().optional(),
+  styleId: z.string().min(1).optional(),
 });
 
 /**
@@ -45,6 +48,20 @@ export const createReelProject = onCall(
       await verifyBusinessAccess(context.userId, data.businessId);
       await checkRateLimit(context.userId, 'createReelProject');
 
+      const savedStyle = data.styleId ? await getSavedStyleDoc(data.styleId) : null;
+      if (
+        data.styleId &&
+        (!savedStyle || savedStyle.businessId !== data.businessId || !savedStyle.active)
+      ) {
+        throw new HttpsError('failed-precondition', 'The selected Saved Style is unavailable.');
+      }
+      if (savedStyle && savedStyle.userId !== context.userId) {
+        throw new HttpsError(
+          'permission-denied',
+          'The selected Saved Style does not belong to this user.'
+        );
+      }
+
       const reelId = uuidv7();
       const now = new Date().toISOString();
       const reel: ReelProject = {
@@ -58,7 +75,13 @@ export const createReelProject = onCall(
         inputClipIds: [],
         offer: data.offer,
         cta: data.cta,
-        additionalMessage: data.additionalMessage, templateId: data.templateId, creativeObjective: data.creativeObjective as any,
+        additionalMessage: data.additionalMessage,
+        templateId: data.templateId,
+        creativeObjective: data.creativeObjective as any,
+        productId: data.productId,
+        offerId: data.offerId,
+        savedStyleId: savedStyle?.styleId,
+        savedStyleVersion: savedStyle?.version,
         createdAt: now,
         updatedAt: now,
       };

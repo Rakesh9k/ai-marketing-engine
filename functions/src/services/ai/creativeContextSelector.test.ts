@@ -84,6 +84,28 @@ describe('CreativeContextSelector', () => {
       expect(result.context.localization).toBeUndefined();
       expect(result.missingRequired).toHaveLength(0);
     });
+
+    it('selects SavedStyleContext for creative copy without changing template grammar', () => {
+      const tctx = createMockTemplateContext('post-product-hero', {
+        savedStyle: {
+          styleId: 'style-1',
+          styleVersion: 1,
+          tone: 'playful',
+          visualDensity: 'medium',
+          productProminence: 'high',
+          textDensity: 'minimal',
+          colorMode: 'brand',
+          humor: 'moderate',
+          ctaStyle: 'direct',
+          language: 'telugu-english',
+        },
+      });
+      const result = selectCreativeContext({ task: 'creative_copy', templateContext: tctx });
+
+      expect(result.context.savedStyle).toMatchObject({ styleId: 'style-1', tone: 'playful' });
+      expect(result.template.id).toBe('post-product-hero');
+      expect(result.missingRequired).toHaveLength(0);
+    });
   });
 
   describe('TEST: MISSING REQUIRED CONTEXT', () => {

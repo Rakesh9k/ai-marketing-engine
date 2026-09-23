@@ -4,6 +4,7 @@ import type {
   User,
   Business,
   BrandKit,
+  SavedStyle,
   Product,
   Campaign,
   CampaignAsset,
@@ -15,6 +16,7 @@ import type {
   Asset,
   CampaignPerformance,
   ReelProject,
+  CreativeFeedback,
 } from '../types';
 
 const db = admin.firestore();
@@ -134,6 +136,43 @@ export async function updateBrandKitDoc(
       ...data,
       updatedAt: serverTimestamp(),
     });
+}
+
+export async function createSavedStyleDoc(style: SavedStyle): Promise<void> {
+  await db.collection('saved_styles').doc(style.styleId).set(style);
+}
+
+export async function createCreativeFeedbackDoc(feedback: CreativeFeedback): Promise<void> {
+  await db.collection('creative_feedback').doc(feedback.feedbackId).set(feedback);
+}
+
+export async function getCreativePreferencesByBusiness(businessId: string): Promise<import('../types').CreativePreference[]> {
+  const snap = await db
+    .collection('creative_preferences')
+    .where('businessId', '==', businessId)
+    .get();
+  return snap.docs.map((doc) => doc.data() as import('../types').CreativePreference);
+}
+
+export async function getSavedStyleDoc(styleId: string): Promise<SavedStyle | null> {
+  const snap = await db.collection('saved_styles').doc(styleId).get();
+  return snap.exists ? (snap.data() as SavedStyle) : null;
+}
+
+export async function getSavedStylesByBusiness(businessId: string): Promise<SavedStyle[]> {
+  const snap = await db
+    .collection('saved_styles')
+    .where('businessId', '==', businessId)
+    .orderBy('createdAt', 'desc')
+    .get();
+  return snap.docs.map((doc) => doc.data() as SavedStyle);
+}
+
+export async function updateSavedStyleDoc(
+  styleId: string,
+  data: Partial<SavedStyle>
+): Promise<void> {
+  await db.collection('saved_styles').doc(styleId).update(data);
 }
 
 export async function createProductDoc(product: Product): Promise<void> {

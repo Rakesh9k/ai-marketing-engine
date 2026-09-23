@@ -8,7 +8,7 @@ describe('buildCreativeTemplateContext', () => {
     colors: { primary: '#000' },
   };
 
-  const mockBusinessBrain = {
+  const mockBusinessBrain: any = {
     identity: {
       name: 'Biryani Palace',
       category: 'restaurant',
@@ -99,7 +99,7 @@ describe('buildCreativeTemplateContext', () => {
     });
 
     it('works with a different localization', () => {
-      const delhiBusiness = {
+      const delhiBusiness: any = {
         ...mockBusinessBrain,
         identity: { ...mockBusinessBrain.identity, location: { city: 'Delhi', state: 'DL' } },
         localization: { primaryLanguage: 'hi' }
@@ -138,7 +138,7 @@ describe('buildCreativeTemplateContext', () => {
 
   describe('Template Independence', () => {
     it('uses the same template for different businesses', () => {
-      const salonBusiness = {
+      const salonBusiness: any = {
         identity: {
           name: 'Glamour Salon',
           category: 'salon',
@@ -202,7 +202,7 @@ describe('buildCreativeTemplateContext', () => {
 
   describe('Provider Independence & No Raw Leakage', () => {
     it('does not contain raw database documents', () => {
-      const rawBusinessBrainDoc = {
+      const rawBusinessBrainDoc: any = {
         ...mockBusinessBrain,
         _firestoreMetadata: 'hidden-secret',
         internalNotes: 'do not show to AI'

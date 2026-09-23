@@ -11,14 +11,17 @@ import {
   getBusinessDoc,
   getBrandKitDoc,
   getAssetDoc,
+  getSavedStyleDoc,
+  getCreativePreferencesByBusiness,
 } from '../../services/firestore';
 import { logFunctionStart, logFunctionComplete, logFunctionError } from '../../utils/logging';
 import { mapErrorToHttpsError, InsufficientCreditsError } from '../../utils/errors';
 import { executeWithUsageControl, USAGE_ERROR_CODES } from '../../services/usageControl';
-import { trackEvent, ANALYTICS_EVENTS } from '../../services/analyticsService';
+import { trackEvent, trackCreativeEvent, ANALYTICS_EVENTS } from '../../services/analyticsService';
 import { analyzeReelClips, generateValidatedReelEditPlan } from '../../services/ai/reelPipeline';
 import { getVideoRenderer } from '../../services/videoRenderer';
 import { getMusicTrackById, MIN_REEL_CLIPS, pickDefaultMusicTrack } from '../../config/reels';
+import { toSavedStyleContext } from '../../services/savedStyle';
 
 const generateReelSchema = z.object({
   businessId: z.string().min(1),
@@ -93,6 +96,26 @@ export const generateReel = onCall(
         throw new HttpsError('not-found', 'Business not found');
       }
 
+      const savedStyle = reel.savedStyleId ? await getSavedStyleDoc(reel.savedStyleId) : null;
+      if (
+        reel.savedStyleId &&
+        (!savedStyle || savedStyle.businessId !== data.businessId || !savedStyle.active)
+      ) {
+        throw new HttpsError('failed-precondition', 'The selected Saved Style is unavailable.');
+      }
+      if (savedStyle && savedStyle.userId !== userId) {
+        throw new HttpsError(
+          'permission-denied',
+          'The selected Saved Style does not belong to this user.'
+        );
+      }
+      if (savedStyle && reel.savedStyleVersion && savedStyle.version !== reel.savedStyleVersion) {
+        throw new HttpsError(
+          'failed-precondition',
+          'The selected Saved Style changed after this Reel was created. Start a new Reel to use the updated style.'
+        );
+      }
+
       const { result, creditsUsed } = await executeWithUsageControl(
         userId,
         reelId,
@@ -142,7 +165,18 @@ export const generateReel = onCall(
           let creativeTemplateContext = undefined;
           let adaptedCreativePlan = undefined;
           if (reel.templateId && reel.creativeObjective) {
-            const { buildCreativeTemplateContext } = await import('../../services/ai/creativeTemplateContext.js');
+            const rawPreferences = await getCreativePreferencesByBusiness(data.businessId);
+            const creativePreferences = {
+              preferredTemplates: rawPreferences
+                .filter((p) => p.preference === 'preferred')
+                .map((p) => p.templateId),
+              avoidedTemplates: rawPreferences
+                .filter((p) => p.preference === 'avoided')
+                .map((p) => p.templateId),
+            };
+
+            const { buildCreativeTemplateContext } =
+              await import('../../services/ai/creativeTemplateContext.js');
             creativeTemplateContext = buildCreativeTemplateContext({
               templateId: reel.templateId,
               objective: reel.creativeObjective as any,
@@ -155,21 +189,25 @@ export const generateReel = onCall(
               offerValidityStart: new Date().toISOString(),
               offerValidityEnd: new Date().toISOString(),
               audienceLocalities: business.location?.locality ? [business.location.locality] : [],
+              savedStyle: savedStyle ? toSavedStyleContext(savedStyle) : undefined,
+              creativePreferences,
             });
 
-            const { selectCreativeContext } = await import('../../services/ai/creativeContextSelector.js');
-            const { TemplateAdaptationPlanner } = await import('../../services/ai/templateAdaptation.js');
-            
+            const { selectCreativeContext } =
+              await import('../../services/ai/creativeContextSelector.js');
+            const { TemplateAdaptationPlanner } =
+              await import('../../services/ai/templateAdaptation.js');
+
             const selectedContext = selectCreativeContext({
               task: 'reel_shot_plan',
-              templateContext: creativeTemplateContext
+              templateContext: creativeTemplateContext,
             });
-            
+
             const planner = new TemplateAdaptationPlanner();
             adaptedCreativePlan = await planner.adapt({
               template: creativeTemplateContext.template,
               selectedContext,
-              objective: creativeTemplateContext.objective
+              objective: creativeTemplateContext.objective,
             });
           }
 
@@ -230,6 +268,14 @@ export const generateReel = onCall(
           });
 
           await trackEvent(ANALYTICS_EVENTS.REEL_GENERATED, userId, data.businessId, reelId);
+          await trackCreativeEvent({
+            eventType: 'creative_generated',
+            userId,
+            businessId: data.businessId,
+            creativeId: reelId,
+            campaignId: reelId,
+            creativeType: 'reel',
+          });
 
           return { outputUrl, thumbnailUrl };
         },
@@ -272,3 +318,4 @@ export const generateReel = onCall(
     }
   })
 );
+

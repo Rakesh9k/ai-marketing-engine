@@ -11,6 +11,7 @@ import type {
   LocalizationContext,
   CreativeTemplateContext
 } from './creativeTemplateContext';
+import type { SavedStyleContext } from '../../types';
 
 export type CreativeTask = 
   | 'business_understanding'
@@ -35,16 +36,18 @@ export type CreativeContextKey =
   | 'colors'
   | 'cta'
   | 'approvedHumor'
-  | 'shotConstraints';
+  | 'shotConstraints'
+  | 'savedStyle'
+  | 'creativePreferences';
 
 export interface SelectedTemplateContext {
   id: string;
   type: 'post' | 'reel';
   name: string;
   objective: CreativeObjective;
-  structure: any;
-  visualGrammar: any;
-  constraints: any;
+  structure: import('../../types').CreativeStructure;
+  visualGrammar: import('../../types').VisualGrammar;
+  constraints: import('../../types').TemplateConstraints;
 }
 
 export interface BusinessRulesContext {
@@ -74,6 +77,11 @@ export interface ShotConstraintsContext {
   maxSections?: number;
 }
 
+export interface CreativePreferenceContext {
+  preferredTemplates: string[];
+  avoidedTemplates: string[];
+}
+
 export interface SelectedCreativeContext {
   task: CreativeTask;
   template: SelectedTemplateContext;
@@ -90,6 +98,8 @@ export interface SelectedCreativeContext {
     cta?: CTAContext;
     approvedHumor?: ApprovedHumorContext;
     shotConstraints?: ShotConstraintsContext;
+    savedStyle?: SavedStyleContext;
+    creativePreferences?: CreativePreferenceContext;
   };
   missingRequired: readonly CreativeContextKey[];
 }
@@ -124,19 +134,19 @@ const TASK_REQUIREMENTS: Record<CreativeTask, { required: CreativeContextKey[], 
   },
   creative_copy: {
     required: ['brand', 'product'],
-    optional: ['cta', 'offer', 'audience', 'localization', 'businessRules', 'approvedHumor']
+    optional: ['cta', 'offer', 'audience', 'localization', 'businessRules', 'approvedHumor', 'savedStyle']
   },
   image_prompt: {
     required: ['product', 'visualPreferences'],
-    optional: ['brand', 'logo', 'colors', 'localization']
+    optional: ['brand', 'logo', 'colors', 'localization', 'savedStyle']
   },
   image_generation: {
     required: ['product', 'visualPreferences', 'logo', 'colors'],
-    optional: ['brand', 'localization']
+    optional: ['brand', 'localization', 'savedStyle']
   },
   reel_shot_plan: {
     required: ['brand', 'product', 'visualPreferences', 'shotConstraints'],
-    optional: ['offer', 'audience', 'localization', 'logo', 'colors']
+    optional: ['offer', 'audience', 'localization', 'logo', 'colors', 'savedStyle']
   },
   truth_check: {
     required: ['brand', 'product'],
@@ -238,8 +248,8 @@ export function selectCreativeContext(input: SelectCreativeContextInput): Select
 
   const colors: BrandColorsContext | undefined = input.templateContext.brand?.colors ? {
     primary: input.templateContext.brand.colors.primary,
-    secondary: (input.templateContext.brand.colors as any).secondary,
-    accent: (input.templateContext.brand.colors as any).accent
+    secondary: input.templateContext.brand.colors.secondary,
+    accent: input.templateContext.brand.colors.accent
   } : undefined;
   checkAndAssign('colors', colors);
 
@@ -251,6 +261,8 @@ export function selectCreativeContext(input: SelectCreativeContextInput): Select
     maxSections: input.templateContext.template.constraints.maxSections,
   } : undefined;
   checkAndAssign('shotConstraints', shotConstraints);
+  checkAndAssign('savedStyle', input.templateContext.savedStyle);
+  checkAndAssign('creativePreferences', input.templateContext.creativePreferences);
 
   checkAndAssign('businessRules', undefined);
   checkAndAssign('approvedHumor', undefined);

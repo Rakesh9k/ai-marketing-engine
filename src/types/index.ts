@@ -362,6 +362,9 @@ export interface Campaign {
   businessId: string;
   userId: string;
   objective: CampaignObjective;
+  templateId?: string;
+  creativeObjective?: CreativeObjective;
+  savedStyleId?: string;
   productId?: string;
   newProduct?: {
     name: string;
@@ -406,6 +409,8 @@ export interface Campaign {
     truthCheckStatus?: 'PASS' | 'FAIL' | 'REVIEW_REQUIRED';
     truthCheckSummary?: string;
     truthCheckResult?: TruthCheckResult;
+    savedStyleId?: string;
+    savedStyleVersion?: number;
   };
   createdAt: string;
   updatedAt: string;
@@ -422,6 +427,111 @@ export type ReelGoal =
 
 export type ReelStyle = 'fast_engaging' | 'premium' | 'local_fun' | 'minimal' | 'cinematic';
 
+export type CreativeObjective =
+  'awareness' | 'engagement' | 'conversion' | 'launch' | 'promotion' | 'retention';
+
+export type SavedStyleTone =
+  'playful' | 'serious' | 'professional' | 'warm' | 'bold' | 'premium' | 'energetic';
+export type SavedStyleVisualDensity = 'minimal' | 'low' | 'medium' | 'high';
+export type SavedStyleProductProminence = 'subtle' | 'balanced' | 'high' | 'dominant';
+export type SavedStyleTextDensity = 'minimal' | 'concise' | 'moderate' | 'detailed';
+export type SavedStyleColorMode = 'brand' | 'neutral' | 'monochrome' | 'vibrant';
+export type SavedStyleHumor = 'none' | 'light' | 'moderate' | 'high';
+export type SavedStyleCtaStyle = 'soft' | 'direct' | 'urgent' | 'conversational';
+export type SavedStyleLanguage =
+  'business-default' | 'english' | 'hinglish' | 'telugu-english' | 'regional';
+export type CreativeFeedbackReason =
+  | 'more_premium'
+  | 'more_local'
+  | 'less_text'
+  | 'more_humorous'
+  | 'more_product_focused'
+  | 'different';
+
+export interface CreativeFeedback {
+  feedbackId: string;
+  creativeId: string; // The ID of the generated asset or reel
+  campaignId?: string;
+  userId: string;
+  businessId: string;
+  templateId?: string;
+  templateVersion?: number;
+  styleId?: string;
+  styleVersion?: number;
+  creativeType: 'post' | 'reel';
+  sentiment: 'positive' | 'negative';
+  reasons?: CreativeFeedbackReason[];
+  customReason?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export type CreativePreferenceSource = 'explicit_user' | 'approval' | 'rejection';
+export type CreativePreferenceState = 'preferred' | 'avoided' | 'none';
+
+export interface CreativePreference {
+  preferenceId: string;
+  businessId: string;
+  templateId: string;
+  preference: CreativePreferenceState;
+  confidence: number;
+  evidenceCount: number;
+  positiveEvidenceCount: number;
+  negativeEvidenceCount: number;
+  source: CreativePreferenceSource;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export type SavedStyleComposition =
+  | 'centered'
+  | 'hero-focused'
+  | 'split-layout'
+  | 'editorial'
+  | 'grid'
+  | 'asymmetric'
+  | 'negative-space-heavy'
+  | 'left-aligned'
+  | 'right-aligned';
+export type SavedStyleVisualHierarchyItem =
+  'product' | 'headline' | 'cta' | 'brand' | 'supporting-copy';
+export type SavedStyleCtaPlacement =
+  'bottom' | 'top' | 'end-card' | 'integrated' | 'product-adjacent';
+export type SavedStyleHookStructure =
+  | 'question'
+  | 'bold-statement'
+  | 'visual-surprise'
+  | 'product-first'
+  | 'problem-first'
+  | 'offer-first'
+  | 'curiosity';
+export type SavedStyleShotPacing = 'slow' | 'moderate' | 'fast' | 'dynamic' | 'cinematic';
+
+export interface SavedStyle {
+  styleId: string;
+  businessId: string;
+  name: string;
+  description?: string;
+  tone: SavedStyleTone;
+  visualDensity: SavedStyleVisualDensity;
+  productProminence: SavedStyleProductProminence;
+  textDensity: SavedStyleTextDensity;
+  colorMode: SavedStyleColorMode;
+  humor: SavedStyleHumor;
+  ctaStyle: SavedStyleCtaStyle;
+  language?: SavedStyleLanguage;
+  composition?: SavedStyleComposition;
+  visualHierarchy?: SavedStyleVisualHierarchyItem[];
+  ctaPlacement?: SavedStyleCtaPlacement;
+  hookStructure?: SavedStyleHookStructure;
+  shotPacing?: SavedStyleShotPacing;
+  source?: 'reference_analysis' | 'manual';
+  active: boolean;
+  version: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export type ReelDurationSeconds = 15 | 30 | 45;
 
 export type ReelStatus =
@@ -433,6 +543,9 @@ export interface ReelProject {
   userId: string;
   status: ReelStatus;
   goal: ReelGoal;
+  templateId?: string;
+  creativeObjective?: CreativeObjective;
+  savedStyleId?: string;
   style: ReelStyle;
   durationSeconds: ReelDurationSeconds;
   inputClipIds: string[];

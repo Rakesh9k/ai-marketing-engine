@@ -101,6 +101,18 @@ service cloud.firestore {
           get(/databases/$(database)/documents/businesses/$(businessId)).data.agencyId == request.auth.token.agencyId));
     }
 
+    // Saved Styles are business-scoped creative preferences. They contain no
+    // business facts or brand assets; Cloud Functions own all writes so the
+    // server can validate the style and enforce the authenticated tenant.
+    match /saved_styles/{styleId} {
+      allow read: if isAuthenticated() &&
+        (resource.data.userId == request.auth.uid ||
+         hasBusinessAccess(resource.data.businessId) ||
+         (request.auth.token.role == 'agency_member' &&
+          get(/databases/$(database)/documents/businesses/$(resource.data.businessId)).data.agencyId == request.auth.token.agencyId));
+      allow write: if false;
+    }
+
     // Products collection
     match /products/{productId} {
       allow read: if isAuthenticated() &&

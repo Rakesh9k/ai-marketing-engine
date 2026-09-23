@@ -44,6 +44,9 @@ export interface UploadedPhoto {
 
 export interface CampaignWizardState {
   step: number;
+  type: 'post' | 'reel' | null;
+  templateId: string | null;
+  styleId: string | null;
   objective: CampaignObjective | null;
   selectedProductId: string | null;
   photos: UploadedPhoto[];
@@ -58,6 +61,9 @@ export interface CampaignWizardState {
 
 export const createInitialWizardState = (): CampaignWizardState => ({
   step: 1,
+  type: null,
+  templateId: null,
+  styleId: null,
   objective: null,
   selectedProductId: null,
   photos: [],

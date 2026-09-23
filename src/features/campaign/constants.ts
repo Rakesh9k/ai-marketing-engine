@@ -215,7 +215,7 @@ export const OCCASIONS: ReadonlyArray<{
   { value: 'family', label: 'Family' },
 ];
 
-export const TOTAL_STEPS = 8;
+export const TOTAL_STEPS = 10;
 
 /**
  * Mirrors functions/src/config/pricing.ts PRICING.campaignBaseCredits (100) +

@@ -488,6 +488,8 @@ export class GenerationPipeline {
         audienceLocalities: input.audience.localities,
         audienceAgeRange: input.audience.ageRange,
         audienceOccasion: input.audience.occasion,
+        savedStyle: input.savedStyleContext,
+        creativePreferences: input.creativePreferences,
       });
 
       const { selectCreativeContext } = await import('./creativeContextSelector.js');
@@ -969,6 +971,8 @@ export class GenerationPipeline {
         audienceLocalities: input.audience.localities,
         audienceAgeRange: input.audience.ageRange,
         audienceOccasion: input.audience.occasion,
+        savedStyle: input.savedStyleContext,
+        creativePreferences: input.creativePreferences,
       });
     }
 
@@ -1593,8 +1597,9 @@ export interface GenerationPipelineInput {
   businessPhone?: string;
   businessWebsite?: string;
   businessInstagram?: string;
-  businessBrain: any;
+  businessBrain: import('../../types').BusinessBrain;
   brandProfile: BrandCreativeContext;
+  creativePreferences?: import('./creativeContextSelector').CreativePreferenceContext;
 
   // Campaign input
   objective: string;
@@ -1611,8 +1616,9 @@ export interface GenerationPipelineInput {
   duration: { start: string; end: string };
   audience: { localities: string[]; ageRange?: { min: number; max: number }; occasion?: string };
   cta: string;
-  localizationProfile: any;
+  localizationProfile: import('../../types').LocalizationProfile;
   campaignStyle: string;
+  savedStyleContext?: import('../../types').SavedStyleContext;
   vertical?: 'restaurant' | 'salon' | 'real_estate';
 
   // New product (if applicable)

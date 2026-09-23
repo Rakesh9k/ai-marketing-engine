@@ -97,6 +97,8 @@ export interface GenerationPipelineInput {
   campaignId?: string;
   templateId?: string;
   creativeObjective?: CreativeObjective;
+  savedStyleId?: string;
+  savedStyleVersion?: number;
   businessName: string;
   businessCategory: string;
   businessLocation: { city: string; state: string; locality?: string };
@@ -104,8 +106,9 @@ export interface GenerationPipelineInput {
   businessPhone?: string;
   businessWebsite?: string;
   businessInstagram?: string;
-  businessBrain: any;
-  brandProfile: any;
+  businessBrain: BusinessBrain;
+  brandProfile: BrandCreativeContext;
+  creativePreferences?: import('../services/ai/creativeContextSelector').CreativePreferenceContext;
   objective: string;
   productId?: string;
   productName: string;
@@ -120,8 +123,9 @@ export interface GenerationPipelineInput {
   duration: { start: string; end: string };
   audience: { localities: string[]; ageRange?: { min: number; max: number }; occasion?: string };
   cta: string;
-  localizationProfile: any;
+  localizationProfile: LocalizationProfile;
   campaignStyle: string;
+  savedStyleContext?: SavedStyleContext;
   newProduct?: {
     name: string;
     description?: string;
@@ -591,6 +595,8 @@ export interface Campaign {
   objective: CampaignObjective;
   templateId?: string;
   creativeObjective?: CreativeObjective;
+  savedStyleId?: string;
+  savedStyleVersion?: number;
   productId?: string;
   newProduct?: {
     name: string;
@@ -635,6 +641,8 @@ export interface Campaign {
     truthCheckStatus?: 'PASS' | 'FAIL' | 'REVIEW_REQUIRED';
     truthCheckSummary?: string;
     truthCheckResult?: TruthCheckResult;
+    savedStyleId?: string;
+    savedStyleVersion?: number;
   };
   createdAt: string;
   updatedAt: string;
@@ -934,6 +942,10 @@ export interface ReelProject {
   goal: ReelGoal;
   templateId?: string;
   creativeObjective?: CreativeObjective;
+  savedStyleId?: string;
+  savedStyleVersion?: number;
+  productId?: string;
+  offerId?: string;
   style: ReelStyle;
   durationSeconds: ReelDurationSeconds;
   /** Asset IDs (assetType: 'reel_clip') of the uploaded raw clips, 3-10. */
@@ -1003,15 +1015,132 @@ export interface BrandCreativeContext {
   visualPreferences?: string;
 }
 
+export type SavedStyleTone =
+  'playful' | 'serious' | 'professional' | 'warm' | 'bold' | 'premium' | 'energetic';
+export type SavedStyleVisualDensity = 'minimal' | 'low' | 'medium' | 'high';
+export type SavedStyleProductProminence = 'subtle' | 'balanced' | 'high' | 'dominant';
+export type SavedStyleTextDensity = 'minimal' | 'concise' | 'moderate' | 'detailed';
+export type SavedStyleColorMode = 'brand' | 'neutral' | 'monochrome' | 'vibrant';
+export type SavedStyleHumor = 'none' | 'light' | 'moderate' | 'high';
+export type SavedStyleCtaStyle = 'soft' | 'direct' | 'urgent' | 'conversational';
+export type SavedStyleLanguage =
+  'business-default' | 'english' | 'hinglish' | 'telugu-english' | 'regional';
+export type CreativeFeedbackReason =
+  | 'more_premium'
+  | 'more_local'
+  | 'less_text'
+  | 'more_humorous'
+  | 'more_product_focused'
+  | 'different';
+
+export interface CreativeFeedback {
+  feedbackId: string;
+  creativeId: string; // The ID of the generated asset or reel
+  campaignId?: string;
+  userId: string;
+  businessId: string;
+  templateId?: string;
+  templateVersion?: number;
+  styleId?: string;
+  styleVersion?: number;
+  creativeType: 'post' | 'reel';
+  sentiment: 'positive' | 'negative';
+  reasons?: CreativeFeedbackReason[];
+  customReason?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export type CreativePreferenceSource = 'explicit_user' | 'approval' | 'rejection';
+export type CreativePreferenceState = 'preferred' | 'avoided' | 'none';
+
+export interface CreativePreference {
+  preferenceId: string;
+  businessId: string;
+  templateId: string;
+  preference: CreativePreferenceState;
+  confidence: number;
+  evidenceCount: number;
+  positiveEvidenceCount: number;
+  negativeEvidenceCount: number;
+  source: CreativePreferenceSource;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export type SavedStyleComposition =
+  | 'centered'
+  | 'hero-focused'
+  | 'split-layout'
+  | 'editorial'
+  | 'grid'
+  | 'asymmetric'
+  | 'negative-space-heavy'
+  | 'left-aligned'
+  | 'right-aligned';
+export type SavedStyleVisualHierarchyItem =
+  'product' | 'headline' | 'cta' | 'brand' | 'supporting-copy';
+export type SavedStyleCtaPlacement =
+  'bottom' | 'top' | 'end-card' | 'integrated' | 'product-adjacent';
+export type SavedStyleHookStructure =
+  | 'question'
+  | 'bold-statement'
+  | 'visual-surprise'
+  | 'product-first'
+  | 'problem-first'
+  | 'offer-first'
+  | 'curiosity';
+export type SavedStyleShotPacing = 'slow' | 'moderate' | 'fast' | 'dynamic' | 'cinematic';
+
+export interface SavedStyle {
+  styleId: string;
+  businessId: string;
+  userId: string;
+  name: string;
+  description?: string;
+  tone: SavedStyleTone;
+  visualDensity: SavedStyleVisualDensity;
+  productProminence: SavedStyleProductProminence;
+  textDensity: SavedStyleTextDensity;
+  colorMode: SavedStyleColorMode;
+  humor: SavedStyleHumor;
+  ctaStyle: SavedStyleCtaStyle;
+  language?: SavedStyleLanguage;
+  composition?: SavedStyleComposition;
+  visualHierarchy?: SavedStyleVisualHierarchyItem[];
+  ctaPlacement?: SavedStyleCtaPlacement;
+  hookStructure?: SavedStyleHookStructure;
+  shotPacing?: SavedStyleShotPacing;
+  source?: 'reference_analysis' | 'manual';
+  active: boolean;
+  version: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface SavedStyleContext {
+  styleId: string;
+  styleVersion: number;
+  tone: SavedStyleTone;
+  visualDensity: SavedStyleVisualDensity;
+  productProminence: SavedStyleProductProminence;
+  textDensity: SavedStyleTextDensity;
+  colorMode: SavedStyleColorMode;
+  humor: SavedStyleHumor;
+  ctaStyle: SavedStyleCtaStyle;
+  language?: SavedStyleLanguage;
+  composition?: SavedStyleComposition;
+  visualHierarchy?: SavedStyleVisualHierarchyItem[];
+  ctaPlacement?: SavedStyleCtaPlacement;
+  hookStructure?: SavedStyleHookStructure;
+  shotPacing?: SavedStyleShotPacing;
+  source?: 'reference_analysis' | 'manual';
+}
+
 export type CreativeTemplateType = 'post' | 'reel';
 
 export type CreativeObjective =
-  | 'awareness'
-  | 'engagement'
-  | 'conversion'
-  | 'launch'
-  | 'promotion'
-  | 'retention';
+  'awareness' | 'engagement' | 'conversion' | 'launch' | 'promotion' | 'retention';
 
 export type CreativeGrammarRole =
   | 'hook'
@@ -1052,18 +1181,10 @@ export interface ReelStructure {
 
 export type CreativeStructure = PostStructure | ReelStructure;
 
-export type VisualEmphasis =
-  | 'product-led'
-  | 'text-led'
-  | 'image-led'
-  | 'offer-led';
+export type VisualEmphasis = 'product-led' | 'text-led' | 'image-led' | 'offer-led';
 
 export type VisualComposition =
-  | 'hero-product'
-  | 'split-composition'
-  | 'editorial'
-  | 'minimal'
-  | 'high-contrast';
+  'hero-product' | 'split-composition' | 'editorial' | 'minimal' | 'high-contrast';
 
 export interface VisualGrammar {
   emphasis: VisualEmphasis;

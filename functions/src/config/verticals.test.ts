@@ -144,7 +144,7 @@ describe('Shared AI pipeline actually consumes VerticalConfig (not a parallel sy
     businessId: 'biz_1',
     businessName: 'Test Biz',
     businessCategory: 'restaurant',
-    businessBrain: {},
+    businessBrain: {} as any,
     brandProfile: {},
     objective: 'weekend_offer',
     productName: 'Test Product',
@@ -156,7 +156,7 @@ describe('Shared AI pipeline actually consumes VerticalConfig (not a parallel sy
     duration: { start: new Date().toISOString(), end: new Date().toISOString() },
     audience: { localities: ['Kondapur'] },
     cta: 'order_whatsapp',
-    localizationProfile: {},
+    localizationProfile: {} as any,
     campaignStyle: 'funny',
   };
 
@@ -200,7 +200,7 @@ describe('Shared deterministic Truth Check receives correct vertical context', (
       businessId: 'biz_1',
       businessName: 'Test Biz',
       businessCategory: vertical || 'restaurant',
-      businessBrain: {},
+      businessBrain: {} as any,
       brandProfile: {},
       objective: 'weekend_offer',
       productName: 'Test Product',
@@ -212,7 +212,7 @@ describe('Shared deterministic Truth Check receives correct vertical context', (
       duration: { start: new Date().toISOString(), end: new Date().toISOString() },
       audience: { localities: ['Kondapur'] },
       cta: 'order_whatsapp',
-      localizationProfile: {},
+      localizationProfile: {} as any,
       campaignStyle: 'funny',
       vertical,
     } as GenerationPipelineInput;

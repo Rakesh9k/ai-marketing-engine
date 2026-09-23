@@ -5,7 +5,8 @@ import type {
   BusinessCategory, 
   BrandCreativeContext,
   LanguageCode,
-  RegionalStyle
+  RegionalStyle,
+  SavedStyleContext,
 } from '../../types';
 import { creativeTemplateRegistry } from '../creativeTemplateRegistry';
 
@@ -72,6 +73,8 @@ export interface CreativeTemplateContext {
   brand: BrandCreativeContext;
   localization?: LocalizationContext;
   campaignConstraints: CampaignConstraints;
+  savedStyle?: SavedStyleContext;
+  creativePreferences?: import('./creativeContextSelector').CreativePreferenceContext;
 }
 
 export class TemplateContextValidationError extends Error {
@@ -84,7 +87,7 @@ export class TemplateContextValidationError extends Error {
 export interface BuildTemplateContextInput {
   templateId: string;
   objective: CreativeObjective;
-  businessBrain: any;
+  businessBrain: import('../../types').BusinessBrain;
   brandCreativeContext: BrandCreativeContext;
   productName: string;
   productDescription?: string;
@@ -102,6 +105,8 @@ export interface BuildTemplateContextInput {
   audienceAgeRange?: { min: number; max: number };
   audienceOccasion?: string;
   campaignConstraints?: CampaignConstraints;
+  savedStyle?: SavedStyleContext;
+  creativePreferences?: import('./creativeContextSelector').CreativePreferenceContext;
 }
 
 export function buildCreativeTemplateContext(input: BuildTemplateContextInput): CreativeTemplateContext {
@@ -203,5 +208,7 @@ export function buildCreativeTemplateContext(input: BuildTemplateContextInput): 
     brand: input.brandCreativeContext,
     localization,
     campaignConstraints: constraints,
+    savedStyle: input.savedStyle,
+    creativePreferences: input.creativePreferences,
   };
 }

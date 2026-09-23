@@ -32,6 +32,22 @@ const VisionAnalysisResultSchema = z.object({
   qualityFlags: z.array(z.string()),
 });
 
+export const ReferenceStyleAnalysisSchema = z.object({
+  tone: z.enum(['playful', 'serious', 'professional', 'warm', 'bold', 'premium', 'energetic']),
+  visualDensity: z.enum(['minimal', 'low', 'medium', 'high']),
+  productProminence: z.enum(['subtle', 'balanced', 'high', 'dominant']),
+  textDensity: z.enum(['minimal', 'concise', 'moderate', 'detailed']),
+  colorMode: z.enum(['brand', 'neutral', 'monochrome', 'vibrant']),
+  humor: z.enum(['none', 'light', 'moderate', 'high']),
+  ctaStyle: z.enum(['soft', 'direct', 'urgent', 'conversational']),
+  composition: z.enum(['centered', 'hero-focused', 'split-layout', 'editorial', 'grid', 'asymmetric', 'negative-space-heavy', 'left-aligned', 'right-aligned']).optional(),
+  visualHierarchy: z.array(z.enum(['product', 'headline', 'cta', 'brand', 'supporting-copy'])).optional(),
+  ctaPlacement: z.enum(['bottom', 'top', 'end-card', 'integrated', 'product-adjacent']).optional(),
+  hookStructure: z.enum(['question', 'bold-statement', 'visual-surprise', 'product-first', 'problem-first', 'offer-first', 'curiosity']).optional(),
+  shotPacing: z.enum(['slow', 'moderate', 'fast', 'dynamic', 'cinematic']).optional(),
+});
+export type ReferenceStyleAnalysisResult = z.infer<typeof ReferenceStyleAnalysisSchema>;
+
 const config = getEnvConfig();
 
 /**
@@ -46,6 +62,49 @@ export class GeminiVisionProvider {
     const apiKey = config.GEMINI_API_KEY || '';
     this.client = new GoogleGenerativeAI(apiKey);
     this.model = this.client.getGenerativeModel({ model: 'gemini-flash-latest' });
+  }
+
+  /**
+   * Analyze reference image for creative style characteristics
+   */
+  async analyzeReferenceStyle(imageUrl: string): Promise<ReferenceStyleAnalysisResult> {
+    const imageParts = await this.prepareImages([imageUrl]);
+
+    const prompt = `You are a professional art director and creative strategist.
+Analyze this reference marketing creative. Extract its STYLE characteristics.
+Do NOT copy the exact text, exact prices, or exact brand names. We only want the creative style/pattern.
+
+Return a JSON object strictly matching this structure:
+{
+  "tone": "playful | serious | professional | warm | bold | premium | energetic",
+  "visualDensity": "minimal | low | medium | high",
+  "productProminence": "subtle | balanced | high | dominant",
+  "textDensity": "minimal | concise | moderate | detailed",
+  "colorMode": "brand | neutral | monochrome | vibrant",
+  "humor": "none | light | moderate | high",
+  "ctaStyle": "soft | direct | urgent | conversational",
+  "composition": "centered | hero-focused | split-layout | editorial | grid | asymmetric | negative-space-heavy | left-aligned | right-aligned",
+  "visualHierarchy": ["product", "headline", "cta", "brand", "supporting-copy"],
+  "ctaPlacement": "bottom | top | end-card | integrated | product-adjacent",
+  "hookStructure": "question | bold-statement | visual-surprise | product-first | problem-first | offer-first | curiosity",
+  "shotPacing": "slow | moderate | fast | dynamic | cinematic"
+}
+Omit fields if you cannot confidently determine them. Output ONLY JSON.`;
+
+    try {
+      const result = await this.model.generateContent([prompt, ...imageParts]);
+      const response = result.response.text();
+      const jsonMatch = response.match(/\{[\s\S]*\}/);
+      const jsonStr = jsonMatch ? jsonMatch[0] : response;
+      const parsed = JSON.parse(jsonStr);
+      const validation = ReferenceStyleAnalysisSchema.safeParse(parsed);
+      if (!validation.success) {
+        throw new Error(`Reference style schema validation failed: ${validation.error.message}`);
+      }
+      return validation.data;
+    } catch (error) {
+      throw new Error(`Reference style analysis failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
   }
 
   /**

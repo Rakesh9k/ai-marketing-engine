@@ -24,7 +24,7 @@ function baseInput(overrides: Partial<GenerationPipelineInput> = {}): Generation
     businessLocation: { city: 'Hyderabad', state: 'Telangana', locality: 'Kondapur' },
     whatsappNumber: '9876543210',
     businessPhone: '9123456780',
-    businessBrain: {},
+    businessBrain: {} as any,
     brandProfile: {},
     objective: 'weekend_offer',
     productId: 'prod_1',
@@ -38,7 +38,7 @@ function baseInput(overrides: Partial<GenerationPipelineInput> = {}): Generation
     duration: { start: '2026-03-10T00:00:00.000Z', end: '2026-03-15T00:00:00.000Z' },
     audience: { localities: ['Kondapur'] },
     cta: 'order_whatsapp',
-    localizationProfile: {},
+    localizationProfile: {} as any,
     campaignStyle: 'funny',
     ...overrides,
   };
@@ -415,7 +415,7 @@ describe('Phase 30 — salon service/package catalog claims', () => {
       vertical: 'salon',
       businessCategory: 'salon',
       productName: 'Haircut & Styling',
-      businessBrain: { verticalProfile },
+      businessBrain: { verticalProfile } as any,
       ...overrides,
     });
   }
@@ -499,7 +499,7 @@ describe('Phase 30 — salon service/package catalog claims', () => {
     const result = run(
       baseInput({
         vertical: 'restaurant',
-        businessBrain: { verticalProfile: { services: [{ name: 'Haircut' }], packages: [] } },
+        businessBrain: { verticalProfile: { services: [{ name: 'Haircut' }], packages: [] } } as any,
       }),
       'Ask about our combo package deal!'
     );
@@ -526,7 +526,7 @@ describe('Phase 31 — real estate property fact claims', () => {
       vertical: 'real_estate',
       businessCategory: 'real_estate',
       productName: '3BHK in Green Meadows',
-      businessBrain: { verticalProfile: { properties } },
+      businessBrain: { verticalProfile: { properties } } as any,
       ...overrides,
     });
   }
@@ -622,7 +622,7 @@ describe('Phase 31 — real estate property fact claims', () => {
       baseInput({
         vertical: 'salon',
         productName: '3BHK in Green Meadows',
-        businessBrain: { verticalProfile: { properties: [GREEN_MEADOWS] } },
+        businessBrain: { verticalProfile: { properties: [GREEN_MEADOWS] } } as any,
       }),
       'Spacious 4 BHK now available!'
     );

@@ -81,7 +81,7 @@ function makeInput(): GenerationPipelineInput {
     businessLocation: { city: 'Hyderabad', state: 'Telangana', locality: 'Kondapur' },
     whatsappNumber: '9876543210',
     businessPhone: '9876543210',
-    businessBrain: {},
+    businessBrain: {} as any,
     brandProfile: getBrandCreativeContext(DISTINCTIVE_BRAND_KIT),
     objective: 'weekend_offer',
     productId: 'prod_1',
@@ -95,7 +95,7 @@ function makeInput(): GenerationPipelineInput {
     duration: { start: '2026-03-10T00:00:00.000Z', end: '2026-03-15T00:00:00.000Z' },
     audience: { localities: ['Kondapur'] },
     cta: 'order_whatsapp',
-    localizationProfile: {},
+    localizationProfile: {} as any,
     campaignStyle: 'funny',
   };
 }

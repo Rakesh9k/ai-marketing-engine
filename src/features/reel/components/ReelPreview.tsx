@@ -3,6 +3,7 @@
 import { Button } from '@/components/ui/Button';
 import Link from 'next/link';
 import type { ReelProject } from '@/types';
+import { CreativeFeedbackControls } from '@/components/campaign/CreativeFeedbackControls';
 
 interface ReelPreviewProps {
   reel: ReelProject;
@@ -26,6 +27,14 @@ export function ReelPreview({ reel, onCreateAnother }: ReelPreviewProps) {
           Reel preview unavailable
         </div>
       )}
+
+      <div className="text-left">
+        <CreativeFeedbackControls
+          businessId={reel.businessId}
+          creativeId={reel.reelId}
+          creativeType="reel"
+        />
+      </div>
 
       <div className="flex flex-col gap-2">
         {reel.outputUrl && (

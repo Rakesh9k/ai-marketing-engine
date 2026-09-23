@@ -2,7 +2,9 @@ import { onCall } from 'firebase-functions/v2/https';
 import { z } from 'zod';
 
 import { validatedCallable } from '../../middleware/validation';
+import { verifyBusinessAccess } from '../../middleware/auth';
 import { creativeTemplateRegistry } from '../../services/creativeTemplateRegistry';
+import { recommendCreativeTemplates } from '../../services/recommendationService';
 import { logFunctionStart, logFunctionComplete, logFunctionError } from '../../utils/logging';
 import { mapErrorToHttpsError } from '../../utils/errors';
 import type { CreativeTemplateType, CreativeObjective, BusinessCategory } from '../../types';
@@ -38,6 +40,7 @@ const listCreativeTemplatesSchema = z.object({
     .enum(['awareness', 'engagement', 'conversion', 'launch', 'promotion', 'retention'])
     .optional(),
   vertical: z.enum(['restaurant', 'salon', 'real_estate']).optional(),
+  businessId: z.string().optional(),
 });
 
 export const listCreativeTemplates = onCall(
@@ -48,9 +51,14 @@ export const listCreativeTemplates = onCall(
       type: data.type,
       objective: data.objective,
       vertical: data.vertical,
+      businessId: data.businessId,
     });
 
     try {
+      if (data.businessId) {
+        await verifyBusinessAccess(context.userId, data.businessId);
+      }
+
       const templates = creativeTemplateRegistry.listCreativeTemplates({
         type: data.type,
         objective: data.objective,
@@ -66,8 +74,18 @@ export const listCreativeTemplates = onCall(
         compatibleVerticals: template.compatibleVerticals,
       }));
 
+      let recommendation = null;
+      if (data.businessId) {
+        recommendation = await recommendCreativeTemplates({
+          type: data.type,
+          objective: data.objective,
+          vertical: data.vertical,
+          businessId: data.businessId,
+        });
+      }
+
       logFunctionComplete(logger, startTime, { success: true, count: cardModels.length });
-      return { templates: cardModels };
+      return { templates: cardModels, recommendation };
     } catch (error) {
       logFunctionError(logger, startTime, error as Error);
       throw mapErrorToHttpsError(error);

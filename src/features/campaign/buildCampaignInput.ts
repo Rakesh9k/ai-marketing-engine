@@ -35,6 +35,12 @@ export function buildCampaignInput(
 
   return {
     businessId: business.businessId,
+    templateId: state.templateId || undefined,
+    styleId: state.styleId || undefined,
+    // For now, map the old objective to a valid creativeObjective for the backend if needed,
+    // or just rely on backend to use template defaults. We'll pass 'conversion' as a safe
+    // default if the backend strictly requires it, though the schema marks it optional.
+    creativeObjective: 'conversion',
     objective: state.objective,
     productId: state.selectedProductId,
     offer: {

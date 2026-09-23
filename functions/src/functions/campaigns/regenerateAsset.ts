@@ -11,6 +11,7 @@ import {
   getCampaignAssetDoc,
   updateCampaignAssetDoc,
   createCampaignAssets,
+  getCreativePreferencesByBusiness,
 } from '../../services/firestore';
 import { logFunctionStart, logFunctionComplete, logFunctionError } from '../../utils/logging';
 import { mapErrorToHttpsError } from '../../utils/errors';
@@ -28,6 +29,7 @@ import {
   getGenerationCost,
   USAGE_ERROR_CODES,
 } from '../../services/usageControl';
+import { trackCreativeEvent } from '../../services/analyticsService';
 import type { UsageErrorCode } from '../../services/usageControl';
 
 const regenerateAssetSchema = z.object({
@@ -132,10 +134,21 @@ export const regenerateAsset = onCall(
         data.idempotencyKey,
         'regeneration',
         async () => {
+          const rawPreferences = await getCreativePreferencesByBusiness(campaign.businessId);
+          const creativePreferences = {
+            preferredTemplates: rawPreferences
+              .filter((p) => p.preference === 'preferred')
+              .map((p) => p.templateId),
+            avoidedTemplates: rawPreferences
+              .filter((p) => p.preference === 'avoided')
+              .map((p) => p.templateId),
+          };
+
           // Build pipeline input from campaign and business data
           const pipelineInput: GenerationPipelineInput = {
             businessId: campaign.businessId,
             campaignId: campaign.campaignId,
+            creativePreferences,
             businessName: business.name,
             businessCategory: business.category,
             businessLocation: {
@@ -242,6 +255,20 @@ export const regenerateAsset = onCall(
           // regeneration is stored (above) but never marked as having
           // superseded anything.
 
+          // Phase 21: Track regeneration
+          await trackCreativeEvent({
+            eventType: 'creative_regenerated',
+            userId: context.userId,
+            businessId: campaign.businessId,
+            creativeId: newAsset.assetId,
+            campaignId: data.campaignId,
+            creativeType: 'post',
+            metadata: {
+              originalAssetId: originalAsset.assetId,
+              regenerationPassed
+            }
+          });
+
           return { pipelineResult, newAsset, regenerationPassed, regenerationTruthStatus };
         },
         { campaignId: campaign.campaignId, businessId: campaign.businessId }
@@ -282,3 +309,4 @@ export const regenerateAsset = onCall(
     }
   })
 );
+

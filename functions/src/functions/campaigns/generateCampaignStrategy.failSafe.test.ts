@@ -50,6 +50,8 @@ const mockGetProductDoc = jest.fn().mockResolvedValue(null);
 const mockCreateCampaignDoc = jest.fn().mockResolvedValue(undefined);
 const mockUpdateCampaignDoc = jest.fn().mockResolvedValue(undefined);
 const mockCreateCampaignAssets = jest.fn().mockResolvedValue(undefined);
+const mockGetCreativePreferencesByBusiness = jest.fn().mockResolvedValue([]);
+const mockGetSavedStyleDoc = jest.fn().mockResolvedValue(null);
 jest.mock('../../services/firestore', () => ({
   createCampaignDoc: (...args: unknown[]) => mockCreateCampaignDoc(...args),
   updateCampaignDoc: (...args: unknown[]) => mockUpdateCampaignDoc(...args),
@@ -57,6 +59,8 @@ jest.mock('../../services/firestore', () => ({
   getBrandKitDoc: (...args: unknown[]) => mockGetBrandKitDoc(...args),
   getProductDoc: (...args: unknown[]) => mockGetProductDoc(...args),
   createCampaignAssets: (...args: unknown[]) => mockCreateCampaignAssets(...args),
+  getCreativePreferencesByBusiness: (...args: unknown[]) => mockGetCreativePreferencesByBusiness(...args),
+  getSavedStyleDoc: (...args: unknown[]) => mockGetSavedStyleDoc(...args),
 }));
 
 const mockExecuteWithUsageControl = jest.fn();
@@ -69,6 +73,7 @@ jest.mock('../../services/usageControl', () => ({
 const mockTrackEvent = jest.fn().mockResolvedValue(undefined);
 jest.mock('../../services/analyticsService', () => ({
   trackEvent: (...args: unknown[]) => mockTrackEvent(...args),
+  trackCreativeEvent: jest.fn().mockResolvedValue(undefined),
   ANALYTICS_EVENTS: {
     CAMPAIGN_STARTED: 'campaign_started',
     CAMPAIGN_GENERATED: 'campaign_generated',
@@ -190,3 +195,6 @@ describeIfOutageSimulated(
     );
   }
 );
+
+
+

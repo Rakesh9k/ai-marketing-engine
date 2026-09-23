@@ -9,6 +9,11 @@ import { validateClipFile } from './reelClipValidation';
 export interface CreateReelProjectRequest {
   businessId: string;
   goal: ReelGoal;
+  templateId?: string;
+  creativeObjective?: string;
+  productId?: string;
+  offerId?: string;
+  styleId?: string;
   style: ReelStyle;
   durationSeconds: ReelDurationSeconds;
   offer?: string;

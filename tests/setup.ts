@@ -1,6 +1,20 @@
 import '@testing-library/jest-dom';
 import { assertSucceeds, assertFails } from '@firebase/rules-unit-testing';
 
+if (typeof global.fetch === 'undefined') {
+  global.fetch = jest.fn() as any;
+  global.Headers = class Headers {} as any;
+  global.Request = class Request {} as any;
+  global.Response = class Response {} as any;
+}
+
+process.env['NEXT_PUBLIC_FIREBASE_API_KEY'] = 'test-api-key';
+process.env['NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN'] = 'test.firebaseapp.com';
+process.env['NEXT_PUBLIC_FIREBASE_PROJECT_ID'] = 'test-project';
+process.env['NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET'] = 'test-bucket';
+process.env['NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID'] = '123456789';
+process.env['NEXT_PUBLIC_FIREBASE_APP_ID'] = '1:12345:web:12345';
+
 /**
  * tests/security.test.ts, tests/phase27-authz.test.ts,
  * tests/phase27-bulk-approval-auth-roles.test.ts, and tests/storage.test.ts

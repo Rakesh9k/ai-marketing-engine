@@ -15,6 +15,7 @@ import { Button } from '@/components/ui/Button';
 import { ImageUploader } from '@/features/asset/components/ImageUploader';
 import type { Asset } from '@/features/asset/services/assetService';
 import { GenerationProgress } from './GenerationProgress';
+import { trackCreativeEvent } from '@/lib/analytics/trackEvent';
 import type { CampaignWizardState } from '../types';
 import { createInitialWizardState } from '../types';
 import { buildCampaignInput as buildCampaignInputPure } from '../buildCampaignInput';
@@ -34,9 +35,12 @@ import {
 } from '../constants';
 import type { Business, Product, Campaign, LanguageCode, RegionalStyle } from '@/types';
 import { MascotScene } from '@/components/mascot/MascotScene';
+import { SavedStylePicker } from '@/features/style/components/SavedStylePicker';
 
 const STEP_TITLES = [
+  'Creative Type',
   'Objective',
+  'Creative Template',
   'Product & Photos',
   'Offer & Duration',
   'Audience',
@@ -82,6 +86,8 @@ export function CampaignWizard({ userId }: CampaignWizardProps) {
   const [businesses, setBusinesses] = useState<Business[]>([]);
   const [businessId, setBusinessId] = useState<string | null>(null);
   const [products, setProducts] = useState<Product[]>([]);
+  const [templates, setTemplates] = useState<any[]>([]);
+  const [recommendation, setRecommendation] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
 
@@ -179,17 +185,18 @@ export function CampaignWizard({ userId }: CampaignWizardProps) {
     };
   }, [userId, refreshCredits]);
 
-  // Load products + prefill Business Brain defaults once a business is known
   useEffect(() => {
     if (!business) return;
     let cancelled = false;
     async function loadProducts() {
       try {
         const productsData = await productService.listByBusiness(business!.businessId);
-        if (!cancelled) setProducts(productsData);
+        if (!cancelled) {
+          setProducts(productsData || []);
+        }
       } catch (err) {
         console.error(err);
-        if (!cancelled) showToast("Couldn't load your products. Please try again.", 'error');
+        if (!cancelled) showToast("Couldn't load products. Please try again.", 'error');
       }
     }
     void loadProducts();
@@ -222,6 +229,37 @@ export function CampaignWizard({ userId }: CampaignWizardProps) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [business?.businessId]);
 
+  useEffect(() => {
+    if (!business) return;
+    let cancelled = false;
+    async function loadTemplates() {
+      try {
+        const templatesRes = await callFunction<any, { templates: any[]; recommendation?: any }>({
+          functionName: 'listCreativeTemplates',
+          data: {
+            type: state.type || 'post',
+            objective: state.objective || undefined,
+            vertical: business!.category,
+            businessId: business!.businessId,
+          },
+        });
+        if (!cancelled) {
+          setTemplates(templatesRes?.templates || []);
+          setRecommendation(templatesRes?.recommendation || null);
+        }
+      } catch (err) {
+        console.error(err);
+        if (!cancelled) showToast("Couldn't load templates. Please try again.", 'error');
+      }
+    }
+    void loadTemplates();
+
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [business?.businessId, business?.category, state.type, state.objective]);
+
   const goNext = useCallback(() => {
     setStepError(null);
     setState((prev) => ({ ...prev, step: Math.min(TOTAL_STEPS, prev.step + 1) }));
@@ -235,15 +273,18 @@ export function CampaignWizard({ userId }: CampaignWizardProps) {
   const validateAndNext = useCallback(() => {
     const s = state;
     switch (s.step) {
-      case 1:
+      case 2:
         if (!s.objective) return setStepError('Please select an objective.');
         break;
-      case 2:
+      case 3:
+        if (!s.templateId) return setStepError('Please select a creative template.');
+        break;
+      case 4:
         if (!s.selectedProductId) return setStepError('Please select a product.');
         if (s.photos.length < 1) return setStepError('Please upload at least 1 photo.');
         if (s.photos.length > 5) return setStepError('You can upload up to 5 photos.');
         break;
-      case 3: {
+      case 5: {
         if (!s.offer.headline.trim()) return setStepError('Please enter an offer headline.');
         if (!s.offer.type) return setStepError('Please select an offer type.');
         const price = Number(s.offer.price);
@@ -274,7 +315,7 @@ export function CampaignWizard({ userId }: CampaignWizardProps) {
         }
         break;
       }
-      case 4: {
+      case 6: {
         if (s.audience.localities.length === 0)
           return setStepError('Please add at least one locality.');
         if (s.audience.localities.length > 10)
@@ -286,14 +327,14 @@ export function CampaignWizard({ userId }: CampaignWizardProps) {
         if (max < min) return setStepError('Maximum age must be greater than minimum age.');
         break;
       }
-      case 5:
+      case 7:
         if (!s.cta) return setStepError('Please select a call to action.');
         break;
-      case 6:
+      case 8:
         if (!s.primaryLanguage) return setStepError('Please select a language.');
         if (!s.regionalStyle) return setStepError('Please select a regional style.');
         break;
-      case 7:
+      case 9:
         if (!s.campaignStyle) return setStepError('Please select a campaign style.');
         break;
       default:
@@ -490,6 +531,36 @@ export function CampaignWizard({ userId }: CampaignWizardProps) {
       )}
 
       {state.step === 1 && (
+        <div className="space-y-4">
+          <h2 className="mb-4 text-xl font-semibold">What do you want to create?</h2>
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+            <button
+              onClick={() => setState({ ...state, type: 'post', templateId: null })}
+              className={`rounded-lg border p-4 text-left transition-colors ${
+                state.type === 'post'
+                  ? 'border-brand-primary bg-brand-primary/5'
+                  : 'hover:border-gray-400'
+              }`}
+            >
+              <h3 className="mb-1 text-lg font-medium">Post</h3>
+              <p className="text-sm text-gray-600">Single image creative for feed.</p>
+            </button>
+            <button
+              onClick={() => setState({ ...state, type: 'reel', templateId: null })}
+              className={`rounded-lg border p-4 text-left transition-colors ${
+                state.type === 'reel'
+                  ? 'border-brand-primary bg-brand-primary/5'
+                  : 'hover:border-gray-400'
+              }`}
+            >
+              <h3 className="mb-1 text-lg font-medium">Reel</h3>
+              <p className="text-sm text-gray-600">Video creative for stories and reels.</p>
+            </button>
+          </div>
+        </div>
+      )}
+
+      {state.step === 2 && (
         <MascotScene
           pose={state.objective ? 'idea' : 'curious'}
           size="sm"
@@ -498,12 +569,12 @@ export function CampaignWizard({ userId }: CampaignWizardProps) {
         />
       )}
 
-      {state.step === 8 && (
+      {state.step === 20 && (
         <MascotScene pose="idea" size="sm" message="Ready when you are." className="mb-4" />
       )}
 
       <div className="rounded-lg border border-neutral-200 bg-white p-6">
-        {state.step === 1 && (
+        {state.step === 2 && (
           <fieldset>
             <legend className="sr-only">Objective</legend>
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
@@ -527,7 +598,103 @@ export function CampaignWizard({ userId }: CampaignWizardProps) {
           </fieldset>
         )}
 
-        {state.step === 2 && (
+        {state.step === 3 && (
+          <fieldset>
+            <legend className="sr-only">Creative Template</legend>
+            <div className="space-y-6">
+              {templates.length === 0 && (
+                <p className="text-sm text-neutral-500">Loading templates...</p>
+              )}
+
+              {recommendation?.recommended && (
+                <div className="border-brand-200 bg-brand-50 rounded-xl border p-5">
+                  <h3 className="text-brand-700 mb-1 text-sm font-semibold tracking-wider uppercase">
+                    Mitra recommends
+                  </h3>
+                  <p className="text-brand-600 mb-4 text-sm">
+                    {recommendation.recommended.reason.message}
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setState((prev) => ({
+                        ...prev,
+                        templateId: recommendation.recommended.templateId,
+                      }));
+                      trackCreativeEvent({
+                        eventType: 'creative_template_selected',
+                        businessId: business!.businessId,
+                        templateId: recommendation.recommended.templateId,
+                        creativeType: state.type || 'post',
+                        objective: state.objective || undefined,
+                      });
+                    }}
+                    aria-pressed={state.templateId === recommendation.recommended.templateId}
+                    className={`w-full rounded-lg border p-4 text-left transition-colors ${
+                      state.templateId === recommendation.recommended.templateId
+                        ? 'border-brand-600 ring-brand-600 bg-white ring-2'
+                        : 'border-brand-300 hover:bg-brand-50 bg-white'
+                    }`}
+                  >
+                    <p className="font-medium text-neutral-900">
+                      🔥 {recommendation.recommended.displayName}
+                    </p>
+                    <p className="mt-1 text-sm text-neutral-500">
+                      {recommendation.recommended.description}
+                    </p>
+                  </button>
+                </div>
+              )}
+
+              {templates.length > 0 && (
+                <div>
+                  {recommendation?.recommended && (
+                    <h3 className="mb-3 text-sm font-medium text-neutral-900">Other options</h3>
+                  )}
+                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                    {templates
+                      .filter((t) => t.id !== recommendation?.recommended?.templateId)
+                      .map((t) => (
+                        <button
+                          key={t.id}
+                          type="button"
+                          onClick={() => {
+                            setState((prev) => ({ ...prev, templateId: t.id }));
+                            trackCreativeEvent({
+                              eventType: 'creative_template_selected',
+                              businessId: business!.businessId,
+                              templateId: t.id,
+                              creativeType: state.type || 'post',
+                              objective: state.objective || undefined,
+                            });
+                          }}
+                          aria-pressed={state.templateId === t.id}
+                          className={`rounded-lg border p-4 text-left transition-colors ${
+                            state.templateId === t.id
+                              ? 'border-brand-600 bg-brand-50'
+                              : 'border-neutral-200 hover:bg-neutral-50'
+                          }`}
+                        >
+                          <p className="font-medium text-neutral-900">{t.name}</p>
+                          <p className="mt-1 text-sm text-neutral-500">{t.description}</p>
+                        </button>
+                      ))}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div className="mt-6">
+              <SavedStylePicker
+                businessId={businessId}
+                value={state.styleId}
+                onChange={(styleId) => setState((prev) => ({ ...prev, styleId }))}
+              />
+            </div>
+          </fieldset>
+        )}
+
+        {state.step === 4 && (
           <div className="space-y-6">
             <div>
               <h3 className="mb-3 text-sm font-medium text-neutral-900">Select a {itemNoun}</h3>
@@ -627,7 +794,7 @@ export function CampaignWizard({ userId }: CampaignWizardProps) {
           </div>
         )}
 
-        {state.step === 3 && (
+        {state.step === 5 && (
           <div className="space-y-6">
             <div>
               <h3 className="mb-3 text-sm font-medium text-neutral-900">Offer</h3>
@@ -782,7 +949,7 @@ export function CampaignWizard({ userId }: CampaignWizardProps) {
           </div>
         )}
 
-        {state.step === 4 && (
+        {state.step === 6 && (
           <div className="space-y-4">
             <div>
               <label className="block text-sm font-medium text-neutral-900">Localities *</label>
@@ -874,7 +1041,7 @@ export function CampaignWizard({ userId }: CampaignWizardProps) {
           </div>
         )}
 
-        {state.step === 5 && (
+        {state.step === 7 && (
           <fieldset>
             <legend className="sr-only">Call to action</legend>
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
@@ -903,7 +1070,7 @@ export function CampaignWizard({ userId }: CampaignWizardProps) {
           </fieldset>
         )}
 
-        {state.step === 6 && (
+        {state.step === 8 && (
           <div className="space-y-6">
             <div>
               <h3 className="mb-3 text-sm font-medium text-neutral-900">Language</h3>
@@ -948,7 +1115,7 @@ export function CampaignWizard({ userId }: CampaignWizardProps) {
           </div>
         )}
 
-        {state.step === 7 && (
+        {state.step === 9 && (
           <fieldset>
             <legend className="sr-only">Campaign style</legend>
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
@@ -972,7 +1139,7 @@ export function CampaignWizard({ userId }: CampaignWizardProps) {
           </fieldset>
         )}
 
-        {state.step === 8 && business && (
+        {state.step === 20 && business && (
           <div className="space-y-5 text-sm">
             <section>
               <h3 className="font-medium text-neutral-900">Business</h3>
@@ -985,6 +1152,12 @@ export function CampaignWizard({ userId }: CampaignWizardProps) {
               <h3 className="font-medium text-neutral-900">Objective</h3>
               <p className="text-neutral-600">
                 {OBJECTIVES.find((o) => o.value === state.objective)?.label}
+              </p>
+            </section>
+            <section>
+              <h3 className="font-medium text-neutral-900">Creative Template</h3>
+              <p className="text-neutral-600">
+                {templates.find((t) => t.id === state.templateId)?.name || state.templateId}
               </p>
             </section>
             <section>
@@ -1081,7 +1254,7 @@ export function CampaignWizard({ userId }: CampaignWizardProps) {
             type="button"
             variant="outline"
             onClick={goBack}
-            disabled={state.step === 1 || phase === 'submitting'}
+            disabled={state.step === 2 || phase === 'submitting'}
           >
             Back
           </Button>

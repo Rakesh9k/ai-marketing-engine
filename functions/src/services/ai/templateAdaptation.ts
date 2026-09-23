@@ -1,9 +1,29 @@
 import { z } from 'zod';
 import { generateStructuredText } from './index';
 import type { SelectedCreativeContext } from './creativeContextSelector';
-import type { CreativeTemplate, CreativeObjective } from '../../types';
+import type { CreativeTemplate, CreativeObjective, CreativeGrammarRole } from '../../types';
+
+const creativeGrammarRoleSchema = z.enum([
+  'hook',
+  'context',
+  'setup',
+  'problem',
+  'product',
+  'benefit',
+  'proof',
+  'differentiator',
+  'offer',
+  'payoff',
+  'urgency',
+  'social-proof',
+  'objection',
+  'emotion',
+  'cta',
+  'closing',
+] as [CreativeGrammarRole, ...CreativeGrammarRole[]]);
 
 export const ReelShotSchema = z.object({
+  role: creativeGrammarRoleSchema,
   purpose: z.string(),
   visualIntent: z.string(),
   productTreatment: z.string(),
@@ -19,6 +39,7 @@ export const AdaptedCreativePlanSchema = z.object({
   composition: z.string().min(5),
   productTreatment: z.string().min(5),
   brandTreatment: z.string().min(5),
+  coveredRoles: z.array(creativeGrammarRoleSchema).min(1),
   localizationApproach: z.string().optional(),
   cta: z.string().optional(),
   reelSequence: z.array(ReelShotSchema).optional()
@@ -29,6 +50,80 @@ export interface TemplateAdaptationInput {
   template: CreativeTemplate;
   selectedContext: SelectedCreativeContext;
   objective: CreativeObjective;
+}
+
+export function validateTemplateSpecificOutput(
+  plan: AdaptedCreativePlan,
+  input: TemplateAdaptationInput
+): AdaptedCreativePlan {
+  const grammar = input.template.structure.grammar ?? [];
+  const requiredRoles = new Set(
+    grammar.filter((step) => step.required).map((step) => step.role)
+  );
+  const templateRoles = new Set(grammar.map((step) => step.role));
+  const coveredRoles = new Set(plan.coveredRoles);
+
+  for (const role of coveredRoles) {
+    if (!templateRoles.has(role)) {
+      throw new Error(`Plan covers ${role}, which is not part of the selected template grammar.`);
+    }
+  }
+
+  for (const role of requiredRoles) {
+    if (!coveredRoles.has(role)) {
+      const label = role === 'cta' ? 'CTA' : role;
+      throw new Error(`Template grammar requires the ${label} role but the plan does not cover it.`);
+    }
+  }
+
+  if (input.template.type === 'reel') {
+    if (!plan.reelSequence || plan.reelSequence.length === 0) {
+      throw new Error('Reel templates require a reelSequence in the adapted plan.');
+    }
+
+    const minSections = input.template.constraints.minSections ?? 1;
+    if (plan.reelSequence.length < minSections) {
+      throw new Error(
+        `Reel template requires at least ${minSections} shots; got ${plan.reelSequence.length}.`
+      );
+    }
+
+    const maxSections = input.template.constraints.maxSections ?? Number.MAX_SAFE_INTEGER;
+    if (plan.reelSequence.length > maxSections) {
+      throw new Error(
+        `Reel template allows at most ${maxSections} shots; got ${plan.reelSequence.length}.`
+      );
+    }
+
+    if (requiredRoles.has('hook') && !plan.hook) {
+      throw new Error('Template grammar requires a hook but none was provided in the plan.');
+    }
+    if (requiredRoles.has('cta') && !plan.cta) {
+      throw new Error('Template grammar requires a CTA but none was provided in the plan.');
+    }
+
+    const sequenceRoles = new Set(plan.reelSequence.map((shot) => shot.role));
+    for (const role of sequenceRoles) {
+      if (!templateRoles.has(role)) {
+        throw new Error(`Reel sequence covers ${role}, which is not part of the selected template grammar.`);
+      }
+    }
+    for (const role of requiredRoles) {
+      if (role !== 'cta' && !sequenceRoles.has(role)) {
+        throw new Error(`Reel sequence does not cover the required ${role} role.`);
+      }
+    }
+  }
+
+  if (requiredRoles.has('cta') && !plan.cta) {
+    throw new Error('Template grammar requires a CTA but none was provided in the plan.');
+  }
+
+  if (requiredRoles.has('hook') && plan.hook.trim().length < 5) {
+    throw new Error('Template grammar requires a hook but none was provided in the plan.');
+  }
+
+  return plan;
 }
 
 export class TemplateAdaptationPlanner {
@@ -65,19 +160,14 @@ INSTRUCTIONS:
 1. Map the semantic roles from the Grammar Structure into your messaging and hook.
 2. If the Grammar requires an offer or CTA, ensure the plan explicitly includes how to represent it (using the actual offer/CTA context). Do not invent prices or discounts.
 3. If this is a 'reel' template, you MUST provide a 'reelSequence' array mapping to the required scenes/shots. For a 'post', omit it.
-4. Keep the plan business-specific based on the Selected Context, but do NOT mutate the template's core grammar.
-5. Respect any localization constraints if provided in the context.`;
+4. Populate 'coveredRoles' with every semantic role represented by the plan. Use only roles from the Grammar Structure.
+5. For each reelSequence shot, populate 'role' with the semantic role that shot fulfills.
+6. Keep the plan business-specific based on the Selected Context, but do NOT mutate the template's core grammar.
+7. Respect any localization constraints if provided in the context.
+8. If a 'savedStyle' is provided in the Selected Context, heavily adapt the creative expression (tone, density, product prominence, humor, CTA style) according to those preferences, without omitting required template elements.`;
   }
 
   private validate(plan: AdaptedCreativePlan, input: TemplateAdaptationInput) {
-    if (input.template.type === 'reel') {
-      if (!plan.reelSequence || plan.reelSequence.length === 0) {
-        throw new Error('Reel templates require a reelSequence in the adapted plan.');
-      }
-    }
-    const hasCtaRole = input.template.structure.grammar?.some((g: any) => g.role === 'cta');
-    if (hasCtaRole && !plan.cta) {
-      throw new Error('Template grammar requires a CTA but none was provided in the plan.');
-    }
+    validateTemplateSpecificOutput(plan, input);
   }
 }

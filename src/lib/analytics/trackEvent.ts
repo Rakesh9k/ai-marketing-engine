@@ -71,3 +71,27 @@ export function recordWhatsAppClick(params: {
     console.error('WhatsApp click tracking failed (non-blocking):', err);
   }
 }
+
+export interface TrackCreativeEventParams {
+  eventType: 'creative_template_viewed' | 'creative_template_selected';
+  businessId: string;
+  templateId: string;
+  templateVersion?: number;
+  campaignId?: string;
+  creativeType?: 'post' | 'reel';
+  objective?: string;
+  metadata?: Record<string, unknown>;
+}
+
+export function trackCreativeEvent(params: TrackCreativeEventParams): void {
+  try {
+    const functions = getFirebaseFunctions();
+    if (!functions) return;
+    const call = httpsCallable(functions, 'trackCreativeEventEndpoint');
+    call(params).catch((err) => {
+      console.error('Creative analytics tracking failed (non-blocking):', err);
+    });
+  } catch (err) {
+    console.error('Creative analytics tracking failed (non-blocking):', err);
+  }
+}

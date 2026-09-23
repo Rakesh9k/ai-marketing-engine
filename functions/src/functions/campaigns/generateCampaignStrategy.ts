@@ -12,6 +12,8 @@ import {
   getBrandKitDoc,
   getProductDoc,
   createCampaignAssets,
+  getSavedStyleDoc,
+  getCreativePreferencesByBusiness,
 } from '../../services/firestore';
 import { logFunctionStart, logFunctionComplete, logFunctionError } from '../../utils/logging';
 import { mapErrorToHttpsError } from '../../utils/errors';
@@ -24,17 +26,19 @@ import {
   getGenerationCost,
   USAGE_ERROR_CODES,
 } from '../../services/usageControl';
-import { trackEvent, ANALYTICS_EVENTS } from '../../services/analyticsService';
+import { trackEvent, trackCreativeEvent, ANALYTICS_EVENTS } from '../../services/analyticsService';
 import {
   computeSourceFingerprint,
   computeVerticalFactsFingerprint,
 } from '../../services/ai/truthCheck';
 import { assertVerticalImplemented, getVerticalConfig } from '../../config/verticals';
 import { ValidationError } from '../../utils/errors';
+import { toSavedStyleContext } from '../../services/savedStyle';
 
 const generateCampaignStrategySchema = z.object({
   businessId: z.string().min(1),
   templateId: z.string().optional(),
+  styleId: z.string().min(1).optional(),
   creativeObjective: z.string().optional(),
   // The union of every vertical's allowed objectives (see config/verticals.ts).
   // This schema can't yet know which business the request is for — that's
@@ -190,6 +194,23 @@ export const generateCampaignStrategy = onCall(
         );
       }
 
+      const savedStyle = data.styleId ? await getSavedStyleDoc(data.styleId) : null;
+      if (
+        data.styleId &&
+        (!savedStyle || savedStyle.businessId !== data.businessId || !savedStyle.active)
+      ) {
+        throw new ValidationError(
+          { styleId: ['The selected Saved Style is unavailable for this business.'] },
+          'Saved Style is unavailable.'
+        );
+      }
+      if (savedStyle && savedStyle.userId !== userId) {
+        throw new ValidationError(
+          { styleId: ['The selected Saved Style does not belong to this user.'] },
+          'Saved Style ownership could not be verified.'
+        );
+      }
+
       const now = new Date().toISOString();
 
       // Execute generation with full usage control:
@@ -250,6 +271,8 @@ export const generateCampaignStrategy = onCall(
             objective: data.objective,
             templateId: data.templateId,
             creativeObjective: data.creativeObjective as any,
+            savedStyleId: savedStyle?.styleId,
+            savedStyleVersion: savedStyle?.version,
             productId: data.productId,
             newProduct: data.newProduct
               ? {
@@ -281,6 +304,9 @@ export const generateCampaignStrategy = onCall(
             creditsReserved: creditsRequired,
             metadata: {
               idempotencyKey: data.idempotencyKey,
+              ...(savedStyle
+                ? { savedStyleId: savedStyle.styleId, savedStyleVersion: savedStyle.version }
+                : {}),
             },
             createdAt: now,
             updatedAt: now,
@@ -299,12 +325,23 @@ export const generateCampaignStrategy = onCall(
           // Track campaign_started - generation workflow actually began
           await trackEvent(ANALYTICS_EVENTS.CAMPAIGN_STARTED, userId, data.businessId, campaignId);
 
+          const rawPreferences = await getCreativePreferencesByBusiness(data.businessId);
+          const creativePreferences = {
+            preferredTemplates: rawPreferences
+              .filter((p) => p.preference === 'preferred')
+              .map((p) => p.templateId),
+            avoidedTemplates: rawPreferences
+              .filter((p) => p.preference === 'avoided')
+              .map((p) => p.templateId),
+          };
+
           const pipeline = new GenerationPipeline();
           const result = await pipeline.execute({
             businessId: data.businessId,
             templateId: data.templateId,
             creativeObjective: data.creativeObjective as any,
             campaignId,
+            creativePreferences,
             businessName: business.name,
             businessCategory: business.category,
             businessLocation: {
@@ -332,6 +369,7 @@ export const generateCampaignStrategy = onCall(
             duration: data.duration,
             newProduct: pipelineProduct,
             vertical: business.category,
+            savedStyleContext: savedStyle ? toSavedStyleContext(savedStyle) : undefined,
           });
 
           // Update status to generating_creatives
@@ -456,6 +494,21 @@ export const generateCampaignStrategy = onCall(
             campaignId
           );
 
+          if (campaignPack?.assets?.length > 0) {
+            const asset = campaignPack.assets[0];
+            await trackCreativeEvent({
+              eventType: 'creative_generated',
+              userId,
+              businessId: data.businessId,
+              creativeId: asset.id,
+              campaignId,
+              templateId: data.templateId,
+              templateVersion: 1, // Assume v1 if not explicitly versioned yet
+              creativeType: 'post',
+              objective: data.objective
+            });
+          }
+
           return result;
         },
         { businessId: data.businessId }
@@ -515,3 +568,5 @@ export const generateCampaignStrategy = onCall(
     }
   })
 );
+
+
