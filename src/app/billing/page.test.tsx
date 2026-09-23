@@ -25,119 +25,65 @@ jest.mock('@/services/api', () => ({
   callFunction: (...args: unknown[]) => callFunctionMock(...args),
 }));
 
-const loadRazorpayCheckoutMock = jest.fn().mockResolvedValue(undefined);
-jest.mock('@/lib/razorpay/loadCheckout', () => ({
-  loadRazorpayCheckout: () => loadRazorpayCheckoutMock(),
+const submitPayUCheckoutMock = jest.fn();
+jest.mock('@/lib/payu/submitCheckout', () => ({
+  submitPayUCheckout: (...args: unknown[]) => submitPayUCheckoutMock(...args),
 }));
 
 import BillingPage from './page';
 
-/**
- * Phase 19A — proves the billing UI actually drives the existing backend
- * payment infrastructure (createSubscription -> Razorpay Checkout ->
- * verifyPayment) rather than the prior console.log()+alert() stub. Razorpay
- * Checkout itself is mocked at the window.Razorpay boundary (the real
- * Checkout.js is a third-party script that opens a real payment iframe —
- * not something a unit test should load), but everything on this
- * application's own side of that boundary (which function is called, with
- * what arguments, in what order) is exercised for real.
- */
-describe('BillingPage — Razorpay checkout wiring (Phase 19A)', () => {
-  let razorpayConstructorMock: jest.Mock;
-  let checkoutOpenMock: jest.Mock;
-  let capturedOptions: any;
+const FAKE_PAYU_PAYMENT = {
+  action: 'https://test.payu.in/_payment',
+  key: 'test-merchant-key',
+  txnid: 'txn_abc123',
+  amount: '999.00',
+  productinfo: 'Mitra business plan subscription',
+  firstname: 'Test',
+  email: 'owner@example.test',
+  phone: '9999999999',
+  surl: 'https://cloudfunctions.net/payuCallback',
+  furl: 'https://cloudfunctions.net/payuCallback',
+  udf1: 'user_1',
+  udf2: 'business',
+  hash: 'fake-hash-value',
+};
 
+/**
+ * PayU migration — proves the billing UI drives createPayUPayment then
+ * hands the exact returned params to submitPayUCheckout (the real
+ * implementation of which builds+submits a hidden HTML form; that DOM/
+ * navigation behavior is mocked here, not the application logic that
+ * decides what to submit and when). Credits/subscription state changes are
+ * never asserted from client-side arithmetic — only from a re-fetch of the
+ * subscription record, since the actual grant happens exclusively in
+ * payuWebhook.ts server-side.
+ */
+describe('BillingPage — PayU checkout wiring', () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    process.env['NEXT_PUBLIC_RAZORPAY_KEY_ID'] = 'rzp_test_fake_key_id';
-
     useAuthMock.mockReturnValue({ user: { uid: 'user_1', email: 'owner@example.test' } });
     getByUserIdMock.mockResolvedValue(null); // starts on the free plan
-
-    checkoutOpenMock = jest.fn();
-    razorpayConstructorMock = jest.fn().mockImplementation((options: any) => {
-      capturedOptions = options;
-      return { open: checkoutOpenMock };
-    });
-    (window as any).Razorpay = razorpayConstructorMock;
+    window.history.replaceState({}, '', '/billing');
   });
 
-  afterEach(() => {
-    delete (window as any).Razorpay;
-    delete process.env['NEXT_PUBLIC_RAZORPAY_KEY_ID'];
-  });
-
-  it('clicking "Upgrade to this Plan" calls createSubscription, then opens the real Razorpay Checkout with the returned subscription_id', async () => {
-    callFunctionMock.mockResolvedValueOnce({
-      subscriptionId: 'sub_abc123',
-      shortUrl: 'https://rzp.io/i/abc123',
-      planId: 'business',
-      price: 999,
-    });
+  it('clicking "Upgrade to this Plan" calls createPayUPayment with only the planId, then submits the returned PayU checkout params', async () => {
+    callFunctionMock.mockResolvedValueOnce(FAKE_PAYU_PAYMENT);
 
     render(<BillingPage />);
-
     const businessButtons = await screen.findAllByRole('button', { name: /upgrade to this plan/i });
     await userEvent.click(businessButtons[1]!); // starter, business, agency in PLAN_DETAILS key order
 
     await waitFor(() => expect(callFunctionMock).toHaveBeenCalledTimes(1));
     expect(callFunctionMock).toHaveBeenCalledWith({
-      functionName: 'createSubscription',
+      functionName: 'createPayUPayment',
       data: { planId: 'business' },
     });
 
-    await waitFor(() => expect(razorpayConstructorMock).toHaveBeenCalledTimes(1));
-    expect(capturedOptions.subscription_id).toBe('sub_abc123');
-    expect(capturedOptions.key).toBe('rzp_test_fake_key_id');
-    expect(checkoutOpenMock).toHaveBeenCalledTimes(1);
+    await waitFor(() => expect(submitPayUCheckoutMock).toHaveBeenCalledTimes(1));
+    expect(submitPayUCheckoutMock).toHaveBeenCalledWith(FAKE_PAYU_PAYMENT);
   });
 
-  it('a successful Razorpay checkout calls verifyPayment exactly once with the correct payment/signature, and never grants credits itself', async () => {
-    callFunctionMock.mockImplementation((opts: any) => {
-      if (opts.functionName === 'createSubscription') {
-        return { subscriptionId: 'sub_abc123', shortUrl: '', planId: 'business', price: 999 };
-      }
-      if (opts.functionName === 'verifyPayment') {
-        return { success: true, status: 'active' };
-      }
-      throw new Error(`unexpected function ${opts.functionName}`);
-    });
-
-    render(<BillingPage />);
-    const businessButtons = await screen.findAllByRole('button', { name: /upgrade to this plan/i });
-    await userEvent.click(businessButtons[1]!);
-
-    await waitFor(() => expect(razorpayConstructorMock).toHaveBeenCalledTimes(1));
-
-    // Simulate Razorpay's own success callback — this application's code
-    // never calls Razorpay's internal payment logic, only reacts to it.
-    capturedOptions.handler({
-      razorpay_payment_id: 'pay_xyz789',
-      razorpay_subscription_id: 'sub_abc123',
-      razorpay_signature: 'sig_fake_but_realistic_hex',
-    });
-
-    await waitFor(() =>
-      expect(callFunctionMock).toHaveBeenCalledWith({
-        functionName: 'verifyPayment',
-        data: {
-          razorpaySubscriptionId: 'sub_abc123',
-          razorpayPaymentId: 'pay_xyz789',
-          razorpaySignature: 'sig_fake_but_realistic_hex',
-        },
-      })
-    );
-
-    // verifyPayment must be called exactly once for one successful checkout
-    // — no duplicate confirmation call.
-    const verifyCalls = callFunctionMock.mock.calls.filter(
-      ([opts]) => opts.functionName === 'verifyPayment'
-    );
-    expect(verifyCalls).toHaveLength(1);
-    expect(showToastMock).toHaveBeenCalledWith(expect.stringMatching(/successful/i), 'success');
-  });
-
-  it('the free plan and the current plan are never purchasable — no createSubscription call, no Razorpay Checkout opened', async () => {
+  it('the free plan and the current plan are never purchasable — no createPayUPayment call, no checkout submitted', async () => {
     getByUserIdMock.mockResolvedValue({ planId: 'starter' } as Subscription);
 
     render(<BillingPage />);
@@ -149,91 +95,24 @@ describe('BillingPage — Razorpay checkout wiring (Phase 19A)', () => {
     expect(currentPlanButton).toBeDisabled();
 
     expect(callFunctionMock).not.toHaveBeenCalled();
-    expect(razorpayConstructorMock).not.toHaveBeenCalled();
+    expect(submitPayUCheckoutMock).not.toHaveBeenCalled();
   });
 
-  it('without NEXT_PUBLIC_RAZORPAY_KEY_ID configured, clicking upgrade shows an error and never calls the backend', async () => {
-    delete process.env['NEXT_PUBLIC_RAZORPAY_KEY_ID'];
+  it('failure: createPayUPayment rejecting shows an error toast, re-enables the button, and never submits checkout', async () => {
+    callFunctionMock.mockRejectedValueOnce(new Error('Payments are not fully configured yet.'));
 
     render(<BillingPage />);
     const businessButtons = await screen.findAllByRole('button', { name: /upgrade to this plan/i });
     await userEvent.click(businessButtons[1]!);
 
     await waitFor(() =>
-      expect(showToastMock).toHaveBeenCalledWith(expect.stringMatching(/not configured/i), 'error')
+      expect(showToastMock).toHaveBeenCalledWith('Payments are not fully configured yet.', 'error')
     );
-    expect(callFunctionMock).not.toHaveBeenCalled();
-    expect(razorpayConstructorMock).not.toHaveBeenCalled();
-  });
-
-  it('cancel: dismissing the Razorpay modal re-enables the upgrade button, without calling verifyPayment or granting credits', async () => {
-    callFunctionMock.mockResolvedValueOnce({
-      subscriptionId: 'sub_abc123',
-      shortUrl: '',
-      planId: 'business',
-      price: 999,
-    });
-
-    render(<BillingPage />);
-    const businessButtons = await screen.findAllByRole('button', { name: /upgrade to this plan/i });
-    await userEvent.click(businessButtons[1]!);
-
-    await waitFor(() => expect(razorpayConstructorMock).toHaveBeenCalledTimes(1));
-    expect(businessButtons[1]).toBeDisabled();
-
-    // Simulate the user closing the Razorpay modal without paying.
-    capturedOptions.modal.ondismiss();
-
-    await waitFor(() => expect(businessButtons[1]).not.toBeDisabled());
-    expect(callFunctionMock).toHaveBeenCalledTimes(1); // createSubscription only, never verifyPayment
-  });
-
-  it('failure: createSubscription rejecting shows an error toast and re-enables the button, without ever opening Razorpay', async () => {
-    callFunctionMock.mockRejectedValueOnce(new Error('Insufficient plan eligibility'));
-
-    render(<BillingPage />);
-    const businessButtons = await screen.findAllByRole('button', { name: /upgrade to this plan/i });
-    await userEvent.click(businessButtons[1]!);
-
-    await waitFor(() =>
-      expect(showToastMock).toHaveBeenCalledWith('Insufficient plan eligibility', 'error')
-    );
-    expect(razorpayConstructorMock).not.toHaveBeenCalled();
+    expect(submitPayUCheckoutMock).not.toHaveBeenCalled();
     await waitFor(() => expect(businessButtons[1]).not.toBeDisabled());
   });
 
-  it('failure: verifyPayment rejecting after a successful checkout shows a "contact support" warning, not a false success', async () => {
-    callFunctionMock.mockImplementation((opts: any) => {
-      if (opts.functionName === 'createSubscription') {
-        return { subscriptionId: 'sub_abc123', shortUrl: '', planId: 'business', price: 999 };
-      }
-      if (opts.functionName === 'verifyPayment') {
-        return Promise.reject(new Error('signature mismatch'));
-      }
-      throw new Error(`unexpected function ${opts.functionName}`);
-    });
-
-    render(<BillingPage />);
-    const businessButtons = await screen.findAllByRole('button', { name: /upgrade to this plan/i });
-    await userEvent.click(businessButtons[1]!);
-    await waitFor(() => expect(razorpayConstructorMock).toHaveBeenCalledTimes(1));
-
-    capturedOptions.handler({
-      razorpay_payment_id: 'pay_xyz789',
-      razorpay_subscription_id: 'sub_abc123',
-      razorpay_signature: 'sig_fake',
-    });
-
-    await waitFor(() =>
-      expect(showToastMock).toHaveBeenCalledWith(
-        expect.stringMatching(/could not confirm it automatically/i),
-        'warning'
-      )
-    );
-    expect(showToastMock).not.toHaveBeenCalledWith(expect.stringMatching(/successful/i), 'success');
-  });
-
-  it('duplicate action: a second click while an upgrade is already in flight does not call createSubscription again', async () => {
+  it('duplicate action: a second click while an upgrade is already in flight does not call createPayUPayment again', async () => {
     let resolveCreate: (v: unknown) => void = () => {};
     callFunctionMock.mockReturnValueOnce(
       new Promise((resolve) => {
@@ -247,42 +126,75 @@ describe('BillingPage — Razorpay checkout wiring (Phase 19A)', () => {
 
     expect(businessButtons[1]).toBeDisabled();
     // A second click can't fire through a disabled button in a real
-    // browser; this proves the guard that makes that true — the app
-    // never relies on the click handler itself to no-op a duplicate.
+    // browser; this proves the guard that makes that true.
     await userEvent.click(businessButtons[1]!);
     expect(callFunctionMock).toHaveBeenCalledTimes(1);
 
-    resolveCreate({ subscriptionId: 'sub_1', shortUrl: '', planId: 'business', price: 999 });
+    resolveCreate(FAKE_PAYU_PAYMENT);
   });
 
-  it('credit update: the success path refreshes the subscription from the backend, never incrementing credits on the client', async () => {
+  it('returning from PayU with payu=success shows a success toast and refreshes the subscription from the backend', async () => {
+    window.history.replaceState({}, '', '/billing?payu=success&txnid=txn_abc123');
     getByUserIdMock.mockResolvedValueOnce(null).mockResolvedValueOnce({
       planId: 'business',
-      creditsIncluded: 500,
+      creditsIncluded: 1200,
     } as Subscription);
-    callFunctionMock.mockImplementation((opts: any) => {
-      if (opts.functionName === 'createSubscription') {
-        return { subscriptionId: 'sub_abc123', shortUrl: '', planId: 'business', price: 999 };
-      }
-      if (opts.functionName === 'verifyPayment') {
-        return { success: true, status: 'active' };
-      }
-      throw new Error(`unexpected function ${opts.functionName}`);
-    });
 
     render(<BillingPage />);
-    const businessButtons = await screen.findAllByRole('button', { name: /upgrade to this plan/i });
-    await userEvent.click(businessButtons[1]!);
-    await waitFor(() => expect(razorpayConstructorMock).toHaveBeenCalledTimes(1));
 
-    capturedOptions.handler({
-      razorpay_payment_id: 'pay_xyz789',
-      razorpay_subscription_id: 'sub_abc123',
-      razorpay_signature: 'sig_fake',
-    });
-
-    // getByUserId (the real subscription record) is re-fetched after a
-    // verified payment — credits are never bumped by client arithmetic.
+    await waitFor(() =>
+      expect(showToastMock).toHaveBeenCalledWith(
+        expect.stringMatching(/payment received/i),
+        'success'
+      )
+    );
+    // Credits are never computed client-side — only re-read from Firestore
+    // via a second subscription fetch (the first is the page's initial load).
     await waitFor(() => expect(getByUserIdMock).toHaveBeenCalledTimes(2));
+    // The query string is cleaned up so a refresh doesn't re-show the toast.
+    expect(window.location.search).toBe('');
+  });
+
+  it('returning from PayU with payu=failure shows a "not completed" warning, not a success message', async () => {
+    window.history.replaceState({}, '', '/billing?payu=failure&txnid=txn_abc123');
+
+    render(<BillingPage />);
+
+    await waitFor(() =>
+      expect(showToastMock).toHaveBeenCalledWith(expect.stringMatching(/not completed/i), 'warning')
+    );
+    expect(showToastMock).not.toHaveBeenCalledWith(
+      expect.stringMatching(/payment received/i),
+      'success'
+    );
+  });
+
+  it('returning from PayU with payu=pending shows a processing message, grants nothing client-side', async () => {
+    window.history.replaceState({}, '', '/billing?payu=pending&txnid=txn_abc123');
+
+    render(<BillingPage />);
+
+    await waitFor(() =>
+      expect(showToastMock).toHaveBeenCalledWith(expect.stringMatching(/being processed/i), 'info')
+    );
+  });
+
+  it('returning from PayU with payu=unverified (tampered/invalid hash on the redirect) warns rather than claiming success', async () => {
+    window.history.replaceState({}, '', '/billing?payu=unverified&txnid=txn_abc123');
+
+    render(<BillingPage />);
+
+    await waitFor(() =>
+      expect(showToastMock).toHaveBeenCalledWith(
+        expect.stringMatching(/could not verify/i),
+        'warning'
+      )
+    );
+  });
+
+  it('with no payu query param present, no PayU-return toast fires', async () => {
+    render(<BillingPage />);
+    await screen.findAllByRole('button', { name: /upgrade to this plan/i });
+    expect(showToastMock).not.toHaveBeenCalled();
   });
 });

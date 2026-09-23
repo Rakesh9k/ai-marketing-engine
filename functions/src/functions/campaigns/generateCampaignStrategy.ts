@@ -18,6 +18,7 @@ import { mapErrorToHttpsError } from '../../utils/errors';
 import { InsufficientCreditsError } from '../../utils/errors';
 import type { Campaign, LocalizationProfile, CampaignAsset } from '../../types';
 import { GenerationPipeline } from '../../services/ai/pipeline';
+import { getBrandCreativeContext } from '../../services/ai/brandCreativeContext';
 import {
   executeWithUsageControl,
   getGenerationCost,
@@ -33,6 +34,8 @@ import { ValidationError } from '../../utils/errors';
 
 const generateCampaignStrategySchema = z.object({
   businessId: z.string().min(1),
+  templateId: z.string().optional(),
+  creativeObjective: z.string().optional(),
   // The union of every vertical's allowed objectives (see config/verticals.ts).
   // This schema can't yet know which business the request is for — that's
   // only known once `business` is fetched below — so it accepts the full
@@ -245,6 +248,8 @@ export const generateCampaignStrategy = onCall(
             businessId: data.businessId,
             userId,
             objective: data.objective,
+            templateId: data.templateId,
+            creativeObjective: data.creativeObjective as any,
             productId: data.productId,
             newProduct: data.newProduct
               ? {
@@ -297,6 +302,8 @@ export const generateCampaignStrategy = onCall(
           const pipeline = new GenerationPipeline();
           const result = await pipeline.execute({
             businessId: data.businessId,
+            templateId: data.templateId,
+            creativeObjective: data.creativeObjective as any,
             campaignId,
             businessName: business.name,
             businessCategory: business.category,
@@ -320,7 +327,7 @@ export const generateCampaignStrategy = onCall(
             cta: data.cta,
             localizationProfile: data.localization,
             campaignStyle: data.localization.campaignStyle,
-            brandProfile: brandKit || {},
+            brandProfile: getBrandCreativeContext(brandKit),
             businessBrain: business.businessBrain,
             duration: data.duration,
             newProduct: pipelineProduct,

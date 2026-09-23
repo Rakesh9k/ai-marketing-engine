@@ -33,7 +33,7 @@ every area (PASS/PARTIAL/BLOCKED/FAIL/NOT IMPLEMENTED per area, not a summary cl
 | **Storage**      | Firebase Storage                                                |
 | **Payments**     | Razorpay (INR subscriptions)                                    |
 | **AI Providers** | NVIDIA Nemotron, Gemini 1.5 Pro, GPT-4o (via abstraction layer) |
-| **Deployment**   | Vercel (Frontend), Firebase (Backend)                           |
+| **Deployment**   | Firebase App Hosting (Frontend), Firebase Functions (Backend)   |
 | **Testing**      | Jest, React Testing Library                                     |
 | **Code Quality** | ESLint, Prettier, TypeScript (strict)                           |
 
@@ -348,9 +348,31 @@ npm run functions:lint && npm run functions:typecheck && npm run functions:test 
 
 ### Branch Strategy
 
-- `main` → Production (auto-deploy via Vercel/Firebase)
-- `staging` → Staging environment
+- `master` → current default branch (this repo does not have a `main` branch as of this writing)
 - `feature/*` → Feature branches
+
+### Deployment (current, as of Phase 19C/20C)
+
+The frontend deploys to **Firebase App Hosting** (backend id `mitra-web`), not Vercel — a Vercel
+project and `vercel.json`/`.vercelignore` exist as leftovers from an earlier, superseded attempt
+(see `docs/PHASE_19C_FIREBASE_APP_HOSTING_PRODUCTION_REPORT.md` §11, "NOT USED in the target
+architecture"). Current architecture:
+
+```
+GitHub (Rakesh9k/ai-marketing-engine, master)
+  → Firebase App Hosting (mitra-web, asia-southeast1, Cloud Build + Cloud Run + CDN)
+    → Next.js
+      → Firebase Auth / App Check (reCAPTCHA Enterprise) — client-side
+      → Cloud Functions (asia-south1) — server-authoritative logic
+        → Firestore / Storage / AI providers / Razorpay
+```
+
+See `docs/PRODUCTION_FRONTEND_DEPLOYMENT_ARCHITECTURE.md` for the full architecture audit and
+`docs/PHASE_19C_FIREBASE_APP_HOSTING_PRODUCTION_REPORT.md` / `docs/PHASE_20C_REAL_FIREBASE_APPCHECK_ENVIRONMENT_REPORT.md`
+for the latest verified deployment state, including which production gates were passing/blocked as
+of that report. Do not assume GitHub-linked continuous deployment is active — the most recent
+verified report describes a **local-source rollout**, with GitHub App Hosting integration recorded
+as a pending one-time console step.
 
 ### Commit Convention
 

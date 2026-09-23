@@ -22,7 +22,19 @@ export function verifyWebhookSignature(
 ): boolean {
   const crypto = require('crypto');
   const expectedSignature = crypto.createHmac('sha256', webhookSecret).update(body).digest('hex');
-  return expectedSignature === signature;
+  // Plain === leaks timing information proportional to how many leading
+  // bytes of an attacker-supplied signature happen to match the real one —
+  // a real (if low-severity, given HMAC-SHA256's keyspace) side channel on
+  // a payment-webhook auth boundary. crypto.timingSafeEqual requires equal-
+  // length buffers or it throws, so the length check must happen first;
+  // that leaks only the expected signature's fixed, publicly-known length
+  // (hex-encoded SHA-256 is always 64 chars), not any of its content.
+  const expected = Buffer.from(expectedSignature, 'utf8');
+  const actual = Buffer.from(signature, 'utf8');
+  if (expected.length !== actual.length) {
+    return false;
+  }
+  return crypto.timingSafeEqual(expected, actual);
 }
 
 export function getRazorpayPlanId(plan: SubscriptionPlan): string {
@@ -136,4 +148,22 @@ export async function createRazorpayOrder(input: CreatePaymentInput): Promise<Cr
 
 export function calculateCreditsToGrant(plan: SubscriptionPlan): number {
   return PRICING.subscriptionTiers[plan].monthlyCredits;
+}
+
+/**
+ * Cancels a Razorpay subscription. `cancelAtCycleEnd: true` (the default)
+ * stops future renewal/billing but leaves the current, already-paid period
+ * active — this is the technical implementation of "cancel" and makes no
+ * refund/proration claim (no refund policy has been decided; see
+ * docs/LEGAL_FOUNDER_DECISIONS_REQUIRED.md). The subscription's Firestore
+ * status/canceledAt fields are updated when Razorpay's own
+ * `subscription.cancelled` webhook event fires (immediately for a
+ * non-cycle-end cancel, or at period end for a cycle-end cancel).
+ */
+export async function cancelRazorpaySubscription(
+  razorpaySubscriptionId: string,
+  cancelAtCycleEnd = true
+): Promise<void> {
+  const client = getRazorpayClient();
+  await client.subscriptions.cancel(razorpaySubscriptionId, cancelAtCycleEnd);
 }

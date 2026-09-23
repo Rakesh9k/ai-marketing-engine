@@ -19,6 +19,8 @@ const createReelProjectSchema = z.object({
   offer: z.string().max(200).optional(),
   cta: z.string().max(60).optional(),
   additionalMessage: z.string().max(200).optional(),
+  templateId: z.string().optional(),
+  creativeObjective: z.string().optional(),
 });
 
 /**
@@ -41,7 +43,7 @@ export const createReelProject = onCall(
 
     try {
       await verifyBusinessAccess(context.userId, data.businessId);
-      await checkRateLimit(context.userId, 'reelClipUpload');
+      await checkRateLimit(context.userId, 'createReelProject');
 
       const reelId = uuidv7();
       const now = new Date().toISOString();
@@ -56,7 +58,7 @@ export const createReelProject = onCall(
         inputClipIds: [],
         offer: data.offer,
         cta: data.cta,
-        additionalMessage: data.additionalMessage,
+        additionalMessage: data.additionalMessage, templateId: data.templateId, creativeObjective: data.creativeObjective as any,
         createdAt: now,
         updatedAt: now,
       };

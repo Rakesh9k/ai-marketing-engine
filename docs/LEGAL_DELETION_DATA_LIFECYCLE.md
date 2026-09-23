@@ -1,0 +1,98 @@
+# Legal Deletion / Data Lifecycle Matrix
+
+Generated 2026-09-22 as part of the pre-deployment account-deletion review. This is a forensic trace
+of what `requestAccountDeletion` (and the pre-existing `onUserDeletedHandler` trigger it invokes)
+actually does today, built from direct code inspection — not from the Privacy Policy's description
+of intent. "Legal Decision" column states only what remains undecided; it does not assert what the
+decision *should* be.
+
+## Full collection inventory (evidence: `grep -rohE ".collection\('[a-zA-Z_]+'\)" functions/src/`)
+
+`users`, `businesses`, `brand_kits`, `products`, `campaigns`, `campaign_assets`,
+`campaign_performance`, `assets`, `reels`, `subscriptions`, `usage`, `transactions`,
+`analytics_events`, `generation_logs`, `accountDeletionRequests`, `rate_limits`,
+`idempotency_keys`, `processed_webhook_events`. `agencies` and `clients` have Firestore rules
+defined but no Cloud Function in `functions/src/functions/` was found reading or writing them —
+Agency Mode's active data model is `users.role === 'agency_member'` + `users.agencyId` (Auth custom
+claim) + `businesses.agencyId` (field), not a populated `agencies`/`clients` collection.
+
+## Deletion Cascade Matrix
+
+| Resource | Collection/Path | Ownership Key | User-Associated? | Deleted | Archived | Anonymized | Retained | Why | Evidence |
+|---|---|---|---|---|---|---|---|---|---|
+| Firebase Auth account | N/A (Auth, not Firestore) | UID | Yes | **DELETED** | — | — | — | This is the actual destructive step | `requestAccountDeletion.ts`: `admin.auth().deleteUser(context.userId)` |
+| User profile | `users/{uid}` | doc ID = uid | Yes | Not deleted | Not archived | Not anonymized | **RETAINED**, marked `deletedAt` | `onUserDeletedHandler` sets `deletedAt`/`updatedAt` only; fields (email, displayName, phone) are never cleared/redacted | `onUserCreated.ts:166-169` |
+| Businesses (owned) | `businesses/{businessId}` | `userId` field, referenced via `users/{uid}.businessIds[]` | Yes | Not deleted | **ARCHIVED** (`status: 'archived'`) | Not anonymized | Retained | Existing behavior, this pass only added the self-service trigger | `onUserCreated.ts:157-163` |
+| Businesses (agency-linked, not directly owned) | `businesses/{businessId}` with `agencyId` field | `agencyId`, not the deleting user's own `businessIds` | Only indirectly | **NOT TOUCHED** | Not touched | Not touched | Retained, untouched | The archival loop iterates only `userData.businessIds`, never queries by `agencyId` — correct behavior for cross-tenant safety (see Phase 11 below), but means an agency member's own account deletion does nothing to shared agency data (also correct — those aren't theirs to delete) | `onUserCreated.ts:155-163`, confirmed by absence of any `agencyId` query in the handler |
+| Business Brain (embedded in `businesses.businessBrain`) | Same doc as business | Same as business | Yes | Not deleted | Archived with parent business doc | Not anonymized | Retained | Business Brain is a field on the business document, not a separate collection — archiving the business archives it too | `functions/src/types/index.ts` (Business.businessBrain), confirmed embedded not separate |
+| Brand Kits | `brand_kits/{id}` | `businessId` | Indirectly | **NOT TOUCHED** | Not touched | Not touched | Retained | No code in the deletion path references `brand_kits` | grep confirmed zero references in `onUserCreated.ts`/`requestAccountDeletion.ts` |
+| Products | `products/{id}` | `businessId` | Indirectly | **NOT TOUCHED** | Not touched | Not touched | Retained | Same — no reference | Same grep |
+| Campaigns | `campaigns/{id}` | `userId`, `businessId` | Yes (directly, `userId`) | **NOT TOUCHED** | Not touched | Not touched | Retained | Same — no reference | Same grep |
+| Campaign assets (generated creative) | `campaign_assets/{id}` | `campaignId` → `businessId` | Indirectly | **NOT TOUCHED** | Not touched | Not touched | Retained | Same | Same grep |
+| Campaign performance | `campaign_performance/{id}` | `campaignId` | Indirectly | **NOT TOUCHED** | Not touched | Not touched | Retained | Same | Same grep |
+| Uploaded/generated assets (Firestore record) | `assets/{id}` | `businessId`, `userId` | Yes | **NOT TOUCHED** | Not touched | Not touched | Retained | Same | Same grep |
+| Cloud Storage objects (files) | `businesses/{businessId}/...` paths in the bucket | Path-embedded `businessId` | Yes | **NOT TOUCHED** — confirmed no Storage delete/cleanup code exists anywhere tied to account or business deletion | Not touched | Not touched | Retained indefinitely | No `admin.storage()` call exists in either `requestAccountDeletion.ts` or `onUserCreated.ts`; a repo-wide check found zero Storage-cleanup code tied to deletion of any kind | `grep -rn "admin.storage\|bucket()" functions/src/functions/auth/ functions/src/functions/campaigns/` → no matches |
+| Reels / reel clips | `reels/{id}` (+ associated Storage clip/output files) | `userId`, `businessId` | Yes | **NOT TOUCHED** | Not touched | Not touched | Retained (Firestore doc and Storage files both) | Same | Same grep pattern, zero matches |
+| Usage / credit history | `usage/{usageId}` | `userId` | Yes | **NOT TOUCHED** | Not touched | Not touched | Retained | Same | Same grep |
+| Transactions (credit ledger + payment metadata) | `transactions/{id}` | `userId` | Yes | **NOT TOUCHED** | Not touched | Not touched | Retained | Financial/accounting record; `/privacy` §6 already states these "may be retained... for legal, tax, or fraud-prevention purposes" — consistent with actual behavior, though no specific retention *period* is defined | Same grep, zero matches; cross-checked against `/privacy` page content |
+| Subscriptions | `subscriptions/{id}` | `userId` | Yes | **NOT TOUCHED — see Critical Finding below** | Not touched | Not touched | Retained, status unchanged | Deletion code never reads or writes this collection | Same grep, zero matches — this is the critical finding, see below |
+| Analytics events | `analytics_events/{id}` | `userId` (where applicable) | Yes | **NOT TOUCHED** | Not touched | Not touched | Retained | Same | Same grep |
+| Generation logs | `generation_logs/{id}` | `userId` | Yes | **NOT TOUCHED** | Not touched | Not touched | Retained | Same | Same grep |
+| Account-deletion audit trail | `accountDeletionRequests/{uid}` | doc ID = uid | Yes | N/A — this collection is created *by* the deletion process itself | N/A | N/A | Retained (this is the audit record) | Intentional — proof the deletion request happened | `requestAccountDeletion.ts:65-79` |
+| Agencies / clients | `agencies/{id}`, `clients/{id}` | `agencyId` | N/A — no active write path found | Not applicable | Not applicable | Not applicable | N/A | No Cloud Function creates/reads/writes these collections currently | See collection inventory above |
+
+## CRITICAL FINDING — Active Razorpay subscriptions are not touched by account deletion — **FIXED, same session**
+
+**Status: FIXED (local, not yet deployed).** `requestAccountDeletion.ts` now checks the caller's
+subscription before deleting the Auth account and rejects the request with a clear error if a
+paid, still-renewing (`active`/`trialing`/`past_due`, not `cancelAtPeriodEnd`) subscription exists —
+the caller must cancel from the Billing page first. Verified by 4 new passing tests against a real
+Firestore emulator. The original finding below is preserved for the record.
+
+`requestAccountDeletion.ts` never reads `users/{uid}.subscriptionId`, never reads
+`subscriptions/{id}`, never calls `cancelRazorpaySubscription()`, and never checks whether the
+account being deleted has an active paid plan. If a user with a live, auto-renewing Razorpay
+subscription deletes their account:
+
+1. Their Firebase Auth login is destroyed (real, immediate, irreversible from the app side).
+2. Their Razorpay subscription (a separate system, keyed by `razorpaySubscriptionId`/
+   `razorpayCustomerId`, not by Firebase UID) **keeps renewing and charging their payment method**
+   — Razorpay has no awareness the Mitra account was deleted.
+3. `subscriptions/{id}.status` in Firestore stays `'active'` indefinitely; `usage/{usageId}`
+   continues to reflect a subscribed plan with no one able to use it.
+4. The customer has **no way to self-serve cancel** afterward — their login no longer exists, so
+   they cannot reach the Billing page's cancel button. Their only recourse is emailing support and
+   hoping someone manually cancels the Razorpay subscription before the next billing cycle.
+
+This is a genuine, reproducible technical defect (not a policy question) — a customer could delete
+their account and then unknowingly keep being charged. Per this audit's own instruction not to
+silently patch discovered issues during the review gate, this is reported here as a
+**PRODUCTION BLOCKER** rather than fixed. It also does not require inventing a refund/retention
+policy to fix at the *technical* level — the fix is simply "cancel the subscription (or refuse to
+delete/require cancel-first) before proceeding," which is the same neutral, policy-free meaning of
+"cancel" already implemented in `cancelSubscription.ts`.
+
+## Failure-mode analysis
+
+| Scenario | Classification | Reasoning |
+|---|---|---|
+| Firestore audit-trail write succeeds, then `deleteUser` fails (e.g. already deleted) | **RECOVERABLE, but leaves a stale artifact** | `accountDeletionRequests/{uid}.status` stays `'processing'` forever — no catch path resets it to `'failed'`. Not destructive, just a minor observability gap (an operator reading this collection would see a stuck record with no indication it actually failed). |
+| `deleteUser` succeeds, `onUserDeletedHandler` (business archival) throws mid-loop (e.g. transient Firestore error on business N of M) | **PARTIALLY DESTRUCTIVE, recoverable** | Auth account is already gone (irreversible from the app side) while some businesses remain un-archived. The trigger's own `try/catch` rethrows on error, which Cloud Functions v1 auth triggers do not automatically retry by default — a partial archive could persist with no automatic retry. No test in this repo proves this path is handled; classified `UNKNOWN` for whether it self-heals, `PARTIALLY DESTRUCTIVE` for the immediate effect. |
+| `requestAccountDeletion` called twice (retry/duplicate click) | **SAFE at the Auth layer, RECOVERABLE at the audit-trail layer** | Second `admin.auth().deleteUser()` call on an already-deleted UID throws a clear `auth/user-not-found`-class error (Firebase's own behavior, not custom code) — it does not silently succeed or double-execute any destructive step. The audit-trail doc would be overwritten to `'processing'` again and then left stuck (same as above), a cosmetic issue, not a data-safety one. **Not proven by an automated test in this pass** — reasoned from Firebase Admin SDK's documented behavior, not verified empirically against the emulator (the Auth emulator was not started in this session's test runs; see Test Failure Classification). |
+| Active Razorpay subscription + account deletion | **DANGEROUS** | See Critical Finding above — real, ongoing financial exposure for the customer with no self-service recovery path. |
+| Cross-tenant safety (User A deletion affecting User B) | **SAFE by construction, reasoned from code, not yet empirically tested in this pass** | The archival loop iterates only `userData.businessIds` read from the deleting user's own `users/{uid}` document — it never queries any collection by another user's ID, and never touches the `agencyId`-scoped shared data path. No code path exists by which User A's deletion could reach User B's `businessIds`, campaigns, assets, or credits. This conclusion is structural (verified by reading every line `requestAccountDeletion.ts` and `onUserDeletedHandler` touch), not yet verified by an actual two-user emulator test in this pass — see Phase 27 in the main report for why that test was not run this session. |
+
+## Idempotency — status
+
+**UNKNOWN — reasoned but not proven.** No automated test in this repository calls
+`requestAccountDeletion` twice in succession and asserts the second call's exact behavior. The
+reasoning above (based on Firebase Admin SDK's documented error behavior for deleting an
+already-deleted user) is sound but not empirical evidence from this codebase's own test suite.
+
+## Technical behavior vs. legal retention decision
+
+Every "RETAINED" row above is a **technical fact**, not a legal conclusion. Whether campaigns,
+assets, Storage objects, usage history, and analytics events *should* be deleted, retained for a
+fixed period, or anonymized is explicitly **FOUNDER DECISION REQUIRED** (data-retention schedule) —
+see `docs/LEGAL_FOUNDER_DECISIONS_REQUIRED.md`. This document states only what the code currently
+does.

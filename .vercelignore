@@ -1,0 +1,3 @@
+# reel-renderer is a separately deployed Cloud Run service (see services/reel-renderer/README.md),
+# not part of the Next.js frontend. Anchored to the repo root so src/services is NOT excluded.
+/services/

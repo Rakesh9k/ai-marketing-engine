@@ -1,13 +1,6 @@
 import { StyledLink } from '@/components/ui/Link';
 import { MitraLogo } from '@/components/ui/MitraLogo';
 
-/**
- * Phase 17: Privacy Policy and Terms routes do not exist in this
- * application (confirmed: no src/app/privacy or src/app/terms). Per the
- * phase's explicit instruction not to fabricate legal pages just to fill
- * space, those links are intentionally omitted rather than pointed at
- * dead routes — see docs/PHASE_17_LANDING_PAGE_REPORT.md.
- */
 export function LandingFooter() {
   return (
     <footer className="border-border-light bg-bg-secondary border-t">
@@ -30,6 +23,24 @@ export function LandingFooter() {
             </StyledLink>
             <StyledLink href="/signup" variant="secondary" size="sm">
               Signup
+            </StyledLink>
+            <StyledLink href="/terms" variant="secondary" size="sm">
+              Terms
+            </StyledLink>
+            <StyledLink href="/privacy" variant="secondary" size="sm">
+              Privacy
+            </StyledLink>
+            <StyledLink href="/refund" variant="secondary" size="sm">
+              Refund
+            </StyledLink>
+            <StyledLink href="/cancellation" variant="secondary" size="sm">
+              Cancellation
+            </StyledLink>
+            <StyledLink href="/support" variant="secondary" size="sm">
+              Support
+            </StyledLink>
+            <StyledLink href="/contact" variant="secondary" size="sm">
+              Contact
             </StyledLink>
           </nav>
         </div>

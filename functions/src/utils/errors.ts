@@ -71,6 +71,19 @@ export class RateLimitError extends AppError {
 }
 
 export function mapErrorToHttpsError(error: unknown): HttpsError {
+  // An HttpsError (e.g. checkRateLimit's 'resource-exhausted', or
+  // verifyAuth's 'unauthenticated') already carries the correct callable
+  // error code, message, and details. Without this check it fell through
+  // to the generic `error instanceof Error` branch below — HttpsError
+  // extends Error — which rebuilt it as a plain 'internal' error and threw
+  // away the code and details (confirmed by a real emulator request: a
+  // rejected checkRateLimit call surfaced to the client as 'internal'
+  // instead of 'resource-exhausted', losing the retryAfterSeconds detail
+  // and the client's ability to distinguish "rate limited" from "server
+  // error").
+  if (error instanceof HttpsError) {
+    return error;
+  }
   if (error instanceof AppError) {
     return error.toHttpsError();
   }

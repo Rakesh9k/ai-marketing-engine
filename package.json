@@ -26,6 +26,7 @@
     "postinstall": "npm --prefix functions install"
   },
   "dependencies": {
+    "@sentry/nextjs": "^10.75.1",
     "@types/uuid": "^10.0.0",
     "date-fns": "^4.4.0",
     "firebase": "^10.14.1",

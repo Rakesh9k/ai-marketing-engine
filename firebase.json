@@ -3,8 +3,22 @@
     {
       "source": "functions",
       "codebase": "default",
-      "ignore": ["node_modules", ".git", "firebase-debug.log", "firebase-debug.*.log", "*.local"],
-      "predeploy": ["npm --prefix functions run build"]
+      "ignore": [
+        "node_modules",
+        ".git",
+        "firebase-debug.log",
+        "firebase-debug.*.log",
+        "*.local",
+        "firebase-debug.log",
+        "firebase-debug.*.log",
+        ".runtimeconfig.json",
+        "firebase-debug.log",
+        "firebase-debug.*.log",
+        ".runtimeconfig.json"
+      ],
+      "predeploy": [
+        "npm --prefix functions run build"
+      ]
     }
   ],
   "apphosting": {
@@ -24,7 +38,8 @@
       "services/reel-renderer",
       "firebase-debug.log",
       "firebase-debug.*.log"
-    ]
+    ],
+    "alwaysDeployFromSource": true
   },
   "emulators": {
     "auth": {
@@ -47,9 +62,11 @@
   },
   "firestore": {
     "rules": "firestore.rules",
-    "indexes": "firestore.indexes.json"
+    "indexes": "firestore.indexes.json",
+    "database": "(default)"
   },
   "storage": {
-    "rules": "storage.rules"
+    "rules": "storage.rules",
+    "bucket": "brainwise-ai-marketing-engine.firebasestorage.app"
   }
 }

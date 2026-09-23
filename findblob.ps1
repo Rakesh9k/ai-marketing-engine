@@ -1,0 +1,1 @@
+foreach ($line in Get-Content fsck.txt) { if ($line -match blob) { $hash = ($line -split  )[2]; $content = git show $hash; if ($content -match interface CreativeTemplate) { Write-Host FOUND: $hash } } }

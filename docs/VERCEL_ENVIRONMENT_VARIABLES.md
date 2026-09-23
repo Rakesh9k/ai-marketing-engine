@@ -1,3 +1,5 @@
+<!-- markdownlint-disable-file MD013 -->
+
 # Vercel Environment Variables
 
 Source of truth: `grep` of `src/` and `next.config.ts` for `process.env` (VERIFIED). The Next.js app reads exactly the 11 variables below. All are `NEXT_PUBLIC_*`, so all are browser-visible and inlined **at build time** (changing one in Vercel requires a redeploy).
@@ -5,7 +7,7 @@ Source of truth: `grep` of `src/` and `next.config.ts` for `process.env` (VERIFI
 No secret values appear in this document. Values for the Firebase web config come from `firebase apps:sdkconfig WEB 1:691254604957:web:caf76181c86efb6a7b5074` (project `brainwise-ai-marketing-engine`); the bundled config was compared against it and matches (projectId, appId, storageBucket, authDomain, messagingSenderId, apiKey).
 
 | Variable | Public | Required | Production | Preview | Purpose |
-|---|---|---|---|---|---|
+| --- | --- | --- | --- | --- | --- |
 | `NEXT_PUBLIC_FIREBASE_API_KEY` | Yes (web key, not a secret) | Yes | Set | Set | Firebase web API key for project `brainwise-ai-marketing-engine` |
 | `NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN` | Yes | Yes | `brainwise-ai-marketing-engine.firebaseapp.com` | same | Firebase Auth domain |
 | `NEXT_PUBLIC_FIREBASE_PROJECT_ID` | Yes | Yes | `brainwise-ai-marketing-engine` | same | Firebase project |
@@ -29,7 +31,7 @@ Razorpay key secret and webhook secret; Gemini / OpenAI / NVIDIA API keys; Fireb
 ## Environment separation
 
 | Environment | `NEXT_PUBLIC_USE_EMULATORS` | Firebase target | App Check |
-|---|---|---|---|
+| --- | --- | --- | --- |
 | Local dev (`.env.local`, git-ignored) | `true` | emulators for Auth/Firestore/Storage/Functions; real App Check exchange via registered debug token | debug token |
 | Vercel Production / Preview | unset | real project `brainwise-ai-marketing-engine` | reCAPTCHA Enterprise, no debug token |
 

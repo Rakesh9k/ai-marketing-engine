@@ -1,18 +1,27 @@
-import { MitraMark } from '@/components/ui/MitraMark';
+import Image from 'next/image';
 
 /**
- * The full Mitra brand lockup: the M mark, the "Mitra" wordmark and the
- * "Your AI Marketing Partner" tagline. Reserved for primary brand moments
- * (login, signup, landing, footer) — everywhere else, use MitraMark.
+ * The official Mitra long logo — the full brand lockup (M mark + "Mitra"
+ * wordmark + "Your AI Marketing Partner" tagline), rendered from the exact
+ * supplied artwork (public/brand/mitra-logo-long.png) as a single image
+ * rather than composed from separate mark/text/tagline elements. Reserved
+ * for primary brand moments with enough width (landing nav/footer, auth
+ * pages) — everywhere else, use MitraShortLogo.
  */
 
-const SIZE_STYLES = {
-  sm: { mark: 'lg', word: 'text-xl', tagline: 'text-xs', gap: 'gap-2' },
-  md: { mark: 'xl', word: 'text-2xl', tagline: 'text-sm', gap: 'gap-2.5' },
-  lg: { mark: '2xl', word: 'text-3xl', tagline: 'text-base', gap: 'gap-3' },
+const HEIGHT_MAP = {
+  sm: 48,
+  md: 64,
+  lg: 80,
 } as const;
 
-export type MitraLogoSize = keyof typeof SIZE_STYLES;
+// Intrinsic dimensions of public/brand/mitra-logo-long.png — used only to
+// give next/image the correct aspect ratio for a `public/` asset (which,
+// unlike a statically-imported image, requires explicit width/height).
+const NATIVE_WIDTH = 1774;
+const NATIVE_HEIGHT = 887;
+
+export type MitraLogoSize = keyof typeof HEIGHT_MAP;
 
 interface MitraLogoProps {
   size?: MitraLogoSize;
@@ -28,22 +37,16 @@ export function MitraLogo({
   ariaLabel = 'Mitra — Your AI Marketing Partner',
   decorative = false,
 }: MitraLogoProps) {
-  const styles = SIZE_STYLES[size];
+  const height = HEIGHT_MAP[size];
+  const width = Math.round((height * NATIVE_WIDTH) / NATIVE_HEIGHT);
 
   return (
-    <div
-      className={`flex flex-col items-center ${className || ''}`.trim()}
-      role={decorative ? undefined : 'img'}
-      aria-hidden={decorative ? 'true' : undefined}
-      aria-label={decorative ? undefined : ariaLabel}
-    >
-      <div className={`flex items-center ${styles.gap}`}>
-        <MitraMark size={styles.mark} decorative />
-        <span className={`text-text-primary font-bold tracking-tight ${styles.word}`}>Mitra</span>
-      </div>
-      <p className={`text-brand-500 mt-1 font-semibold ${styles.tagline}`}>
-        Your AI Marketing Partner
-      </p>
-    </div>
+    <Image
+      src="/brand/mitra-logo-long.png"
+      alt={decorative ? '' : ariaLabel}
+      width={width}
+      height={height}
+      className={`shrink-0 ${className || ''}`.trim()}
+    />
   );
 }

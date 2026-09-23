@@ -1,7 +1,7 @@
 import type { z } from 'zod';
 import { HttpsError } from 'firebase-functions/v2/https';
 import type { CallableRequest } from 'firebase-functions/v2/https';
-import { createLogger } from '../utils/logging';
+import { createLogger, generateRequestId } from '../utils/logging';
 
 // Phase 14: these two wrappers gate EVERY callable function and reject
 // unauthenticated/malformed requests before the target handler's own
@@ -68,11 +68,17 @@ export function validateInput<T>(schema: z.ZodSchema<T>) {
 
 export function validatedCallable<T, R>(
   schema: z.ZodSchema<T>,
-  handler: (data: T, context: { userId: string; token: any }) => Promise<R>
+  handler: (data: T, context: { userId: string; token: any; requestId: string }) => Promise<R>
 ) {
   return async (request: CallableRequest<T>): Promise<R> => {
+    // A per-invocation correlation ID, generated at the single shared entry
+    // point every callable passes through. It is not yet threaded into every
+    // downstream handler's own logFunctionStart context — see
+    // docs/OBSERVABILITY_AUDIT_REPORT.md for what "requestId" currently
+    // covers and what remains a follow-up.
+    const requestId = generateRequestId();
     if (!request.auth) {
-      authLogger.warn('Rejected unauthenticated call');
+      authLogger.warn('Rejected unauthenticated call', { requestId });
       throw new HttpsError('unauthenticated', 'Authentication required');
     }
     const validate = validateInput(schema);
@@ -81,6 +87,7 @@ export function validatedCallable<T, R>(
       validatedData = validate(request.data);
     } catch (error) {
       authLogger.warn('Rejected call with invalid input', {
+        requestId,
         userId: request.auth.uid,
         fieldErrors: error instanceof ValidationError ? Object.keys(error.fieldErrors) : undefined,
       });
@@ -89,6 +96,7 @@ export function validatedCallable<T, R>(
     return handler(validatedData, {
       userId: request.auth.uid,
       token: request.auth.token,
+      requestId,
     });
   };
 }
@@ -96,11 +104,15 @@ export function validatedCallable<T, R>(
 export function validatedCallableWithBusiness<T, R>(
   schema: z.ZodSchema<T>,
   businessIdField: keyof T = 'businessId' as keyof T,
-  handler: (data: T, context: { userId: string; businessId: string; token: any }) => Promise<R>
+  handler: (
+    data: T,
+    context: { userId: string; businessId: string; token: any; requestId: string }
+  ) => Promise<R>
 ) {
   return async (request: CallableRequest<T>): Promise<R> => {
+    const requestId = generateRequestId();
     if (!request.auth) {
-      authLogger.warn('Rejected unauthenticated call');
+      authLogger.warn('Rejected unauthenticated call', { requestId });
       throw new HttpsError('unauthenticated', 'Authentication required');
     }
     const validate = validateInput(schema);
@@ -113,6 +125,7 @@ export function validatedCallableWithBusiness<T, R>(
       userId: request.auth.uid,
       businessId,
       token: request.auth.token,
+      requestId,
     });
   };
 }

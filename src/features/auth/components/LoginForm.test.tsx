@@ -3,8 +3,22 @@ import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
 const loginWithEmailPasswordMock = jest.fn();
+const signInWithGoogleMock = jest.fn();
+const logoutMock = jest.fn();
 jest.mock('@/features/auth/services/authService', () => ({
   loginWithEmailPassword: (...args: unknown[]) => loginWithEmailPasswordMock(...args),
+  signInWithGoogle: (...args: unknown[]) => signInWithGoogleMock(...args),
+  logout: (...args: unknown[]) => logoutMock(...args),
+}));
+
+const callFunctionMock = jest.fn();
+jest.mock('@/services/api', () => ({
+  callFunction: (...args: unknown[]) => callFunctionMock(...args),
+}));
+
+const getAdditionalUserInfoMock = jest.fn();
+jest.mock('firebase/auth', () => ({
+  getAdditionalUserInfo: (...args: unknown[]) => getAdditionalUserInfoMock(...args),
 }));
 
 import { LoginForm } from './LoginForm';
@@ -97,5 +111,49 @@ describe('LoginForm', () => {
       'href',
       '/forgot-password'
     );
+  });
+
+  it('an existing Google user is signed in and onSuccess is called without a consent prompt', async () => {
+    signInWithGoogleMock.mockResolvedValue({ user: { uid: 'g1' } });
+    getAdditionalUserInfoMock.mockReturnValue({ isNewUser: false });
+    const onSuccess = jest.fn();
+    const user = userEvent.setup();
+    render(<LoginForm onSuccess={onSuccess} />);
+
+    await user.click(screen.getByRole('button', { name: /continue with google/i }));
+
+    await waitFor(() => expect(onSuccess).toHaveBeenCalled());
+    expect(callFunctionMock).not.toHaveBeenCalled();
+  });
+
+  it('a brand-new Google user is blocked on an explicit consent step before onSuccess fires', async () => {
+    signInWithGoogleMock.mockResolvedValue({ user: { uid: 'g2' } });
+    getAdditionalUserInfoMock.mockReturnValue({ isNewUser: true });
+    callFunctionMock.mockResolvedValue({ success: true });
+    const onSuccess = jest.fn();
+    const user = userEvent.setup();
+    render(<LoginForm onSuccess={onSuccess} />);
+
+    await user.click(screen.getByRole('button', { name: /continue with google/i }));
+
+    expect(await screen.findByText(/review and accept our policies/i)).toBeInTheDocument();
+    expect(onSuccess).not.toHaveBeenCalled();
+
+    // Two checkboxes are now on screen: the form's existing "Remember me"
+    // checkbox and the new inline Google consent-confirmation checkbox —
+    // the latter is the one that just appeared.
+    const checkboxes = screen.getAllByRole('checkbox');
+    await user.click(checkboxes[checkboxes.length - 1] as HTMLElement);
+    await user.click(screen.getByRole('button', { name: /agree & continue/i }));
+
+    await waitFor(() =>
+      expect(callFunctionMock).toHaveBeenCalledWith(
+        expect.objectContaining({
+          functionName: 'recordConsentAcceptance',
+          data: { accepted: true },
+        })
+      )
+    );
+    expect(onSuccess).toHaveBeenCalled();
   });
 });

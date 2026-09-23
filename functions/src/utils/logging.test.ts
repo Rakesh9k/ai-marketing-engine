@@ -6,7 +6,7 @@
  * does NOT mangle an ordinary error with no secret in it.
  */
 import * as functions from 'firebase-functions';
-import { createLogger } from './logging';
+import { createLogger, generateRequestId } from './logging';
 
 describe('createLogger().error — secret redaction (Phase 14)', () => {
   let errorSpy: jest.SpyInstance;
@@ -56,5 +56,38 @@ describe('createLogger().error — secret redaction (Phase 14)', () => {
     expect(payload.error.message).toBe('Business not found: biz_123');
     expect(payload.businessId).toBeUndefined();
     expect(payload.campaignId).toBe('camp_1');
+  });
+});
+
+describe('generateRequestId (Phase — Monitoring & Observability)', () => {
+  it('returns a unique identifier on each call', () => {
+    const a = generateRequestId();
+    const b = generateRequestId();
+    expect(a).not.toBe(b);
+    expect(typeof a).toBe('string');
+    expect(a.length).toBeGreaterThan(0);
+  });
+});
+
+describe('createLogger — deployment revision context', () => {
+  let infoSpy: jest.SpyInstance;
+
+  beforeEach(() => {
+    infoSpy = jest.spyOn(functions.logger, 'info').mockImplementation(() => undefined);
+  });
+
+  afterEach(() => infoSpy.mockRestore());
+
+  it('attaches K_REVISION as deploymentRevision when Cloud Run sets it', () => {
+    const previous = process.env['K_REVISION'];
+    process.env['K_REVISION'] = 'mitra-web-00042-abc';
+    try {
+      createLogger({ businessId: 'biz_1' }).info('test event');
+      const [, payload] = infoSpy.mock.calls[0]!;
+      expect(payload.deploymentRevision).toBe('mitra-web-00042-abc');
+    } finally {
+      if (previous === undefined) delete process.env['K_REVISION'];
+      else process.env['K_REVISION'] = previous;
+    }
   });
 });

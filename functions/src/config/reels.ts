@@ -27,7 +27,13 @@ export const REEL_GOALS: ReelGoal[] = [
   'surprise_me',
 ];
 
-export const REEL_STYLES: ReelStyle[] = ['fast_engaging', 'premium', 'local_fun', 'minimal', 'cinematic'];
+export const REEL_STYLES: ReelStyle[] = [
+  'fast_engaging',
+  'premium',
+  'local_fun',
+  'minimal',
+  'cinematic',
+];
 
 export const REEL_DURATIONS: ReelDurationSeconds[] = [15, 30, 45];
 

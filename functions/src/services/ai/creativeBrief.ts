@@ -1,6 +1,6 @@
 import type {
   BusinessProfile,
-  BrandProfile,
+  BrandCreativeContext,
   LocalizationProfile,
   Product,
   BusinessRules,
@@ -13,7 +13,7 @@ import type {
  * CreativeBrief - Centralized typed creative brief for image generation
  *
  * Derived from:
- * - Business Brain (BusinessProfile, BrandProfile, LocalizationProfile, BusinessRules)
+ * - Business Brain (BusinessProfile, BrandCreativeContext, LocalizationProfile, BusinessRules)
  * - Product
  * - Offer
  * - Campaign Strategy
@@ -22,7 +22,7 @@ import type {
  */
 export interface CreativeBrief {
   /** Campaign objective */
-  readonly objective: string;
+  readonly objective: string; readonly creativeTemplateContext?: import('./creativeTemplateContext').CreativeTemplateContext;
 
   /** Product being marketed */
   readonly product: {
@@ -141,7 +141,7 @@ export interface CreativeBriefInput {
   /** Business context from Business Brain */
   readonly businessProfile: BusinessProfile;
   /** Brand context from Brand Kit */
-  readonly brandProfile: BrandProfile;
+  readonly brandProfile: BrandCreativeContext;
   /** Localization profile */
   readonly localizationProfile: LocalizationProfile;
   /** Product being marketed */
@@ -172,7 +172,7 @@ export interface CreativeBriefInput {
   /** Business rules */
   readonly businessRules: BusinessRules;
   /** CTA type */
-  readonly cta: CTAType;
+  readonly cta: CTAType; readonly creativeTemplateContext?: import('./creativeTemplateContext').CreativeTemplateContext;
 }
 
 /**
@@ -210,7 +210,7 @@ export function buildCreativeBrief(input: CreativeBriefInput): CreativeBrief {
   const prohibitedElements = buildProhibitedElements(input);
 
   return {
-    objective: input.objective,
+    objective: input.objective, creativeTemplateContext: input.creativeTemplateContext,
     product: {
       id: product.productId,
       name: product.name,
@@ -235,9 +235,9 @@ export function buildCreativeBrief(input: CreativeBriefInput): CreativeBrief {
     },
     brand: {
       colors: brandColors,
-      tone: brandProfile.brandTone,
+      tone: brandProfile.tone,
       visualStyle: brandProfile.visualPreferences,
-      logoUrl: brandProfile.logo?.url,
+      logoUrl: brandProfile.logo?.primaryUrl,
       fonts: {
         heading: brandProfile.fonts?.heading,
         body: brandProfile.fonts?.body,

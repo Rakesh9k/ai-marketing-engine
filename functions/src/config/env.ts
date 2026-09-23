@@ -14,6 +14,27 @@ export const envSchema = z.object({
   RAZORPAY_STARTER_PLAN_ID: z.string().optional(),
   RAZORPAY_BUSINESS_PLAN_ID: z.string().optional(),
   RAZORPAY_AGENCY_PLAN_ID: z.string().optional(),
+  // PayU (see functions/src/services/payu.ts). PAYU_SALT is a credential —
+  // it must only ever be read here (server-side Functions config) and must
+  // never be logged, returned to a client, or written to Firestore.
+  PAYU_MERCHANT_KEY: z.string().optional(),
+  PAYU_SALT: z.string().optional(),
+  PAYU_ENVIRONMENT: z.enum(['test', 'production']).default('test'),
+  // Standing Instruction (recurring/auto-renewal) capability — off by
+  // default. PayU must separately enable SI on the merchant account before
+  // this can ever be turned on; see docs/PAYMENT_GATEWAY.md "Recurring
+  // billing" section for why this defaults to disabled rather than assumed
+  // available.
+  PAYU_SI_ENABLED: z
+    .string()
+    .optional()
+    .transform((v) => v === 'true'),
+  // The deployed HTTPS URLs for payuCallback/payuWebhook (Cloud Run URLs
+  // are only known after the functions are first deployed — a real
+  // chicken-and-egg constraint, not an oversight — so these must be set
+  // post-deploy rather than derived). See docs/PAYMENT_GATEWAY.md.
+  PAYU_CALLBACK_URL: z.string().url().optional(),
+  PAYU_WEBHOOK_URL: z.string().url().optional(),
   APP_URL: z.string().url().optional(),
   ADMIN_EMAILS: z.string().optional(),
   // "Create a Reel" video renderer (Cloud Run service running ffmpeg — see

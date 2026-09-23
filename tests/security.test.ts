@@ -7,21 +7,29 @@
  * the emulator (confirmed: every test here, including previously-untouched
  * ones, timed out under jsdom, then ran and completed in well under a
  * second each under 'node').
+ *
+ * Phase 37 QA Remediation (D-3): this file previously guarded every test
+ * body with `if (skipIfNoEnv()) return;` inside a `beforeAll` that itself
+ * only logged and returned when FIRESTORE_EMULATOR_HOST was unset. Jest
+ * counts a test whose callback returns without throwing as PASSED, so a
+ * run with no emulator reported all these security-rules tests as green —
+ * identical in effect to not running them, but indistinguishable from a
+ * real pass in the summary. Switched to the `describeIfEmulator` pattern
+ * already used throughout functions/src/**\/*.test.ts, so a missing
+ * emulator now shows up as SKIPPED in the Jest summary, never PASSED.
  */
 import type { RulesTestEnvironment } from '@firebase/rules-unit-testing';
 import { initializeTestEnvironment } from '@firebase/rules-unit-testing';
 import { readFileSync } from 'fs';
 import { describe, beforeAll, afterAll, afterEach, test, expect } from '@jest/globals';
 
-describe('Firestore Security Rules', () => {
+const emulatorHost = process.env['FIRESTORE_EMULATOR_HOST'];
+const describeIfEmulator = emulatorHost ? describe : describe.skip;
+
+describeIfEmulator('Firestore Security Rules', () => {
   let testEnv: RulesTestEnvironment | null = null;
 
   beforeAll(async () => {
-    const firestoreEmulatorHost = process.env['FIRESTORE_EMULATOR_HOST'];
-    if (!firestoreEmulatorHost) {
-      console.log('Skipping Firestore security tests - emulator not available');
-      return;
-    }
     testEnv = await initializeTestEnvironment({
       // Phase 15: each rules-test file gets its own emulator project
       // namespace. Jest runs test files in separate parallel worker
@@ -58,15 +66,7 @@ describe('Firestore Security Rules', () => {
     }
   });
 
-  const skipIfNoEnv = () => {
-    if (!testEnv) {
-      return true;
-    }
-    return false;
-  };
-
   test('User can read own user document', async () => {
-    if (skipIfNoEnv()) return;
     // users/{uid} is only ever created server-side (the onUserCreated Auth
     // trigger, via the Admin SDK) — seed it the same way here, bypassing
     // rules, rather than through a client .set() the rules now correctly
@@ -84,14 +84,12 @@ describe('Firestore Security Rules', () => {
   });
 
   test('Phase 11: User CANNOT create their own user document via the client SDK (server-only)', async () => {
-    if (skipIfNoEnv()) return;
     const user = testEnv!.authenticatedContext('user1');
     const userDoc = user.firestore().collection('users').doc('user1');
     await expect(userDoc.set({ userId: 'user1', email: 'test@test.com' }))['toDeny']();
   });
 
   test('Phase 11 CRITICAL: User cannot self-escalate role/agencyId/businessIds by writing their own user document', async () => {
-    if (skipIfNoEnv()) return;
     await testEnv!.withSecurityRulesDisabled(async (context) => {
       await context
         .firestore()
@@ -126,14 +124,12 @@ describe('Firestore Security Rules', () => {
   });
 
   test('User cannot read other user document', async () => {
-    if (skipIfNoEnv()) return;
     const user = testEnv!.authenticatedContext('user1');
     const userDoc = user.firestore().collection('users').doc('user2');
     await expect(userDoc.get())['toDeny']();
   });
 
   test('User can create business with own userId', async () => {
-    if (skipIfNoEnv()) return;
     const user = testEnv!.authenticatedContext('user1');
     const business = user.firestore().collection('businesses').doc('biz1');
     await expect(
@@ -147,7 +143,6 @@ describe('Firestore Security Rules', () => {
   });
 
   test('User cannot create business with different userId', async () => {
-    if (skipIfNoEnv()) return;
     const user = testEnv!.authenticatedContext('user1');
     const business = user.firestore().collection('businesses').doc('biz2');
     await expect(
@@ -161,7 +156,6 @@ describe('Firestore Security Rules', () => {
   });
 
   test('User cannot read business they do not own', async () => {
-    if (skipIfNoEnv()) return;
     const owner = testEnv!.authenticatedContext('owner1');
     await owner.firestore().collection('businesses').doc('biz1').set({
       userId: 'owner1',
@@ -175,7 +169,6 @@ describe('Firestore Security Rules', () => {
   });
 
   test('User can read own business', async () => {
-    if (skipIfNoEnv()) return;
     const user = testEnv!.authenticatedContext('user1');
     const business = user.firestore().collection('businesses').doc('biz1');
     await business.set({
@@ -188,7 +181,6 @@ describe('Firestore Security Rules', () => {
   });
 
   test('User cannot update business they do not own', async () => {
-    if (skipIfNoEnv()) return;
     const owner = testEnv!.authenticatedContext('owner1');
     await owner.firestore().collection('businesses').doc('biz1').set({
       userId: 'owner1',
@@ -206,7 +198,6 @@ describe('Firestore Security Rules', () => {
   });
 
   test('User can update own business', async () => {
-    if (skipIfNoEnv()) return;
     const user = testEnv!.authenticatedContext('user1');
     const business = user.firestore().collection('businesses').doc('biz1');
     await business.set({
@@ -219,7 +210,6 @@ describe('Firestore Security Rules', () => {
   });
 
   test('User cannot delete business (soft delete only)', async () => {
-    if (skipIfNoEnv()) return;
     const user = testEnv!.authenticatedContext('user1');
     const business = user.firestore().collection('businesses').doc('biz1');
     await business.set({
@@ -232,7 +222,6 @@ describe('Firestore Security Rules', () => {
   });
 
   test('Agency member can access managed business', async () => {
-    if (skipIfNoEnv()) return;
     // A business document is always created by its own owning user (or
     // server-side) — the businesses/{id} create rule requires
     // request.resource.data.userId == request.auth.uid, so an agency
@@ -259,7 +248,6 @@ describe('Firestore Security Rules', () => {
   });
 
   test('Agency member cannot access unmanaged business', async () => {
-    if (skipIfNoEnv()) return;
     await testEnv!.withSecurityRulesDisabled(async (context) => {
       await context.firestore().collection('businesses').doc('biz2').set({
         agencyId: 'agency_2',
@@ -282,7 +270,6 @@ describe('Firestore Security Rules', () => {
   // campaign status or forge Truth Check status directly via Firestore.
   describe('Campaign verification fields cannot be forged by the client', () => {
     test('Owner cannot directly set campaign status to "completed" via Firestore write', async () => {
-      if (skipIfNoEnv()) return;
       const user = testEnv!.authenticatedContext('user1', { businessIds: ['biz1'] });
       const campaign = user.firestore().collection('campaigns').doc('camp1');
       await campaign.set({
@@ -296,7 +283,6 @@ describe('Firestore Security Rules', () => {
     });
 
     test('Owner cannot forge metadata.truthCheckStatus from FAIL to PASS via Firestore write', async () => {
-      if (skipIfNoEnv()) return;
       const user = testEnv!.authenticatedContext('user1', { businessIds: ['biz1'] });
       const campaign = user.firestore().collection('campaigns').doc('camp2');
       await campaign.set({
@@ -310,7 +296,6 @@ describe('Firestore Security Rules', () => {
     });
 
     test('Owner cannot alter creditsReserved/creditsUsed via Firestore write', async () => {
-      if (skipIfNoEnv()) return;
       const user = testEnv!.authenticatedContext('user1', { businessIds: ['biz1'] });
       const campaign = user.firestore().collection('campaigns').doc('camp3');
       await campaign.set({
@@ -325,7 +310,6 @@ describe('Firestore Security Rules', () => {
     });
 
     test('Owner CAN still update ordinary editable campaign fields (status/credits untouched)', async () => {
-      if (skipIfNoEnv()) return;
       const user = testEnv!.authenticatedContext('user1', { businessIds: ['biz1'] });
       const campaign = user.firestore().collection('campaigns').doc('camp4');
       await campaign.set({
@@ -339,7 +323,6 @@ describe('Firestore Security Rules', () => {
     });
 
     test('Client cannot write to campaign_assets at all (verification-bearing collection is server-only)', async () => {
-      if (skipIfNoEnv()) return;
       const user = testEnv!.authenticatedContext('user1', { businessIds: ['biz1'] });
       const asset = user.firestore().collection('campaign_assets').doc('asset1');
       await expect(
@@ -355,7 +338,6 @@ describe('Firestore Security Rules', () => {
   // status or an outputUrl), or delete one directly via Firestore.
   describe('Reels collection is fully server-owned', () => {
     test('Owner can read their own reel', async () => {
-      if (skipIfNoEnv()) return;
       await testEnv!.withSecurityRulesDisabled(async (context) => {
         await context.firestore().collection('reels').doc('reel1').set({
           reelId: 'reel1',
@@ -370,7 +352,6 @@ describe('Firestore Security Rules', () => {
     });
 
     test('A different user without business access cannot read the reel', async () => {
-      if (skipIfNoEnv()) return;
       await testEnv!.withSecurityRulesDisabled(async (context) => {
         await context.firestore().collection('reels').doc('reel2').set({
           reelId: 'reel2',
@@ -385,7 +366,6 @@ describe('Firestore Security Rules', () => {
     });
 
     test('Client cannot create a reel project directly via Firestore (must go through createReelProject)', async () => {
-      if (skipIfNoEnv()) return;
       const user = testEnv!.authenticatedContext('user1', { businessIds: ['biz1'] });
       const reel = user.firestore().collection('reels').doc('reel3');
       await expect(
@@ -394,7 +374,6 @@ describe('Firestore Security Rules', () => {
     });
 
     test('Owner cannot forge their own reel to "completed" or fabricate an outputUrl via Firestore write', async () => {
-      if (skipIfNoEnv()) return;
       await testEnv!.withSecurityRulesDisabled(async (context) => {
         await context.firestore().collection('reels').doc('reel4').set({
           reelId: 'reel4',
@@ -412,7 +391,6 @@ describe('Firestore Security Rules', () => {
     });
 
     test('Owner cannot delete a reel via Firestore', async () => {
-      if (skipIfNoEnv()) return;
       await testEnv!.withSecurityRulesDisabled(async (context) => {
         await context.firestore().collection('reels').doc('reel5').set({
           reelId: 'reel5',
@@ -434,7 +412,6 @@ describe('Firestore Security Rules', () => {
   // directly" scenario the phase mandates.
   describe('Cross-tenant IDOR — campaign, asset, usage', () => {
     test("User A cannot read User B's campaign (campaign IDOR)", async () => {
-      if (skipIfNoEnv()) return;
       await testEnv!.withSecurityRulesDisabled(async (context) => {
         await context
           .firestore()
@@ -453,7 +430,6 @@ describe('Firestore Security Rules', () => {
     });
 
     test("User A cannot update User B's campaign by guessing its ID", async () => {
-      if (skipIfNoEnv()) return;
       await testEnv!.withSecurityRulesDisabled(async (context) => {
         await context
           .firestore()
@@ -480,7 +456,6 @@ describe('Firestore Security Rules', () => {
     });
 
     test("User A cannot read User B's campaign asset (asset IDOR)", async () => {
-      if (skipIfNoEnv()) return;
       await testEnv!.withSecurityRulesDisabled(async (context) => {
         await context.firestore().collection('campaign_assets').doc('asset_b1').set({
           campaignId: 'camp_b1',
@@ -497,7 +472,6 @@ describe('Firestore Security Rules', () => {
     });
 
     test("User A cannot read User B's usage/credit history (usage IDOR)", async () => {
-      if (skipIfNoEnv()) return;
       await testEnv!.withSecurityRulesDisabled(async (context) => {
         await context.firestore().collection('usage').doc('userB_2026-01-01').set({
           usageId: 'userB_2026-01-01',
@@ -511,7 +485,6 @@ describe('Firestore Security Rules', () => {
     });
 
     test("User A cannot read User B's transaction/payment records (financial IDOR)", async () => {
-      if (skipIfNoEnv()) return;
       await testEnv!.withSecurityRulesDisabled(async (context) => {
         await context.firestore().collection('transactions').doc('tx_b1').set({
           transactionId: 'tx_b1',
@@ -526,7 +499,6 @@ describe('Firestore Security Rules', () => {
     });
 
     test("User A cannot read User B's subscription (entitlement IDOR)", async () => {
-      if (skipIfNoEnv()) return;
       await testEnv!.withSecurityRulesDisabled(async (context) => {
         await context.firestore().collection('subscriptions').doc('sub_b1').set({
           subscriptionId: 'sub_b1',
@@ -540,7 +512,6 @@ describe('Firestore Security Rules', () => {
     });
 
     test("Knowing a resource ID alone is not authorization: User A with a valid businessId of their OWN still cannot read Business B's brand kit by ID", async () => {
-      if (skipIfNoEnv()) return;
       await testEnv!.withSecurityRulesDisabled(async (context) => {
         const db = context.firestore();
         await db.collection('businesses').doc('biz_b').set({

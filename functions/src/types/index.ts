@@ -95,6 +95,8 @@ export interface TruthCheckResult {
 export interface GenerationPipelineInput {
   businessId: string;
   campaignId?: string;
+  templateId?: string;
+  creativeObjective?: CreativeObjective;
   businessName: string;
   businessCategory: string;
   businessLocation: { city: string; state: string; locality?: string };
@@ -587,6 +589,8 @@ export interface Campaign {
   businessId: string;
   userId: string;
   objective: CampaignObjective;
+  templateId?: string;
+  creativeObjective?: CreativeObjective;
   productId?: string;
   newProduct?: {
     name: string;
@@ -688,6 +692,8 @@ export interface Subscription {
   creditsIncluded: number;
   creditsUsed: number;
   cancelAtPeriodEnd: boolean;
+  provider?: string;
+  payuMandateTxnId?: string;
   canceledAt?: string;
   trialEnd?: string;
   metadata?: Record<string, unknown>;
@@ -738,6 +744,10 @@ export interface User {
   businessIds: string[];
   agencyId?: string;
   subscriptionId?: string;
+  termsVersion?: string;
+  privacyVersion?: string;
+  termsAcceptedAt?: string;
+  privacyAcceptedAt?: string;
   settings: {
     notifications: boolean;
     language: 'en' | 'te' | 'hi';
@@ -922,6 +932,8 @@ export interface ReelProject {
   userId: string;
   status: ReelStatus;
   goal: ReelGoal;
+  templateId?: string;
+  creativeObjective?: CreativeObjective;
   style: ReelStyle;
   durationSeconds: ReelDurationSeconds;
   /** Asset IDs (assetType: 'reel_clip') of the uploaded raw clips, 3-10. */
@@ -970,4 +982,144 @@ export interface GenerationLog {
   error?: Record<string, unknown>;
   retryCount: number;
   createdAt: string;
+}
+export interface BrandCreativeContext {
+  logo?: {
+    primaryUrl?: string;
+    secondaryUrl?: string;
+  };
+  colors?: {
+    primary?: string;
+    secondary?: string;
+    accent?: string;
+    background?: string;
+    text?: string;
+  };
+  fonts?: {
+    heading?: string;
+    body?: string;
+  };
+  tone?: string;
+  visualPreferences?: string;
+}
+
+export type CreativeTemplateType = 'post' | 'reel';
+
+export type CreativeObjective =
+  | 'awareness'
+  | 'engagement'
+  | 'conversion'
+  | 'launch'
+  | 'promotion'
+  | 'retention';
+
+export type CreativeGrammarRole =
+  | 'hook'
+  | 'context'
+  | 'setup'
+  | 'problem'
+  | 'product'
+  | 'benefit'
+  | 'proof'
+  | 'differentiator'
+  | 'offer'
+  | 'payoff'
+  | 'urgency'
+  | 'social-proof'
+  | 'objection'
+  | 'emotion'
+  | 'cta'
+  | 'closing';
+
+export interface CreativeGrammarStep {
+  id: string;
+  role: CreativeGrammarRole;
+  purpose: string;
+  required: boolean;
+}
+
+export type CreativeTemplateSource = 'system' | 'user';
+
+export interface PostStructure {
+  type: 'post';
+  grammar: CreativeGrammarStep[];
+}
+
+export interface ReelStructure {
+  type: 'reel';
+  grammar: CreativeGrammarStep[];
+}
+
+export type CreativeStructure = PostStructure | ReelStructure;
+
+export type VisualEmphasis =
+  | 'product-led'
+  | 'text-led'
+  | 'image-led'
+  | 'offer-led';
+
+export type VisualComposition =
+  | 'hero-product'
+  | 'split-composition'
+  | 'editorial'
+  | 'minimal'
+  | 'high-contrast';
+
+export interface VisualGrammar {
+  emphasis: VisualEmphasis;
+  composition: VisualComposition;
+}
+
+export type AdaptationCondition =
+  | { check: 'offerAvailable' }
+  | { check: 'proofAvailable' }
+  | { check: 'productImageAvailable' }
+  | { check: 'vertical'; equals: string }
+  | { check: 'ctaType'; equals: string };
+
+export type AdaptationAction =
+  | { action: 'include'; role: CreativeGrammarRole }
+  | { action: 'exclude'; role: CreativeGrammarRole }
+  | { action: 'emphasize'; role: CreativeGrammarRole }
+  | { action: 'deemphasize'; role: CreativeGrammarRole }
+  | { action: 'prioritize'; role: CreativeGrammarRole }
+  | { action: 'fallback'; role: CreativeGrammarRole; to: CreativeGrammarRole };
+
+export interface AdaptationRule {
+  id: string;
+  condition: AdaptationCondition;
+  action: AdaptationAction;
+}
+
+export interface PostTemplateConstraints {
+  type: 'post';
+  minSections: number;
+  maxSections: number;
+  maxTextDensity?: 'low' | 'medium' | 'high';
+}
+
+export interface ReelTemplateConstraints {
+  type: 'reel';
+  minSections: number;
+  maxSections: number;
+  minDurationSeconds: number;
+  maxDurationSeconds: number;
+}
+
+export type TemplateConstraints = PostTemplateConstraints | ReelTemplateConstraints;
+
+export interface CreativeTemplate {
+  id: string;
+  name: string;
+  description: string;
+  type: CreativeTemplateType;
+  objectives: CreativeObjective[];
+  compatibleVerticals: BusinessCategory[];
+  structure: CreativeStructure;
+  visualGrammar: VisualGrammar;
+  adaptationRules: AdaptationRule[];
+  constraints: TemplateConstraints;
+  version: number;
+  active: boolean;
+  source: CreativeTemplateSource;
 }

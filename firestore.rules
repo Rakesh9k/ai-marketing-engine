@@ -200,6 +200,13 @@ service cloud.firestore {
       allow write: if false; // Cloud Functions only
     }
 
+    // Account deletion request audit trail (written only by the
+    // requestAccountDeletion Cloud Function, which uses a server timestamp)
+    match /accountDeletionRequests/{userId} {
+      allow read: if isAuthenticated() && request.auth.uid == userId;
+      allow write: if false; // Cloud Functions only
+    }
+
     // Post-MVP collections (rules exist, no MVP access)
     match /partners/{partnerId} {
       allow read: if isAuthenticated() && resource.data.userId == request.auth.uid;

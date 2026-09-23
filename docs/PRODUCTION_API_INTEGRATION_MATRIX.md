@@ -1,0 +1,43 @@
+# Production API & External Integration Matrix
+
+**Date:** 2026-09-22. Covers Cloud Functions callables sampled this pass (not exhaustive — see note at bottom) and every external service integration found.
+
+## Cloud Functions callables (sampled)
+
+| API | Caller | Auth | App Check | Authorization | Rate limit | Credits | DB | Verdict |
+|---|---|---|---|---|---|---|---|---|
+| `generateCampaignStrategy` | `CampaignWizard.tsx` | Yes (`validatedCallable`) | Yes | `verifyBusinessAccess` + explicit product-ownership cross-check | Yes (10/hr) | Yes, atomic reserve/finalize/refund | Yes | REAL/PRODUCTION-READY |
+| `regenerateAsset` | Campaign detail UI | Yes | Yes | Direct `userId` ownership check (not `verifyBusinessAccess` — agency-member gap, fails closed) | Yes | Yes | Yes | REAL, with a minor functional (not security) gap |
+| `generateReel` | Reel feature UI | Yes | Yes | `verifyBusinessAccess` + direct `userId` check (same agency-member gap) | Yes | Yes | Yes | REAL, with same minor gap |
+| `createCampaign` | **No current UI caller** (orphaned) | Yes | Yes | Not verified this pass beyond credit path | Yes | **Reserves, never finalizes/refunds — BROKEN** | Yes (draft doc only) | **BROKEN / CRITICAL — see billing audit** |
+| `confirmUpload` | Asset upload flow | Yes | Yes | `verifyBusinessAccess` + storage-path prefix check (defense in depth vs Admin SDK bypassing Storage rules) | Yes | N/A | Yes | REAL/PRODUCTION-READY |
+| `confirmReelClipUpload` / `getReelClipUploadUrl` | Reel upload flow | Yes | Yes | Same pattern as confirmUpload; server mints storage path (no client path injection possible) | Yes | N/A | Yes | REAL/PRODUCTION-READY |
+| `updateBusinessBrain` | Business Brain UI | Yes | Yes | `verifyBusinessAccess`; Zod schema excludes credits/billing/ownership fields (no mass-assignment) | Not confirmed this pass | N/A | Yes | REAL |
+| `createSubscription` | Billing page | Yes | Yes | Zod-validated planId enum only | Yes | N/A (payment init) | Yes | REAL (code); blocked by placeholder prod key — see billing/subscription findings |
+| `verifyPayment` | Billing page post-checkout | Yes | Yes | Not deeply re-traced this pass | Yes | N/A | Yes | REAL (updates status only; actual credit grant happens via webhook, not here) |
+| `razorpayWebhook` | Razorpay servers | N/A (`onRequest`, not `onCall`) | N/A | **HMAC signature verification** (`crypto.createHmac`, real, not mocked) | N/A | Grants credits exactly-once, transactional idempotency via `processed_webhook_events` claim doc | Yes | REAL/PRODUCTION-READY (signature + idempotency); missing refund/chargeback event handling — see billing findings |
+
+**Not individually re-traced this pass**: `updateCampaign.ts`, `updateBusiness.ts`, `createBrandKit.ts`, `products/*`, `analytics/*`. The security research pass noted the codebase's centralized `verifyBusinessAccess` helper design makes a missed check less likely than in a codebase without that shared pattern, but this is inference, not direct verification — a follow-up pass should spot-check these directly before calling authorization "complete" across the full API surface.
+
+## External API integrations
+
+| API | Purpose | SDK | Credentials (this session) | Caller | Credit-gated | Verdict |
+|---|---|---|---|---|---|---|
+| Google Gemini | Text generation (all 10 pipeline stages), vision/clip analysis | Yes, server-side only | Present in `functions/src/config/env.ts` (value unverified, not a placeholder pattern found) | `functions/src/services/ai/text.ts`, `.../reelVision.ts` | Yes (via campaign/reel pipelines) | REAL/PRODUCTION-READY |
+| OpenAI (DALL-E 3) | Image generation, sole provider | Yes, server-side only, lazily constructed | Present in env config; not independently verified live | `functions/src/services/ai/image.ts` | Yes | REAL, single point of failure (no working fallback despite `modelRouting.ts` implying one — `imageFallback: 'gemini-imagen'` is dead config, no such provider exists in code) |
+| NVIDIA/Nemotron | Declared, unused | N/A | Env var declared (`NVIDIA_API_KEY`), zero code references beyond declaration | None | N/A | **PLACEHOLDER / NOT IMPLEMENTED** |
+| Razorpay | Payments/subscriptions | Yes | **`NEXT_PUBLIC_RAZORPAY_KEY_ID` confirmed PLACEHOLDER in deployed `apphosting.yaml`** (`rzp_test_placeholder_no_real_credentials`); server secrets (`RAZORPAY_KEY_SECRET`, `RAZORPAY_WEBHOOK_SECRET`, plan IDs) unverifiable from repo — likely in a gitignored `functions/.env.<project-id>` file | `src/app/billing/page.tsx`, `functions/src/functions/subscriptions/*`, `functions/src/functions/webhooks/razorpayWebhook.ts` | N/A | **BLOCKED-CREDENTIALS (client key confirmed non-functional; server secrets unverifiable)** |
+| Meta/Instagram Graph API | Social publishing | N/A — does not exist | N/A | N/A | N/A | **NOT IMPLEMENTED** |
+| WhatsApp Business API | Automated messaging | N/A — does not exist (only `wa.me` client link) | N/A | `src/lib/utils/whatsapp.ts` (client-side only) | N/A | **NOT IMPLEMENTED** (by design, per Phase 9) |
+| Cloud Run reel renderer | FFmpeg video rendering | Yes, custom HTTP service (`services/reel-renderer/`) | `REEL_RENDERER_URL` — **presence/value in live prod environment could not be confirmed from repo**; if absent, silently mocked | `functions/src/services/videoRenderer.ts` | Yes (via `generateReel`) | REAL code; **production wiring unverified — see content capability matrix** |
+
+## Orphaned / dead-code findings
+
+- `createCampaign` callable: live, deployed, no current frontend caller — orphaned and actively dangerous (credit loss). See billing audit.
+- `confirmCredits` / `refundCredits` in `functions/src/services/firestore.ts`: zero call sites anywhere in the repo — dead code, superseded by `usageControl.ts`'s `finalizeReservation`/`refundReservation`.
+- `modelRouting.ts`'s `MODEL_ROUTING_CONFIG` (declares text/image fallback providers): never imported/read by any provider-selection code — dead configuration, gives a false impression that fallback exists.
+- `USAGE_ERROR_CODES.SUBSCRIPTION_REQUIRED`: defined and referenced in two callables' catch blocks, but never thrown by `checkGenerationEligibility` — dead error path, consistent with the finding that plan-tier enforcement doesn't exist.
+
+## Frontend → backend contract
+
+Not exhaustively re-audited this pass. One drift confirmed: `docs/VERCEL_ENVIRONMENT_VARIABLES.md` claims "exactly 11" env vars are read by the Next.js app — false; `src/instrumentation.ts`/`instrumentation-client.ts` and `next.config.ts` (Sentry config) read additional vars (`SENTRY_DSN`, `NEXT_PUBLIC_SENTRY_DSN`, `NEXT_PUBLIC_VERCEL_ENV`, `NEXT_PUBLIC_SENTRY_RELEASE`, `SENTRY_ORG`, `SENTRY_PROJECT`) not documented there. Currently harmless (Sentry DSN intentionally unset) but the doc's "exhaustive" claim is stale.

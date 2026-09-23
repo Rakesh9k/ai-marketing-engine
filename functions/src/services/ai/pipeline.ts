@@ -1,5 +1,6 @@
+
 import { analyzeProductImages, generateStructuredText, generateImage } from './index';
-import { buildCreativeBrief, type CreativeBrief, type CreativeBriefInput } from './creativeBrief';
+import { buildCreativeBrief, type CreativeBrief, type CreativeBriefInput } from './creativeBrief'; import { buildCreativeTemplateContext } from './creativeTemplateContext';
 import { buildImagePromptPack } from './imagePromptBuilder';
 import { runDeterministicTruthCheck } from './truthCheck';
 import {
@@ -12,7 +13,7 @@ import { fetchAsBuffer, uploadGeneratedAsset } from './generatedAssetStorage';
 import { MAX_IMAGE_GENERATION_CALLS_PER_CAMPAIGN } from '../../config/pricing';
 import { getVerticalConfigOrDefault } from '../../config/verticals';
 import { z } from 'zod';
-import type { BusinessRules } from '../../types';
+import type { BusinessRules, BrandCreativeContext } from '../../types';
 import { createLogger, logFunctionStage } from '../../utils/logging';
 
 /**
@@ -446,6 +447,8 @@ export class GenerationPipeline {
       safetyValidation?: any;
       truthCheck?: any;
       campaignPack?: any;
+      creativeTemplateContext?: any;
+      adaptedCreativePlan?: any;
     } = {};
 
     // Phase 14: every stage marker and the top-level failure here previously
@@ -460,6 +463,51 @@ export class GenerationPipeline {
     // exactly which stage was running when the pipeline failed.
     const logger = createLogger({ businessId: input.businessId, campaignId: input.campaignId });
     let currentStage = 'business_understanding';
+
+    let creativeTemplateContext = undefined;
+    let adaptedCreativePlan = undefined;
+    if (input.templateId && input.creativeObjective) {
+      const { buildCreativeTemplateContext } = await import('./creativeTemplateContext.js');
+      creativeTemplateContext = buildCreativeTemplateContext({
+        templateId: input.templateId,
+        objective: input.creativeObjective as any,
+        businessBrain: input.businessBrain,
+        brandCreativeContext: input.brandProfile,
+        productName: input.productName,
+        productDescription: input.newProduct?.description,
+        productPrice: input.offerPrice,
+        productCategory: input.newProduct?.category,
+        offerHeadline: input.offerHeadline,
+        offerDescription: input.offerDescription,
+        offerPrice: input.offerPrice,
+        offerOriginalPrice: input.offerOriginalPrice,
+        offerType: input.offerType,
+        offerValidityStart: input.offerValidityStart,
+        offerValidityEnd: input.offerValidityEnd,
+        offerTerms: input.offerTerms,
+        audienceLocalities: input.audience.localities,
+        audienceAgeRange: input.audience.ageRange,
+        audienceOccasion: input.audience.occasion,
+      });
+
+      const { selectCreativeContext } = await import('./creativeContextSelector.js');
+      const { TemplateAdaptationPlanner } = await import('./templateAdaptation.js');
+      
+      const selectedContext = selectCreativeContext({
+        task: 'campaign_strategy', // High-level task for adaptation planning
+        templateContext: creativeTemplateContext
+      });
+      
+      const planner = new TemplateAdaptationPlanner();
+      adaptedCreativePlan = await planner.adapt({
+        template: creativeTemplateContext.template,
+        selectedContext,
+        objective: creativeTemplateContext.objective
+      });
+    }
+    // Attach to previousResults conceptually so it's available early
+    stageResults.creativeTemplateContext = creativeTemplateContext;
+    stageResults.adaptedCreativePlan = adaptedCreativePlan;
 
     try {
       // Stage 1: Business Understanding
@@ -899,7 +947,33 @@ export class GenerationPipeline {
    * Build creative brief from pipeline results
    */
   private buildCreativeBriefFromResults(input: GenerationPipelineInput, previousResults: any): any {
+    let creativeTemplateContext = undefined;
+    if (input.templateId && input.creativeObjective) {
+      creativeTemplateContext = buildCreativeTemplateContext({
+        templateId: input.templateId,
+        objective: input.creativeObjective as any,
+        businessBrain: input.businessBrain,
+        brandCreativeContext: input.brandProfile,
+        productName: input.productName,
+        productDescription: input.newProduct?.description,
+        productPrice: input.offerPrice,
+        productCategory: input.newProduct?.category,
+        offerHeadline: input.offerHeadline,
+        offerDescription: input.offerDescription,
+        offerPrice: input.offerPrice,
+        offerOriginalPrice: input.offerOriginalPrice,
+        offerType: input.offerType,
+        offerValidityStart: input.offerValidityStart,
+        offerValidityEnd: input.offerValidityEnd,
+        offerTerms: input.offerTerms,
+        audienceLocalities: input.audience.localities,
+        audienceAgeRange: input.audience.ageRange,
+        audienceOccasion: input.audience.occasion,
+      });
+    }
+
     const creativeBriefInput: CreativeBriefInput = {
+      creativeTemplateContext,
       businessProfile: {
         businessId: input.businessId,
         businessName: input.businessName,
@@ -1207,6 +1281,18 @@ OUTPUT FORMAT: Must match the provided JSON schema exactly.`;
     previousResults: any
   ): string {
     const vertical = getVerticalConfigOrDefault(input.vertical ?? input.businessCategory);
+    
+    const templateContextSection = previousResults.creativeTemplateContext
+      ? `
+TEMPLATE CONTEXT:
+Template: ${previousResults.creativeTemplateContext.template.name}
+Objective: ${previousResults.creativeTemplateContext.objective}
+Grammar Structure:
+${previousResults.creativeTemplateContext.template.structure.grammar.map((g: any) => `- ${g.role}: ${g.purpose}${g.required ? ' (REQUIRED)' : ' (OPTIONAL)'}`).join('\n')}
+Visual Emphasis: ${previousResults.creativeTemplateContext.template.visualGrammar.emphasis}
+`
+      : '';
+
     return `SYSTEM RULES:
 ${vertical.promptContext.campaignStrategistPersona} Use ONLY facts from business/product context. Never invent offers, prices, or claims.
 
@@ -1225,6 +1311,7 @@ CONTEXT HIERARCHY (HIGHEST AUTHORITY FIRST):
       null,
       2
     )}
+${templateContextSection}
 
 CAMPAIGN INPUT:
 - Objective: ${input.objective}
@@ -1240,6 +1327,7 @@ Create a campaign strategy that:
 - Uses regional insights for Hyderabad
 - Differentiates from generic marketing
 - Drives WhatsApp action
+${previousResults.creativeTemplateContext ? '- Closely follows the provided TEMPLATE CONTEXT grammar and structure.' : ''}
 
 OUTPUT FORMAT: Must match the provided JSON schema exactly.`;
   }
@@ -1278,6 +1366,16 @@ OUTPUT FORMAT: Must match the provided JSON schema exactly.`;
 
   private buildCopyGenerationPrompt(input: GenerationPipelineInput, previousResults: any): string {
     const vertical = getVerticalConfigOrDefault(input.vertical ?? input.businessCategory);
+
+    const templateContextSection = previousResults.creativeTemplateContext
+      ? `
+8. TEMPLATE CONTEXT:
+Template: ${previousResults.creativeTemplateContext.template.name}
+Grammar Structure:
+${previousResults.creativeTemplateContext.template.structure.grammar.map((g: any) => `- ${g.role}: ${g.purpose}${g.required ? ' (REQUIRED)' : ' (OPTIONAL)'}`).join('\n')}
+`
+      : '';
+
     return `SYSTEM RULES:
 ${vertical.promptContext.copywriterSystemRules}
 
@@ -1286,7 +1384,7 @@ CONTEXT HIERARCHY:
 2. PRODUCT FACTS (IMMUTABLE): ${JSON.stringify(previousResults.productUnderstanding?.productFacts || [], null, 2)}
 3. CAMPAIGN STRATEGY: ${JSON.stringify(previousResults.campaignStrategy, null, 2)}
 4. LOCALIZATION STRATEGY: ${JSON.stringify(previousResults.localizationStrategy, null, 2)}
-5. BRAND TONE: ${input.brandProfile?.brandTone || 'friendly'}
+5. BRAND TONE: ${input.brandProfile?.tone || 'friendly'}
 6. CAMPAIGN STYLE: ${input.campaignStyle}
 7. CAMPAIGN INPUT: ${JSON.stringify(
       {
@@ -1299,6 +1397,7 @@ CONTEXT HIERARCHY:
       null,
       2
     )}
+${templateContextSection}
 
 MANDATORY REQUIREMENTS:
 - Prices: ALWAYS use exact offer price (₹${input.offerPrice})
@@ -1310,6 +1409,7 @@ MANDATORY REQUIREMENTS:
 - Language: ${input.localizationProfile?.primaryLanguage} + ${input.localizationProfile?.secondaryLanguage} with ${input.localizationProfile?.languageMixing} mixing
 - Regional style: ${input.localizationProfile?.regionalStyle}
 - Campaign style: ${input.campaignStyle}
+${previousResults.creativeTemplateContext ? '- The copy MUST follow the semantic roles and structure defined in the TEMPLATE CONTEXT Grammar Structure.' : ''}
 
 GENERATE:
 1. 5 HEADLINES: Short, punchy, localized hooks (≤100 chars each)
@@ -1338,7 +1438,7 @@ BRAND VISUAL IDENTITY:
 - Secondary Color: ${input.brandProfile?.colors?.secondary || '#FFFFFF'}
 - Accent Color: ${input.brandProfile?.colors?.accent || '#FFD700'}
 - Fonts: Heading=${input.brandProfile?.fonts?.heading || 'Poppins'}, Body=${input.brandProfile?.fonts?.body || 'Inter'}
-- Logo: ${input.brandProfile?.logo?.url || ''}
+- Logo: ${input.brandProfile?.logo?.primaryUrl || ''}
 - Visual Preferences: ${input.brandProfile?.visualPreferences || ''}
 
 PRODUCT VISUALS:
@@ -1437,7 +1537,7 @@ COPY PACK:
 ${JSON.stringify(previousResults.copyPack, null, 2)}
 
 CHECK:
-1. BRAND TONE: Consistent with ${input.brandProfile?.brandTone || 'friendly'} across all assets
+1. BRAND TONE: Consistent with ${input.brandProfile?.tone || 'friendly'} across all assets
 2. CHARACTER LIMITS: Instagram caption ≤2200, ad copy limits, headline ≤100
 3. CTA PRESENCE: Every asset has clear CTA
 4. HASHTAGS: Relevant (Hyderabad, category, offer, locality)
@@ -1477,6 +1577,8 @@ export interface GenerationPipelineInput {
   // Business context
   businessId: string;
   campaignId?: string;
+  templateId?: string;
+  creativeObjective?: any;
   businessName: string;
   businessCategory: string;
   businessLocation: { city: string; state: string; locality?: string };
@@ -1492,7 +1594,7 @@ export interface GenerationPipelineInput {
   businessWebsite?: string;
   businessInstagram?: string;
   businessBrain: any;
-  brandProfile: any;
+  brandProfile: BrandCreativeContext;
 
   // Campaign input
   objective: string;

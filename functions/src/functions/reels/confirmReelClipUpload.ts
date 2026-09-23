@@ -10,7 +10,11 @@ import { checkRateLimit } from '../../middleware/rateLimit';
 import { createAssetDoc, getAssetDoc, getReelProjectDoc } from '../../services/firestore';
 import { logFunctionStart, logFunctionComplete, logFunctionError } from '../../utils/logging';
 import { mapErrorToHttpsError } from '../../utils/errors';
-import { MAX_CLIP_FILE_SIZE_BYTES, MAX_REEL_CLIPS, MAX_TOTAL_UPLOAD_SIZE_BYTES } from '../../config/reels';
+import {
+  MAX_CLIP_FILE_SIZE_BYTES,
+  MAX_REEL_CLIPS,
+  MAX_TOTAL_UPLOAD_SIZE_BYTES,
+} from '../../config/reels';
 import type { Asset } from '../../types';
 
 const db = admin.firestore();
@@ -38,17 +42,40 @@ export const confirmReelClipUpload = onCall(
 
     try {
       await verifyBusinessAccess(context.userId, data.businessId);
-      await checkRateLimit(context.userId, 'reelClipUpload');
+      await checkRateLimit(context.userId, 'confirmReelClipUpload');
 
       const reel = await getReelProjectDoc(data.reelId);
       if (!reel || reel.businessId !== data.businessId) {
         throw new HttpsError('not-found', 'Reel project not found');
       }
       if (reel.status !== 'draft' && reel.status !== 'uploading') {
-        throw new HttpsError('failed-precondition', 'This reel is no longer accepting clip uploads');
+        throw new HttpsError(
+          'failed-precondition',
+          'This reel is no longer accepting clip uploads'
+        );
       }
       if (reel.inputClipIds.length >= MAX_REEL_CLIPS) {
-        throw new HttpsError('failed-precondition', `A Reel can use at most ${MAX_REEL_CLIPS} clips`);
+        throw new HttpsError(
+          'failed-precondition',
+          `A Reel can use at most ${MAX_REEL_CLIPS} clips`
+        );
+      }
+
+      // Defense in depth (same fix applied to confirmUpload.ts, Phase 2
+      // Security Audit): verifyBusinessAccess above only proves the caller
+      // owns `businessId` — it does not prove the client-supplied
+      // storagePath actually lives inside that business's own Storage
+      // folder. admin.storage() bypasses storage.rules entirely, so
+      // without this check a caller could point storagePath at another
+      // business's uploaded clip and have this function mint them a
+      // 7-day admin-signed download URL for it.
+      const expectedPrefix = `businesses/${data.businessId}/`;
+      if (!data.storagePath.startsWith(expectedPrefix)) {
+        logger.warn('confirmReelClipUpload denied: storagePath outside caller business scope', {
+          userId: context.userId,
+          businessId: data.businessId,
+        });
+        throw new HttpsError('permission-denied', 'storagePath does not belong to businessId');
       }
 
       const bucket = admin.storage().bucket();
@@ -104,7 +131,11 @@ export const confirmReelClipUpload = onCall(
           updatedAt: FieldValue.serverTimestamp(),
         });
 
-      logFunctionComplete(logger, startTime, { success: true, assetId, storagePath: data.storagePath });
+      logFunctionComplete(logger, startTime, {
+        success: true,
+        assetId,
+        storagePath: data.storagePath,
+      });
       return { assetId, asset, downloadURL };
     } catch (error) {
       logFunctionError(logger, startTime, error as Error);

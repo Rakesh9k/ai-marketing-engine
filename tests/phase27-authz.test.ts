@@ -2,21 +2,25 @@
  * @jest-environment node
  *
  * See tests/security.test.ts for why this override is required.
+ *
+ * Phase 37 QA Remediation (D-3): had the same misleading-pass harness
+ * defect as tests/security.test.ts — every test guarded itself with
+ * `if (skipIfNoEnv()) return;`, so a run without FIRESTORE_EMULATOR_HOST
+ * reported these as PASSED rather than SKIPPED. Switched to the same
+ * `describeIfEmulator` pattern.
  */
 import type { RulesTestEnvironment } from '@firebase/rules-unit-testing';
 import { initializeTestEnvironment } from '@firebase/rules-unit-testing';
 import { readFileSync } from 'fs';
 import { describe, beforeAll, afterAll, test, expect } from '@jest/globals';
 
-describe('Phase 27 — Agency Authorization', function () {
+const emulatorHost = process.env['FIRESTORE_EMULATOR_HOST'];
+const describeIfEmulator = emulatorHost ? describe : describe.skip;
+
+describeIfEmulator('Phase 27 — Agency Authorization', function () {
   let testEnv: RulesTestEnvironment | null = null;
 
   beforeAll(async () => {
-    const firestoreEmulatorHost = process.env['FIRESTORE_EMULATOR_HOST'];
-    if (!firestoreEmulatorHost) {
-      console.log('Skipping Phase 27 security tests - emulator not available');
-      return;
-    }
     testEnv = await initializeTestEnvironment({
       // Phase 15: distinct per-file project namespace — see the identical
       // comment in tests/security.test.ts for why.
@@ -35,15 +39,7 @@ describe('Phase 27 — Agency Authorization', function () {
     }
   });
 
-  const skipIfNoEnv = () => {
-    if (!testEnv) {
-      return true;
-    }
-    return false;
-  };
-
   test('Foreign agency access — agency A cannot access agency B', async () => {
-    if (skipIfNoEnv()) return;
     const agencyA = testEnv!.authenticatedContext('agencyA', {
       role: 'agency_member',
       agencyId: 'agency_A',
@@ -53,7 +49,6 @@ describe('Phase 27 — Agency Authorization', function () {
   });
 
   test('Foreign client access — agency member cannot access another agency clients', async () => {
-    if (skipIfNoEnv()) return;
     const agencyA = testEnv!.authenticatedContext('agencyA', {
       role: 'agency_member',
       agencyId: 'agency_A',
@@ -63,7 +58,6 @@ describe('Phase 27 — Agency Authorization', function () {
   });
 
   test('Foreign business access — agency member cannot access another agency businesses', async () => {
-    if (skipIfNoEnv()) return;
     const agencyA = testEnv!.authenticatedContext('agencyA', {
       role: 'agency_member',
       agencyId: 'agency_A',
@@ -73,7 +67,6 @@ describe('Phase 27 — Agency Authorization', function () {
   });
 
   test('Cross-tenant Agency A Agency B businesses', async () => {
-    if (skipIfNoEnv()) return;
     const agencyA = testEnv!.authenticatedContext('agencyA', {
       role: 'agency_member',
       agencyId: 'agency_A',
@@ -83,7 +76,6 @@ describe('Phase 27 — Agency Authorization', function () {
   });
 
   test('Cross-tenant Agency A Agency B campaigns', async () => {
-    if (skipIfNoEnv()) return;
     const agencyA = testEnv!.authenticatedContext('agencyA', {
       role: 'agency_member',
       agencyId: 'agency_A',
@@ -93,7 +85,6 @@ describe('Phase 27 — Agency Authorization', function () {
   });
 
   test('Cross-tenant Agency A Agency B assets', async () => {
-    if (skipIfNoEnv()) return;
     const agencyA = testEnv!.authenticatedContext('agencyA', {
       role: 'agency_member',
       agencyId: 'agency_A',
@@ -103,7 +94,6 @@ describe('Phase 27 — Agency Authorization', function () {
   });
 
   test('Cross-business isolation agency A can read own biz not others', async () => {
-    if (skipIfNoEnv()) return;
     // biz_A must actually be a business the agency manages (agencyId
     // matching + agencyManaged) for the "can read own" half of this test
     // to mean anything — reading a nonexistent document evaluates to
@@ -139,7 +129,6 @@ describe('Phase 27 — Agency Authorization', function () {
   });
 
   test('Cross-client isolation agency member cannot access another clients businesses', async () => {
-    if (skipIfNoEnv()) return;
     const agencyA = testEnv!.authenticatedContext('agencyA', {
       role: 'agency_member',
       agencyId: 'agency_A',
@@ -149,7 +138,6 @@ describe('Phase 27 — Agency Authorization', function () {
   });
 
   test('Cross-agency isolation no agency can access another agencys data', async () => {
-    if (skipIfNoEnv()) return;
     const agencyA = testEnv!.authenticatedContext('agencyA', {
       role: 'agency_member',
       agencyId: 'agency_A',
@@ -159,14 +147,12 @@ describe('Phase 27 — Agency Authorization', function () {
   });
 
   test('Unauthorized bulk job regular user cannot trigger', async () => {
-    if (skipIfNoEnv()) return;
     const regularUser = testEnv!.authenticatedContext('user1', { role: 'user' });
     const bulkJob = regularUser.firestore().collection('bulk_jobs').doc('job1');
     await expect(bulkJob.set({ status: 'queued' }))['toDeny']();
   });
 
   test('Unauthorized approval attempt client cannot approve own campaign', async () => {
-    if (skipIfNoEnv()) return;
     const clientUser = testEnv!.authenticatedContext('client1', { role: 'user' });
     const campaign = clientUser.firestore().collection('campaigns').doc('camp1');
     await expect(campaign.update({ status: 'approved', metadata: { truthCheckStatus: 'PASS' } }))[

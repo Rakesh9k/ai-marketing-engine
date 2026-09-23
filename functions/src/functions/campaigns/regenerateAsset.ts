@@ -21,6 +21,7 @@ import type {
   TruthCheckStatus,
 } from '../../types';
 import { GenerationPipeline } from '../../services/ai/pipeline';
+import { getBrandCreativeContext } from '../../services/ai/brandCreativeContext';
 import { shouldActivateRegeneration } from '../../services/ai/truthCheck';
 import {
   executeWithUsageControl,
@@ -161,7 +162,7 @@ export const regenerateAsset = onCall(
             campaignStyle: campaign.localization.campaignStyle,
             duration: campaign.duration,
             businessBrain: business.businessBrain,
-            brandProfile: brandKit || {},
+            brandProfile: getBrandCreativeContext(brandKit),
           };
 
           // Run the pipeline to regenerate the specific asset type

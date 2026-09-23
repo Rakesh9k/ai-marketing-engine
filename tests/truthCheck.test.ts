@@ -53,11 +53,7 @@ describe('Truth Check - Deterministic Validation', () => {
       end: '2026-01-12T23:59:59Z',
     },
     brandProfile: {
-      businessId: 'biz_123',
-      brandName: 'Hyderabad Biryani House',
-      tagline: 'Authentic Hyderabadi Biryani',
-      brandTone: 'friendly',
-      brandPersonality: 'Warm, authentic, local pride',
+      tone: 'friendly',
       visualPreferences: 'Warm lighting, copper handi, traditional',
       colors: {
         primary: '#E84D1A',

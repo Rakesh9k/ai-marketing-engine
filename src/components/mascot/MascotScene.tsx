@@ -1,5 +1,11 @@
+import Image from 'next/image';
 import type { ReactNode } from 'react';
-import { MitraMascot, type MitraMascotPose, type MitraMascotSize } from './MitraMascot';
+import {
+  MASCOT_POSE_ASSET,
+  SIZE_MAP,
+  type MitraMascotPose,
+  type MitraMascotSize,
+} from './MitraMascot';
 
 /**
  * An open, composed mascot moment — not `<Card><Mascot /></Card>` (see the
@@ -15,6 +21,11 @@ import { MitraMascot, type MitraMascotPose, type MitraMascotSize } from './Mitra
  * Which pose belongs on which screen is centralized in
  * mascotPlacement.ts — check there before picking one ad hoc, and add a
  * new entry there (not just inline here) if this is a genuinely new moment.
+ *
+ * Renders the official photoreal Mitra artwork (public/brand/mascot/*.png,
+ * background-removed from the supplied source renders — see
+ * scripts/mascot-extract.mjs) rather than the earlier vector character. The
+ * pose → asset mapping lives in MitraMascot.tsx as MASCOT_POSE_ASSET.
  */
 interface MascotSceneProps {
   pose?: MitraMascotPose;
@@ -40,12 +51,24 @@ export function MascotScene({
   className,
   children,
 }: MascotSceneProps) {
+  const asset = MASCOT_POSE_ASSET[pose];
+  const height = SIZE_MAP[size];
+  const width = Math.round(height * (asset.width / asset.height));
+
   return (
     <div
       className={`animate-scene-enter flex gap-5 ${align === 'center' ? 'flex-col items-center text-center' : 'items-start'} ${className || ''}`.trim()}
     >
       <div className="relative shrink-0">
-        <MitraMascot pose={pose} size={size} animated decorative />
+        <Image
+          src={asset.src}
+          alt=""
+          aria-hidden="true"
+          width={width}
+          height={height}
+          className="animate-mascot-idle object-contain"
+          style={{ width, height }}
+        />
         {decoration && (
           <div className="pointer-events-none absolute -top-2 -right-2" aria-hidden="true">
             {decoration}

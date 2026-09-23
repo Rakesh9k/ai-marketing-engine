@@ -2,21 +2,27 @@
  * @jest-environment node
  *
  * See tests/security.test.ts for why this override is required.
+ *
+ * Phase 37 QA Remediation (D-3): had the same misleading-pass harness
+ * defect as tests/security.test.ts — every test guarded itself with
+ * `if (skipIfNoEnv()) return;`, so a run without FIRESTORE_EMULATOR_HOST
+ * reported these as PASSED rather than SKIPPED. Switched to the same
+ * `describeIfEmulator` pattern. (The five `test.skip(...)` calls below are
+ * unrelated — genuine "feature not implemented" markers, unaffected by
+ * this change.)
  */
 import type { RulesTestEnvironment } from '@firebase/rules-unit-testing';
 import { initializeTestEnvironment } from '@firebase/rules-unit-testing';
 import { readFileSync } from 'fs';
 import { describe, beforeAll, afterAll, test, expect } from '@jest/globals';
 
-describe('Phase 27 — Bulk Jobs, Approvals, Auth, Roles', function () {
+const emulatorHost = process.env['FIRESTORE_EMULATOR_HOST'];
+const describeIfEmulator = emulatorHost ? describe : describe.skip;
+
+describeIfEmulator('Phase 27 — Bulk Jobs, Approvals, Auth, Roles', function () {
   let testEnv: RulesTestEnvironment | null = null;
 
   beforeAll(async () => {
-    const firestoreEmulatorHost = process.env['FIRESTORE_EMULATOR_HOST'];
-    if (!firestoreEmulatorHost) {
-      console.log('Skipping Phase 27 bulk/approval/auth/roles tests - emulator not available');
-      return;
-    }
     testEnv = await initializeTestEnvironment({
       // Phase 15: distinct per-file project namespace — see the identical
       // comment in tests/security.test.ts for why.
@@ -35,18 +41,10 @@ describe('Phase 27 — Bulk Jobs, Approvals, Auth, Roles', function () {
     }
   });
 
-  const skipIfNoEnv = () => {
-    if (!testEnv) {
-      return true;
-    }
-    return false;
-  };
-
   // ── Auth tests ────────────────────────────────────────────────────────
 
   describe('Authentication & Roles', () => {
     test('Regular user role is "user"', async () => {
-      if (skipIfNoEnv()) return;
       // users/{uid} is only ever created server-side; seed it the same
       // way (bypassing rules) rather than reading a document that was
       // never written, which would make data()?.role undefined regardless
@@ -75,7 +73,6 @@ describe('Phase 27 — Bulk Jobs, Approvals, Auth, Roles', function () {
     // forgotten if that role is built later, and so it doesn't read as an
     // unexplained security regression in the meantime.
     test.skip('Agency admin role can access agency features (not implemented: no "agency_admin" role exists in current rules/backend)', async () => {
-      if (skipIfNoEnv()) return;
       const admin = testEnv!.authenticatedContext('admin1', {
         role: 'agency_admin',
         agencyId: 'agency_1',
@@ -86,7 +83,6 @@ describe('Phase 27 — Bulk Jobs, Approvals, Auth, Roles', function () {
     });
 
     test('Agency member role cannot access admin-only operations', async () => {
-      if (skipIfNoEnv()) return;
       const member = testEnv!.authenticatedContext('member1', {
         role: 'agency_member',
         agencyId: 'agency_1',
@@ -112,7 +108,6 @@ describe('Phase 27 — Bulk Jobs, Approvals, Auth, Roles', function () {
 
   describe('Bulk Job Authorization', () => {
     test.skip('Bulk job — agency admin can create (not implemented: no bulk_jobs collection/rules exist)', async () => {
-      if (skipIfNoEnv()) return;
       const admin = testEnv!.authenticatedContext('admin1', {
         role: 'agency_admin',
         agencyId: 'agency_1',
@@ -122,7 +117,6 @@ describe('Phase 27 — Bulk Jobs, Approvals, Auth, Roles', function () {
     });
 
     test.skip('Bulk job — agency member cannot create without proper agencyId (not implemented: no bulk_jobs collection/rules exist)', async () => {
-      if (skipIfNoEnv()) return;
       const member = testEnv!.authenticatedContext('member1', {
         role: 'agency_member',
         agencyId: 'agency_1',
@@ -133,7 +127,6 @@ describe('Phase 27 — Bulk Jobs, Approvals, Auth, Roles', function () {
     });
 
     test('Bulk job — regular user cannot create bulk jobs', async () => {
-      if (skipIfNoEnv()) return;
       const user = testEnv!.authenticatedContext('user1', { role: 'user' });
       const job = user.firestore().collection('bulk_jobs').doc('job_user');
       await expect(job.set({ status: 'queued' }))['toDeny']();
@@ -152,7 +145,6 @@ describe('Phase 27 — Bulk Jobs, Approvals, Auth, Roles', function () {
     // rule; skipped rather than asserting behavior the product doesn't
     // implement.
     test.skip('Campaign — agency admin can approve (not implemented: campaigns have no agency-based update rule)', async () => {
-      if (skipIfNoEnv()) return;
       const admin = testEnv!.authenticatedContext('admin1', {
         role: 'agency_admin',
         agencyId: 'agency_1',
@@ -165,7 +157,6 @@ describe('Phase 27 — Bulk Jobs, Approvals, Auth, Roles', function () {
     });
 
     test('Campaign — regular user cannot set approved status', async () => {
-      if (skipIfNoEnv()) return;
       const user = testEnv!.authenticatedContext('user1', { role: 'user' });
       const campaign = user.firestore().collection('campaigns').doc('camp1');
       // Users can update their own campaigns but NOT Truth Check fields;
@@ -174,7 +165,6 @@ describe('Phase 27 — Bulk Jobs, Approvals, Auth, Roles', function () {
     });
 
     test.skip('Campaign — version-aware: regeneration resets approval (not implemented: same agency-update-rule gap as above)', async () => {
-      if (skipIfNoEnv()) return;
       // This tests the conceptual behavior; the actual version-aware
       // approval reset is implemented in generateCampaignStrategy.ts
       // Firestore rules test that setting a new version-related status
@@ -194,7 +184,6 @@ describe('Phase 27 — Bulk Jobs, Approvals, Auth, Roles', function () {
 
   describe('Cross-Tenant Isolation', () => {
     test('Agency A cannot access Agency B agencies collection', async () => {
-      if (skipIfNoEnv()) return;
       const agencyA = testEnv!.authenticatedContext('agencyA', {
         role: 'agency_member',
         agencyId: 'agency_A',
@@ -204,7 +193,6 @@ describe('Phase 27 — Bulk Jobs, Approvals, Auth, Roles', function () {
     });
 
     test('Agency A cannot access Agency B clients', async () => {
-      if (skipIfNoEnv()) return;
       const agencyA = testEnv!.authenticatedContext('agencyA', {
         role: 'agency_member',
         agencyId: 'agency_A',
@@ -214,7 +202,6 @@ describe('Phase 27 — Bulk Jobs, Approvals, Auth, Roles', function () {
     });
 
     test('Agency A cannot access Agency B businesses', async () => {
-      if (skipIfNoEnv()) return;
       const agencyA = testEnv!.authenticatedContext('agencyA', {
         role: 'agency_member',
         agencyId: 'agency_A',
@@ -224,7 +211,6 @@ describe('Phase 27 — Bulk Jobs, Approvals, Auth, Roles', function () {
     });
 
     test('Agency A cannot access Agency B campaigns', async () => {
-      if (skipIfNoEnv()) return;
       const agencyA = testEnv!.authenticatedContext('agencyA', {
         role: 'agency_member',
         agencyId: 'agency_A',
@@ -234,7 +220,6 @@ describe('Phase 27 — Bulk Jobs, Approvals, Auth, Roles', function () {
     });
 
     test('Agency A cannot access Agency B assets/campaign-assets', async () => {
-      if (skipIfNoEnv()) return;
       const agencyA = testEnv!.authenticatedContext('agencyA', {
         role: 'agency_member',
         agencyId: 'agency_A',

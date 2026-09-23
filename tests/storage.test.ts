@@ -12,6 +12,12 @@
  * use the real modular `firebase/storage` client API (`ref`, `uploadString`,
  * `getMetadata`), which is what `RulesTestContext.storage()` is designed to
  * be used with.
+ *
+ * Phase 37 QA Remediation (D-3): had the same misleading-pass harness
+ * defect as tests/security.test.ts (see that file's header for the
+ * mechanism) — every test guarded itself with `if (skipIfNoEnv()) return;`
+ * so a run without STORAGE_EMULATOR_HOST reported all these as PASSED
+ * rather than SKIPPED. Switched to the same `describeIfEmulator` pattern.
  */
 import type { RulesTestEnvironment } from '@firebase/rules-unit-testing';
 import { initializeTestEnvironment } from '@firebase/rules-unit-testing';
@@ -19,15 +25,13 @@ import { readFileSync } from 'fs';
 import { ref, uploadString, getMetadata } from 'firebase/storage';
 import { describe, beforeAll, afterAll, test, expect } from '@jest/globals';
 
-describe('Storage Security Rules', () => {
+const emulatorHost = process.env['STORAGE_EMULATOR_HOST'];
+const describeIfEmulator = emulatorHost ? describe : describe.skip;
+
+describeIfEmulator('Storage Security Rules', () => {
   let testEnv: RulesTestEnvironment | null = null;
 
   beforeAll(async () => {
-    const storageEmulatorHost = process.env['STORAGE_EMULATOR_HOST'];
-    if (!storageEmulatorHost) {
-      console.log('Skipping Storage security tests - emulator not available');
-      return;
-    }
     testEnv = await initializeTestEnvironment({
       // Phase 15: distinct per-file project namespace — see the identical
       // comment in tests/security.test.ts for why.
@@ -46,20 +50,12 @@ describe('Storage Security Rules', () => {
     }
   });
 
-  const skipIfNoEnv = () => {
-    if (!testEnv) {
-      return true;
-    }
-    return false;
-  };
-
   // businesses/{businessId}/** requires both read and write to be gated on
   // the same rule, so "can read own" must actually upload the file first
   // (bypassing rules, as the real generation pipeline would have already
   // done) — reading a file that was never uploaded proves nothing about
   // authorization, only that a 404 isn't mistaken for an ALLOW.
   test('User can read own business assets', async () => {
-    if (skipIfNoEnv()) return;
     await testEnv!.withSecurityRulesDisabled(async (context) => {
       const seedRef = ref(context.storage(), 'businesses/biz1/assets/asset1/test.jpg');
       await uploadString(seedRef, 'seed content');
@@ -71,7 +67,6 @@ describe('Storage Security Rules', () => {
   });
 
   test('User cannot read other business assets', async () => {
-    if (skipIfNoEnv()) return;
     await testEnv!.withSecurityRulesDisabled(async (context) => {
       const seedRef = ref(context.storage(), 'businesses/biz2/assets/asset1/test.jpg');
       await uploadString(seedRef, 'seed content');
@@ -83,28 +78,24 @@ describe('Storage Security Rules', () => {
   });
 
   test('User can write to own business assets', async () => {
-    if (skipIfNoEnv()) return;
     const user = testEnv!.authenticatedContext('user1', { businessIds: ['biz1'] });
     const fileRef = ref(user.storage(), 'businesses/biz1/assets/asset1/test.jpg');
     await expect(uploadString(fileRef, 'test content')).resolves.toBeDefined();
   });
 
   test('User cannot write to other business assets', async () => {
-    if (skipIfNoEnv()) return;
     const user = testEnv!.authenticatedContext('user1', { businessIds: ['biz1'] });
     const fileRef = ref(user.storage(), 'businesses/biz2/assets/asset1/test.jpg');
     await expect(uploadString(fileRef, 'test content')).rejects.toThrow();
   });
 
   test('User can write to their own temp uploads', async () => {
-    if (skipIfNoEnv()) return;
     const user = testEnv!.authenticatedContext('user1');
     const fileRef = ref(user.storage(), 'temp/user1/test.jpg');
     await expect(uploadString(fileRef, 'test content')).resolves.toBeDefined();
   });
 
   test("User cannot write to another user's temp uploads", async () => {
-    if (skipIfNoEnv()) return;
     const user = testEnv!.authenticatedContext('user1');
     const fileRef = ref(user.storage(), 'temp/user2/test.jpg');
     await expect(uploadString(fileRef, 'test content')).rejects.toThrow();
@@ -115,7 +106,6 @@ describe('Storage Security Rules', () => {
   // businesses/** writes and temp/** writes, never businesses/** cross-user
   // READ of a generated creative, nor temp/** cross-user READ.
   test("Phase 11: User cannot download another business's generated creative via Storage", async () => {
-    if (skipIfNoEnv()) return;
     await testEnv!.withSecurityRulesDisabled(async (context) => {
       const seedRef = ref(
         context.storage(),
@@ -129,7 +119,6 @@ describe('Storage Security Rules', () => {
   });
 
   test("Phase 11: User cannot read another user's temp upload", async () => {
-    if (skipIfNoEnv()) return;
     await testEnv!.withSecurityRulesDisabled(async (context) => {
       const seedRef = ref(context.storage(), 'temp/user2/private-upload.jpg');
       await uploadString(seedRef, 'private bytes');
@@ -143,7 +132,6 @@ describe('Storage Security Rules', () => {
   // firestore.rules' "agency member can access managed business" test,
   // against storage.rules' resource.metadata.agencyId check.
   test("Phase 11: Agency member CAN access a managed business's assets when object metadata carries the matching agencyId", async () => {
-    if (skipIfNoEnv()) return;
     await testEnv!.withSecurityRulesDisabled(async (context) => {
       const seedRef = ref(context.storage(), 'businesses/biz_managed/assets/a1/test.jpg');
       await uploadString(seedRef, 'seed content', undefined, {
@@ -159,7 +147,6 @@ describe('Storage Security Rules', () => {
   });
 
   test("Phase 11: Agency member CANNOT access an unmanaged business's assets (different agencyId metadata)", async () => {
-    if (skipIfNoEnv()) return;
     await testEnv!.withSecurityRulesDisabled(async (context) => {
       const seedRef = ref(context.storage(), 'businesses/biz_unmanaged/assets/a1/test.jpg');
       await uploadString(seedRef, 'seed content', undefined, {

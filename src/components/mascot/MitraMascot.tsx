@@ -59,6 +59,40 @@ const SIZE_MAP = {
 
 export type MitraMascotSize = keyof typeof SIZE_MAP;
 
+export { SIZE_MAP };
+
+/**
+ * Pose -> official photoreal artwork, background-removed from the supplied
+ * source renders (D:\brainwise ai agent files\mascot, never modified in
+ * place) via scripts/mascot-extract.mjs into public/brand/mascot/*.png.
+ * `width`/`height` are each asset's actual pixel dimensions, used to
+ * preserve aspect ratio when MascotScene sizes it to a SIZE_MAP height.
+ *
+ * A few poses have no genuinely matching photoreal asset in the supplied
+ * set and fall back to the closest neutral render rather than being left
+ * blank (see the phase report for which ones and why):
+ *  - 'designer' has no pencil/creative-direction asset — falls back to the
+ *    same neutral "point" render.
+ */
+export const MASCOT_POSE_ASSET: Record<
+  MitraMascotPose,
+  { src: string; width: number; height: number }
+> = {
+  idle: { src: '/brand/mascot/idle.png', width: 1200, height: 1357 },
+  point: { src: '/brand/mascot/point.png', width: 1024, height: 1536 },
+  explain: { src: '/brand/mascot/explain.png', width: 1200, height: 1189 },
+  cheer: { src: '/brand/mascot/cheer.png', width: 1200, height: 2132 },
+  concerned: { src: '/brand/mascot/concerned.png', width: 1200, height: 1519 },
+  curious: { src: '/brand/mascot/curious.png', width: 1200, height: 2155 },
+  idea: { src: '/brand/mascot/idea.png', width: 1200, height: 1965 },
+  thinking: { src: '/brand/mascot/thinking.png', width: 495, height: 1254 },
+  creating: { src: '/brand/mascot/creating.png', width: 1200, height: 1773 },
+  designer: { src: '/brand/mascot/designer.png', width: 1024, height: 1536 },
+  analyst: { src: '/brand/mascot/analyst.png', width: 1200, height: 1250 },
+  remembering: { src: '/brand/mascot/remembering.png', width: 1200, height: 1578 },
+  discovering: { src: '/brand/mascot/discovering.png', width: 1200, height: 1307 },
+};
+
 interface MitraMascotProps {
   pose?: MitraMascotPose;
   size?: MitraMascotSize;

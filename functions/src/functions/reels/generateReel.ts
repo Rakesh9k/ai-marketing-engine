@@ -106,9 +106,14 @@ export const generateReel = onCall(
           const clipAssets = await Promise.all(reel.inputClipIds.map((id) => getAssetDoc(id)));
           const missingIdx = clipAssets.findIndex((a) => !a);
           if (missingIdx !== -1) {
-            throw new Error(`Uploaded clip record missing (assetId: ${reel.inputClipIds[missingIdx]})`);
+            throw new Error(
+              `Uploaded clip record missing (assetId: ${reel.inputClipIds[missingIdx]})`
+            );
           }
-          const clips = clipAssets.map((a) => ({ clipId: a!.assetId, storagePath: a!.storagePath }));
+          const clips = clipAssets.map((a) => ({
+            clipId: a!.assetId,
+            storagePath: a!.storagePath,
+          }));
 
           const clipAnalyses = await analyzeReelClips(
             clips,
@@ -134,6 +139,40 @@ export const generateReel = onCall(
             },
           });
 
+          let creativeTemplateContext = undefined;
+          let adaptedCreativePlan = undefined;
+          if (reel.templateId && reel.creativeObjective) {
+            const { buildCreativeTemplateContext } = await import('../../services/ai/creativeTemplateContext.js');
+            creativeTemplateContext = buildCreativeTemplateContext({
+              templateId: reel.templateId,
+              objective: reel.creativeObjective as any,
+              businessBrain: business.businessBrain,
+              brandCreativeContext: brandKit as any,
+              productName: business.name,
+              offerHeadline: reel.offer,
+              offerPrice: 0,
+              offerType: 'reel_offer',
+              offerValidityStart: new Date().toISOString(),
+              offerValidityEnd: new Date().toISOString(),
+              audienceLocalities: business.location?.locality ? [business.location.locality] : [],
+            });
+
+            const { selectCreativeContext } = await import('../../services/ai/creativeContextSelector.js');
+            const { TemplateAdaptationPlanner } = await import('../../services/ai/templateAdaptation.js');
+            
+            const selectedContext = selectCreativeContext({
+              task: 'reel_shot_plan',
+              templateContext: creativeTemplateContext
+            });
+            
+            const planner = new TemplateAdaptationPlanner();
+            adaptedCreativePlan = await planner.adapt({
+              template: creativeTemplateContext.template,
+              selectedContext,
+              objective: creativeTemplateContext.objective
+            });
+          }
+
           const editPlan = await generateValidatedReelEditPlan({
             business,
             brandKit,
@@ -144,11 +183,14 @@ export const generateReel = onCall(
             cta: reel.cta,
             additionalMessage: reel.additionalMessage,
             clipAnalyses: usableClips,
+            creativeTemplateContext,
+            adaptedCreativePlan,
           });
 
           await updateReelProjectDoc(reelId, { status: 'rendering', editPlan });
 
-          const music = getMusicTrackById(editPlan.musicTrackId) ?? pickDefaultMusicTrack(reel.style);
+          const music =
+            getMusicTrackById(editPlan.musicTrackId) ?? pickDefaultMusicTrack(reel.style);
           const outputStoragePath = `businesses/${data.businessId}/reels/${reelId}/output/reel.mp4`;
           const thumbnailStoragePath = `businesses/${data.businessId}/reels/${reelId}/output/thumbnail.jpg`;
 
@@ -215,9 +257,7 @@ export const generateReel = onCall(
           error: {
             code: error.code || 'GENERATION_FAILED',
             message:
-              error instanceof Error && error.message
-                ? error.message
-                : 'Reel generation failed.',
+              error instanceof Error && error.message ? error.message : 'Reel generation failed.',
             stage: 'generation',
             retryable: true,
           },

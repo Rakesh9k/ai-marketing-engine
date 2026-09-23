@@ -1,0 +1,36 @@
+# Production Content Capability Matrix
+
+**Date:** 2026-09-22. Distinguishes four levels per content type: **CREATION** (AI generates it) / **PACKAGING** (assembled into final usable size/format with caption/CTA) / **EXPORT** (user can download/share it) / **PUBLISHING** (Mitra authenticates with Meta/Instagram and publishes via their API). These are not equivalent — see `docs/PRODUCTION_READINESS_AUDIT_REPORT.md` for why this distinction matters.
+
+Two separate systems exist and must not be conflated:
+- **(A) Campaign generation pipeline** (`functions/src/services/ai/pipeline.ts`) — produces poster/story/reel-concept/caption/WhatsApp text via AI + a deterministic SVG compositor.
+- **(B) "Create a Reel" feature** (`functions/src/functions/reels/*`, `services/reel-renderer/`) — renders a real MP4 from user-uploaded clips via FFmpeg. Entirely separate code path from (A)'s "reel" asset type.
+
+| Content type | UI | Backend produces | Final file/format | Social publish API | Verdict |
+|---|---|---|---|---|---|
+| **Instagram Post** (poster) | Yes | 1 AI hero image (DALL-E 3) + deterministic SVG text overlay (price/CTA/phone burned in) | **SVG**, not rasterized PNG/JPEG; no Instagram-specific aspect-ratio enforcement found | None | CREATION=IMPLEMENTED, PACKAGING=IMPLEMENTED, EXPORT=IMPLEMENTED, **PUBLISHING=NOT IMPLEMENTED** |
+| **Instagram Story** | Yes | Per-frame SVG compositor calls, 3 stories × N frames | SVG frames, same rasterization gap as posters | None | CREATION=IMPLEMENTED, PACKAGING=IMPLEMENTED, EXPORT=IMPLEMENTED, **PUBLISHING=NOT IMPLEMENTED** |
+| **"Reel" (campaign pipeline asset)** | Yes | `buildReelStoryboard()` — **text storyboard only**, reuses the same hero image, zero extra AI calls | Not a video file — a script/storyboard concept | None | CREATION=**PLACEHOLDER** (not video), PACKAGING=NOT IMPLEMENTED, EXPORT=N/A, PUBLISHING=NOT IMPLEMENTED |
+| **"Create a Reel" (dedicated feature)** | Yes (`src/app/reels/*`) | Real pipeline: clip upload → confirm → AI clip analysis + edit plan → FFmpeg render via `services/reel-renderer/` (real ffmpeg binary, not a wrapper stub) | Real MP4, 1080×1920 (true 9:16), 30fps, 15/30/45s duration, logo overlay, text cards, audio mix | None | CREATION=IMPLEMENTED **if `REEL_RENDERER_URL` is deployed and configured in prod (unverifiable from repo)** — otherwise silently degrades to a fake placeholder text file labeled `video/mp4`. PACKAGING=IMPLEMENTED. EXPORT=IMPLEMENTED (same download pattern). **PUBLISHING=NOT IMPLEMENTED** |
+| **Carousel** | No | No | No | No | **NOT IMPLEMENTED — does not exist in any form.** Zero matches for "carousel" anywhere in `src/` or `functions/src/`; no `AssetType` enum value for it. |
+| **Poster** | Yes | Same as Instagram Post (same asset type) | Same | None | Same as Instagram Post |
+| **Marketing Video** | See "Create a Reel" | Same | Same | None | Same as "Create a Reel" |
+| **Caption** | Yes | Real AI-generated text, 5 variants, zod-validated | Plain text, downloadable as `.txt` | N/A (manual copy/paste) | CREATION=IMPLEMENTED, PACKAGING=IMPLEMENTED, EXPORT=IMPLEMENTED, PUBLISHING=NOT IMPLEMENTED (no auto-post) |
+| **Hashtags** | Bundled in caption | Real, part of each caption object | Text | N/A | IMPLEMENTED (bundled, no standalone asset) |
+| **CTA** | Yes | Present in ad copies, CTA variations, reel concepts; burned into SVG compositor and WhatsApp message | Text + rendered into creative | N/A | IMPLEMENTED (no click-tracking beyond internal analytics) |
+| **WhatsApp** | Yes | AI-authored message text + `wa.me` deep link builder (`src/lib/utils/whatsapp.ts`), country-code-aware number normalization | Opens WhatsApp client with prefilled text | **None — this is a share link, not the WhatsApp Business API** | CREATION=IMPLEMENTED, PACKAGING=IMPLEMENTED, EXPORT/SHARE=IMPLEMENTED, **PUBLISHING (server-side send)=NOT IMPLEMENTED, by design** |
+
+## Instagram/Meta Publishing — explicit statement
+
+**NOT IMPLEMENTED.** Repo-wide search (`instagram_business_account`, `media_publish`, `graph.facebook`, `Graph API`, `access_token`, `OAuth`, `ig-user-id`) found 9 hits, all belonging to Firebase/Google/Facebook *login* auth or Sentry PII-scrubbing regexes — none are Meta content-publishing code. No "Connect Instagram" flow, no OAuth-to-Meta flow, no media container creation, no publish call exists anywhere. Every content type in this app terminates at "download the file" or "open a wa.me link," never at an authenticated call to Meta's API.
+
+This is consistent with what the reviewed phase docs (`PHASE_7_CREATIVE_GENERATION_REPORT.md`, `PHASE_9_DOWNLOAD_WHATSAPP_REPORT.md`) already documented and never claimed to have built — no drift here, publishing was never claimed as done.
+
+## Known gaps already flagged in prior phase docs (still true)
+
+- SVG output (not rasterized PNG/JPEG) for posters/stories — flagged in Phase 7 as a known gap, still present.
+- WhatsApp is intentionally `wa.me`-only, not an API integration — Phase 9 confirms this was a deliberate MVP choice, not an oversight.
+
+## New risk found this pass (not in prior docs)
+
+- **`getVideoRenderer()` silent mock fallback** (`functions/src/services/videoRenderer.ts`): if `REEL_RENDERER_URL` is unset, it falls back to a `DevMockVideoRenderer` that writes a plain text buffer labeled `contentType: 'video/mp4'` — no error is thrown, no warning surfaces to the user. Production deployment status of the real Cloud Run renderer could not be confirmed from the repo (no reference in `.github/` or `firebase.json`). **Recommend**: fail loudly instead of silently substituting a mock outside explicit dev/test environments, and confirm `REEL_RENDERER_URL` is actually set in the live Functions environment.

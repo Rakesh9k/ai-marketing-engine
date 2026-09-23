@@ -6,7 +6,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useAuth } from '@/features/auth/hooks/useAuth';
 import { usageService, subscriptionService } from '@/services/database';
-import { MitraMark } from '@/components/ui/MitraMark';
+import { MitraShortLogo } from '@/components/ui/MitraShortLogo';
 import { ThemeToggle } from '@/components/ui/ThemeToggle';
 
 interface SidebarProps {
@@ -156,7 +156,7 @@ export function Sidebar({ children }: SidebarProps) {
       <header className="bg-bg-primary/90 fixed inset-x-0 top-0 z-40 backdrop-blur">
         <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-4 sm:px-6 lg:px-8">
           <Link href="/dashboard" aria-label="Mitra — Home">
-            <MitraMark size="md" decorative />
+            <MitraShortLogo size="md" decorative />
           </Link>
 
           <div className="flex items-center gap-2 sm:gap-3">
@@ -205,6 +205,14 @@ export function Sidebar({ children }: SidebarProps) {
                       {item.name}
                     </Link>
                   ))}
+                  <a
+                    href="mailto:support@brain-wise.com"
+                    role="menuitem"
+                    onClick={() => setProfileOpen(false)}
+                    className="text-text-secondary hover:bg-bg-secondary hover:text-text-primary block rounded-lg px-3 py-2 text-sm transition-colors"
+                  >
+                    Help &amp; support
+                  </a>
                   <button
                     role="menuitem"
                     onClick={handleLogout}

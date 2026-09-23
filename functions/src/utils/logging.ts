@@ -1,4 +1,5 @@
 import * as functions from 'firebase-functions';
+import { randomUUID } from 'crypto';
 
 export interface LogContext {
   userId?: string;
@@ -37,11 +38,22 @@ function redactSecrets(value: string): string {
   );
 }
 
+/**
+ * A per-invocation correlation ID. Cloud Functions Gen2 runs on Cloud Run,
+ * which always sets K_REVISION to the deployed revision name — reusing it
+ * costs nothing and lets an operator tie a log entry to "which deploy was
+ * this" (Phase — Monitoring & Observability, §40) without any new CI wiring.
+ */
+export function generateRequestId(): string {
+  return randomUUID();
+}
+
 export function createLogger(context: LogContext = {}) {
   const baseContext = {
     ...context,
     timestamp: new Date().toISOString(),
     environment: process.env['FUNCTIONS_EMULATOR'] ? 'emulator' : 'production',
+    deploymentRevision: process.env['K_REVISION'],
   };
 
   return {

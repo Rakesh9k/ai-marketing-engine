@@ -34,7 +34,7 @@ export const getReelClipUploadUrl = onCall(
 
     try {
       await verifyBusinessAccess(context.userId, data.businessId);
-      await checkRateLimit(context.userId, 'reelClipUpload');
+      await checkRateLimit(context.userId, 'getReelClipUploadUrl');
 
       const reel = await getReelProjectDoc(data.reelId);
       if (!reel || reel.businessId !== data.businessId) {

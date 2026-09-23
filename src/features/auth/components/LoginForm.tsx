@@ -8,6 +8,7 @@ import { getAuthErrorMessage } from '@/features/auth/utils/authErrors';
 import { Input } from '@/components/ui/Input';
 import { Button } from '@/components/ui/Button';
 import { StyledLink } from '@/components/ui/Link';
+import { GoogleSignInButton } from '@/features/auth/components/GoogleSignInButton';
 import type { ValidationErrors } from '@/features/auth/types';
 
 interface LoginFormProps {
@@ -123,6 +124,14 @@ export function LoginForm({ onSuccess }: LoginFormProps) {
       >
         Log in
       </Button>
+
+      <div className="flex items-center gap-3" role="separator">
+        <div className="border-border-light h-px flex-1 border-t" />
+        <span className="text-text-tertiary text-xs">or</span>
+        <div className="border-border-light h-px flex-1 border-t" />
+      </div>
+
+      <GoogleSignInButton onSuccess={() => onSuccess?.()} />
 
       <p className="text-text-secondary text-center text-sm">
         Don&apos;t have an account?{' '}

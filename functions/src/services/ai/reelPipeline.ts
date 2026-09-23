@@ -1,3 +1,4 @@
+
 import { z } from 'zod';
 import { generateStructuredText, classifyReelClipThumbnails } from './index';
 import { getVideoRenderer } from '../videoRenderer';
@@ -132,6 +133,8 @@ interface BuildPromptInput {
   offer?: string;
   cta?: string;
   additionalMessage?: string;
+  creativeTemplateContext?: import('./creativeTemplateContext').CreativeTemplateContext;
+  adaptedCreativePlan?: import('./templateAdaptation').AdaptedCreativePlan;
   clipAnalyses: ReelClipAnalysis[];
 }
 
@@ -142,7 +145,7 @@ interface BuildPromptInput {
  * a price, phone number, or offer it wasn't handed here.
  */
 export function buildReelEditPlanPrompt(input: BuildPromptInput): string {
-  const { business, goal, style, durationSeconds, offer, cta, additionalMessage, clipAnalyses } = input;
+  const { business, goal, style, durationSeconds, offer, cta, additionalMessage, clipAnalyses, creativeTemplateContext, adaptedCreativePlan } = input;
   const defaultTemplate = GOAL_DEFAULT_TEMPLATE[goal];
   const defaultTransition = STYLE_TRANSITION_DEFAULTS[style];
   const music = pickDefaultMusicTrack(style, goal);
@@ -152,6 +155,28 @@ export function buildReelEditPlanPrompt(input: BuildPromptInput): string {
   const locationText = [business.location?.locality, business.location?.city]
     .filter(Boolean)
     .join(', ');
+
+  const templateContextSection = creativeTemplateContext 
+    ? `
+TEMPLATE:
+${creativeTemplateContext.template.name} (${creativeTemplateContext.template.id})
+Type: ${creativeTemplateContext.template.type}
+Objectives: ${creativeTemplateContext.template.objectives.join(', ')}
+
+STRUCTURE:
+${creativeTemplateContext.template.structure.grammar.map(g => `- ${g.role}: ${g.purpose}${g.required ? ' (REQUIRED)' : ' (OPTIONAL)'}`).join('\n')}
+
+VISUAL GRAMMAR:
+Emphasis: ${creativeTemplateContext.template.visualGrammar.emphasis}
+Composition: ${creativeTemplateContext.template.visualGrammar.composition}
+
+CONSTRAINTS:
+Min Sections: ${creativeTemplateContext.template.constraints.minSections || 'N/A'}
+Max Sections: ${creativeTemplateContext.template.constraints.maxSections || 'N/A'}
+Min Duration: ${(creativeTemplateContext.template.constraints as any).minDurationSeconds || 'N/A'}s
+Max Duration: ${(creativeTemplateContext.template.constraints as any).maxDurationSeconds || 'N/A'}s
+`
+    : `DEFAULT TEMPLATE FOR THIS GOAL: ${defaultTemplate} (you may choose a different one from: ${REEL_TEMPLATES.join(', ')} if the footage genuinely fits better)`;
 
   return `You are Mitra's short-form social video editor. Your job is to select the strongest moments from user-provided footage and create a structured editing plan for a short vertical social Reel.
 
@@ -169,7 +194,7 @@ TARGET DURATION: ${durationSeconds} seconds (${durationSeconds * 1000}ms) total,
 OFFER (only mention if present): ${offer || 'none provided'}
 CTA TEXT (only use if present, otherwise write a generic natural CTA like "Order now" only if it matches the goal): ${cta || 'none provided'}
 ADDITIONAL MESSAGE: ${additionalMessage || 'none'}
-DEFAULT TEMPLATE FOR THIS GOAL: ${defaultTemplate} (you may choose a different one from: ${REEL_TEMPLATES.join(', ')} if the footage genuinely fits better)
+${templateContextSection}
 MUSIC TRACK TO USE: "${music.id}" (style-matched, do not invent a different musicTrackId)
 
 AVAILABLE CLIPS (choose the best subset, order them into a story - do not use every clip if some are weak):

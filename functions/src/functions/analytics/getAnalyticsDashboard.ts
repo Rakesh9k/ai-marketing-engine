@@ -167,9 +167,16 @@ export const getAnalyticsDashboard = onCall(
     });
 
     try {
-      await verifyBusinessAccess(context.userId, data.businessId);
-
-      const business = await getBusinessDoc(data.businessId);
+      // verifyBusinessAccess and getBusinessDoc each independently read the
+      // same businesses/{businessId} document — neither depends on the
+      // other's result, so they run concurrently instead of as two
+      // sequential round trips. If verifyBusinessAccess rejects, Promise.all
+      // rejects before `business` is ever used, so authorization ordering
+      // (deny before data use) is preserved.
+      const [, business] = await Promise.all([
+        verifyBusinessAccess(context.userId, data.businessId),
+        getBusinessDoc(data.businessId),
+      ]);
       if (!business) {
         throw new Error(`Business not found: ${data.businessId}`);
       }

@@ -6,7 +6,7 @@ import { businessService } from '@/services/database';
 import { callFunction } from '@/services/api';
 
 import { Button } from '@/components/ui/Button';
-import { MitraMark } from '@/components/ui/MitraMark';
+import { MitraShortLogo } from '@/components/ui/MitraShortLogo';
 import { MascotScene } from '@/components/mascot/MascotScene';
 import { SparkIllustration } from '@/components/illustrations/Illustrations';
 
@@ -324,8 +324,8 @@ function OnboardingPage() {
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <div className="flex h-16 items-center justify-between px-4 sm:px-6">
             <div className="text-brand-600 flex items-center gap-2 text-xl font-bold">
-              <MitraMark size="lg" decorative />
-              AI Marketing Engine
+              <MitraShortLogo size="lg" decorative />
+              Mitra
             </div>
             <div className="flex items-center gap-3">
               <div className="flex gap-2">

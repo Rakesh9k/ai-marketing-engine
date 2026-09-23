@@ -15,6 +15,12 @@ export const AUTH_ERROR_MESSAGES: Record<string, string> = {
   'auth/popup-closed-by-user': 'Sign-in was cancelled. Please try again.',
   'auth/cancelled-popup-request': 'Sign-in was cancelled. Please try again.',
   'auth/requires-recent-login': 'Please log in again to complete this action.',
+  'auth/popup-blocked':
+    'Your browser blocked the sign-in popup. Please allow popups for this site and try again.',
+  'auth/account-exists-with-different-credential':
+    'An account already exists with this email using a different sign-in method. Please log in with your password instead.',
+  'auth/unauthorized-domain':
+    'Google sign-in is not available from this domain. Please contact support.',
 };
 
 export function getAuthErrorMessage(error: unknown): string {

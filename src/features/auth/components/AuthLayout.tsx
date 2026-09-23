@@ -2,7 +2,7 @@
 
 import type { ReactNode } from 'react';
 import Link from 'next/link';
-import { MitraMark } from '@/components/ui/MitraMark';
+import { MitraShortLogo } from '@/components/ui/MitraShortLogo';
 import { MitraLogo } from '@/components/ui/MitraLogo';
 
 interface AuthLayoutProps {
@@ -13,15 +13,15 @@ interface AuthLayoutProps {
 
 export function AuthLayout({
   children,
-  title = 'AI Marketing Engine',
+  title = 'Mitra',
   description = 'One Photo + One Offer → Complete Local Campaign',
 }: AuthLayoutProps) {
   return (
     <div className="flex min-h-screen flex-col">
       <header className="border-border-light bg-bg-primary border-b">
         <div className="mx-auto flex h-16 max-w-md items-center justify-between px-4">
-          <Link href="/" aria-label="AI Marketing Engine Home">
-            <MitraMark size="lg" decorative />
+          <Link href="/" aria-label="Mitra — Home">
+            <MitraShortLogo size="lg" decorative />
           </Link>
         </div>
       </header>
@@ -53,7 +53,7 @@ export function AuthLayout({
 
       <footer className="border-border-light bg-bg-primary border-t">
         <div className="text-caption text-text-tertiary mx-auto max-w-md px-4 py-4 text-center">
-          © {new Date().getFullYear()} AI Marketing Engine. All rights reserved.
+          © {new Date().getFullYear()} Mitra. All rights reserved.
         </div>
       </footer>
     </div>

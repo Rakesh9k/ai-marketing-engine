@@ -7,19 +7,13 @@ import type { Subscription, SubscriptionPlan } from '@/types';
 import { formatINR } from '@/lib/utils';
 import { PLAN_DETAILS } from '@/features/billing/planDetails';
 import { callFunction } from '@/services/api';
-import { loadRazorpayCheckout, type RazorpaySuccessResponse } from '@/lib/razorpay/loadCheckout';
+import { submitPayUCheckout, type PayUCheckoutParams } from '@/lib/payu/submitCheckout';
 import { useToast } from '@/hooks/useToast';
 
-interface CreateSubscriptionResponse {
-  subscriptionId: string;
-  shortUrl: string;
-  planId: SubscriptionPlan;
-  price: number;
-}
-
-interface VerifyPaymentResponse {
+interface CancelSubscriptionResponse {
   success: boolean;
-  status: string;
+  alreadyCanceled: boolean;
+  currentPeriodEnd: string;
 }
 
 const TOP_UP_PACKS = [
@@ -29,11 +23,14 @@ const TOP_UP_PACKS = [
 ];
 
 export default function BillingPage() {
-  const { user } = useAuth();
+  const { user, logout } = useAuth();
   const { showToast } = useToast();
   const [subscription, setSubscription] = useState<Subscription | null>(null);
   const [loading, setLoading] = useState(true);
   const [purchasingPlan, setPurchasingPlan] = useState<SubscriptionPlan | null>(null);
+  const [canceling, setCanceling] = useState(false);
+  const [deleteConfirmEmail, setDeleteConfirmEmail] = useState('');
+  const [deleting, setDeleting] = useState(false);
 
   const refreshSubscription = useCallback(async () => {
     if (!user) return;
@@ -61,87 +58,31 @@ export default function BillingPage() {
     void loadSubscription();
   }, [user]);
 
-  // Phase 19A: wires the billing UI to the existing, already-tested backend
-  // payment infrastructure (createSubscription + verifyPayment Cloud
-  // Functions, Razorpay's own webhook) rather than a new payment system.
-  // Credits themselves are granted exclusively by razorpayWebhook.ts once
-  // Razorpay confirms the payment server-side — verifyPayment here only
-  // updates the subscription's status so the UI can reflect it quickly;
-  // it deliberately never grants credits itself (see verifyPayment.ts's
-  // own comment and Phase 15's regression test for that exact boundary).
+  // PayU migration: createPayUPayment computes the authoritative
+  // amount/credits server-side from pricing.ts and returns the exact
+  // hidden-form fields (including a server-generated hash) for PayU
+  // Hosted Checkout — a full-page redirect, not an in-page popup like the
+  // previous Razorpay integration. The browser never sees the PayU salt.
+  // Credits are granted exclusively by payuWebhook.ts (server-to-server);
+  // this page never grants credits itself — it just initiates checkout and,
+  // on return (see the payu= query param handling below), refreshes the
+  // subscription from Firestore to reflect whatever the webhook already did.
   const handleUpgrade = useCallback(
     async (plan: SubscriptionPlan) => {
       if (plan === 'free' || plan === subscription?.planId) {
         return;
       }
 
-      const razorpayKeyId = process.env['NEXT_PUBLIC_RAZORPAY_KEY_ID'];
-      if (!razorpayKeyId) {
-        showToast('Payments are not configured yet. Please try again later.', 'error');
-        return;
-      }
-
       setPurchasingPlan(plan);
       try {
-        const order = await callFunction<{ planId: SubscriptionPlan }, CreateSubscriptionResponse>({
-          functionName: 'createSubscription',
+        const payment = await callFunction<{ planId: SubscriptionPlan }, PayUCheckoutParams>({
+          functionName: 'createPayUPayment',
           data: { planId: plan },
         });
 
-        await loadRazorpayCheckout();
-
-        if (!window.Razorpay) {
-          throw new Error('Razorpay Checkout failed to load');
-        }
-
-        const checkout = new window.Razorpay({
-          key: razorpayKeyId,
-          subscription_id: order.subscriptionId,
-          name: 'Mitra',
-          description: `${PLAN_DETAILS[plan].name} plan`,
-          prefill: { email: user?.email || undefined },
-          theme: { color: '#E84D1A' },
-          handler: (response: RazorpaySuccessResponse) => {
-            void (async () => {
-              try {
-                await callFunction<
-                  {
-                    razorpaySubscriptionId: string;
-                    razorpayPaymentId: string;
-                    razorpaySignature: string;
-                  },
-                  VerifyPaymentResponse
-                >({
-                  functionName: 'verifyPayment',
-                  data: {
-                    razorpaySubscriptionId:
-                      response.razorpay_subscription_id || order.subscriptionId,
-                    razorpayPaymentId: response.razorpay_payment_id,
-                    razorpaySignature: response.razorpay_signature,
-                  },
-                });
-                showToast(
-                  'Payment successful! Your credits will reflect within a few moments.',
-                  'success'
-                );
-                await refreshSubscription();
-              } catch (verifyError) {
-                console.error(verifyError);
-                showToast(
-                  'Payment received, but we could not confirm it automatically. Contact support if your credits do not update shortly.',
-                  'warning'
-                );
-              } finally {
-                setPurchasingPlan(null);
-              }
-            })();
-          },
-          modal: {
-            ondismiss: () => setPurchasingPlan(null),
-          },
-        });
-
-        checkout.open();
+        // Navigates the browser away to PayU — no further code here runs
+        // in this tab; purchasingPlan intentionally stays set until then.
+        submitPayUCheckout(payment);
       } catch (err) {
         console.error(err);
         showToast(
@@ -151,8 +92,110 @@ export default function BillingPage() {
         setPurchasingPlan(null);
       }
     },
-    [subscription, user, showToast, refreshSubscription]
+    [subscription, showToast]
   );
+
+  // Handles the return from PayU's checkout redirect (payuCallback.ts sends
+  // the browser back to /billing?payu=<status>&txnid=<id>). This is
+  // COSMETIC ONLY — the actual credit grant already happened (or didn't)
+  // server-side via payuWebhook.ts before this page even loads; refreshing
+  // the subscription here just reflects that real state, it never trusts
+  // the query param as proof of anything.
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const params = new URLSearchParams(window.location.search);
+    const payuStatus = params.get('payu');
+    if (!payuStatus) return;
+
+    if (payuStatus === 'success') {
+      showToast('Payment received! Your credits will reflect within a few moments.', 'success');
+    } else if (payuStatus === 'pending') {
+      showToast('Your payment is being processed. This page will update shortly.', 'info');
+    } else if (payuStatus === 'failure' || payuStatus === 'usercancel') {
+      showToast('Payment was not completed. No credits were charged.', 'warning');
+    } else if (payuStatus === 'unverified') {
+      showToast(
+        'We could not verify the payment response. Contact support if this seems wrong.',
+        'warning'
+      );
+    }
+
+    setPurchasingPlan(null);
+    void refreshSubscription();
+    // Clean the query params without a full navigation/reload.
+    window.history.replaceState({}, '', '/billing');
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const handleCancelSubscription = useCallback(async () => {
+    if (!subscription || subscription.planId === 'free') return;
+    if (
+      !window.confirm(
+        'Cancel your subscription? You will keep access and remaining credits until the end of your current billing period, then your account reverts to the Free plan. This does not issue a refund.'
+      )
+    ) {
+      return;
+    }
+    setCanceling(true);
+    try {
+      const result = await callFunction<Record<string, never>, CancelSubscriptionResponse>({
+        functionName: 'cancelSubscription',
+        data: {},
+      });
+      showToast(
+        result.alreadyCanceled
+          ? 'Your subscription is already set to cancel at the end of the current period.'
+          : 'Subscription canceled. You keep access until the end of your current billing period.',
+        'success'
+      );
+      await refreshSubscription();
+    } catch (err) {
+      console.error(err);
+      showToast(
+        err instanceof Error ? err.message : 'Could not cancel subscription. Please try again.',
+        'error'
+      );
+    } finally {
+      setCanceling(false);
+    }
+  }, [subscription, showToast, refreshSubscription]);
+
+  const handleDeleteAccount = useCallback(async () => {
+    if (!user?.email || deleteConfirmEmail.trim().toLowerCase() !== user.email.toLowerCase()) {
+      return;
+    }
+    if (
+      !window.confirm(
+        'This permanently deletes your login and archives your businesses. This cannot be undone from the app. Continue?'
+      )
+    ) {
+      return;
+    }
+    setDeleting(true);
+    try {
+      await callFunction<{ confirm: true }, { success: boolean }>({
+        functionName: 'requestAccountDeletion',
+        data: { confirm: true },
+      });
+      showToast('Your account has been deleted.', 'success');
+      await logout();
+      window.location.href = '/';
+    } catch (err) {
+      console.error(err);
+      const message = err instanceof Error ? err.message : '';
+      const lowerMessage = message.toLowerCase();
+      if (
+        lowerMessage.includes('sign out and sign back in') ||
+        lowerMessage.includes('active subscription')
+      ) {
+        showToast(message, 'error');
+      } else {
+        showToast('Could not delete account. Please try again or contact support.', 'error');
+      }
+    } finally {
+      setDeleting(false);
+    }
+  }, [user, deleteConfirmEmail, showToast, logout]);
 
   if (loading) {
     return (
@@ -182,12 +225,27 @@ export default function BillingPage() {
               <h2 className="mt-1 text-2xl font-bold text-neutral-900">
                 {PLAN_DETAILS[currentPlan].name}
               </h2>
+              {subscription?.cancelAtPeriodEnd && (
+                <p className="text-warning-600 mt-1 text-sm">
+                  Cancels at the end of your current period (
+                  {new Date(subscription.currentPeriodEnd).toLocaleDateString('en-IN')})
+                </p>
+              )}
             </div>
             <div className="text-right">
               <p className="text-sm text-neutral-500">Monthly</p>
               <p className="text-2xl font-bold text-neutral-900">
                 {formatINR(PLAN_DETAILS[currentPlan].price)}/month
               </p>
+              {currentPlan !== 'free' && !subscription?.cancelAtPeriodEnd && (
+                <button
+                  onClick={() => void handleCancelSubscription()}
+                  disabled={canceling}
+                  className="text-error-600 hover:text-error-700 mt-2 text-sm underline disabled:opacity-60"
+                >
+                  {canceling ? 'Canceling…' : 'Cancel subscription'}
+                </button>
+              )}
             </div>
           </div>
 
@@ -348,6 +406,48 @@ export default function BillingPage() {
               </div>
             );
           })}
+        </div>
+      </div>
+
+      <div className="mx-auto mt-8 max-w-4xl">
+        <div className="border-error-200 rounded-xl border bg-white p-6">
+          <h2 className="text-error-700 text-lg font-bold">Danger zone</h2>
+          <p className="mt-1 text-sm text-neutral-500">
+            Deleting your account removes your login and archives your businesses. Some records
+            (such as billing history) may be retained where legally required — see our{' '}
+            <a href="/privacy" className="text-brand-600 hover:underline">
+              Privacy Policy
+            </a>
+            . This cannot be undone from the app.
+          </p>
+          <div className="mt-4 flex flex-col gap-2 sm:flex-row sm:items-center">
+            <label htmlFor="delete-confirm-email" className="sr-only">
+              Type your email to confirm account deletion
+            </label>
+            <input
+              id="delete-confirm-email"
+              type="email"
+              placeholder={`Type "${user?.email ?? 'your email'}" to confirm`}
+              value={deleteConfirmEmail}
+              onChange={(e) => setDeleteConfirmEmail(e.target.value)}
+              className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm sm:max-w-xs"
+            />
+            <button
+              onClick={() => void handleDeleteAccount()}
+              disabled={
+                deleting ||
+                !user?.email ||
+                deleteConfirmEmail.trim().toLowerCase() !== user.email.toLowerCase()
+              }
+              className="bg-error-600 hover:bg-error-700 rounded-lg px-4 py-2 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              {deleting ? 'Deleting…' : 'Delete my account'}
+            </button>
+          </div>
+          <p className="mt-2 text-xs text-neutral-400">
+            For your security, you may be asked to sign out and back in again if you signed in a
+            while ago.
+          </p>
         </div>
       </div>
     </div>

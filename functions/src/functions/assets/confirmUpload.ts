@@ -60,6 +60,28 @@ export const confirmUpload = onCall(
       const businessId = data.businessId;
       const userId = context.userId;
 
+      // Defense in depth: verifyBusinessAccess above only proves the caller
+      // owns/has access to `businessId` — it says nothing about whether
+      // `storagePath` (a client-supplied string) actually points inside
+      // that business's own Storage folder. Without this check, a caller
+      // who owns Business A could pass Business A's businessId alongside a
+      // storagePath belonging to Business B (e.g. leaked via a log, a
+      // referrer header, or a guessed path) and this function would happily
+      // generate a 7-day admin-signed download URL for Business B's file
+      // (admin.storage() bypasses storage.rules entirely) and persist a
+      // campaign_assets doc pointing at it. getUploadUrl.ts always
+      // generates paths as `businesses/${businessId}/...`, so a legitimate
+      // caller's storagePath must already start with their own verified
+      // businessId's prefix.
+      const expectedPrefix = `businesses/${businessId}/`;
+      if (!storagePath.startsWith(expectedPrefix)) {
+        logger.warn('confirmUpload denied: storagePath outside caller business scope', {
+          userId,
+          businessId,
+        });
+        throw new HttpsError('permission-denied', 'storagePath does not belong to businessId');
+      }
+
       // Verify the file exists in storage
       const bucket = admin.storage().bucket();
       const file = bucket.file(storagePath);

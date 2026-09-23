@@ -11,7 +11,9 @@ import { getAuthErrorMessage } from '@/features/auth/utils/authErrors';
 import { Input } from '@/components/ui/Input';
 import { Button } from '@/components/ui/Button';
 import { StyledLink } from '@/components/ui/Link';
+import { GoogleSignInButton } from '@/features/auth/components/GoogleSignInButton';
 import type { ValidationErrors } from '@/features/auth/types';
+import { callFunction } from '@/services/api';
 
 interface SignupFormProps {
   _onSuccess?: () => void;
@@ -25,6 +27,8 @@ export function SignupForm({ _onSuccess }: SignupFormProps) {
   const [generalError, setGeneralError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [showVerificationNotice, setShowVerificationNotice] = useState(false);
+  const [termsAccepted, setTermsAccepted] = useState(false);
+  const [termsError, setTermsError] = useState('');
 
   const validateField = (name: string, value: string) => {
     let error: string | undefined;
@@ -45,6 +49,7 @@ export function SignupForm({ _onSuccess }: SignupFormProps) {
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     setGeneralError('');
+    setTermsError('');
 
     const validationErrors = validateSignupForm(email, password, confirmPassword);
     if (Object.keys(validationErrors).length > 0) {
@@ -52,9 +57,27 @@ export function SignupForm({ _onSuccess }: SignupFormProps) {
       return;
     }
 
+    if (!termsAccepted) {
+      setTermsError('You must agree to the Terms of Service and Privacy Policy to continue.');
+      return;
+    }
+
     setIsLoading(true);
     try {
       await signupWithEmailPassword(email, password);
+      // Record consent server-side (server timestamp + server-chosen
+      // version — see recordConsentAcceptance.ts). Best-effort: if this
+      // call fails, the account still exists and the user can still use
+      // the product; we surface a soft warning rather than blocking signup
+      // on a secondary write.
+      try {
+        await callFunction<{ accepted: true }, { success: boolean }>({
+          functionName: 'recordConsentAcceptance',
+          data: { accepted: true },
+        });
+      } catch (consentError) {
+        console.error('Failed to record consent acceptance', consentError);
+      }
       // Show verification notice instead of redirecting to dashboard
       setShowVerificationNotice(true);
     } catch (error) {
@@ -181,6 +204,40 @@ export function SignupForm({ _onSuccess }: SignupFormProps) {
         required
       />
 
+      <div>
+        <label className="flex items-start gap-2 text-sm">
+          <input
+            type="checkbox"
+            className="mt-0.5"
+            checked={termsAccepted}
+            onChange={(e) => {
+              setTermsAccepted(e.target.checked);
+              if (e.target.checked) setTermsError('');
+            }}
+            disabled={isLoading}
+            required
+            aria-invalid={!!termsError}
+            aria-describedby={termsError ? 'terms-error' : undefined}
+          />
+          <span className="text-text-secondary">
+            I agree to the{' '}
+            <StyledLink href="/terms" variant="primary" size="sm">
+              Terms of Service
+            </StyledLink>{' '}
+            and{' '}
+            <StyledLink href="/privacy" variant="primary" size="sm">
+              Privacy Policy
+            </StyledLink>
+            .
+          </span>
+        </label>
+        {termsError && (
+          <p id="terms-error" className="text-error-600 mt-1 text-sm" role="alert">
+            {termsError}
+          </p>
+        )}
+      </div>
+
       <Button
         type="submit"
         variant="primary"
@@ -191,6 +248,24 @@ export function SignupForm({ _onSuccess }: SignupFormProps) {
       >
         Create account
       </Button>
+
+      <div className="flex items-center gap-3" role="separator">
+        <div className="border-border-light h-px flex-1 border-t" />
+        <span className="text-text-tertiary text-xs">or</span>
+        <div className="border-border-light h-px flex-1 border-t" />
+      </div>
+
+      {/* Same Terms/Privacy checkbox above gates this button too — Google
+          authenticating is not itself acceptance of Mitra's policies, so a
+          brand-new Google user who hasn't checked the box can't proceed via
+          Google either. An existing user isn't affected by this gate in
+          practice since they'd use the Google button on /login, not here. */}
+      <GoogleSignInButton
+        onSuccess={() => {
+          window.location.href = '/dashboard';
+        }}
+        disabled={!termsAccepted}
+      />
 
       <p className="text-text-secondary text-center text-sm">
         Already have an account?{' '}
