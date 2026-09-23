@@ -145,7 +145,7 @@ const generateCampaignStrategySchema = z.object({
 });
 
 export const generateCampaignStrategy = onCall(
-  { region: 'asia-south1', enforceAppCheck: true, maxInstances: 50 },
+  { region: 'asia-south1', enforceAppCheck: true, maxInstances: 50, timeoutSeconds: 540, memory: '2GiB' },
   validatedCallable(generateCampaignStrategySchema, async (data, context) => {
     const { logger, startTime } = logFunctionStart('generateCampaignStrategy', {
       userId: context.userId,
@@ -221,7 +221,7 @@ export const generateCampaignStrategy = onCall(
       // - Refund on failure
       const { result, creditsUsed } = await executeWithUsageControl(
         userId,
-        campaignId,
+        data.idempotencyKey,
         'campaign_generation',
         async () => {
           // Fetch brand kit, and (if an existing product was selected

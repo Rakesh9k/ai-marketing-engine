@@ -50,7 +50,7 @@ const regenerateAssetSchema = z.object({
 });
 
 export const regenerateAsset = onCall(
-  { region: 'asia-south1', enforceAppCheck: true, maxInstances: 20 },
+  { region: 'asia-south1', enforceAppCheck: true, maxInstances: 20, timeoutSeconds: 540, memory: '1GiB' },
   validatedCallable(regenerateAssetSchema, async (data, context) => {
     const { logger, startTime } = logFunctionStart('regenerateAsset', {
       userId: context.userId,

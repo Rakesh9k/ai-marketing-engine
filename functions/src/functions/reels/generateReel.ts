@@ -118,7 +118,7 @@ export const generateReel = onCall(
 
       const { result, creditsUsed } = await executeWithUsageControl(
         userId,
-        reelId,
+        data.idempotencyKey,
         'reel_generation',
         async () => {
           const brandKit = await getBrandKitDoc(data.businessId);
