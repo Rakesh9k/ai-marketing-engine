@@ -819,7 +819,7 @@ export class GenerationPipeline {
     const headline: string =
       copyPack?.headlines?.[0] || input.offerHeadline || input.productName || '';
 
-    const priceText = `₹${input.offerPrice}`;
+    const priceText = input.offerPrice ? `₹${input.offerPrice}` : undefined;
     const originalPriceText =
       input.offerOriginalPrice && input.offerOriginalPrice > input.offerPrice
         ? `₹${input.offerOriginalPrice}`
@@ -885,7 +885,7 @@ export class GenerationPipeline {
       { ...base },
       {
         ...base,
-        headline: base.offerBadge ? `${base.offerBadge} — ${base.priceText}` : base.priceText,
+        headline: base.offerBadge ? `${base.offerBadge} - ${base.priceText || ''}` : (base.priceText || 'Special Offer'),
       },
       { ...base, headline: base.ctaText },
     ];
@@ -911,9 +911,7 @@ export class GenerationPipeline {
         {
           sceneNumber: 3,
           durationSeconds: 4,
-          text: overlay.offerBadge
-            ? `${overlay.priceText} · ${overlay.offerBadge}`
-            : overlay.priceText,
+          text: overlay.offerBadge ? `${overlay.priceText || ''} - ${overlay.offerBadge}` : (overlay.priceText || 'Special Offer'),
         },
         { sceneNumber: 4, durationSeconds: 3, text: overlay.ctaText },
       ],
@@ -1404,12 +1402,12 @@ CONTEXT HIERARCHY:
 ${templateContextSection}
 
 MANDATORY REQUIREMENTS:
-- Prices: ALWAYS use exact offer price (₹${input.offerPrice})
-- Business name: ${input.businessName}
-- WhatsApp number: ${input.whatsappNumber}
-- Location: ${input.businessLocation?.locality || input.businessLocation?.city}
-- Product: ${input.productName}
-- NO invented dishes, hours, reviews, guarantees, medical claims
+  ${input.offerPrice ? `- Prices: ALWAYS use exact offer price (₹${input.offerPrice})` : `- Prices: No specific discount price provided, focus on value/benefits.`}
+  ${input.businessName ? `- Business name: ${input.businessName}` : ``}
+  ${input.whatsappNumber ? `- WhatsApp number: ${input.whatsappNumber}` : ``}
+  ${(input.businessLocation?.locality || input.businessLocation?.city) ? `- Location: ${input.businessLocation?.locality || input.businessLocation?.city}` : ``}
+  ${input.productName ? `- Product: ${input.productName}` : ``}
+  - NO invented dishes, hours, reviews, guarantees, medical claims
 - Language: ${input.localizationProfile?.primaryLanguage} + ${input.localizationProfile?.secondaryLanguage} with ${input.localizationProfile?.languageMixing} mixing
 - Regional style: ${input.localizationProfile?.regionalStyle}
 - Campaign style: ${input.campaignStyle}

@@ -33,7 +33,7 @@ export interface CreativeTextOverlay {
   businessName: string;
   productName?: string;
   headline: string;
-  priceText: string; // e.g. "₹299" — pre-formatted, deterministic, from verified offer data
+  priceText?: string; // e.g. "₹299" — pre-formatted, deterministic, from verified offer data
   originalPriceText?: string; // e.g. "₹332" struck through
   offerBadge?: string; // e.g. "10% OFF" — only ever the server-computed authorized value
   ctaText: string;
@@ -147,18 +147,20 @@ export function composeCreativeSVG(
   lines.push(headlineSpans);
   cursorY += headlineLines.length * (headlineFontSize + 6) + 14;
 
-  const priceFontSize = format === 'story' ? 48 : 42;
-  let priceLine = `<text x="${margin}" y="${cursorY + priceFontSize}" font-family="Arial, sans-serif" font-weight="800" font-size="${priceFontSize}" fill="${brand.accentColor}">${escapeSvgText(overlay.priceText)}</text>`;
-  let priceLineWidth = overlay.priceText.length * priceFontSize * 0.6;
-  if (overlay.originalPriceText) {
-    const origX = margin + priceLineWidth + 16;
-    const origFontSize = Math.round(priceFontSize * 0.55);
-    const origY = cursorY + priceFontSize - Math.round(origFontSize * 0.35);
-    priceLine += `\n    <text x="${origX}" y="${origY}" font-family="Arial, sans-serif" font-size="${origFontSize}" fill="${brand.textColor}" opacity="0.75" text-decoration="line-through">${escapeSvgText(overlay.originalPriceText)}</text>`;
-    priceLineWidth += overlay.originalPriceText.length * origFontSize * 0.6 + 16;
+  const priceFontSize = format === `story` ? 48 : 42;
+  if (overlay.priceText) {
+    let priceLine = `<text x="${margin}" y="${cursorY + priceFontSize}" font-family="Arial, sans-serif" font-weight="800" font-size="${priceFontSize}" fill="${brand.accentColor}">${escapeSvgText(overlay.priceText)}</text>`;
+    let priceLineWidth = overlay.priceText.length * priceFontSize * 0.6;
+    if (overlay.originalPriceText) {
+      const origX = margin + priceLineWidth + 16;
+      const origFontSize = Math.round(priceFontSize * 0.55);
+      const origY = cursorY + priceFontSize - Math.round(origFontSize * 0.35);
+      priceLine += `\n    <text x="${origX}" y="${origY}" font-family="Arial, sans-serif" font-size="${origFontSize}" fill="${brand.textColor}" opacity="0.75" text-decoration="line-through">${escapeSvgText(overlay.originalPriceText)}</text>`;
+      priceLineWidth += overlay.originalPriceText.length * origFontSize * 0.6 + 16;
+    }
+    lines.push(priceLine);
+    cursorY += priceFontSize + 16;
   }
-  lines.push(priceLine);
-  cursorY += priceFontSize + 16;
 
   if (overlay.offerBadge) {
     const badgeText = escapeSvgText(overlay.offerBadge);
