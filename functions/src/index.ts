@@ -59,13 +59,18 @@ export { onUserDeletedHandler } from './functions/auth/onUserCreated';
 export { getUploadUrl } from './functions/assets/getUploadUrl';
 export { confirmUpload } from './functions/assets/confirmUpload';
 export { deleteAsset } from './functions/assets/deleteAsset';
-// Disabled third-party payment/subscription functions (require PAYU_SALT / PADDLE secrets)
+// Payments: Paddle is the primary (and only deployed) provider. Requires the
+// PADDLE_API_KEY / PADDLE_WEBHOOK_SECRET secrets and PADDLE_PRICE_ID_* config
+// (see docs/PAYMENT_GATEWAY.md).
+export { createPaddleCheckout } from './functions/subscriptions/createPaddleCheckout';
+export { cancelPaddleSubscription } from './functions/subscriptions/cancelPaddleSubscription';
+export { paddleWebhook } from './functions/webhooks/paddleWebhook';
+// PayU is kept in the repo for migration/rollback but deliberately NOT exported, so the
+// app can never present two competing payment flows. To roll back, re-enable these and
+// point src/app/billing/page.tsx back at createPayUPayment (see docs/PAYMENT_GATEWAY.md).
 // export { createPayUPayment } from './functions/subscriptions/createPayUPayment';
 // export { payuCallback } from './functions/webhooks/payuCallback';
 // export { payuWebhook } from './functions/webhooks/payuWebhook';
-// export { createPaddleCheckout } from './functions/subscriptions/createPaddleCheckout';
-// export { cancelPaddleSubscription } from './functions/subscriptions/cancelPaddleSubscription';
-// export { paddleWebhook } from './functions/webhooks/paddleWebhook';
 
 // M2 (Pass 2): scheduled reconciliation for stuck 'pending' credit
 // reservations (see reconcileStaleReservations.ts's own doc comment).
