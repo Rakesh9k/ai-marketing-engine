@@ -9,6 +9,8 @@ import type { Business, BrandKit, Product } from '@/types';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { MascotScene } from '@/components/mascot/MascotScene';
+import { PageSkeleton } from '@/components/motion/PageSkeleton';
+import { BusinessBrainGraph } from '@/components/motion/BusinessBrainGraph';
 
 /**
  * Phase 33 — "Your Business Profile": a customer-facing view over the
@@ -1348,14 +1350,7 @@ export default function BusinessProfilePage() {
   }, [selectedBusinessId, reload]);
 
   if (loading && !business) {
-    return (
-      <div className="flex min-h-screen items-center justify-center">
-        <div
-          className="border-brand-600 h-8 w-8 animate-spin rounded-full border-4 border-t-transparent"
-          aria-hidden="true"
-        />
-      </div>
-    );
+    return <PageSkeleton variant="form" />;
   }
 
   if (businesses.length === 0) {
@@ -1422,6 +1417,7 @@ export default function BusinessProfilePage() {
       </div>
 
       <div className="mx-auto max-w-4xl space-y-6">
+        <BusinessBrainGraph />
         <BusinessSection
           business={business}
           onSaved={(patch) => setBusiness({ ...business, ...patch } as Business)}
@@ -1492,6 +1488,24 @@ export default function BusinessProfilePage() {
             })
           }
         />
+
+        <div className="flex flex-col items-start justify-between gap-4 rounded-2xl border border-slate-200 bg-white p-6 shadow-xs sm:flex-row sm:items-center dark:border-slate-800 dark:bg-slate-900">
+          <div>
+            <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-100">
+              Social Media Connections
+            </h3>
+            <p className="text-sm text-slate-500 dark:text-slate-400">
+              Connect your Facebook Pages and Instagram Professional accounts to publish campaigns
+              directly.
+            </p>
+          </div>
+          <Link
+            href="/settings/social"
+            className="shrink-0 rounded-lg bg-blue-600 px-4 py-2 text-xs font-semibold text-white hover:bg-blue-700"
+          >
+            Manage Social Connections →
+          </Link>
+        </div>
       </div>
     </div>
   );

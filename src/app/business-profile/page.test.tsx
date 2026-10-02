@@ -119,8 +119,8 @@ describe('BusinessProfilePage (Phase 33)', () => {
 
   it('shows a loading spinner before the business list resolves', () => {
     getByUserIdMock.mockReturnValue(new Promise(() => {}));
-    const { container } = render(<BusinessProfilePage />);
-    expect(container.querySelector('.animate-spin')).toBeTruthy();
+    render(<BusinessProfilePage />);
+    expect(screen.getByRole('status', { name: /loading/i })).toBeInTheDocument();
   });
 
   it('shows a "no business" empty state when the user has no business set up', async () => {

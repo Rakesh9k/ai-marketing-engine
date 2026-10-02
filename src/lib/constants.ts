@@ -66,12 +66,8 @@ export const CAMPAIGN_STYLES = [
   { value: 'youthful', label: 'Youthful' },
 ] as const;
 
-export const SUBSCRIPTION_PLANS = [
-  { id: 'free', name: 'Free', price: 0, credits: 100 },
-  { id: 'starter', name: 'Starter', price: 499, credits: 500 },
-  { id: 'business', name: 'Business', price: 999, credits: 1200 },
-  { id: 'agency', name: 'Agency', price: 2499, credits: 3000 },
-] as const;
+// Plan prices/credits live in functions/src/config/pricing.ts (mirrored for display in
+// src/lib/config/pricing.ts). A stale duplicate used to live here and was removed.
 
 export const CREDIT_COSTS = {
   BASE_CAMPAIGN: 100,

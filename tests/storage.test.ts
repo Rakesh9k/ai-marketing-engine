@@ -77,10 +77,19 @@ describeIfEmulator('Storage Security Rules', () => {
     await expect(getMetadata(fileRef)).rejects.toThrow();
   });
 
-  test('User can write to own business assets', async () => {
+  // Phase 4 Storage Security Audit: businesses/{businessId}/{allPaths=**}
+  // write access was closed entirely (previously "allow read, write" for any
+  // business member) — no application code anywhere uses the client SDK to
+  // write here. Every real upload goes through a signed URL minted by
+  // getUploadUrl.ts/getReelClipUploadUrl.ts, confirmed server-side via
+  // confirmUpload.ts/confirmReelClipUpload.ts, neither of which is subject
+  // to these rules (Admin SDK bypasses them). The open client-SDK write path
+  // had no size or content-type limit at all — this test now proves that
+  // path is closed, not merely untested.
+  test('Business member CANNOT write to business assets via the client SDK (server-only, via signed URL + confirmUpload)', async () => {
     const user = testEnv!.authenticatedContext('user1', { businessIds: ['biz1'] });
     const fileRef = ref(user.storage(), 'businesses/biz1/assets/asset1/test.jpg');
-    await expect(uploadString(fileRef, 'test content')).resolves.toBeDefined();
+    await expect(uploadString(fileRef, 'test content')).rejects.toThrow();
   });
 
   test('User cannot write to other business assets', async () => {
@@ -89,10 +98,14 @@ describeIfEmulator('Storage Security Rules', () => {
     await expect(uploadString(fileRef, 'test content')).rejects.toThrow();
   });
 
-  test('User can write to their own temp uploads', async () => {
+  // Phase 4: temp/{userId}/{fileName} is unimplemented scaffolding — no code
+  // anywhere reads or writes it, and the "TTL enforced by Cloud Function"
+  // cleanup the old comment claimed does not exist. Closed entirely rather
+  // than left open with no size/content-type limit and no cleanup.
+  test('User CANNOT write to their own temp uploads (path closed — unused, no TTL cleanup ever existed)', async () => {
     const user = testEnv!.authenticatedContext('user1');
     const fileRef = ref(user.storage(), 'temp/user1/test.jpg');
-    await expect(uploadString(fileRef, 'test content')).resolves.toBeDefined();
+    await expect(uploadString(fileRef, 'test content')).rejects.toThrow();
   });
 
   test("User cannot write to another user's temp uploads", async () => {

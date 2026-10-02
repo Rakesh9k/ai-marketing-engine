@@ -3,7 +3,35 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/features/auth/hooks/useAuth';
 import { businessService, brandKitService } from '@/services/database';
+import { callFunction } from '@/services/api';
+import { uploadImage } from '@/features/asset/services/assetService';
+import { useToast } from '@/hooks/useToast';
+import { PageSkeleton } from '@/components/motion/PageSkeleton';
 import type { Business, BrandKit, BrandTone } from '@/types';
+
+const DEFAULT_BRAND_KIT_FIELDS = {
+  colors: {
+    primary: '#E84D1A',
+    secondary: '#FFFFFF',
+    accent: '#FFD700',
+    background: '#FFFFFF',
+    text: '#1A1A1A',
+  },
+  fonts: { heading: 'Poppins', body: 'Inter' },
+  tone: 'friendly' as BrandTone,
+  personality: '',
+  visualPreferences: '',
+  targetAudience: '',
+};
+
+function toFormData(initialData: BrandKit | null): Partial<BrandKit> {
+  return {
+    ...DEFAULT_BRAND_KIT_FIELDS,
+    ...initialData,
+    colors: { ...DEFAULT_BRAND_KIT_FIELDS.colors, ...initialData?.colors },
+    fonts: { ...DEFAULT_BRAND_KIT_FIELDS.fonts, ...initialData?.fonts },
+  };
+}
 
 function ColorInput({
   label,
@@ -147,30 +175,60 @@ function BrandKitForm({
   initialData,
   onSubmit,
   loading,
+  userId,
+  businessId,
 }: {
   initialData: BrandKit | null;
   onSubmit: (data: Partial<BrandKit>) => Promise<void>;
   loading: boolean;
+  userId: string;
+  businessId: string;
 }) {
-  const [formData, setFormData] = useState<Partial<BrandKit>>({
-    colors: {
-      primary: '#E84D1A',
-      secondary: '#FFFFFF',
-      accent: '#FFD700',
-      background: '#FFFFFF',
-      text: '#1A1A1A',
-    },
-    fonts: { heading: 'Poppins', body: 'Inter' },
-    tone: 'friendly' as BrandTone,
-    personality: '',
-    visualPreferences: '',
-    targetAudience: '',
-    logo: initialData?.logo,
-  });
+  const { showToast } = useToast();
+  const [formData, setFormData] = useState<Partial<BrandKit>>(() => toFormData(initialData));
+  const [uploadingLogo, setUploadingLogo] = useState<'primary' | 'secondary' | null>(null);
+  const [submitError, setSubmitError] = useState<string | null>(null);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    await onSubmit(formData);
+    setSubmitError(null);
+    try {
+      await onSubmit(formData);
+      showToast('Brand kit saved', 'success');
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed to save brand kit';
+      setSubmitError(message);
+      showToast(message, 'error');
+    }
+  };
+
+  const handleCancel = () => {
+    setFormData(toFormData(initialData));
+    setSubmitError(null);
+  };
+
+  const handleLogoSelect = async (slot: 'primary' | 'secondary', file: File) => {
+    setUploadingLogo(slot);
+    try {
+      const asset = await uploadImage(file, userId, businessId, 'logo');
+      setFormData((prev) => ({
+        ...prev,
+        logo: {
+          ...prev.logo,
+          [slot]: {
+            url: asset.previewUrl,
+            storagePath: asset.storagePath,
+            width: asset.width,
+            height: asset.height,
+          },
+        },
+      }));
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Logo upload failed';
+      showToast(message, 'error');
+    } finally {
+      setUploadingLogo(null);
+    }
   };
 
   return (
@@ -181,64 +239,56 @@ function BrandKitForm({
           <div>
             <label className="mb-2 block text-sm font-medium text-neutral-700">Primary Logo</label>
             <div className="flex items-center gap-4">
+              {formData.logo?.primary?.url && (
+                // eslint-disable-next-line @next/next/no-img-element -- Storage/signed-URL preview
+                <img
+                  src={formData.logo.primary.url}
+                  alt="Primary logo preview"
+                  className="h-10 w-10 rounded border border-neutral-200 object-contain"
+                />
+              )}
               <input
                 type="file"
                 accept="image/*"
+                disabled={uploadingLogo !== null}
                 onChange={(e) => {
                   const file = e.target.files?.[0];
-                  if (file) {
-                    const reader = new FileReader();
-                    reader.onload = (event) => {
-                      setFormData((prev) => ({
-                        ...prev,
-                        logo: {
-                          ...prev.logo,
-                          primary: {
-                            url: event.target?.result as string,
-                            storagePath: '',
-                            width: 0,
-                            height: 0,
-                          },
-                        },
-                      }));
-                    };
-                    reader.readAsDataURL(file);
-                  }
+                  if (file) void handleLogoSelect('primary', file);
                 }}
-                className="focus:ring-brand-500 w-full rounded-lg border border-neutral-300 bg-white px-3 py-2 text-sm text-neutral-900 focus:ring-2 focus:outline-none"
+                className="focus:ring-brand-500 w-full rounded-lg border border-neutral-300 bg-white px-3 py-2 text-sm text-neutral-900 focus:ring-2 focus:outline-none disabled:opacity-50"
               />
+              {uploadingLogo === 'primary' && (
+                <span className="text-sm text-neutral-500">Uploading…</span>
+              )}
             </div>
           </div>
           <div>
             <label className="mb-2 block text-sm font-medium text-neutral-700">
               Secondary Logo (optional)
             </label>
-            <input
-              type="file"
-              accept="image/*"
-              onChange={(e) => {
-                const file = e.target.files?.[0];
-                if (file) {
-                  const reader = new FileReader();
-                  reader.onload = (event) => {
-                    setFormData((prev) => ({
-                      ...prev,
-                      logo: {
-                        ...prev.logo,
-                        secondary: {
-                          url: event.target?.result as string,
-                          storagePath: '',
-                          width: 0,
-                          height: 0,
-                        },
-                      },
-                    }));
-                  };
-                  reader.readAsDataURL(file);
-                }
-              }}
-              className="focus:ring-brand-500 w-full rounded-lg border border-neutral-300 bg-white px-3 py-2 text-sm text-neutral-900 focus:ring-2 focus:outline-none"
-            />
+            <div className="flex items-center gap-4">
+              {formData.logo?.secondary?.url && (
+                // eslint-disable-next-line @next/next/no-img-element -- Storage/signed-URL preview
+                <img
+                  src={formData.logo.secondary.url}
+                  alt="Secondary logo preview"
+                  className="h-10 w-10 rounded border border-neutral-200 object-contain"
+                />
+              )}
+              <input
+                type="file"
+                accept="image/*"
+                disabled={uploadingLogo !== null}
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (file) void handleLogoSelect('secondary', file);
+                }}
+                className="focus:ring-brand-500 w-full rounded-lg border border-neutral-300 bg-white px-3 py-2 text-sm text-neutral-900 focus:ring-2 focus:outline-none disabled:opacity-50"
+              />
+              {uploadingLogo === 'secondary' && (
+                <span className="text-sm text-neutral-500">Uploading…</span>
+              )}
+            </div>
           </div>
         </div>
       </div>
@@ -351,16 +401,24 @@ function BrandKitForm({
         </div>
       </div>
 
+      {submitError && (
+        <p className="text-error-600 rounded-lg border border-red-200 bg-red-50 px-4 py-2 text-sm">
+          {submitError}
+        </p>
+      )}
+
       <div className="flex justify-end gap-3 border-t border-neutral-200 pt-4">
         <button
           type="button"
-          className="rounded-lg border border-neutral-300 px-4 py-2 text-sm font-medium text-neutral-700 hover:bg-neutral-50"
+          onClick={handleCancel}
+          disabled={loading || uploadingLogo !== null}
+          className="rounded-lg border border-neutral-300 px-4 py-2 text-sm font-medium text-neutral-700 hover:bg-neutral-50 disabled:pointer-events-none disabled:opacity-50"
         >
           Cancel
         </button>
         <button
           type="submit"
-          disabled={loading}
+          disabled={loading || uploadingLogo !== null}
           className="bg-brand-600 hover:bg-brand-700 rounded-lg px-4 py-2 text-sm font-medium text-white disabled:pointer-events-none disabled:opacity-50"
         >
           {loading ? 'Saving...' : 'Save Brand Kit'}
@@ -386,9 +444,16 @@ export default function BrandPage() {
         if (businessesData.length > 0) {
           const firstBusiness = businessesData[0]!;
           setSelectedBusinessId(firstBusiness.businessId);
+        } else {
+          // No business yet — there's nothing for the brand-kit effect below
+          // to load (it only runs when selectedBusinessId is set), so this
+          // was the one path that left `loading` stuck at `true` forever,
+          // spinning instead of showing the "No business set up yet" state.
+          setLoading(false);
         }
       } catch (err) {
         console.error(err);
+        setLoading(false);
       }
     }
     void loadBusinesses();
@@ -404,6 +469,7 @@ export default function BrandPage() {
           setBrandKit(brandKitData ?? null);
         } catch (err) {
           console.error(err);
+          setBrandKit(null);
         } finally {
           setLoading(false);
         }
@@ -414,30 +480,25 @@ export default function BrandPage() {
 
   const handleSubmit = async (data: Partial<BrandKit>) => {
     if (!selectedBusinessId) return;
+    setSaving(true);
     try {
-      setSaving(true);
-      await brandKitService.upsert({ businessId: selectedBusinessId, ...data } as BrandKit);
-    } catch (err) {
-      console.error(err);
+      // Writes go through the validated callables (hex colours, tone enum),
+      // not a direct client Firestore write — brand_kits is now
+      // server-write-only (see firestore.rules). create vs update is
+      // decided by whether a kit already exists for this business.
+      const functionName = brandKit ? 'updateBrandKit' : 'createBrandKit';
+      const result = await callFunction<Partial<BrandKit>, { brandKit: BrandKit }>({
+        functionName,
+        data: { businessId: selectedBusinessId, ...data },
+      });
+      setBrandKit(result.brandKit);
     } finally {
       setSaving(false);
     }
   };
 
-  const __handleSelectBusiness = (_businessId: string) => {
-    // Handler kept for future use
-  };
-  void __handleSelectBusiness;
-
   if (loading) {
-    return (
-      <div className="flex min-h-screen items-center justify-center">
-        <div
-          className="border-brand-600 h-8 w-8 animate-spin rounded-full border-4 border-t-transparent"
-          aria-hidden="true"
-        />
-      </div>
-    );
+    return <PageSkeleton variant="form" />;
   }
 
   return (
@@ -495,7 +556,17 @@ export default function BrandPage() {
         />
       ) : (
         <div className="mx-auto max-w-4xl">
-          <BrandKitForm initialData={brandKit} onSubmit={handleSubmit} loading={saving} />
+          <BrandKitForm
+            // Remounts (and re-seeds formData from the new business's
+            // brandKit) on business switch instead of carrying over the
+            // previous business's draft/logo.
+            key={selectedBusinessId}
+            initialData={brandKit}
+            onSubmit={handleSubmit}
+            loading={saving}
+            userId={user?.uid || ''}
+            businessId={selectedBusinessId || ''}
+          />
         </div>
       )}
     </div>

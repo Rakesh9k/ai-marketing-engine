@@ -114,10 +114,9 @@ export default function TermsPage() {
           7. Credits, subscriptions, and payments
         </h2>
         <p className="text-body text-text-secondary">
-          Paid plans are billed through PayU (some existing subscriptions predating this change may
-          still be billed through Razorpay until they lapse or are renewed). Credits are granted
-          when a payment is confirmed and are consumed as you generate campaign content. You can
-          cancel your subscription yourself from the Billing page — see our{' '}
+          Paid plans are billed through PayU. Credits are granted when a payment is confirmed and
+          are consumed as you generate campaign content. You can cancel your subscription yourself
+          from the Billing page — see our{' '}
           <Link href="/cancellation" className="text-brand-600 hover:underline">
             Cancellation Policy
           </Link>{' '}

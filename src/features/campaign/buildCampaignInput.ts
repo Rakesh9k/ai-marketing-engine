@@ -37,10 +37,12 @@ export function buildCampaignInput(
     businessId: business.businessId,
     templateId: state.templateId || undefined,
     styleId: state.styleId || undefined,
-    // For now, map the old objective to a valid creativeObjective for the backend if needed,
-    // or just rely on backend to use template defaults. We'll pass 'conversion' as a safe
-    // default if the backend strictly requires it, though the schema marks it optional.
-    creativeObjective: 'conversion',
+    // Left undefined: a hardcoded 'conversion' here used to make
+    // buildCreativeTemplateContext throw for any template whose objectives
+    // don't include 'conversion' (festival, new-launch, etc — 10 of 30
+    // templates), failing generation before the pipeline even starts. The
+    // server derives the right creativeObjective from the selected
+    // template and campaign objective instead (see generateCampaignStrategy.ts).
     objective: state.objective,
     productId: state.selectedProductId,
     offer: {

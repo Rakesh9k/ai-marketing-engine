@@ -3,11 +3,13 @@
 import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { v4 as uuidv4 } from 'uuid';
+import { motion, AnimatePresence, useReducedMotion } from 'motion/react';
 import {
   businessService,
   productService,
   subscriptionService,
   usageService,
+  campaignService,
 } from '@/services/database';
 import { callFunction } from '@/services/api';
 import { useToast } from '@/hooks/useToast';
@@ -35,6 +37,9 @@ import {
 } from '../constants';
 import type { Business, Product, Campaign, LanguageCode, RegionalStyle } from '@/types';
 import { MascotScene } from '@/components/mascot/MascotScene';
+import { MitraMark } from '@/components/ui/MitraMark';
+import { PageSkeleton } from '@/components/motion/PageSkeleton';
+import { MagneticWrap } from '@/components/motion/MagneticWrap';
 import { SavedStylePicker } from '@/features/style/components/SavedStylePicker';
 
 const STEP_TITLES = [
@@ -50,14 +55,27 @@ const STEP_TITLES = [
   'Review & Generate',
 ];
 
-// MVP restricts the wizard to en/te/te_en. If Business Brain has an out-of-scope
-// value (hi/hi_en) stored, fall back to English rather than exposing it.
+const MASCOT_MESSAGES: Record<
+  number,
+  { pose: 'curious' | 'idea' | 'explain' | 'cheer' | 'thinking'; text: string }
+> = {
+  1: { pose: 'curious', text: 'What type of creative are we building today?' },
+  2: { pose: 'idea', text: 'Got it. What are we promoting today?' },
+  3: { pose: 'idea', text: "Let's pick a layout tailored for your goal." },
+  4: { pose: 'curious', text: "Show me the product or service you're featuring." },
+  5: { pose: 'idea', text: "Set a clear offer that catches your customer's eye." },
+  6: { pose: 'thinking', text: "Now I'm shaping this for your target audience." },
+  7: { pose: 'curious', text: 'What action should your customers take next?' },
+  8: { pose: 'idea', text: 'Speak directly to your local audience in their language.' },
+  9: { pose: 'explain', text: 'Turning your idea into something people will want to see.' },
+  10: { pose: 'cheer', text: 'Almost ready. Review your campaign details before launch!' },
+};
+
 function normalizeLanguage(value: LanguageCode | undefined): LanguageCode {
   if (value === 'en' || value === 'te' || value === 'te_en') return value;
   return 'en';
 }
 
-// MVP restricts the wizard to neutral/hyderabadi.
 function normalizeRegionalStyle(value: RegionalStyle | undefined): RegionalStyle {
   if (value === 'neutral' || value === 'hyderabadi') return value;
   return 'neutral';
@@ -71,16 +89,8 @@ export function CampaignWizard({ userId }: CampaignWizardProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { showToast } = useToast();
+  const reduceMotion = useReducedMotion();
 
-  // Phase 12: a browser refresh mid-generation must resume the live
-  // progress view for the actual in-flight campaign, not silently drop
-  // the user back to the empty form — that would hide a real, already
-  // credit-reserved generation in progress and invite a genuine duplicate
-  // attempt (a second reservation for what the user believes is a first
-  // try). The in-flight campaignId is mirrored into the URL
-  // (?generating=<campaignId>) precisely so a full page reload can
-  // recover it; GenerationProgress itself always re-derives status from
-  // the authoritative Firestore document, never from anything client-held.
   const initialGeneratingId = searchParams.get('generating');
 
   const [businesses, setBusinesses] = useState<Business[]>([]);
@@ -104,8 +114,6 @@ export function CampaignWizard({ userId }: CampaignWizardProps) {
     initialGeneratingId
   );
 
-  // One idempotency key per wizard attempt; regenerated only if the user
-  // explicitly retries after a failure (a fresh attempt), never on re-render.
   const idempotencyKeyRef = useRef<string>(uuidv4());
   const submitLockRef = useRef(false);
 
@@ -114,10 +122,6 @@ export function CampaignWizard({ userId }: CampaignWizardProps) {
     [businesses, businessId]
   );
 
-  // Phase 30: only show objectives/CTAs/offer types appropriate for this
-  // business's vertical — e.g. a salon must never be offered "Book a
-  // Table". Defaults to restaurant's list if the business hasn't loaded
-  // yet, matching this app's existing restaurant-first behavior.
   const vertical = business?.category || 'restaurant';
   const availableObjectives = useMemo(
     () => OBJECTIVES.filter((o) => VERTICAL_OBJECTIVES[vertical].includes(o.value)),
@@ -131,21 +135,12 @@ export function CampaignWizard({ userId }: CampaignWizardProps) {
     () => OFFER_TYPES.filter((o) => VERTICAL_OFFER_TYPES[vertical].includes(o.value)),
     [vertical]
   );
-  // Phase 31: the "product" step is really "what is this campaign about" —
-  // a dish, a service, or a property listing, depending on vertical.
+
   const itemNoun =
     vertical === 'salon' ? 'service' : vertical === 'real_estate' ? 'listing' : 'product';
   const itemNounPlural =
     vertical === 'salon' ? 'services' : vertical === 'real_estate' ? 'listings' : 'products';
 
-  // The credits balance shown in this wizard is informational display
-  // only (Phase 12: frontend state must not override backend state) — the
-  // actual reservation gate is always re-checked server-side in
-  // generateCampaignStrategy. refreshCredits() is called both on initial
-  // load and after a failed generation attempt, so a stale pre-attempt
-  // number is never shown as if it still reflects reality: whether credits
-  // were reserved-then-refunded, or never reserved at all, the displayed
-  // balance is re-fetched from the server rather than assumed.
   const refreshCredits = useCallback(async () => {
     try {
       const [subscription, usage] = await Promise.all([
@@ -160,7 +155,6 @@ export function CampaignWizard({ userId }: CampaignWizardProps) {
     }
   }, [userId]);
 
-  // Load businesses + credit balance
   useEffect(() => {
     let cancelled = false;
     async function load() {
@@ -368,7 +362,7 @@ export function CampaignWizard({ userId }: CampaignWizardProps) {
   }, [business, state]);
 
   const handleGenerate = useCallback(async () => {
-    if (submitLockRef.current) return; // double-click protection
+    if (submitLockRef.current) return;
     const input = buildCampaignInput();
     if (!business || !input) {
       setSubmitError('Please complete all required fields before generating.');
@@ -388,26 +382,40 @@ export function CampaignWizard({ userId }: CampaignWizardProps) {
         {
           functionName: 'generateCampaignStrategy',
           data: input,
+          timeoutMs: 540_000,
         }
       );
       setGeneratingCampaignId(response.campaignId);
       setPhase('generating');
-      // Mirror into the URL so a refresh resumes this exact campaign's
-      // progress view instead of resetting to the empty form.
       router.replace(`/campaigns/new?generating=${response.campaignId}`);
     } catch (err) {
       console.error(err);
+      const code = (err as { code?: string } | null)?.code || '';
       const message = err instanceof Error ? err.message : '';
-      // executeWithUsageControl (functions/src/services/usageControl.ts)
-      // always attempts a refund before re-throwing on failure, so by the
-      // time this catch runs, credits reserved for this attempt were
-      // either never taken (e.g. rejected before reservation) or
-      // reserved-then-refunded — never left charged. "Not charged" would
-      // be an inaccurate claim in the second case; "returned" is accurate
-      // in both (Phase 12: never assert a financial claim the frontend
-      // hasn't verified from backend state — refreshCredits() below is
-      // what actually lets the user see the real current balance rather
-      // than trusting this wording alone).
+
+      if (code.includes('deadline-exceeded')) {
+        try {
+          const existing = await campaignService.getByIdempotencyKey(
+            idempotencyKeyRef.current,
+            userId
+          );
+          if (existing) {
+            setGeneratingCampaignId(existing.campaignId);
+            setPhase('generating');
+            router.replace(`/campaigns/new?generating=${existing.campaignId}`);
+            return;
+          }
+        } catch (lookupErr) {
+          console.error('Failed to recover campaign after client timeout:', lookupErr);
+        }
+        setSubmitError(
+          'This is taking longer than expected. We’re still checking on it — please wait a moment and refresh.'
+        );
+        setPhase('failed');
+        void refreshCredits();
+        return;
+      }
+
       let friendly = 'We couldn’t start this campaign. Any reserved credits have been returned.';
       if (message.toLowerCase().includes('credit')) {
         friendly = "You don't have enough credits for this campaign.";
@@ -417,24 +425,15 @@ export function CampaignWizard({ userId }: CampaignWizardProps) {
       }
       setSubmitError(friendly);
       setPhase('failed');
-      // Allow a genuine retry (new attempt) with a fresh idempotency key.
       idempotencyKeyRef.current = uuidv4();
       submitLockRef.current = false;
       void refreshCredits();
     }
-  }, [buildCampaignInput, business, creditsRemaining, refreshCredits, router]);
+  }, [buildCampaignInput, business, creditsRemaining, refreshCredits, router, userId]);
 
   const handleSettled = useCallback(
     (campaign: Campaign) => {
       if (campaign.status === 'failed') {
-        // Truth Check failure is a completed generation that didn't pass
-        // verification — credits for that attempt are charged, not
-        // refunded (functions/src/functions/campaigns/
-        // generateCampaignStrategy.ts, consistent with regeneration's
-        // behavior). Any other failure reason is a pipeline exception,
-        // which IS refunded. Phase 12: never assert a financial outcome
-        // the backend hasn't actually reported — campaign.error.code is
-        // the authoritative signal for which case this is.
         const isTruthCheckFailure = campaign.error?.code === 'TRUTH_CHECK_FAILED';
         const fallbackMessage = isTruthCheckFailure
           ? 'Campaign generation completed, but some details could not be verified. Credits for this attempt were used. Please review and try again.'
@@ -444,9 +443,6 @@ export function CampaignWizard({ userId }: CampaignWizardProps) {
         idempotencyKeyRef.current = uuidv4();
         submitLockRef.current = false;
         void refreshCredits();
-        // Clear the resumable-generation marker — this attempt reached a
-        // terminal failed state, so a later refresh must land on the
-        // (now-editable) form again, not try to resume a dead campaign.
         router.replace('/campaigns/new');
         return;
       }
@@ -455,15 +451,66 @@ export function CampaignWizard({ userId }: CampaignWizardProps) {
     [router, refreshCredits]
   );
 
+  // Quick preset loader for suggestion pills
+  const applyQuickPreset = (preset: 'lunch' | 'combo' | 'festive') => {
+    const today = new Date().toISOString().split('T')[0]!;
+    const nextWeek = new Date(Date.now() + 7 * 86400000).toISOString().split('T')[0]!;
+
+    if (preset === 'lunch') {
+      setState((prev) => ({
+        ...prev,
+        type: 'post',
+        objective: 'weekend_offer',
+        offer: {
+          ...prev.offer,
+          type: 'percentage',
+          headline: 'Lunch Special 15% OFF',
+          originalPrice: '350',
+          price: '295',
+          description:
+            'Special lunch combo for tech park & office goers. Free delivery within 3km.',
+        },
+        duration: { start: today, end: nextWeek },
+        step: 4,
+      }));
+    } else if (preset === 'combo') {
+      setState((prev) => ({
+        ...prev,
+        type: 'post',
+        objective: 'weekend_offer',
+        offer: {
+          ...prev.offer,
+          type: 'fixed',
+          headline: 'Weekend Family Biryani Feast',
+          originalPrice: '799',
+          price: '599',
+          description: 'Serves 3-4 people. Includes 2 Special Biryanis + 2 Drinks + Dessert.',
+        },
+        duration: { start: today, end: nextWeek },
+        step: 4,
+      }));
+    } else if (preset === 'festive') {
+      setState((prev) => ({
+        ...prev,
+        type: 'post',
+        objective: 'festival',
+        offer: {
+          ...prev.offer,
+          type: 'percentage',
+          headline: 'Festive Season Celebration Offer',
+          originalPrice: '999',
+          price: '799',
+          description:
+            'Celebrate the festive season with authentic delights and special discounts.',
+        },
+        duration: { start: today, end: nextWeek },
+        step: 4,
+      }));
+    }
+  };
+
   if (loading) {
-    return (
-      <div className="flex min-h-[60vh] items-center justify-center">
-        <div
-          className="border-brand-600 h-8 w-8 animate-spin rounded-full border-4 border-t-transparent"
-          aria-hidden="true"
-        />
-      </div>
-    );
+    return <PageSkeleton variant="form" />;
   }
 
   if (loadError) {
@@ -477,7 +524,9 @@ export function CampaignWizard({ userId }: CampaignWizardProps) {
   if (businesses.length === 0) {
     return (
       <div className="bg-bg-primary min-h-screen p-8 text-center">
-        <p className="text-neutral-500">You need to set up a business before creating campaigns.</p>
+        <p className="text-text-secondary">
+          You need to set up a business before creating campaigns.
+        </p>
         <a href="/onboarding" className="mt-4 inline-block">
           <Button>Set up business</Button>
         </a>
@@ -490,792 +539,1044 @@ export function CampaignWizard({ userId }: CampaignWizardProps) {
   }
 
   const selectedProduct = products.find((p) => p.productId === state.selectedProductId) || null;
+  const currentMascot = MASCOT_MESSAGES[state.step] || {
+    pose: 'idea',
+    text: 'Working together with Mitra.',
+  };
+
+  const currentPreviewPhoto = state.photos[0]?.url || selectedProduct?.images?.[0]?.url || null;
+
+  const currentCTAObj = CTA_OPTIONS.find((c) => c.value === state.cta);
+
+  const workflowStages = [
+    { label: '1. Create', active: state.step <= 3 },
+    { label: '2. Customize', active: state.step >= 4 && state.step <= 6 },
+    { label: '3. Preview', active: state.step >= 7 && state.step <= 9 },
+    { label: '4. Publish', active: state.step === 10 },
+  ];
+
+  const optionCardClass = (isSelected: boolean) =>
+    `cursor-pointer rounded-xl border p-4 text-left transition-all duration-200 ease-out hover:-translate-y-[1px] hover:shadow-sm active:translate-y-0 ${
+      isSelected
+        ? 'border-brand-600 bg-brand-50 shadow-sm ring-1 ring-brand-600/30 dark:bg-amber-950/40 dark:border-amber-500'
+        : 'border-border-light bg-surface hover:bg-bg-secondary'
+    }`;
 
   return (
-    <div className="mx-auto max-w-3xl">
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold text-neutral-900">Create Campaign</h1>
-        <p className="mt-1 text-neutral-500">
-          Step {state.step} of {TOTAL_STEPS}: {STEP_TITLES[state.step - 1]}
-        </p>
-        <div
-          className="mt-3 h-2 w-full overflow-hidden rounded-full bg-neutral-200"
-          role="progressbar"
-          aria-valuenow={state.step}
-          aria-valuemin={1}
-          aria-valuemax={TOTAL_STEPS}
-          aria-label={`Step ${state.step} of ${TOTAL_STEPS}`}
-        >
-          <div
-            className="bg-brand-600 h-full rounded-full transition-all duration-300"
-            style={{ width: `${(state.step / TOTAL_STEPS) * 100}%` }}
-          />
-        </div>
-      </div>
-
-      {businesses.length > 1 && (
-        <div className="mb-6">
-          <label className="block text-sm font-medium text-neutral-900">Business</label>
-          <select
-            value={businessId || ''}
-            onChange={(e) => setBusinessId(e.target.value)}
-            className="focus:ring-brand-500 mt-1 w-full rounded-lg border border-neutral-300 bg-white px-3 py-2 text-sm text-neutral-900 focus:outline-none"
-          >
-            {businesses.map((b) => (
-              <option key={b.businessId} value={b.businessId}>
-                {b.name}
-              </option>
-            ))}
-          </select>
-        </div>
-      )}
-
-      {state.step === 1 && (
-        <div className="space-y-4">
-          <h2 className="mb-4 text-xl font-semibold">What do you want to create?</h2>
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-            <button
-              onClick={() => setState({ ...state, type: 'post', templateId: null })}
-              className={`rounded-lg border p-4 text-left transition-colors ${
-                state.type === 'post'
-                  ? 'border-brand-primary bg-brand-primary/5'
-                  : 'hover:border-gray-400'
-              }`}
-            >
-              <h3 className="mb-1 text-lg font-medium">Post</h3>
-              <p className="text-sm text-gray-600">Single image creative for feed.</p>
-            </button>
-            <button
-              onClick={() => setState({ ...state, type: 'reel', templateId: null })}
-              className={`rounded-lg border p-4 text-left transition-colors ${
-                state.type === 'reel'
-                  ? 'border-brand-primary bg-brand-primary/5'
-                  : 'hover:border-gray-400'
-              }`}
-            >
-              <h3 className="mb-1 text-lg font-medium">Reel</h3>
-              <p className="text-sm text-gray-600">Video creative for stories and reels.</p>
-            </button>
+    <div className="mx-auto max-w-7xl px-4 py-4 sm:px-6">
+      {/* Top Header & Subheader Bar */}
+      <div className="mb-6 rounded-2xl border border-amber-500/10 bg-slate-900/80 p-5 shadow-xl backdrop-blur-md">
+        <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+          <div>
+            <div className="flex items-center gap-2">
+              <h1 className="text-2xl font-bold tracking-tight text-white">AI Campaign Studio</h1>
+              <span className="rounded-full border border-amber-500/30 bg-amber-500/20 px-2.5 py-0.5 text-xs font-semibold text-amber-400">
+                Mitra 3.1 Pro Live
+              </span>
+            </div>
+            <p className="mt-1 text-xs text-slate-400">
+              Transform your intent into multi-format marketing campaigns powered by local
+              intelligence.
+            </p>
           </div>
-        </div>
-      )}
 
-      {state.step === 2 && (
-        <MascotScene
-          pose={state.objective ? 'idea' : 'curious'}
-          size="sm"
-          message={state.objective ? 'Got it.' : 'What are we promoting today?'}
-          className="mb-4"
-        />
-      )}
-
-      {state.step === 20 && (
-        <MascotScene pose="idea" size="sm" message="Ready when you are." className="mb-4" />
-      )}
-
-      <div className="rounded-lg border border-neutral-200 bg-white p-6">
-        {state.step === 2 && (
-          <fieldset>
-            <legend className="sr-only">Objective</legend>
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-              {availableObjectives.map((o) => (
-                <button
-                  key={o.value}
-                  type="button"
-                  onClick={() => setState((prev) => ({ ...prev, objective: o.value }))}
-                  aria-pressed={state.objective === o.value}
-                  className={`rounded-lg border p-4 text-left transition-colors ${
-                    state.objective === o.value
-                      ? 'border-brand-600 bg-brand-50'
-                      : 'border-neutral-200 hover:bg-neutral-50'
-                  }`}
-                >
-                  <p className="font-medium text-neutral-900">{o.label}</p>
-                  <p className="mt-1 text-sm text-neutral-500">{o.description}</p>
-                </button>
-              ))}
-            </div>
-          </fieldset>
-        )}
-
-        {state.step === 3 && (
-          <fieldset>
-            <legend className="sr-only">Creative Template</legend>
-            <div className="space-y-6">
-              {templates.length === 0 && (
-                <p className="text-sm text-neutral-500">Loading templates...</p>
-              )}
-
-              {recommendation?.recommended && (
-                <div className="border-brand-200 bg-brand-50 rounded-xl border p-5">
-                  <h3 className="text-brand-700 mb-1 text-sm font-semibold tracking-wider uppercase">
-                    Mitra recommends
-                  </h3>
-                  <p className="text-brand-600 mb-4 text-sm">
-                    {recommendation.recommended.reason.message}
-                  </p>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setState((prev) => ({
-                        ...prev,
-                        templateId: recommendation.recommended.templateId,
-                      }));
-                      trackCreativeEvent({
-                        eventType: 'creative_template_selected',
-                        businessId: business!.businessId,
-                        templateId: recommendation.recommended.templateId,
-                        creativeType: state.type || 'post',
-                        objective: state.objective || undefined,
-                      });
-                    }}
-                    aria-pressed={state.templateId === recommendation.recommended.templateId}
-                    className={`w-full rounded-lg border p-4 text-left transition-colors ${
-                      state.templateId === recommendation.recommended.templateId
-                        ? 'border-brand-600 ring-brand-600 bg-white ring-2'
-                        : 'border-brand-300 hover:bg-brand-50 bg-white'
-                    }`}
-                  >
-                    <p className="font-medium text-neutral-900">
-                      🔥 {recommendation.recommended.displayName}
-                    </p>
-                    <p className="mt-1 text-sm text-neutral-500">
-                      {recommendation.recommended.description}
-                    </p>
-                  </button>
-                </div>
-              )}
-
-              {templates.length > 0 && (
-                <div>
-                  {recommendation?.recommended && (
-                    <h3 className="mb-3 text-sm font-medium text-neutral-900">Other options</h3>
-                  )}
-                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                    {templates
-                      .filter((t) => t.id !== recommendation?.recommended?.templateId)
-                      .map((t) => (
-                        <button
-                          key={t.id}
-                          type="button"
-                          onClick={() => {
-                            setState((prev) => ({ ...prev, templateId: t.id }));
-                            trackCreativeEvent({
-                              eventType: 'creative_template_selected',
-                              businessId: business!.businessId,
-                              templateId: t.id,
-                              creativeType: state.type || 'post',
-                              objective: state.objective || undefined,
-                            });
-                          }}
-                          aria-pressed={state.templateId === t.id}
-                          className={`rounded-lg border p-4 text-left transition-colors ${
-                            state.templateId === t.id
-                              ? 'border-brand-600 bg-brand-50'
-                              : 'border-neutral-200 hover:bg-neutral-50'
-                          }`}
-                        >
-                          <p className="font-medium text-neutral-900">{t.name}</p>
-                          <p className="mt-1 text-sm text-neutral-500">{t.description}</p>
-                        </button>
-                      ))}
-                  </div>
-                </div>
-              )}
-            </div>
-
-            <div className="mt-6">
-              <SavedStylePicker
-                businessId={businessId}
-                value={state.styleId}
-                onChange={(styleId) => setState((prev) => ({ ...prev, styleId }))}
-              />
-            </div>
-          </fieldset>
-        )}
-
-        {state.step === 4 && (
-          <div className="space-y-6">
-            <div>
-              <h3 className="mb-3 text-sm font-medium text-neutral-900">Select a {itemNoun}</h3>
-              {products.length === 0 ? (
-                <div className="rounded-lg border border-dashed border-neutral-300 p-6 text-center">
-                  <p className="text-neutral-500">You don&apos;t have any {itemNounPlural} yet.</p>
-                  <a href="/products/new" className="mt-3 inline-block">
-                    <Button variant="outline">Add a product</Button>
-                  </a>
-                </div>
-              ) : (
-                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                  {products.map((p) => (
-                    <button
-                      key={p.productId}
-                      type="button"
-                      onClick={() =>
-                        setState((prev) => ({ ...prev, selectedProductId: p.productId }))
-                      }
-                      aria-pressed={state.selectedProductId === p.productId}
-                      className={`flex items-center gap-3 rounded-lg border p-3 text-left transition-colors ${
-                        state.selectedProductId === p.productId
-                          ? 'border-brand-600 bg-brand-50'
-                          : 'border-neutral-200 hover:bg-neutral-50'
-                      }`}
-                    >
-                      <div className="h-14 w-14 flex-shrink-0 overflow-hidden rounded-md bg-neutral-100">
-                        {p.images?.[0] && (
-                          // eslint-disable-next-line @next/next/no-img-element
-                          <img
-                            src={p.images[0].url}
-                            alt={p.name}
-                            className="h-full w-full object-cover"
-                          />
-                        )}
-                      </div>
-                      <div className="min-w-0">
-                        <p className="truncate font-medium text-neutral-900">{p.name}</p>
-                        <p className="text-sm text-neutral-500">
-                          ₹{p.price.toLocaleString('en-IN')}
-                        </p>
-                      </div>
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
-
-            <div>
-              <h3 className="mb-1 text-sm font-medium text-neutral-900">Campaign photos</h3>
-              <p className="mb-3 text-sm text-neutral-500">
-                Upload 1 to 5 photos for this campaign.
-              </p>
-              <div className="mb-3 grid grid-cols-3 gap-3 sm:grid-cols-5">
-                {state.photos.map((photo) => (
-                  <div
-                    key={photo.assetId}
-                    className="group relative aspect-square overflow-hidden rounded-md bg-neutral-100"
-                  >
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img src={photo.url} alt="Campaign" className="h-full w-full object-cover" />
-                    <button
-                      type="button"
-                      onClick={() => removePhoto(photo.assetId)}
-                      aria-label="Remove photo"
-                      className="absolute top-1 right-1 rounded-full bg-black/50 p-1 text-white hover:bg-black/70"
-                    >
-                      <svg
-                        className="h-3 w-3"
-                        fill="none"
-                        stroke="currentColor"
-                        viewBox="0 0 24 24"
-                        aria-hidden="true"
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth={2}
-                          d="M6 18L18 6M6 6l12 12"
-                        />
-                      </svg>
-                    </button>
-                  </div>
-                ))}
-              </div>
-              {state.photos.length < 5 && business && (
-                <ImageUploader
-                  key={state.photos.length}
-                  userId={userId}
-                  businessId={business.businessId}
-                  assetType="campaign"
-                  onUploadComplete={handlePhotoUploaded}
-                  onUploadError={(err) => showToast(err.message, 'error')}
-                />
-              )}
-            </div>
-          </div>
-        )}
-
-        {state.step === 5 && (
-          <div className="space-y-6">
-            <div>
-              <h3 className="mb-3 text-sm font-medium text-neutral-900">Offer</h3>
-              <div className="space-y-4">
-                <div>
-                  <label className="block text-sm font-medium text-neutral-900">Offer type *</label>
-                  <select
-                    value={state.offer.type || ''}
-                    onChange={(e) =>
-                      setState((prev) => ({
-                        ...prev,
-                        offer: { ...prev.offer, type: e.target.value as typeof prev.offer.type },
-                      }))
-                    }
-                    className="focus:ring-brand-500 mt-1 w-full rounded-lg border border-neutral-300 bg-white px-3 py-2 text-sm text-neutral-900 focus:outline-none"
-                  >
-                    <option value="">Select an offer type</option>
-                    {availableOfferTypes.map((o) => (
-                      <option key={o.value} value={o.value}>
-                        {o.label}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-neutral-900">Headline *</label>
-                  <input
-                    value={state.offer.headline}
-                    onChange={(e) =>
-                      setState((prev) => ({
-                        ...prev,
-                        offer: { ...prev.offer, headline: e.target.value },
-                      }))
-                    }
-                    type="text"
-                    maxLength={100}
-                    placeholder="e.g., Weekend Biryani Special"
-                    className="focus:ring-brand-500 mt-1 w-full rounded-lg border border-neutral-300 bg-white px-3 py-2 text-sm text-neutral-900 focus:outline-none"
-                  />
-                </div>
-                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                  <div>
-                    <label className="block text-sm font-medium text-neutral-900">
-                      {state.offer.type === 'percentage' || state.offer.type === 'fixed'
-                        ? 'Original price (₹)'
-                        : 'Original price (₹, optional)'}
-                    </label>
-                    <input
-                      value={state.offer.originalPrice}
-                      onChange={(e) =>
-                        setState((prev) => ({
-                          ...prev,
-                          offer: { ...prev.offer, originalPrice: e.target.value },
-                        }))
-                      }
-                      type="number"
-                      min="1"
-                      placeholder="e.g., 349"
-                      className="focus:ring-brand-500 mt-1 w-full rounded-lg border border-neutral-300 bg-white px-3 py-2 text-sm text-neutral-900 focus:outline-none"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-neutral-900">
-                      {state.offer.type === 'percentage' || state.offer.type === 'fixed'
-                        ? 'Price after discount (₹) *'
-                        : 'Offer price (₹) *'}
-                    </label>
-                    <input
-                      value={state.offer.price}
-                      onChange={(e) =>
-                        setState((prev) => ({
-                          ...prev,
-                          offer: { ...prev.offer, price: e.target.value },
-                        }))
-                      }
-                      type="number"
-                      min="1"
-                      placeholder="e.g., 299"
-                      className="focus:ring-brand-500 mt-1 w-full rounded-lg border border-neutral-300 bg-white px-3 py-2 text-sm text-neutral-900 focus:outline-none"
-                    />
-                  </div>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-neutral-900">
-                    Description (optional)
-                  </label>
-                  <textarea
-                    value={state.offer.description}
-                    onChange={(e) =>
-                      setState((prev) => ({
-                        ...prev,
-                        offer: { ...prev.offer, description: e.target.value.slice(0, 500) },
-                      }))
-                    }
-                    rows={2}
-                    className="focus:ring-brand-500 mt-1 w-full rounded-lg border border-neutral-300 bg-white px-3 py-2 text-sm text-neutral-900 focus:outline-none"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-neutral-900">
-                    Terms (optional)
-                  </label>
-                  <input
-                    value={state.offer.terms}
-                    onChange={(e) =>
-                      setState((prev) => ({
-                        ...prev,
-                        offer: { ...prev.offer, terms: e.target.value.slice(0, 1000) },
-                      }))
-                    }
-                    type="text"
-                    placeholder="e.g., Valid on dine-in only"
-                    className="focus:ring-brand-500 mt-1 w-full rounded-lg border border-neutral-300 bg-white px-3 py-2 text-sm text-neutral-900 focus:outline-none"
-                  />
-                </div>
-              </div>
-            </div>
-
-            <div>
-              <h3 className="mb-3 text-sm font-medium text-neutral-900">Duration</h3>
-              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                <div>
-                  <label className="block text-sm font-medium text-neutral-900">Start date *</label>
-                  <input
-                    value={state.duration.start}
-                    onChange={(e) =>
-                      setState((prev) => ({
-                        ...prev,
-                        duration: { ...prev.duration, start: e.target.value },
-                      }))
-                    }
-                    type="date"
-                    className="focus:ring-brand-500 mt-1 w-full rounded-lg border border-neutral-300 bg-white px-3 py-2 text-sm text-neutral-900 focus:outline-none"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-neutral-900">End date *</label>
-                  <input
-                    value={state.duration.end}
-                    onChange={(e) =>
-                      setState((prev) => ({
-                        ...prev,
-                        duration: { ...prev.duration, end: e.target.value },
-                      }))
-                    }
-                    type="date"
-                    className="focus:ring-brand-500 mt-1 w-full rounded-lg border border-neutral-300 bg-white px-3 py-2 text-sm text-neutral-900 focus:outline-none"
-                  />
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {state.step === 6 && (
-          <div className="space-y-4">
-            <div>
-              <label className="block text-sm font-medium text-neutral-900">Localities *</label>
-              <p className="mb-1 text-sm text-neutral-500">
-                Comma-separated areas you want to reach, e.g. Kondapur, Gachibowli
-              </p>
-              <input
-                value={state.audience.localities.join(', ')}
-                onChange={(e) =>
-                  setState((prev) => ({
-                    ...prev,
-                    audience: {
-                      ...prev.audience,
-                      localities: e.target.value
-                        .split(',')
-                        .map((l) => l.trim())
-                        .filter(Boolean)
-                        .slice(0, 10),
-                    },
-                  }))
-                }
-                type="text"
-                className="focus:ring-brand-500 mt-1 w-full rounded-lg border border-neutral-300 bg-white px-3 py-2 text-sm text-neutral-900 focus:outline-none"
-              />
-            </div>
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-              <div>
-                <label className="block text-sm font-medium text-neutral-900">
-                  Age range (min) *
-                </label>
-                <input
-                  value={state.audience.ageMin}
-                  onChange={(e) =>
-                    setState((prev) => ({
-                      ...prev,
-                      audience: { ...prev.audience, ageMin: e.target.value },
-                    }))
-                  }
-                  type="number"
-                  min="18"
-                  max="80"
-                  className="focus:ring-brand-500 mt-1 w-full rounded-lg border border-neutral-300 bg-white px-3 py-2 text-sm text-neutral-900 focus:outline-none"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-neutral-900">
-                  Age range (max) *
-                </label>
-                <input
-                  value={state.audience.ageMax}
-                  onChange={(e) =>
-                    setState((prev) => ({
-                      ...prev,
-                      audience: { ...prev.audience, ageMax: e.target.value },
-                    }))
-                  }
-                  type="number"
-                  min="18"
-                  max="80"
-                  className="focus:ring-brand-500 mt-1 w-full rounded-lg border border-neutral-300 bg-white px-3 py-2 text-sm text-neutral-900 focus:outline-none"
-                />
-              </div>
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-neutral-900">
-                Occasion (optional)
-              </label>
+          <div className="flex flex-wrap items-center gap-3">
+            {/* Business Switcher */}
+            {businesses.length > 1 && (
               <select
-                value={state.audience.occasion}
-                onChange={(e) =>
-                  setState((prev) => ({
-                    ...prev,
-                    audience: {
-                      ...prev.audience,
-                      occasion: e.target.value as typeof prev.audience.occasion,
-                    },
-                  }))
-                }
-                className="focus:ring-brand-500 mt-1 w-full rounded-lg border border-neutral-300 bg-white px-3 py-2 text-sm text-neutral-900 focus:outline-none"
+                value={businessId || ''}
+                onChange={(e) => setBusinessId(e.target.value)}
+                className="rounded-lg border border-slate-700 bg-slate-800 px-3 py-1.5 text-xs text-white focus:border-amber-500 focus:outline-none"
               >
-                <option value="">None</option>
-                {OCCASIONS.map((o) => (
-                  <option key={o.value} value={o.value}>
-                    {o.label}
+                {businesses.map((b) => (
+                  <option key={b.businessId} value={b.businessId}>
+                    {b.name}
                   </option>
                 ))}
               </select>
-            </div>
-          </div>
-        )}
-
-        {state.step === 7 && (
-          <fieldset>
-            <legend className="sr-only">Call to action</legend>
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-              {availableCTAs.map((c) => (
-                <button
-                  key={c.value}
-                  type="button"
-                  onClick={() => setState((prev) => ({ ...prev, cta: c.value }))}
-                  aria-pressed={state.cta === c.value}
-                  className={`rounded-lg border p-4 text-left transition-colors ${
-                    state.cta === c.value
-                      ? 'border-brand-600 bg-brand-50'
-                      : 'border-neutral-200 hover:bg-neutral-50'
-                  }`}
-                >
-                  <p className="font-medium text-neutral-900">{c.label}</p>
-                  <p className="mt-1 text-sm text-neutral-500">{c.description}</p>
-                </button>
-              ))}
-            </div>
-            {state.cta === 'order_whatsapp' && business?.contact.whatsapp && (
-              <p className="mt-3 text-sm text-neutral-500">
-                Customers will be directed to WhatsApp ({business.contact.whatsapp}).
-              </p>
             )}
-          </fieldset>
-        )}
 
-        {state.step === 8 && (
-          <div className="space-y-6">
-            <div>
-              <h3 className="mb-3 text-sm font-medium text-neutral-900">Language</h3>
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-                {LANGUAGES.map((l) => (
-                  <button
-                    key={l.value}
-                    type="button"
-                    onClick={() => setState((prev) => ({ ...prev, primaryLanguage: l.value }))}
-                    aria-pressed={state.primaryLanguage === l.value}
-                    className={`rounded-lg border p-3 text-center transition-colors ${
-                      state.primaryLanguage === l.value
-                        ? 'border-brand-600 bg-brand-50'
-                        : 'border-neutral-200 hover:bg-neutral-50'
-                    }`}
-                  >
-                    {l.label}
-                  </button>
-                ))}
-              </div>
-            </div>
-            <div>
-              <h3 className="mb-3 text-sm font-medium text-neutral-900">Regional style</h3>
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                {REGIONAL_STYLES.map((r) => (
-                  <button
-                    key={r.value}
-                    type="button"
-                    onClick={() => setState((prev) => ({ ...prev, regionalStyle: r.value }))}
-                    aria-pressed={state.regionalStyle === r.value}
-                    className={`rounded-lg border p-3 text-center transition-colors ${
-                      state.regionalStyle === r.value
-                        ? 'border-brand-600 bg-brand-50'
-                        : 'border-neutral-200 hover:bg-neutral-50'
-                    }`}
-                  >
-                    {r.label}
-                  </button>
-                ))}
-              </div>
+            {/* Credit Counter Badge */}
+            <div className="flex items-center gap-1.5 rounded-full border border-amber-500/30 bg-amber-500/10 px-3 py-1 text-xs font-medium text-amber-300">
+              <span>⚡</span>
+              <span>{creditsRemaining !== null ? `${creditsRemaining} Credits` : '—'}</span>
             </div>
           </div>
-        )}
+        </div>
 
-        {state.step === 9 && (
-          <fieldset>
-            <legend className="sr-only">Campaign style</legend>
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-              {CAMPAIGN_STYLES.map((c) => (
-                <button
-                  key={c.value}
-                  type="button"
-                  onClick={() => setState((prev) => ({ ...prev, campaignStyle: c.value }))}
-                  aria-pressed={state.campaignStyle === c.value}
-                  className={`rounded-lg border p-4 text-left transition-colors ${
-                    state.campaignStyle === c.value
-                      ? 'border-brand-600 bg-brand-50'
-                      : 'border-neutral-200 hover:bg-neutral-50'
-                  }`}
-                >
-                  <p className="font-medium text-neutral-900">{c.label}</p>
-                  <p className="mt-1 text-sm text-neutral-500">{c.description}</p>
-                </button>
-              ))}
+        {/* Quick Campaign Starter Pills */}
+        <div className="mt-4 flex flex-wrap items-center gap-2 border-t border-slate-800/80 pt-3">
+          <span className="text-xs font-medium text-slate-400">Quick Ideas:</span>
+          <button
+            type="button"
+            onClick={() => applyQuickPreset('lunch')}
+            className="rounded-full border border-slate-700 bg-slate-800/80 px-3 py-1 text-xs text-slate-300 transition-colors hover:border-amber-500/50 hover:bg-slate-700 hover:text-white"
+          >
+            🍱 Lunch Special 15% OFF
+          </button>
+          <button
+            type="button"
+            onClick={() => applyQuickPreset('combo')}
+            className="rounded-full border border-slate-700 bg-slate-800/80 px-3 py-1 text-xs text-slate-300 transition-colors hover:border-amber-500/50 hover:bg-slate-700 hover:text-white"
+          >
+            🍛 Weekend Biryani Combo
+          </button>
+          <button
+            type="button"
+            onClick={() => applyQuickPreset('festive')}
+            className="rounded-full border border-slate-700 bg-slate-800/80 px-3 py-1 text-xs text-slate-300 transition-colors hover:border-amber-500/50 hover:bg-slate-700 hover:text-white"
+          >
+            🎉 Festive Season Special
+          </button>
+        </div>
+
+        {/* Horizontal Workflow Stepper */}
+        <div className="mt-4 grid grid-cols-4 gap-2 border-t border-slate-800/60 pt-3 text-center text-xs">
+          {workflowStages.map((stage) => (
+            <div
+              key={stage.label}
+              className={`rounded-lg py-1.5 font-medium transition-all ${
+                stage.active
+                  ? 'bg-amber-500 font-semibold text-slate-950 shadow-sm'
+                  : 'bg-slate-800/50 text-slate-400'
+              }`}
+            >
+              {stage.label}
             </div>
-          </fieldset>
-        )}
+          ))}
+        </div>
+      </div>
 
-        {state.step === 20 && business && (
-          <div className="space-y-5 text-sm">
-            <section>
-              <h3 className="font-medium text-neutral-900">Business</h3>
-              <p className="text-neutral-600">{business.name}</p>
-              <p className="text-neutral-500">
-                {business.location.locality || business.location.city}, {business.location.state}
-              </p>
-            </section>
-            <section>
-              <h3 className="font-medium text-neutral-900">Objective</h3>
-              <p className="text-neutral-600">
-                {OBJECTIVES.find((o) => o.value === state.objective)?.label}
-              </p>
-            </section>
-            <section>
-              <h3 className="font-medium text-neutral-900">Creative Template</h3>
-              <p className="text-neutral-600">
-                {templates.find((t) => t.id === state.templateId)?.name || state.templateId}
-              </p>
-            </section>
-            <section>
-              <h3 className="font-medium text-neutral-900">Product</h3>
-              <p className="text-neutral-600">{selectedProduct?.name}</p>
-            </section>
-            <section>
-              <h3 className="font-medium text-neutral-900">Photos</h3>
-              <p className="text-neutral-600">
-                {state.photos.length} photo{state.photos.length === 1 ? '' : 's'}
-              </p>
-            </section>
-            <section>
-              <h3 className="font-medium text-neutral-900">Offer</h3>
-              <p className="text-neutral-600">
-                {OFFER_TYPES.find((o) => o.value === state.offer.type)?.label} &mdash;{' '}
-                {state.offer.headline}
-              </p>
-              <p className="text-neutral-500">
-                ₹{state.offer.price}
-                {state.offer.originalPrice ? ` (was ₹${state.offer.originalPrice})` : ''}
-              </p>
-            </section>
-            <section>
-              <h3 className="font-medium text-neutral-900">Duration</h3>
-              <p className="text-neutral-600">
-                {state.duration.start} to {state.duration.end}
-              </p>
-            </section>
-            <section>
-              <h3 className="font-medium text-neutral-900">Audience</h3>
-              <p className="text-neutral-600">{state.audience.localities.join(', ')}</p>
-              <p className="text-neutral-500">
-                Ages {state.audience.ageMin}&ndash;{state.audience.ageMax}
-                {state.audience.occasion ? ` · ${state.audience.occasion}` : ''}
-              </p>
-            </section>
-            <section>
-              <h3 className="font-medium text-neutral-900">Call to action</h3>
-              <p className="text-neutral-600">
-                {CTA_OPTIONS.find((c) => c.value === state.cta)?.label}
-              </p>
-            </section>
-            <section>
-              <h3 className="font-medium text-neutral-900">Language & regional style</h3>
-              <p className="text-neutral-600">
-                {LANGUAGES.find((l) => l.value === state.primaryLanguage)?.label} &middot;{' '}
-                {REGIONAL_STYLES.find((r) => r.value === state.regionalStyle)?.label}
-              </p>
-            </section>
-            <section>
-              <h3 className="font-medium text-neutral-900">Campaign style</h3>
-              <p className="text-neutral-600">
-                {CAMPAIGN_STYLES.find((c) => c.value === state.campaignStyle)?.label}
-              </p>
-            </section>
+      {/* 3-Column Studio Grid Layout */}
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-12">
+        {/* ============================================================ */}
+        {/* COLUMN 1: Step Inputs & Wizard Form Controls (5 cols)        */}
+        {/* ============================================================ */}
+        <div className="flex flex-col gap-4 lg:col-span-5">
+          <div className="border-border-light bg-surface flex-1 rounded-2xl border p-6 shadow-md">
+            {/* Header step title */}
+            <div className="border-border-light mb-4 flex items-center justify-between border-b pb-3">
+              <div>
+                <span className="text-brand-600 text-xs font-semibold tracking-wider uppercase">
+                  Step {state.step} of {TOTAL_STEPS}
+                </span>
+                <h2 className="text-text-primary text-xl font-bold tracking-tight">
+                  {STEP_TITLES[state.step - 1]}
+                </h2>
+              </div>
+              <MitraMark size="sm" decorative />
+            </div>
 
-            <section className="bg-brand-50 rounded-lg p-4">
-              <h3 className="font-medium text-neutral-900">Credits</h3>
-              <p className="text-neutral-600">Current balance: {creditsRemaining ?? '—'} credits</p>
-              <p className="text-neutral-600">
-                Estimated cost: {ESTIMATED_CAMPAIGN_GENERATION_CREDITS} credits
-              </p>
-              {creditsRemaining !== null && (
-                <p className="text-neutral-600">
-                  After generation:{' '}
-                  {Math.max(0, creditsRemaining - ESTIMATED_CAMPAIGN_GENERATION_CREDITS)} credits
-                  remaining
-                </p>
-              )}
-              {creditsRemaining !== null &&
-                creditsRemaining < ESTIMATED_CAMPAIGN_GENERATION_CREDITS && (
-                  <div className="mt-2">
-                    <p className="text-error-600 font-medium">
-                      Not enough credits to generate this campaign.
+            {/* Step Content */}
+            <AnimatePresence mode="wait">
+              <motion.div
+                key={state.step}
+                initial={reduceMotion ? { opacity: 1 } : { opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={reduceMotion ? { opacity: 0 } : { opacity: 0, y: -8 }}
+                transition={{ duration: 0.2, ease: 'easeOut' }}
+              >
+                {/* STEP 1: Creative Type */}
+                {state.step === 1 && (
+                  <div className="space-y-4">
+                    <p className="text-text-secondary text-sm">
+                      Select the format for your campaign.
                     </p>
-                    <a href="/billing" className="mt-1 inline-block">
-                      <Button variant="outline" size="sm">
-                        View billing options
-                      </Button>
-                    </a>
+                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                      <button
+                        type="button"
+                        onClick={() => setState({ ...state, type: 'post', templateId: null })}
+                        aria-pressed={state.type === 'post'}
+                        className={optionCardClass(state.type === 'post')}
+                      >
+                        <div className="mb-1 flex items-center justify-between">
+                          <h3 className="text-text-primary text-base font-semibold">Post</h3>
+                          {state.type === 'post' && (
+                            <span className="bg-brand-600 flex h-5 w-5 items-center justify-center rounded-full text-xs font-bold text-white">
+                              ✓
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-text-secondary text-xs">
+                          Single image 1:1 feed creative.
+                        </p>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setState({ ...state, type: 'reel', templateId: null })}
+                        aria-pressed={state.type === 'reel'}
+                        className={optionCardClass(state.type === 'reel')}
+                      >
+                        <div className="mb-1 flex items-center justify-between">
+                          <h3 className="text-text-primary text-base font-semibold">Reel</h3>
+                          {state.type === 'reel' && (
+                            <span className="bg-brand-600 flex h-5 w-5 items-center justify-center rounded-full text-xs font-bold text-white">
+                              ✓
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-text-secondary text-xs">
+                          Vertical 9:16 story & reel video.
+                        </p>
+                      </button>
+                    </div>
                   </div>
                 )}
-            </section>
 
-            {submitError && <p className="text-error-600">{submitError}</p>}
+                {/* STEP 2: Objective */}
+                {state.step === 2 && (
+                  <fieldset>
+                    <legend className="sr-only">Objective</legend>
+                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                      {availableObjectives.map((o) => {
+                        const isSelected = state.objective === o.value;
+                        return (
+                          <button
+                            key={o.value}
+                            type="button"
+                            onClick={() => setState((prev) => ({ ...prev, objective: o.value }))}
+                            aria-pressed={isSelected}
+                            className={optionCardClass(isSelected)}
+                          >
+                            <div className="flex items-center justify-between">
+                              <p className="text-text-primary text-sm font-medium">{o.label}</p>
+                              {isSelected && (
+                                <span className="bg-brand-600 flex h-4 w-4 items-center justify-center rounded-full text-xs font-bold text-white">
+                                  ✓
+                                </span>
+                              )}
+                            </div>
+                            <p className="text-text-secondary mt-1 text-xs">{o.description}</p>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </fieldset>
+                )}
+
+                {/* STEP 3: Template */}
+                {state.step === 3 && (
+                  <fieldset>
+                    <legend className="sr-only">Creative Template</legend>
+                    <div className="space-y-4">
+                      {templates.length === 0 && (
+                        <p className="text-text-secondary text-xs">Loading templates...</p>
+                      )}
+
+                      {recommendation?.recommended && (
+                        <div className="border-brand-200/60 bg-brand-50 rounded-xl border p-4">
+                          <h3 className="text-brand-700 mb-1 text-xs font-semibold tracking-wider uppercase">
+                            Mitra Recommends
+                          </h3>
+                          <p className="text-brand-600 mb-3 text-xs font-medium">
+                            {recommendation.recommended.reason.message}
+                          </p>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setState((prev) => ({
+                                ...prev,
+                                templateId: recommendation.recommended.templateId,
+                              }));
+                              trackCreativeEvent({
+                                eventType: 'creative_template_selected',
+                                businessId: business!.businessId,
+                                templateId: recommendation.recommended.templateId,
+                                creativeType: state.type || 'post',
+                                objective: state.objective || undefined,
+                              });
+                            }}
+                            aria-pressed={
+                              state.templateId === recommendation.recommended.templateId
+                            }
+                            className={optionCardClass(
+                              state.templateId === recommendation.recommended.templateId
+                            )}
+                          >
+                            <div className="flex items-center justify-between">
+                              <p className="text-text-primary text-sm font-semibold">
+                                🔥 {recommendation.recommended.displayName}
+                              </p>
+                              {state.templateId === recommendation.recommended.templateId && (
+                                <span className="bg-brand-600 flex h-4 w-4 items-center justify-center rounded-full text-xs font-bold text-white">
+                                  ✓
+                                </span>
+                              )}
+                            </div>
+                            <p className="text-text-secondary mt-1 text-xs">
+                              {recommendation.recommended.description}
+                            </p>
+                          </button>
+                        </div>
+                      )}
+
+                      {templates.length > 0 && (
+                        <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
+                          {templates
+                            .filter((t) => t.id !== recommendation?.recommended?.templateId)
+                            .map((t) => {
+                              const isSelected = state.templateId === t.id;
+                              return (
+                                <button
+                                  key={t.id}
+                                  type="button"
+                                  onClick={() => {
+                                    setState((prev) => ({ ...prev, templateId: t.id }));
+                                    trackCreativeEvent({
+                                      eventType: 'creative_template_selected',
+                                      businessId: business!.businessId,
+                                      templateId: t.id,
+                                      creativeType: state.type || 'post',
+                                      objective: state.objective || undefined,
+                                    });
+                                  }}
+                                  aria-pressed={isSelected}
+                                  className={optionCardClass(isSelected)}
+                                >
+                                  <div className="flex items-center justify-between">
+                                    <p className="text-text-primary text-xs font-semibold">
+                                      {t.name}
+                                    </p>
+                                    {isSelected && (
+                                      <span className="bg-brand-600 flex h-4 w-4 items-center justify-center rounded-full text-xs font-bold text-white">
+                                        ✓
+                                      </span>
+                                    )}
+                                  </div>
+                                  <p className="text-text-secondary mt-1 line-clamp-2 text-xs">
+                                    {t.description}
+                                  </p>
+                                </button>
+                              );
+                            })}
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="mt-4">
+                      <SavedStylePicker
+                        businessId={businessId}
+                        value={state.styleId}
+                        onChange={(styleId) => setState((prev) => ({ ...prev, styleId }))}
+                      />
+                    </div>
+                  </fieldset>
+                )}
+
+                {/* STEP 4: Product & Photos */}
+                {state.step === 4 && (
+                  <div className="space-y-4">
+                    <div>
+                      <h3 className="text-text-primary mb-2 text-xs font-semibold tracking-wider uppercase">
+                        Select a {itemNoun}
+                      </h3>
+                      {products.length === 0 ? (
+                        <div className="border-border-medium rounded-xl border border-dashed p-4 text-center">
+                          <p className="text-text-secondary text-xs">No {itemNounPlural} found.</p>
+                          <a href="/products/new" className="mt-2 inline-block">
+                            <Button variant="outline" size="sm">
+                              Add a {itemNoun}
+                            </Button>
+                          </a>
+                        </div>
+                      ) : (
+                        <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
+                          {products.map((p) => {
+                            const isSelected = state.selectedProductId === p.productId;
+                            return (
+                              <button
+                                key={p.productId}
+                                type="button"
+                                onClick={() =>
+                                  setState((prev) => ({ ...prev, selectedProductId: p.productId }))
+                                }
+                                aria-pressed={isSelected}
+                                className={`flex items-center gap-2.5 ${optionCardClass(isSelected)}`}
+                              >
+                                <div className="bg-bg-tertiary h-10 w-10 shrink-0 overflow-hidden rounded-md">
+                                  {p.images?.[0] && (
+                                    // eslint-disable-next-line @next/next/no-img-element
+                                    <img
+                                      src={p.images[0].url}
+                                      alt={p.name}
+                                      className="h-full w-full object-cover"
+                                    />
+                                  )}
+                                </div>
+                                <div className="min-w-0 flex-1">
+                                  <p className="text-text-primary truncate text-xs font-semibold">
+                                    {p.name}
+                                  </p>
+                                  <p className="text-text-secondary text-xs">
+                                    ₹{p.price.toLocaleString('en-IN')}
+                                  </p>
+                                </div>
+                                {isSelected && (
+                                  <span className="bg-brand-600 flex h-4 w-4 items-center justify-center rounded-full text-xs font-bold text-white">
+                                    ✓
+                                  </span>
+                                )}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
+
+                    <div>
+                      <h3 className="text-text-primary mb-1 text-xs font-semibold tracking-wider uppercase">
+                        Campaign photos
+                      </h3>
+                      <p className="text-text-secondary mb-2 text-xs">
+                        Upload 1 to 5 photos for this campaign.
+                      </p>
+                      <div className="mb-2 grid grid-cols-3 gap-2 sm:grid-cols-5">
+                        <AnimatePresence>
+                          {state.photos.map((photo) => (
+                            <motion.div
+                              key={photo.assetId}
+                              initial={reduceMotion ? { opacity: 1 } : { opacity: 0, scale: 0.9 }}
+                              animate={{ opacity: 1, scale: 1 }}
+                              exit={reduceMotion ? { opacity: 0 } : { opacity: 0, scale: 0.9 }}
+                              transition={{ duration: 0.2 }}
+                              className="bg-bg-tertiary group border-border-light relative aspect-square overflow-hidden rounded-lg border"
+                            >
+                              {/* eslint-disable-next-line @next/next/no-img-element */}
+                              <img
+                                src={photo.url}
+                                alt="Campaign"
+                                className="h-full w-full object-cover"
+                              />
+                              <button
+                                type="button"
+                                onClick={() => removePhoto(photo.assetId)}
+                                aria-label="Remove photo"
+                                className="absolute top-1 right-1 cursor-pointer rounded-full bg-black/50 p-1 text-white hover:bg-black/70"
+                              >
+                                <svg
+                                  className="h-3 w-3"
+                                  fill="none"
+                                  stroke="currentColor"
+                                  viewBox="0 0 24 24"
+                                >
+                                  <path
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                    strokeWidth={2}
+                                    d="M6 18L18 6M6 6l12 12"
+                                  />
+                                </svg>
+                              </button>
+                            </motion.div>
+                          ))}
+                        </AnimatePresence>
+                      </div>
+                      {state.photos.length < 5 && business && (
+                        <ImageUploader
+                          key={state.photos.length}
+                          userId={userId}
+                          businessId={business.businessId}
+                          assetType="campaign"
+                          onUploadComplete={handlePhotoUploaded}
+                          onUploadError={(err) => showToast(err.message, 'error')}
+                        />
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {/* STEP 5: Offer & Duration */}
+                {state.step === 5 && (
+                  <div className="space-y-4">
+                    <div>
+                      <label className="text-text-primary block text-xs font-semibold tracking-wider uppercase">
+                        Offer type *
+                      </label>
+                      <select
+                        value={state.offer.type || ''}
+                        onChange={(e) =>
+                          setState((prev) => ({
+                            ...prev,
+                            offer: {
+                              ...prev.offer,
+                              type: e.target.value as typeof prev.offer.type,
+                            },
+                          }))
+                        }
+                        className="border-border-medium bg-surface text-text-primary focus:ring-brand-500 mt-1 w-full rounded-lg border px-3 py-2 text-xs focus:outline-none"
+                      >
+                        <option value="">Select an offer type</option>
+                        {availableOfferTypes.map((o) => (
+                          <option key={o.value} value={o.value}>
+                            {o.label}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="text-text-primary block text-xs font-semibold tracking-wider uppercase">
+                        Headline *
+                      </label>
+                      <input
+                        value={state.offer.headline}
+                        onChange={(e) =>
+                          setState((prev) => ({
+                            ...prev,
+                            offer: { ...prev.offer, headline: e.target.value },
+                          }))
+                        }
+                        type="text"
+                        maxLength={100}
+                        placeholder="e.g., Weekend Biryani Special"
+                        className="border-border-medium bg-surface text-text-primary placeholder:text-text-tertiary focus:ring-brand-500 mt-1 w-full rounded-lg border px-3 py-2 text-xs focus:outline-none"
+                      />
+                    </div>
+
+                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                      <div>
+                        <label className="text-text-primary block text-xs font-semibold">
+                          Original price (₹)
+                        </label>
+                        <input
+                          value={state.offer.originalPrice}
+                          onChange={(e) =>
+                            setState((prev) => ({
+                              ...prev,
+                              offer: { ...prev.offer, originalPrice: e.target.value },
+                            }))
+                          }
+                          type="number"
+                          min="1"
+                          placeholder="e.g., 349"
+                          className="border-border-medium bg-surface text-text-primary placeholder:text-text-tertiary focus:ring-brand-500 mt-1 w-full rounded-lg border px-3 py-2 text-xs focus:outline-none"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-text-primary block text-xs font-semibold">
+                          Offer price (₹) *
+                        </label>
+                        <input
+                          value={state.offer.price}
+                          onChange={(e) =>
+                            setState((prev) => ({
+                              ...prev,
+                              offer: { ...prev.offer, price: e.target.value },
+                            }))
+                          }
+                          type="number"
+                          min="1"
+                          placeholder="e.g., 299"
+                          className="border-border-medium bg-surface text-text-primary placeholder:text-text-tertiary focus:ring-brand-500 mt-1 w-full rounded-lg border px-3 py-2 text-xs focus:outline-none"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 gap-3 pt-2 sm:grid-cols-2">
+                      <div>
+                        <label className="text-text-primary block text-xs font-semibold">
+                          Start date *
+                        </label>
+                        <input
+                          value={state.duration.start}
+                          onChange={(e) =>
+                            setState((prev) => ({
+                              ...prev,
+                              duration: { ...prev.duration, start: e.target.value },
+                            }))
+                          }
+                          type="date"
+                          className="border-border-medium bg-surface text-text-primary focus:ring-brand-500 mt-1 w-full rounded-lg border px-3 py-2 text-xs focus:outline-none"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-text-primary block text-xs font-semibold">
+                          End date *
+                        </label>
+                        <input
+                          value={state.duration.end}
+                          onChange={(e) =>
+                            setState((prev) => ({
+                              ...prev,
+                              duration: { ...prev.duration, end: e.target.value },
+                            }))
+                          }
+                          type="date"
+                          className="border-border-medium bg-surface text-text-primary focus:ring-brand-500 mt-1 w-full rounded-lg border px-3 py-2 text-xs focus:outline-none"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* STEP 6: Audience */}
+                {state.step === 6 && (
+                  <div className="space-y-4">
+                    <div>
+                      <label className="text-text-primary block text-xs font-semibold tracking-wider uppercase">
+                        Localities *
+                      </label>
+                      <p className="text-text-secondary mb-1 text-xs">
+                        Comma-separated target areas (e.g., Kondapur, Gachibowli)
+                      </p>
+                      <input
+                        value={state.audience.localities.join(', ')}
+                        onChange={(e) =>
+                          setState((prev) => ({
+                            ...prev,
+                            audience: {
+                              ...prev.audience,
+                              localities: e.target.value
+                                .split(',')
+                                .map((l) => l.trim())
+                                .filter(Boolean)
+                                .slice(0, 10),
+                            },
+                          }))
+                        }
+                        type="text"
+                        className="border-border-medium bg-surface text-text-primary placeholder:text-text-tertiary focus:ring-brand-500 mt-1 w-full rounded-lg border px-3 py-2 text-xs focus:outline-none"
+                      />
+                    </div>
+                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                      <div>
+                        <label className="text-text-primary block text-xs font-semibold">
+                          Min Age *
+                        </label>
+                        <input
+                          value={state.audience.ageMin}
+                          onChange={(e) =>
+                            setState((prev) => ({
+                              ...prev,
+                              audience: { ...prev.audience, ageMin: e.target.value },
+                            }))
+                          }
+                          type="number"
+                          min="18"
+                          max="80"
+                          className="border-border-medium bg-surface text-text-primary focus:ring-brand-500 mt-1 w-full rounded-lg border px-3 py-2 text-xs focus:outline-none"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-text-primary block text-xs font-semibold">
+                          Max Age *
+                        </label>
+                        <input
+                          value={state.audience.ageMax}
+                          onChange={(e) =>
+                            setState((prev) => ({
+                              ...prev,
+                              audience: { ...prev.audience, ageMax: e.target.value },
+                            }))
+                          }
+                          type="number"
+                          min="18"
+                          max="80"
+                          className="border-border-medium bg-surface text-text-primary focus:ring-brand-500 mt-1 w-full rounded-lg border px-3 py-2 text-xs focus:outline-none"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* STEP 7: Call to Action */}
+                {state.step === 7 && (
+                  <fieldset>
+                    <legend className="sr-only">Call to action</legend>
+                    <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
+                      {availableCTAs.map((c) => {
+                        const isSelected = state.cta === c.value;
+                        return (
+                          <button
+                            key={c.value}
+                            type="button"
+                            onClick={() => setState((prev) => ({ ...prev, cta: c.value }))}
+                            aria-pressed={isSelected}
+                            className={optionCardClass(isSelected)}
+                          >
+                            <div className="flex items-center justify-between">
+                              <p className="text-text-primary text-xs font-semibold">{c.label}</p>
+                              {isSelected && (
+                                <span className="bg-brand-600 flex h-4 w-4 items-center justify-center rounded-full text-xs font-bold text-white">
+                                  ✓
+                                </span>
+                              )}
+                            </div>
+                            <p className="text-text-secondary mt-1 text-xs">{c.description}</p>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </fieldset>
+                )}
+
+                {/* STEP 8: Language & Regional Style */}
+                {state.step === 8 && (
+                  <div className="space-y-4">
+                    <div>
+                      <h3 className="text-text-primary mb-2 text-xs font-semibold tracking-wider uppercase">
+                        Language
+                      </h3>
+                      <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+                        {LANGUAGES.map((l) => {
+                          const isSelected = state.primaryLanguage === l.value;
+                          return (
+                            <button
+                              key={l.value}
+                              type="button"
+                              onClick={() =>
+                                setState((prev) => ({ ...prev, primaryLanguage: l.value }))
+                              }
+                              aria-pressed={isSelected}
+                              className={`flex items-center justify-between ${optionCardClass(isSelected)}`}
+                            >
+                              <span className="text-text-primary text-xs font-medium">
+                                {l.label}
+                              </span>
+                              {isSelected && (
+                                <span className="bg-brand-600 flex h-4 w-4 items-center justify-center rounded-full text-xs font-bold text-white">
+                                  ✓
+                                </span>
+                              )}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                    <div>
+                      <h3 className="text-text-primary mb-2 text-xs font-semibold tracking-wider uppercase">
+                        Regional style
+                      </h3>
+                      <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                        {REGIONAL_STYLES.map((r) => {
+                          const isSelected = state.regionalStyle === r.value;
+                          return (
+                            <button
+                              key={r.value}
+                              type="button"
+                              onClick={() =>
+                                setState((prev) => ({ ...prev, regionalStyle: r.value }))
+                              }
+                              aria-pressed={isSelected}
+                              className={`flex items-center justify-between ${optionCardClass(isSelected)}`}
+                            >
+                              <span className="text-text-primary text-xs font-medium">
+                                {r.label}
+                              </span>
+                              {isSelected && (
+                                <span className="bg-brand-600 flex h-4 w-4 items-center justify-center rounded-full text-xs font-bold text-white">
+                                  ✓
+                                </span>
+                              )}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* STEP 9: Campaign Style */}
+                {state.step === 9 && (
+                  <fieldset>
+                    <legend className="sr-only">Campaign style</legend>
+                    <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
+                      {CAMPAIGN_STYLES.map((c) => {
+                        const isSelected = state.campaignStyle === c.value;
+                        return (
+                          <button
+                            key={c.value}
+                            type="button"
+                            onClick={() =>
+                              setState((prev) => ({ ...prev, campaignStyle: c.value }))
+                            }
+                            aria-pressed={isSelected}
+                            className={optionCardClass(isSelected)}
+                          >
+                            <div className="flex items-center justify-between">
+                              <p className="text-text-primary text-xs font-semibold">{c.label}</p>
+                              {isSelected && (
+                                <span className="bg-brand-600 flex h-4 w-4 items-center justify-center rounded-full text-xs font-bold text-white">
+                                  ✓
+                                </span>
+                              )}
+                            </div>
+                            <p className="text-text-secondary mt-1 text-xs">{c.description}</p>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </fieldset>
+                )}
+
+                {/* STEP 10: Review & Generate */}
+                {state.step === 10 && business && (
+                  <div className="space-y-4 text-xs">
+                    <div className="rounded-xl border border-amber-500/20 bg-amber-500/10 p-3">
+                      <h3 className="font-semibold text-amber-500">Ready to Generate Campaign</h3>
+                      <p className="text-text-secondary mt-0.5">
+                        Mitra will generate copy, posters, reel scripts, and targeted audience
+                        strategy.
+                      </p>
+                    </div>
+
+                    <div className="text-text-secondary grid grid-cols-2 gap-2">
+                      <div className="bg-bg-secondary rounded-lg p-2.5">
+                        <span className="text-text-primary block font-semibold">Business:</span>
+                        {business.name} ({business.location.city})
+                      </div>
+                      <div className="bg-bg-secondary rounded-lg p-2.5">
+                        <span className="text-text-primary block font-semibold">Offer:</span>
+                        {state.offer.headline || 'Offer set'} (₹{state.offer.price})
+                      </div>
+                      <div className="bg-bg-secondary rounded-lg p-2.5">
+                        <span className="text-text-primary block font-semibold">Target Area:</span>
+                        {state.audience.localities.join(', ')}
+                      </div>
+                      <div className="bg-bg-secondary rounded-lg p-2.5">
+                        <span className="text-text-primary block font-semibold">Dialect:</span>
+                        {LANGUAGES.find((l) => l.value === state.primaryLanguage)?.label}
+                      </div>
+                    </div>
+
+                    <div className="border-brand-200/60 bg-brand-50 rounded-xl border p-3 dark:bg-amber-950/20">
+                      <p className="text-text-primary font-semibold">Credits Summary</p>
+                      <p className="text-text-secondary">
+                        Current: {creditsRemaining ?? '—'} credits | Cost:{' '}
+                        {ESTIMATED_CAMPAIGN_GENERATION_CREDITS} credits
+                      </p>
+                    </div>
+
+                    {submitError && <p className="text-error-600 font-medium">{submitError}</p>}
+                  </div>
+                )}
+
+                {stepError && (
+                  <p className="text-error-600 mt-3 text-xs font-semibold">{stepError}</p>
+                )}
+              </motion.div>
+            </AnimatePresence>
+
+            {/* Navigation Action Buttons */}
+            <div className="border-border-light mt-6 flex gap-3 border-t pt-3">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={goBack}
+                disabled={state.step === 1 || phase === 'submitting'}
+                className="transition-transform duration-150 hover:-translate-y-[0.5px]"
+              >
+                Back
+              </Button>
+
+              {state.step < TOTAL_STEPS ? (
+                <Button
+                  type="button"
+                  onClick={validateAndNext}
+                  className="flex-1 transition-transform duration-150 hover:-translate-y-[0.5px]"
+                >
+                  Continue
+                </Button>
+              ) : (
+                <MagneticWrap className="flex-1" strength={5}>
+                <Button
+                  type="button"
+                  fullWidth
+                  onClick={handleGenerate}
+                  loading={phase === 'submitting'}
+                  disabled={
+                    phase === 'submitting' ||
+                    (creditsRemaining !== null &&
+                      creditsRemaining < ESTIMATED_CAMPAIGN_GENERATION_CREDITS)
+                  }
+                >
+                  {phase === 'submitting' ? 'Starting generation...' : 'Generate Campaign Strategy'}
+                </Button>
+                </MagneticWrap>
+              )}
+            </div>
           </div>
-        )}
+        </div>
 
-        {stepError && <p className="text-error-600 mt-4 text-sm">{stepError}</p>}
+        {/* ============================================================ */}
+        {/* COLUMN 2: Live AI Generation Flow & Business Context (3 cols) */}
+        {/* ============================================================ */}
+        <div className="flex flex-col gap-4 lg:col-span-3">
+          {/* AI Workflow Checklist Card */}
+          <div className="rounded-2xl border border-amber-500/20 bg-slate-900/90 p-4 shadow-md backdrop-blur-md">
+            <div className="mb-3 flex items-center gap-2 text-xs font-bold tracking-wider text-amber-400 uppercase">
+              <span className="relative flex h-2 w-2">
+                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-amber-400 opacity-75"></span>
+                <span className="relative inline-flex h-2 w-2 rounded-full bg-amber-500"></span>
+              </span>
+              AI Studio Status
+            </div>
 
-        <div className="mt-6 flex gap-3">
-          <Button
-            type="button"
-            variant="outline"
-            onClick={goBack}
-            disabled={state.step === 2 || phase === 'submitting'}
-          >
-            Back
-          </Button>
-          {state.step < TOTAL_STEPS ? (
-            <Button type="button" onClick={validateAndNext}>
-              Continue
-            </Button>
-          ) : (
-            <Button
-              type="button"
-              onClick={handleGenerate}
-              loading={phase === 'submitting'}
-              disabled={
-                phase === 'submitting' ||
-                (creditsRemaining !== null &&
-                  creditsRemaining < ESTIMATED_CAMPAIGN_GENERATION_CREDITS)
-              }
-            >
-              {phase === 'submitting' ? 'Starting generation...' : 'Generate Campaign'}
-            </Button>
-          )}
+            <div className="space-y-2.5 text-xs">
+              <div className="flex items-center gap-2 text-slate-300">
+                <span className="font-bold text-emerald-400">✓</span>
+                <span>Business Brain Synced</span>
+              </div>
+              <div className="flex items-center gap-2 text-slate-300">
+                <span
+                  className={
+                    state.selectedProductId || state.photos.length > 0
+                      ? 'font-bold text-emerald-400'
+                      : 'text-slate-600'
+                  }
+                >
+                  {state.selectedProductId || state.photos.length > 0 ? '✓' : '○'}
+                </span>
+                <span>Product / Media Selected</span>
+              </div>
+              <div className="flex items-center gap-2 text-slate-300">
+                <span
+                  className={state.offer.headline ? 'font-bold text-emerald-400' : 'text-slate-600'}
+                >
+                  {state.offer.headline ? '✓' : '○'}
+                </span>
+                <span>Offer Structured</span>
+              </div>
+              <div className="flex items-center gap-2 text-slate-300">
+                <span
+                  className={
+                    state.audience.localities.length > 0
+                      ? 'font-bold text-emerald-400'
+                      : 'text-slate-600'
+                  }
+                >
+                  {state.audience.localities.length > 0 ? '✓' : '○'}
+                </span>
+                <span>Localities Locked ({state.audience.localities.length || 0})</span>
+              </div>
+              <div className="flex items-center gap-2 text-slate-300">
+                <span
+                  className={
+                    state.primaryLanguage ? 'font-bold text-emerald-400' : 'text-slate-600'
+                  }
+                >
+                  {state.primaryLanguage ? '✓' : '○'}
+                </span>
+                <span>
+                  Dialect: {LANGUAGES.find((l) => l.value === state.primaryLanguage)?.label}
+                </span>
+              </div>
+            </div>
+          </div>
+
+          {/* Interactive Mascot Advice Card */}
+          <div className="border-border-light bg-surface flex flex-col items-center rounded-2xl border p-4 text-center shadow-sm">
+            <MascotScene
+              pose={currentMascot.pose}
+              size="md"
+              message={currentMascot.text}
+              align="center"
+            />
+          </div>
+
+          {/* Business Brain Intelligence Callout */}
+          <div className="space-y-2 rounded-2xl border border-slate-800 bg-slate-900/60 p-4 text-xs text-slate-300">
+            <div className="font-semibold text-amber-400">💡 Business Intelligence</div>
+            <p>
+              <strong className="text-white">{business?.name || ''}</strong> ·{' '}
+              {business?.location?.city || ''}
+            </p>
+            <p className="text-slate-400">
+              Targeting ages {state.audience.ageMin}–{state.audience.ageMax} across local
+              neighborhoods.
+            </p>
+          </div>
+        </div>
+
+        {/* ============================================================ */}
+        {/* COLUMN 3: Live Visual Campaign Preview Canvas (4 cols)       */}
+        {/* ============================================================ */}
+        <div className="flex flex-col gap-4 lg:col-span-4">
+          <div className="flex flex-col gap-3 rounded-2xl border border-amber-500/20 bg-slate-900 p-4 shadow-xl">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-semibold tracking-wider text-amber-400 uppercase">
+                Live Campaign Preview
+              </span>
+              <span className="rounded bg-slate-800 px-2 py-0.5 text-[10px] text-slate-400">
+                {state.type === 'reel' ? '9:16 Reel' : '1:1 Post'}
+              </span>
+            </div>
+
+            {/* Campaign Visual Canvas */}
+            <div className="relative flex aspect-square flex-col justify-between overflow-hidden rounded-xl border border-slate-700/80 bg-gradient-to-br from-amber-600/30 via-slate-900 to-amber-900/40 p-4 shadow-inner">
+              {/* Image / Graphic Background */}
+              {currentPreviewPhoto ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={currentPreviewPhoto}
+                  alt="Preview"
+                  className="absolute inset-0 h-full w-full object-cover opacity-60 mix-blend-overlay"
+                />
+              ) : (
+                <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-amber-500/20 via-slate-900 to-black opacity-80" />
+              )}
+
+              {/* Offer Badge Top Left */}
+              <div className="relative z-10 self-start">
+                <span className="rounded-full bg-amber-500 px-3 py-1 text-xs font-bold tracking-wider text-slate-950 uppercase shadow-lg">
+                  {state.offer.type === 'percentage' ? '20% OFF' : 'SPECIAL OFFER'}
+                </span>
+              </div>
+
+              {/* Offer Details Overlay Bottom */}
+              <div className="relative z-10 space-y-1.5 rounded-lg border border-slate-800 bg-slate-950/80 p-3 shadow-lg backdrop-blur-md">
+                <h4 className="text-sm leading-tight font-extrabold text-white">
+                  {state.offer.headline || 'Weekend Biryani Special'}
+                </h4>
+                <div className="flex items-center gap-2">
+                  <span className="text-base font-bold text-amber-400">
+                    ₹{state.offer.price || '299'}
+                  </span>
+                  {state.offer.originalPrice && (
+                    <span className="text-xs text-slate-400 line-through">
+                      ₹{state.offer.originalPrice}
+                    </span>
+                  )}
+                </div>
+
+                <div className="flex items-center justify-between border-t border-slate-800 pt-1 text-[11px]">
+                  <span className="font-semibold text-amber-300">
+                    {currentCTAObj?.label || 'Order on WhatsApp 💬'}
+                  </span>
+                  <span className="max-w-[120px] truncate text-slate-400">
+                    {business?.name || ''}
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            {/* Dialect / Language Badge */}
+            <div className="flex items-center justify-between pt-1 text-xs text-slate-400">
+              <span>Dialect:</span>
+              <span className="font-semibold text-slate-200">
+                {LANGUAGES.find((l) => l.value === state.primaryLanguage)?.label} (
+                {REGIONAL_STYLES.find((r) => r.value === state.regionalStyle)?.label})
+              </span>
+            </div>
+
+            {/* Export Format Badges */}
+            <div className="border-t border-slate-800 pt-2">
+              <span className="mb-2 block text-[11px] font-semibold text-slate-400">
+                Export Formats:
+              </span>
+              <div className="flex flex-wrap gap-1.5">
+                <span className="rounded bg-slate-800 px-2 py-1 font-mono text-[10px] text-slate-300">
+                  1:1 Feed Post
+                </span>
+                <span className="rounded bg-slate-800 px-2 py-1 font-mono text-[10px] text-slate-300">
+                  9:16 Story
+                </span>
+                <span className="rounded bg-slate-800 px-2 py-1 font-mono text-[10px] text-slate-300">
+                  WhatsApp Banner
+                </span>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
     </div>

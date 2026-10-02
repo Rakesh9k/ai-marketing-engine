@@ -19,13 +19,7 @@ process.env['NEXT_PUBLIC_FIREBASE_APP_ID'] = '1:12345:web:12345';
  * tests/security.test.ts, tests/phase27-authz.test.ts,
  * tests/phase27-bulk-approval-auth-roles.test.ts, and tests/storage.test.ts
  * all call expect(promise)['toSucceed']() / ['toDeny'](), but these custom
- * matchers were never actually registered anywhere in the codebase. Since
- * every one of those test files has always run in an environment where
- * FIRESTORE_EMULATOR_HOST is unset (self-skipping before ever reaching an
- * assertion), this was never caught — the matchers were dead references.
- * Implemented directly on top of @firebase/rules-unit-testing's own
- * assertSucceeds/assertFails, which is exactly what these matcher names
- * were always meant to wrap.
+ * matchers were never actually registered anywhere in the codebase.
  */
 expect.extend({
   async toSucceed(received: Promise<unknown>) {
@@ -53,11 +47,6 @@ expect.extend({
   },
 });
 
-// jsdom's window.crypto does not implement randomUUID (Node's own global
-// crypto does). Components that call crypto.randomUUID() (e.g. the
-// regenerate-asset idempotency key in CampaignDetailContent) crash in any
-// jsdom-environment test without this — this project had no .tsx component
-// tests before Phase 8, so it was never exercised.
 if (typeof window !== 'undefined' && window.crypto && !window.crypto.randomUUID) {
   // eslint-disable-next-line @typescript-eslint/no-var-requires
   const nodeCrypto = require('node:crypto');
@@ -65,9 +54,6 @@ if (typeof window !== 'undefined' && window.crypto && !window.crypto.randomUUID)
     nodeCrypto.randomUUID();
 }
 
-// Guarded: this setup file also runs for tests forced into the 'node'
-// environment (e.g. Firestore rules tests via the @jest-environment node
-// pragma), where `window` does not exist.
 if (typeof window !== 'undefined') {
   Object.defineProperty(window, 'matchMedia', {
     writable: true,
@@ -92,6 +78,28 @@ if (typeof window !== 'undefined') {
       clear: jest.fn(),
     },
   });
+
+  if (typeof window.IntersectionObserver === 'undefined') {
+    class IntersectionObserverMock {
+      readonly root: Element | null = null;
+      readonly rootMargin: string = '';
+      readonly thresholds: ReadonlyArray<number> = [];
+      disconnect = jest.fn();
+      observe = jest.fn();
+      takeRecords = jest.fn().mockReturnValue([]);
+      unobserve = jest.fn();
+    }
+    Object.defineProperty(window, 'IntersectionObserver', {
+      writable: true,
+      configurable: true,
+      value: IntersectionObserverMock,
+    });
+    Object.defineProperty(global, 'IntersectionObserver', {
+      writable: true,
+      configurable: true,
+      value: IntersectionObserverMock,
+    });
+  }
 }
 
 const originalConsoleError = console.error;

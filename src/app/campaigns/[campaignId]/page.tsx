@@ -9,6 +9,7 @@ import { callFunction } from '@/services/api';
 import type { Business, Campaign, CampaignAsset } from '@/types';
 import { CampaignDetailContent } from '@/components/campaign/CampaignDetailContent';
 import { MascotScene } from '@/components/mascot/MascotScene';
+import { MitraMark } from '@/components/ui/MitraMark';
 import { WrenchIllustration } from '@/components/illustrations/Illustrations';
 import { Button } from '@/components/ui/Button';
 
@@ -62,16 +63,29 @@ export default function CampaignDetailPage({ params: _params }: CampaignDetailPa
       try {
         setLoading(true);
         setLoadError(null);
-        const [campaignData, assetsData] = await Promise.all([
-          campaignService.get(campaignId),
-          campaignAssetService.listByCampaign(campaignId),
-        ]);
+        // Assets are loaded only after the campaign, since the
+        // campaign_assets read rule requires businessId (from the loaded
+        // campaign) — listing by campaignId alone is not enough for the
+        // rule to authorize the query. Wrapped separately so a denied or
+        // failed asset read degrades to an empty asset list instead of
+        // hiding the whole campaign (see 'Something got in the way').
+        const campaignData = await campaignService.get(campaignId);
         if (!campaignData) {
           setLoadError('not-found');
           return;
         }
         setCampaign(campaignData);
-        setAssets(assetsData);
+
+        try {
+          const assetsData = await campaignAssetService.listByCampaign(
+            campaignId,
+            campaignData.businessId
+          );
+          setAssets(assetsData);
+        } catch (assetsErr) {
+          console.error('Failed to load campaign assets:', assetsErr);
+          setAssets([]);
+        }
 
         // Best-effort: a failed business fetch must not block the campaign
         // page itself. CampaignDetailContent already handles business
@@ -122,10 +136,7 @@ export default function CampaignDetailPage({ params: _params }: CampaignDetailPa
     return (
       <div className="flex min-h-screen items-center justify-center">
         <div className="text-center">
-          <div
-            className="border-brand-600 mx-auto h-8 w-8 animate-spin rounded-full border-4 border-t-transparent"
-            aria-hidden="true"
-          />
+          <MitraMark size="lg" state="loading" decorative className="mx-auto" />
           <p className="mt-4 text-sm text-neutral-500">Loading your campaign...</p>
         </div>
       </div>

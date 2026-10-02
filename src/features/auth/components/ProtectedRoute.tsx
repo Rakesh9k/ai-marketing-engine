@@ -4,6 +4,7 @@ import type { ReactNode } from 'react';
 import { useEffect } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import { useAuthStatus } from '@/features/auth/hooks/useAuth';
+import { MitraMark } from '@/components/ui/MitraMark';
 
 interface ProtectedRouteProps {
   children: ReactNode;
@@ -28,10 +29,7 @@ export function ProtectedRoute({ children, fallback = null }: ProtectedRouteProp
         role="status"
         aria-label="Loading"
       >
-        <div
-          className="border-brand-600 h-8 w-8 animate-spin rounded-full border-4 border-t-transparent"
-          aria-hidden="true"
-        />
+        <MitraMark size="lg" state="loading" decorative />
       </div>
     );
   }
@@ -60,10 +58,7 @@ export function PublicOnlyRoute({ children, fallback = null }: ProtectedRoutePro
         role="status"
         aria-label="Loading"
       >
-        <div
-          className="border-brand-600 h-8 w-8 animate-spin rounded-full border-4 border-t-transparent"
-          aria-hidden="true"
-        />
+        <MitraMark size="lg" state="loading" decorative />
       </div>
     );
   }

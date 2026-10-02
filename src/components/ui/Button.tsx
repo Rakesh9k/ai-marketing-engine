@@ -1,7 +1,8 @@
 'use client';
 
 import type { ButtonHTMLAttributes } from 'react';
-import { forwardRef } from 'react';
+import { forwardRef, useState } from 'react';
+import { motion, useReducedMotion } from 'motion/react';
 
 export interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   variant?: 'primary' | 'secondary' | 'outline' | 'ghost' | 'danger';
@@ -20,22 +21,37 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
       loading = false,
       disabled,
       className = '',
+      onClick,
       ...props
     },
     ref
   ) => {
+    const reduceMotion = useReducedMotion();
+    const isDisabled = disabled || loading;
+    const [ripples, setRipples] = useState<{ id: number; x: number; y: number }[]>([]);
+
+    const handleClick = (e: React.MouseEvent<HTMLButtonElement>) => {
+      if (!reduceMotion && !isDisabled) {
+        const rect = e.currentTarget.getBoundingClientRect();
+        const id = Date.now() + Math.random();
+        setRipples((r) => [...r, { id, x: e.clientX - rect.left, y: e.clientY - rect.top }]);
+        window.setTimeout(() => setRipples((r) => r.filter((x) => x.id !== id)), 600);
+      }
+      onClick?.(e);
+    };
+
     const baseStyles =
-      'inline-flex items-center justify-center gap-2 font-medium rounded-md transition-colors duration-150 focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 disabled:opacity-50 disabled:pointer-events-none';
+      'relative overflow-hidden border-trace inline-flex items-center justify-center gap-2 font-medium rounded-md transition-colors duration-150 focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 disabled:opacity-50 disabled:pointer-events-none cursor-pointer disabled:cursor-not-allowed';
 
     const variantStyles = {
       primary:
-        'bg-brand-600 text-white hover:bg-brand-700 active:bg-brand-700 focus-visible:ring-brand-500',
+        'bg-brand-600 text-white hover:bg-brand-700 active:bg-brand-700 focus-visible:ring-brand-500 shadow-xs hover:shadow-sm',
       secondary:
-        'bg-neutral-100 text-neutral-900 hover:bg-neutral-200 active:bg-neutral-200 focus-visible:ring-neutral-400 border border-neutral-200',
+        'bg-bg-tertiary text-text-primary hover:bg-border-light active:bg-border-medium focus-visible:ring-brand-500 border border-border-light',
       outline:
-        'bg-transparent text-neutral-700 hover:bg-neutral-50 active:bg-neutral-100 focus-visible:ring-neutral-400 border border-neutral-300',
+        'bg-transparent text-text-primary hover:bg-bg-secondary active:bg-bg-tertiary focus-visible:ring-brand-500 border border-border-medium',
       ghost:
-        'bg-transparent text-neutral-600 hover:bg-neutral-100 active:bg-neutral-200 focus-visible:ring-neutral-400',
+        'bg-transparent text-text-secondary hover:bg-bg-secondary active:bg-bg-tertiary focus-visible:ring-brand-500',
       danger:
         'bg-error-50 text-error-600 hover:bg-error-100 active:bg-error-100 focus-visible:ring-error-500',
     };
@@ -50,11 +66,15 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
     const widthStyles = fullWidth ? 'w-full' : '';
 
     return (
-      <button
+      <motion.button
         ref={ref}
         className={`${baseStyles} ${variantStyles[variant]} ${sizeStyles[size]} ${widthStyles} ${className}`}
-        disabled={disabled || loading}
-        {...props}
+        disabled={isDisabled}
+        onClick={handleClick}
+        whileHover={isDisabled || reduceMotion ? undefined : { scale: 1.02 }}
+        whileTap={isDisabled || reduceMotion ? undefined : { scale: 0.97 }}
+        transition={{ type: 'spring', stiffness: 450, damping: 25 }}
+        {...(props as React.ComponentPropsWithoutRef<typeof motion.button>)}
       >
         {loading && (
           <svg
@@ -80,7 +100,15 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
           </svg>
         )}
         {children}
-      </button>
+        {ripples.map((r) => (
+          <span
+            key={r.id}
+            aria-hidden="true"
+            className="btn-ripple pointer-events-none absolute rounded-full bg-white/40"
+            style={{ left: r.x, top: r.y }}
+          />
+        ))}
+      </motion.button>
     );
   }
 );

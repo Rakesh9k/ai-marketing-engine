@@ -1,62 +1,38 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
+import { motion, useReducedMotion } from 'motion/react';
 import { useAuth } from '@/features/auth/hooks/useAuth';
 import { businessService } from '@/services/database';
 import { callFunction } from '@/services/api';
 
-import { Button } from '@/components/ui/Button';
-import { MitraShortLogo } from '@/components/ui/MitraShortLogo';
-import { MascotScene } from '@/components/mascot/MascotScene';
-import { SparkIllustration } from '@/components/illustrations/Illustrations';
-
 import { REGIONAL_STYLES, CAMPAIGN_STYLES } from '@/lib/constants';
 
-interface OnboardingService {
-  name: string;
-  category: 'hair' | 'skin' | 'nails' | 'makeup' | 'bridal' | 'spa' | 'grooming' | 'other';
-  price: string;
-}
+import { ScrollReactiveBackground } from '@/components/onboarding/ScrollReactiveBackground';
+import { OnboardingProgress } from '@/components/onboarding/OnboardingProgress';
+import { Step1Welcome } from '@/components/onboarding/Step1Welcome';
+import { Step2BusinessType } from '@/components/onboarding/Step2BusinessType';
+import { Step3Location } from '@/components/onboarding/Step3Location';
+import { Step4Contact } from '@/components/onboarding/Step4Contact';
+import { Step5Marketing } from '@/components/onboarding/Step5Marketing';
+import { Step6BrandStyle } from '@/components/onboarding/Step6BrandStyle';
+import { Step7Review } from '@/components/onboarding/Step7Review';
+import { Step8Completion } from '@/components/onboarding/Step8Completion';
 
-interface OnboardingPackage {
-  name: string;
-  price: string;
-}
+import type { OnboardingFormData, StepErrors } from '@/components/onboarding/types';
 
-interface OnboardingProperty {
-  title: string;
-  propertyType: 'apartment' | 'villa' | 'plot' | 'commercial' | 'other';
-  areaSqft: string;
-  bedrooms: string;
-  bathrooms: string;
-  price: string;
-  possessionStatus: 'ready_to_move' | 'under_construction' | 'upcoming';
-}
-
-function OnboardingPage() {
+export default function OnboardingPage() {
   const { user } = useAuth();
+  const reduceMotion = useReducedMotion();
   const [step, setStep] = useState(1);
-  const [form, setForm] = useState<{
-    name: string;
-    category: 'restaurant' | 'salon' | 'real_estate';
-    description?: string;
-    city: string;
-    state: string;
-    locality?: string;
-    address?: string;
-    phone: string;
-    whatsapp: string;
-    dining: 'dine-in' | 'takeaway' | 'delivery';
-    // Salon-only (Phase 30) — ignored entirely when category isn't 'salon'.
-    services: OnboardingService[];
-    packages: OnboardingPackage[];
-    bookingChannel: 'whatsapp' | 'phone' | 'in_person';
-    // Real-estate-only (Phase 31) — ignored entirely when category isn't 'real_estate'.
-    properties: OnboardingProperty[];
-    language: 'en' | 'te' | 'hi' | 'te_en' | 'hi_en';
-    regionalStyle: (typeof REGIONAL_STYLES)[number]['value'];
-    contentStyle: (typeof CAMPAIGN_STYLES)[number]['value'];
-  }>({
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  // Parallax mouse position & scroll velocity state
+  const [mousePos, setMousePos] = useState({ x: 0, y: 0 });
+  const [scrollVelocity, setScrollVelocity] = useState(0);
+
+  // Form State
+  const [form, setForm] = useState<OnboardingFormData>({
     name: '',
     category: 'restaurant',
     description: undefined,
@@ -64,52 +40,79 @@ function OnboardingPage() {
     state: '',
     locality: undefined,
     address: undefined,
+    pincode: undefined,
     phone: '',
     whatsapp: '',
+    email: undefined,
     dining: 'dine-in',
+    businessHours: {
+      openDays: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'],
+      openTime: '09:00',
+      closeTime: '22:00',
+      open7Days: true,
+    },
     services: [],
     packages: [],
     bookingChannel: 'whatsapp',
     properties: [],
     language: 'en',
+    goals: ['Get more customers', 'Promote special offers'],
     regionalStyle: 'neutral',
     contentStyle: 'funny',
   });
+
   const isSalon = form.category === 'salon';
   const isRealEstate = form.category === 'real_estate';
-  // Salon and real estate each insert one extra step (Services & Packages,
-  // or Properties) between Contact and Marketing Preferences — never both
-  // at once, since a business is exactly one category. Restaurant's step
-  // count and shape are completely unaffected either way.
   const hasExtraStep = isSalon || isRealEstate;
-  const totalSteps = hasExtraStep ? 6 : 5;
+
   const servicesStepNumber = 4;
   const marketingStepNumber = hasExtraStep ? 5 : 4;
   const reviewStepNumber = hasExtraStep ? 6 : 5;
-  const [errors, setErrors] = useState<{
-    name?: string;
-    category?: string;
-    city?: string;
-    state?: string;
-    phone?: string;
-    whatsapp?: string;
-    dining?: string;
-    services?: string;
-    properties?: string;
-    language?: string;
-    regionalStyle?: string;
-    contentStyle?: string;
-    general?: string;
-  }>({});
+  const totalSteps = hasExtraStep ? 6 : 5;
+
+  const [errors, setErrors] = useState<StepErrors>({});
   const [isSaving, setIsSaving] = useState(false);
 
+  // Ambient mouse & scroll physics listeners
+  useEffect(() => {
+    let lastScrollY = typeof window !== 'undefined' ? window.scrollY : 0;
+    let ticking = false;
+
+    const handleMouseMove = (e: MouseEvent) => {
+      const { innerWidth, innerHeight } = window;
+      const x = (e.clientX / innerWidth - 0.5) * 16;
+      const y = (e.clientY / innerHeight - 0.5) * 16;
+      setMousePos({ x, y });
+    };
+
+    const handleScroll = () => {
+      if (!ticking) {
+        window.requestAnimationFrame(() => {
+          const delta = window.scrollY - lastScrollY;
+          lastScrollY = window.scrollY;
+          setScrollVelocity(Math.min(Math.max(delta, -15), 15));
+          ticking = false;
+        });
+        ticking = true;
+      }
+    };
+
+    window.addEventListener('mousemove', handleMouseMove, { passive: true });
+    window.addEventListener('scroll', handleScroll, { passive: true });
+    return () => {
+      window.removeEventListener('mousemove', handleMouseMove);
+      window.removeEventListener('scroll', handleScroll);
+    };
+  }, []);
+
+  // Redirect if user already completed onboarding
   useEffect(() => {
     if (user) {
       const loadExisting = async () => {
         try {
           const businesses = await businessService.getByUserId(user.uid);
           if (businesses.length > 0) {
-            const existing = businesses.length > 0 ? businesses[0] : undefined;
+            const existing = businesses[0];
             if (existing?.status !== 'archived' && existing?.category) {
               setStep(100);
               return;
@@ -123,61 +126,50 @@ function OnboardingPage() {
     }
   }, [user]);
 
-  const handleNext = (e: React.FormEvent) => {
-    e.preventDefault();
-    setErrors({});
+  // Handle Step Validation & Advancement
+  const handleStepValidation = (currentStepNum: number) => {
+    const newErrors: StepErrors = {};
 
-    let isValid = true;
-    if (step === 1) {
+    if (currentStepNum === 1) {
       if (!form.name.trim()) {
-        setErrors((prev) => ({ ...prev, name: 'Business name is required' }));
-        isValid = false;
+        newErrors.name = 'Business name is required';
       }
       if (!form.category) {
-        setErrors((prev) => ({ ...prev, category: 'Business type is required' }));
-        isValid = false;
+        newErrors.category = 'Business type is required';
       }
-    } else if (step === 2) {
+    } else if (currentStepNum === 2) {
       if (!form.city.trim()) {
-        setErrors((prev) => ({ ...prev, city: 'City is required' }));
-        isValid = false;
+        newErrors.city = 'City is required';
       }
       if (!form.state.trim()) {
-        setErrors((prev) => ({ ...prev, state: 'State is required' }));
-        isValid = false;
+        newErrors.state = 'State is required';
       }
-    } else if (step === 3) {
+    } else if (currentStepNum === 3) {
       if (!form.phone.trim()) {
-        setErrors((prev) => ({ ...prev, phone: 'Phone number is required' }));
-        isValid = false;
+        newErrors.phone = 'Phone number is required';
       }
       if (!form.whatsapp.trim()) {
-        setErrors((prev) => ({ ...prev, whatsapp: 'WhatsApp number is required' }));
-        isValid = false;
+        newErrors.whatsapp = 'WhatsApp number is required';
       }
-    } else if (isSalon && step === servicesStepNumber) {
+    } else if (isSalon && currentStepNum === servicesStepNumber) {
       const validServices = form.services.filter((s) => s.name.trim() && s.price.trim());
       if (validServices.length === 0) {
-        setErrors((prev) => ({
-          ...prev,
-          services: 'Add at least one service with a name and price',
-        }));
-        isValid = false;
+        newErrors.services = 'Add at least one service with a name and price';
       }
-    } else if (isRealEstate && step === servicesStepNumber) {
+    } else if (isRealEstate && currentStepNum === servicesStepNumber) {
       const validProperties = form.properties.filter((p) => p.title.trim() && p.price.trim());
       if (validProperties.length === 0) {
-        setErrors((prev) => ({
-          ...prev,
-          properties: 'Add at least one property with a title and price',
-        }));
-        isValid = false;
+        newErrors.properties = 'Add at least one property with a title and price';
       }
-    } else if (step === marketingStepNumber) {
-      // Language and content style are optional but validated if provided
     }
 
-    if (!isValid) return;
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
+
+  const handleNext = (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    if (!handleStepValidation(step)) return;
     setStep((prev) => prev + 1);
   };
 
@@ -202,7 +194,7 @@ function OnboardingPage() {
           services?: Array<{
             id: string;
             name: string;
-            category: OnboardingService['category'];
+            category: 'hair' | 'skin' | 'nails' | 'makeup' | 'bridal' | 'spa' | 'grooming' | 'other';
             price: number;
             active: boolean;
           }>;
@@ -214,15 +206,15 @@ function OnboardingPage() {
           properties?: Array<{
             id: string;
             title: string;
-            propertyType: OnboardingProperty['propertyType'];
+            propertyType: 'apartment' | 'villa' | 'plot' | 'commercial' | 'other';
             areaSqft?: number;
             bedrooms?: number;
             bathrooms?: number;
             price: number;
-            possessionStatus: OnboardingProperty['possessionStatus'];
+            possessionStatus: 'ready_to_move' | 'under_construction' | 'upcoming';
             active: boolean;
           }>;
-          language: 'en' | 'te' | 'hi' | 'te_en' | 'hi_en';
+          language: 'en' | 'te' | 'hi' | 'ta' | 'te_en' | 'hi_en';
           regionalStyle: (typeof REGIONAL_STYLES)[number]['value'];
           contentStyle: (typeof CAMPAIGN_STYLES)[number]['value'];
         },
@@ -231,7 +223,7 @@ function OnboardingPage() {
         functionName: 'createBusiness',
         data: {
           name: form.name.trim(),
-          category: form.category,
+          category: form.category === 'other' ? 'restaurant' : form.category,
           description: form.description?.trim() || undefined,
           location: {
             city: form.city.trim(),
@@ -285,8 +277,8 @@ function OnboardingPage() {
                 }
               : { operatingMode: form.dining }),
           language: form.language,
-          regionalStyle: form.regionalStyle,
-          contentStyle: form.contentStyle,
+          regionalStyle: form.regionalStyle as (typeof REGIONAL_STYLES)[number]['value'],
+          contentStyle: form.contentStyle as (typeof CAMPAIGN_STYLES)[number]['value'],
         },
       });
       setStep(100);
@@ -300,874 +292,196 @@ function OnboardingPage() {
     }
   };
 
+  // Completion Screen (Step 100)
   if (step === 100) {
     return (
-      <div className="bg-bg-primary flex min-h-screen items-center justify-center p-8">
-        <MascotScene
-          pose="cheer"
-          size="lg"
-          align="center"
-          message="Your business is set up."
-          supporting="Let's create your first campaign."
-        >
-          <a href="/dashboard" className="mt-4 inline-block">
-            <Button>Go to Dashboard</Button>
-          </a>
-        </MascotScene>
-      </div>
+      <ScrollReactiveBackground mousePos={mousePos} scrollVelocity={scrollVelocity}>
+        <div className="py-12 px-4 max-w-5xl mx-auto min-h-screen flex items-center justify-center">
+          <Step8Completion />
+        </div>
+      </ScrollReactiveBackground>
     );
   }
 
   return (
-    <div className="bg-bg-primary min-h-screen">
-      <nav className="border-b border-neutral-200 bg-white">
-        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-          <div className="flex h-16 items-center justify-between px-4 sm:px-6">
-            <div className="text-brand-600 flex items-center gap-2 text-xl font-bold">
-              <MitraShortLogo size="lg" decorative />
-              Mitra
-            </div>
-            <div className="flex items-center gap-3">
-              <div className="flex gap-2">
-                {Array.from({ length: totalSteps }, (_, i) => i + 1).map((n) => (
-                  <div key={n} className="flex items-center gap-2">
-                    <div
-                      className={`h-8 w-8 rounded-full border-2 ${step >= n ? 'border-brand-600' : 'border-neutral-300'} bg-brand-600 ${step >= n ? 'text-white' : 'text-neutral-300'} flex items-center justify-center text-xs font-bold`}
-                    >
-                      {n}
-                    </div>
-                    {n < totalSteps && (
-                      <div
-                        className={`bg-brand-600 h-1 w-1 rounded-full ${step > n ? 'opacity-100' : 'opacity-0'}`}
-                      />
-                    )}
-                  </div>
-                ))}
-              </div>
-              <div className="text-sm text-neutral-500">
-                Step {step} of {totalSteps}
-              </div>
-            </div>
-          </div>
-        </div>
-      </nav>
+    <ScrollReactiveBackground mousePos={mousePos} scrollVelocity={scrollVelocity}>
+      <div ref={containerRef} className="min-h-screen flex flex-col font-sans pb-12">
+        {/* Animated Progress Header */}
+        <OnboardingProgress
+          currentStep={step}
+          totalSteps={totalSteps}
+          onStepClick={(targetStep) => setStep(targetStep)}
+        />
 
-      <main className="pb-8">
-        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-          <div className="py-8">
+        {/* Main Content Area */}
+        <main className="relative z-10 flex-1 max-w-6xl mx-auto w-full px-4 sm:px-6 py-6 sm:py-10 flex flex-col justify-center">
+          <motion.div
+            key={step}
+            initial={reduceMotion ? { opacity: 1 } : { opacity: 0, y: 12 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.25, ease: 'easeOut' }}
+          >
+            {/* Step 1: Welcome Hero & Business Basics */}
             {step === 1 && (
-              <MascotScene
-                pose="point"
-                size="lg"
-                message="Hey, I'm Mitra."
-                supporting="Let's turn your business into marketing you can actually use."
-                decoration={<SparkIllustration size={16} />}
-                className="mb-6"
-              />
-            )}
-            {step === 1 && (
-              <div className="rounded-lg border border-neutral-200 bg-white p-6">
-                <h2 className="mb-4 text-xl font-bold text-neutral-900">Business Basics</h2>
-                <p className="mb-4 text-neutral-500">
-                  Tell us about your business so we can set up your marketing correctly.
-                </p>
+              <div className="space-y-8">
+                <Step1Welcome onNext={() => handleNext()} mousePos={mousePos} />
 
-                <form className="space-y-4">
-                  <div>
-                    <label className="block text-sm font-medium text-neutral-900">
-                      Business Name *
-                    </label>
-                    <input
-                      value={form.name}
-                      onChange={(e) => setForm({ ...form, name: e.target.value })}
-                      type="text"
-                      required
-                      placeholder="e.g., Biryani House"
-                      className="focus:ring-brand-500 w-full rounded-lg border border-neutral-300 bg-white px-3 py-2 text-sm text-neutral-900 focus:outline-none"
-                    />
-                    {errors.name && <p className="text-error-600 mt-1 text-sm">{errors.name}</p>}
+                <div className="bg-white rounded-3xl border border-neutral-200/90 p-6 sm:p-8 shadow-sm">
+                  <div className="mb-4">
+                    <span className="text-xs font-extrabold uppercase tracking-wider text-[#E84D1A]">
+                      CHAPTER 1 — Business Identity
+                    </span>
+                    <h2 className="text-xl font-extrabold text-[#1A1A1E]">Business Basics</h2>
+                    <p className="text-sm text-neutral-500">
+                      Tell us about your business so we can set up your marketing correctly.
+                    </p>
                   </div>
 
-                  <div>
-                    <label className="block text-sm font-medium text-neutral-900">
-                      Business Type *
-                    </label>
-                    <div className="mt-2 grid grid-cols-3 gap-3">
-                      {(['restaurant', 'salon', 'real_estate'] as const).map((cat) => (
-                        <button
-                          key={cat}
-                          type="button"
-                          onClick={() => setForm({ ...form, category: cat })}
-                          aria-pressed={form.category === cat}
-                          className={`rounded-lg border p-3 text-left capitalize transition-colors ${
-                            form.category === cat
-                              ? 'border-brand-600 bg-brand-50 text-brand-600 font-medium'
-                              : 'border-neutral-200 text-neutral-700 hover:bg-neutral-50'
-                          }`}
-                        >
-                          {cat === 'real_estate' ? 'Real Estate' : cat}
-                        </button>
-                      ))}
-                    </div>
-                    {errors.category && (
-                      <p className="text-error-600 mt-1 text-sm">{errors.category}</p>
-                    )}
-                  </div>
-
-                  <div className="flex gap-3">
-                    <button type="button" onClick={handleBack} className="flex-1">
-                      Back
-                    </button>
-                    <button
-                      type="button"
-                      onClick={handleNext}
-                      disabled={Object.keys(errors).length > 0}
-                      className="flex-1"
-                    >
-                      Continue
-                    </button>
-                  </div>
-                </form>
-              </div>
-            )}
-
-            {step === 2 && (
-              <MascotScene
-                pose="curious"
-                size="sm"
-                message="Where are you based?"
-                className="mb-4"
-              />
-            )}
-            {step === 2 && (
-              <div className="rounded-lg border border-neutral-200 bg-white p-6">
-                <h2 className="mb-4 text-xl font-bold text-neutral-900">Location</h2>
-                <p className="mb-4 text-neutral-500">
-                  Your location helps us target customers in your area.
-                </p>
-
-                <form className="space-y-4">
-                  <div>
-                    <label className="block text-sm font-medium text-neutral-900">City *</label>
-                    <input
-                      value={form.city}
-                      onChange={(e) => setForm({ ...form, city: e.target.value })}
-                      type="text"
-                      required
-                      placeholder="e.g., Hyderabad"
-                      className="focus:ring-brand-500 w-full rounded-lg border border-neutral-300 bg-white px-3 py-2 text-sm text-neutral-900 focus:outline-none"
-                    />
-                    {errors.city && <p className="text-error-600 mt-1 text-sm">{errors.city}</p>}
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-neutral-900">State *</label>
-                    <input
-                      value={form.state}
-                      onChange={(e) => setForm({ ...form, state: e.target.value })}
-                      type="text"
-                      required
-                      placeholder="e.g., Telangana"
-                      className="focus:ring-brand-500 w-full rounded-lg border border-neutral-300 bg-white px-3 py-2 text-sm text-neutral-900 focus:outline-none"
-                    />
-                    {errors.state && <p className="text-error-600 mt-1 text-sm">{errors.state}</p>}
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-neutral-900">
-                      Locality / Area (Optional)
-                    </label>
-                    <input
-                      value={form.locality || ''}
-                      onChange={(e) => setForm({ ...form, locality: e.target.value || undefined })}
-                      type="text"
-                      placeholder="e.g., Kondapur"
-                      className="focus:ring-brand-500 w-full rounded-lg border border-neutral-300 bg-white px-3 py-2 text-sm text-neutral-900 focus:outline-none"
-                    />
-                  </div>
-
-                  <div className="flex gap-3">
-                    <button type="button" onClick={handleBack} className="flex-1">
-                      Back
-                    </button>
-                    <button
-                      type="button"
-                      onClick={handleNext}
-                      disabled={Object.keys(errors).length > 0}
-                      className="flex-1"
-                    >
-                      Continue
-                    </button>
-                  </div>
-                </form>
-              </div>
-            )}
-
-            {step === 3 && (
-              <div className="rounded-lg border border-neutral-200 bg-white p-6">
-                <h2 className="mb-4 text-xl font-bold text-neutral-900">Contact & Operations</h2>
-                <p className="mb-4 text-neutral-500">
-                  How customers can reach you and what services you offer.
-                </p>
-
-                <form className="space-y-4">
-                  <div>
-                    <label className="block text-sm font-medium text-neutral-900">
-                      Phone Number *
-                    </label>
-                    <input
-                      value={form.phone}
-                      onChange={(e) => setForm({ ...form, phone: e.target.value })}
-                      type="tel"
-                      required
-                      placeholder="e.g., +91 98765 43210"
-                      className="focus:ring-brand-500 w-full rounded-lg border border-neutral-300 bg-white px-3 py-2 text-sm text-neutral-900 focus:outline-none"
-                    />
-                    {errors.phone && <p className="text-error-600 mt-1 text-sm">{errors.phone}</p>}
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-neutral-900">
-                      WhatsApp Number *
-                    </label>
-                    <input
-                      value={form.whatsapp}
-                      onChange={(e) => setForm({ ...form, whatsapp: e.target.value })}
-                      type="tel"
-                      required
-                      placeholder="e.g., +91 98765 43210"
-                      className="focus:ring-brand-500 w-full rounded-lg border border-neutral-300 bg-white px-3 py-2 text-sm text-neutral-900 focus:outline-none"
-                    />
-                    {errors.whatsapp && (
-                      <p className="text-error-600 mt-1 text-sm">{errors.whatsapp}</p>
-                    )}
-                  </div>
-
-                  {!isSalon && !isRealEstate && (
+                  <form onSubmit={handleNext} className="space-y-5">
                     <div>
-                      <label className="block text-sm font-medium text-neutral-900">
-                        How do customers buy from you? *
+                      <label className="block text-sm font-bold text-[#1A1A1E] mb-1">
+                        Business Name *
                       </label>
-                      <select
-                        value={form.dining}
-                        onChange={(e) =>
-                          setForm({
-                            ...form,
-                            dining: e.target.value as 'dine-in' | 'takeaway' | 'delivery',
-                          })
-                        }
-                        className="focus:ring-brand-500 w-full rounded-lg border border-neutral-300 bg-white px-3 py-2 text-sm text-neutral-900 focus:outline-none"
-                      >
-                        <option value="dine-in">Dine-in</option>
-                        <option value="takeaway">Takeaway</option>
-                        <option value="delivery">Delivery</option>
-                      </select>
-                      {errors.dining && (
-                        <p className="text-error-600 mt-1 text-sm">{errors.dining}</p>
+                      <input
+                        value={form.name}
+                        onChange={(e) => setForm({ ...form, name: e.target.value })}
+                        type="text"
+                        placeholder="e.g., Biryani House"
+                        className="w-full rounded-2xl border border-neutral-300 bg-white px-4 py-3.5 text-sm text-[#1A1A1E] placeholder:text-neutral-400 focus:border-[#E84D1A] focus:ring-2 focus:ring-[#E84D1A]/20 outline-none transition-all"
+                      />
+                      {errors.name && (
+                        <p className="text-red-600 mt-1.5 text-xs font-bold">{errors.name}</p>
                       )}
                     </div>
-                  )}
 
-                  <div className="flex gap-3">
-                    <button type="button" onClick={handleBack} className="flex-1">
-                      Back
-                    </button>
-                    <button
-                      type="button"
-                      onClick={handleNext}
-                      disabled={Object.keys(errors).length > 0}
-                      className="flex-1"
-                    >
-                      Continue
-                    </button>
-                  </div>
-                </form>
-              </div>
-            )}
-
-            {isSalon && step === servicesStepNumber && (
-              <MascotScene
-                pose="remembering"
-                size="sm"
-                message="What services do you offer?"
-                className="mb-4"
-              />
-            )}
-            {isSalon && step === servicesStepNumber && (
-              <div className="rounded-lg border border-neutral-200 bg-white p-6">
-                <h2 className="mb-4 text-xl font-bold text-neutral-900">Services &amp; Packages</h2>
-                <p className="mb-4 text-neutral-500">
-                  Add the services you offer so Mitra can generate accurate campaigns. Packages are
-                  optional.
-                </p>
-
-                <div className="space-y-4">
-                  <div>
-                    <label className="block text-sm font-medium text-neutral-900">Services *</label>
-                    <div className="mt-2 space-y-2">
-                      {form.services.map((svc, i) => (
-                        <div key={i} className="flex gap-2">
-                          <input
-                            value={svc.name}
-                            onChange={(e) => {
-                              const services = [...form.services];
-                              services[i] = { ...services[i]!, name: e.target.value };
-                              setForm({ ...form, services });
-                            }}
-                            type="text"
-                            placeholder="e.g., Haircut & Styling"
-                            className="focus:ring-brand-500 flex-1 rounded-lg border border-neutral-300 bg-white px-3 py-2 text-sm text-neutral-900 focus:outline-none"
-                          />
-                          <input
-                            value={svc.price}
-                            onChange={(e) => {
-                              const services = [...form.services];
-                              services[i] = { ...services[i]!, price: e.target.value };
-                              setForm({ ...form, services });
-                            }}
-                            type="number"
-                            min="0"
-                            placeholder="Price (₹)"
-                            className="focus:ring-brand-500 w-32 rounded-lg border border-neutral-300 bg-white px-3 py-2 text-sm text-neutral-900 focus:outline-none"
-                          />
+                    <div>
+                      <label className="block text-sm font-bold text-[#1A1A1E] mb-2">
+                        Business Type *
+                      </label>
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                        {(['restaurant', 'salon', 'real_estate'] as const).map((cat) => (
                           <button
+                            key={cat}
                             type="button"
-                            onClick={() =>
-                              setForm({
-                                ...form,
-                                services: form.services.filter((_, idx) => idx !== i),
-                              })
-                            }
-                            className="text-error-600 px-2 text-sm"
-                            aria-label="Remove service"
+                            onClick={() => setForm({ ...form, category: cat })}
+                            aria-pressed={form.category === cat}
+                            className={`rounded-2xl border p-4 text-left capitalize transition-all cursor-pointer ${
+                              form.category === cat
+                                ? 'border-[#E84D1A] bg-orange-50/70 text-[#E84D1A] font-extrabold ring-2 ring-[#E84D1A]/20 shadow-xs'
+                                : 'border-neutral-200 text-neutral-700 hover:bg-neutral-50'
+                            }`}
                           >
-                            Remove
+                            <span className="block text-sm font-bold">
+                              {cat === 'real_estate' ? 'Real Estate' : cat}
+                            </span>
+                            <span className="text-[11px] text-neutral-500 font-normal mt-0.5 block">
+                              {cat === 'restaurant'
+                                ? 'Food & Dining'
+                                : cat === 'salon'
+                                  ? 'Beauty & Wellness'
+                                  : 'Listings & Brokerage'}
+                            </span>
                           </button>
-                        </div>
-                      ))}
+                        ))}
+                      </div>
+                      {errors.category && (
+                        <p className="text-red-600 mt-1.5 text-xs font-bold">{errors.category}</p>
+                      )}
                     </div>
-                    <button
-                      type="button"
-                      onClick={() =>
-                        setForm({
-                          ...form,
-                          services: [...form.services, { name: '', category: 'other', price: '' }],
-                        })
-                      }
-                      className="text-brand-600 mt-2 text-sm font-medium"
-                    >
-                      + Add a service
-                    </button>
-                    {errors.services && (
-                      <p className="text-error-600 mt-1 text-sm">{errors.services}</p>
-                    )}
-                  </div>
 
-                  <div>
-                    <label className="block text-sm font-medium text-neutral-900">
-                      Packages (Optional)
-                    </label>
-                    <div className="mt-2 space-y-2">
-                      {form.packages.map((pkg, i) => (
-                        <div key={i} className="flex gap-2">
-                          <input
-                            value={pkg.name}
-                            onChange={(e) => {
-                              const packages = [...form.packages];
-                              packages[i] = { ...packages[i]!, name: e.target.value };
-                              setForm({ ...form, packages });
-                            }}
-                            type="text"
-                            placeholder="e.g., Bridal Package"
-                            className="focus:ring-brand-500 flex-1 rounded-lg border border-neutral-300 bg-white px-3 py-2 text-sm text-neutral-900 focus:outline-none"
-                          />
-                          <input
-                            value={pkg.price}
-                            onChange={(e) => {
-                              const packages = [...form.packages];
-                              packages[i] = { ...packages[i]!, price: e.target.value };
-                              setForm({ ...form, packages });
-                            }}
-                            type="number"
-                            min="0"
-                            placeholder="Price (₹)"
-                            className="focus:ring-brand-500 w-32 rounded-lg border border-neutral-300 bg-white px-3 py-2 text-sm text-neutral-900 focus:outline-none"
-                          />
-                          <button
-                            type="button"
-                            onClick={() =>
-                              setForm({
-                                ...form,
-                                packages: form.packages.filter((_, idx) => idx !== i),
-                              })
-                            }
-                            className="text-error-600 px-2 text-sm"
-                            aria-label="Remove package"
-                          >
-                            Remove
-                          </button>
-                        </div>
-                      ))}
+                    <div>
+                      <label className="block text-sm font-bold text-[#1A1A1E] mb-1">
+                        Short Tagline or Description (Optional)
+                      </label>
+                      <textarea
+                        value={form.description || ''}
+                        onChange={(e) =>
+                          setForm({ ...form, description: e.target.value || undefined })
+                        }
+                        rows={2}
+                        placeholder="e.g., Authentic Dum Biryani since 2012"
+                        className="w-full rounded-2xl border border-neutral-300 bg-white px-4 py-3 text-sm text-[#1A1A1E] placeholder:text-neutral-400 focus:border-[#E84D1A] focus:ring-2 focus:ring-[#E84D1A]/20 outline-none transition-all resize-none"
+                      />
                     </div>
-                    <button
-                      type="button"
-                      onClick={() =>
-                        setForm({ ...form, packages: [...form.packages, { name: '', price: '' }] })
-                      }
-                      className="text-brand-600 mt-2 text-sm font-medium"
-                    >
-                      + Add a package
-                    </button>
-                  </div>
 
-                  <div>
-                    <label className="block text-sm font-medium text-neutral-900">
-                      Preferred booking channel
-                    </label>
-                    <select
-                      value={form.bookingChannel}
-                      onChange={(e) =>
-                        setForm({
-                          ...form,
-                          bookingChannel: e.target.value as 'whatsapp' | 'phone' | 'in_person',
-                        })
-                      }
-                      className="focus:ring-brand-500 w-full rounded-lg border border-neutral-300 bg-white px-3 py-2 text-sm text-neutral-900 focus:outline-none"
-                    >
-                      <option value="whatsapp">WhatsApp</option>
-                      <option value="phone">Phone call</option>
-                      <option value="in_person">In person / walk-in</option>
-                    </select>
-                  </div>
-
-                  <div className="flex gap-3">
-                    <button type="button" onClick={handleBack} className="flex-1">
-                      Back
-                    </button>
-                    <button
-                      type="button"
-                      onClick={handleNext}
-                      disabled={Object.keys(errors).length > 0}
-                      className="flex-1"
-                    >
-                      Continue
-                    </button>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {isRealEstate && step === servicesStepNumber && (
-              <MascotScene
-                pose="remembering"
-                size="sm"
-                message="What are you listing?"
-                className="mb-4"
-              />
-            )}
-            {isRealEstate && step === servicesStepNumber && (
-              <div className="rounded-lg border border-neutral-200 bg-white p-6">
-                <h2 className="mb-4 text-xl font-bold text-neutral-900">Properties</h2>
-                <p className="mb-4 text-neutral-500">
-                  Add the properties or listings you want to market. Mitra will only use these exact
-                  facts in your campaigns.
-                </p>
-
-                <div className="space-y-3">
-                  {form.properties.map((prop, i) => (
-                    <div
-                      key={i}
-                      className="grid grid-cols-2 gap-2 rounded-lg border border-neutral-200 p-3 sm:grid-cols-3"
-                    >
-                      <input
-                        value={prop.title}
-                        onChange={(e) => {
-                          const properties = [...form.properties];
-                          properties[i] = { ...properties[i]!, title: e.target.value };
-                          setForm({ ...form, properties });
-                        }}
-                        type="text"
-                        placeholder="e.g., 3BHK in Green Meadows"
-                        className="focus:ring-brand-500 col-span-2 rounded-lg border border-neutral-300 bg-white px-3 py-2 text-sm text-neutral-900 focus:outline-none sm:col-span-3"
-                      />
-                      <select
-                        value={prop.propertyType}
-                        onChange={(e) => {
-                          const properties = [...form.properties];
-                          properties[i] = {
-                            ...properties[i]!,
-                            propertyType: e.target.value as OnboardingProperty['propertyType'],
-                          };
-                          setForm({ ...form, properties });
-                        }}
-                        className="focus:ring-brand-500 rounded-lg border border-neutral-300 bg-white px-3 py-2 text-sm text-neutral-900 focus:outline-none"
-                      >
-                        <option value="apartment">Apartment</option>
-                        <option value="villa">Villa</option>
-                        <option value="plot">Plot</option>
-                        <option value="commercial">Commercial</option>
-                        <option value="other">Other</option>
-                      </select>
-                      <input
-                        value={prop.bedrooms}
-                        onChange={(e) => {
-                          const properties = [...form.properties];
-                          properties[i] = { ...properties[i]!, bedrooms: e.target.value };
-                          setForm({ ...form, properties });
-                        }}
-                        type="number"
-                        min="0"
-                        placeholder="Bedrooms"
-                        className="focus:ring-brand-500 rounded-lg border border-neutral-300 bg-white px-3 py-2 text-sm text-neutral-900 focus:outline-none"
-                      />
-                      <input
-                        value={prop.bathrooms}
-                        onChange={(e) => {
-                          const properties = [...form.properties];
-                          properties[i] = { ...properties[i]!, bathrooms: e.target.value };
-                          setForm({ ...form, properties });
-                        }}
-                        type="number"
-                        min="0"
-                        placeholder="Bathrooms"
-                        className="focus:ring-brand-500 rounded-lg border border-neutral-300 bg-white px-3 py-2 text-sm text-neutral-900 focus:outline-none"
-                      />
-                      <input
-                        value={prop.areaSqft}
-                        onChange={(e) => {
-                          const properties = [...form.properties];
-                          properties[i] = { ...properties[i]!, areaSqft: e.target.value };
-                          setForm({ ...form, properties });
-                        }}
-                        type="number"
-                        min="0"
-                        placeholder="Area (sqft)"
-                        className="focus:ring-brand-500 rounded-lg border border-neutral-300 bg-white px-3 py-2 text-sm text-neutral-900 focus:outline-none"
-                      />
-                      <input
-                        value={prop.price}
-                        onChange={(e) => {
-                          const properties = [...form.properties];
-                          properties[i] = { ...properties[i]!, price: e.target.value };
-                          setForm({ ...form, properties });
-                        }}
-                        type="number"
-                        min="0"
-                        placeholder="Price (₹)"
-                        className="focus:ring-brand-500 rounded-lg border border-neutral-300 bg-white px-3 py-2 text-sm text-neutral-900 focus:outline-none"
-                      />
-                      <select
-                        value={prop.possessionStatus}
-                        onChange={(e) => {
-                          const properties = [...form.properties];
-                          properties[i] = {
-                            ...properties[i]!,
-                            possessionStatus: e.target
-                              .value as OnboardingProperty['possessionStatus'],
-                          };
-                          setForm({ ...form, properties });
-                        }}
-                        className="focus:ring-brand-500 rounded-lg border border-neutral-300 bg-white px-3 py-2 text-sm text-neutral-900 focus:outline-none"
-                      >
-                        <option value="ready_to_move">Ready to move</option>
-                        <option value="under_construction">Under construction</option>
-                        <option value="upcoming">Upcoming</option>
-                      </select>
+                    <div className="pt-4 flex items-center justify-between gap-4 border-t border-neutral-100">
                       <button
                         type="button"
-                        onClick={() =>
-                          setForm({
-                            ...form,
-                            properties: form.properties.filter((_, idx) => idx !== i),
-                          })
-                        }
-                        className="text-error-600 col-span-2 text-left text-sm sm:col-span-3"
-                        aria-label="Remove property"
+                        onClick={handleBack}
+                        className="px-6 py-3 rounded-2xl border border-neutral-200 text-neutral-700 hover:bg-neutral-50 font-bold text-sm"
                       >
-                        Remove
+                        Back
+                      </button>
+                      <button
+                        type="submit"
+                        className="px-8 py-3.5 rounded-2xl bg-[#E84D1A] hover:bg-[#d03f10] text-white font-extrabold text-sm shadow-md shadow-orange-600/20 cursor-pointer"
+                      >
+                        Continue →
                       </button>
                     </div>
-                  ))}
-                </div>
-                <button
-                  type="button"
-                  onClick={() =>
-                    setForm({
-                      ...form,
-                      properties: [
-                        ...form.properties,
-                        {
-                          title: '',
-                          propertyType: 'apartment',
-                          areaSqft: '',
-                          bedrooms: '',
-                          bathrooms: '',
-                          price: '',
-                          possessionStatus: 'ready_to_move',
-                        },
-                      ],
-                    })
-                  }
-                  className="text-brand-600 mt-3 text-sm font-medium"
-                >
-                  + Add a property
-                </button>
-                {errors.properties && (
-                  <p className="text-error-600 mt-1 text-sm">{errors.properties}</p>
-                )}
-
-                <div className="mt-6 flex gap-3">
-                  <button type="button" onClick={handleBack} className="flex-1">
-                    Back
-                  </button>
-                  <button
-                    type="button"
-                    onClick={handleNext}
-                    disabled={Object.keys(errors).length > 0}
-                    className="flex-1"
-                  >
-                    Continue
-                  </button>
+                  </form>
                 </div>
               </div>
             )}
 
-            {step === marketingStepNumber && (
-              <MascotScene
-                pose="remembering"
-                size="sm"
-                message="Getting a feel for your style."
-                className="mb-4"
+            {/* Step 2: Location */}
+            {step === 2 && (
+              <Step3Location
+                form={form}
+                setForm={setForm}
+                errors={errors}
+                onNext={handleNext}
+                onBack={handleBack}
               />
             )}
+
+            {/* Step 3: Contact & Operations */}
+            {step === 3 && (
+              <Step4Contact
+                form={form}
+                setForm={setForm}
+                errors={errors}
+                onNext={handleNext}
+                onBack={handleBack}
+              />
+            )}
+
+            {/* Step 4 (if salon/real estate): Services & Packages / Properties */}
+            {hasExtraStep && step === servicesStepNumber && (
+              <Step2BusinessType
+                form={form}
+                setForm={setForm}
+                errors={errors}
+                onNext={handleNext}
+                onBack={handleBack}
+              />
+            )}
+
+            {/* Marketing Preferences Step */}
             {step === marketingStepNumber && (
-              <div className="rounded-lg border border-neutral-200 bg-white p-6">
-                <h2 className="mb-4 text-xl font-bold text-neutral-900">Marketing Preferences</h2>
-                <p className="mb-4 text-neutral-500">
-                  Help us generate marketing content that resonates with your audience.
-                </p>
-
-                <form className="space-y-4">
-                  <div>
-                    <label className="block text-sm font-medium text-neutral-900">
-                      Preferred Language *
-                    </label>
-                    <select
-                      value={form.language}
-                      onChange={(e) =>
-                        setForm({
-                          ...form,
-                          language: e.target.value as 'en' | 'te' | 'hi' | 'te_en' | 'hi_en',
-                        })
-                      }
-                      className="focus:ring-brand-500 w-full rounded-lg border border-neutral-300 bg-white px-3 py-2 text-sm text-neutral-900 focus:outline-none"
-                    >
-                      <option value="en">English</option>
-                      <option value="te">Telugu</option>
-                      <option value="hi">Hindi</option>
-                      <option value="te_en">Telugu-English</option>
-                      <option value="hi_en">Hindi-English</option>
-                    </select>
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-neutral-900">
-                      Regional Style *
-                    </label>
-                    <select
-                      value={form.regionalStyle}
-                      onChange={(e) =>
-                        setForm({
-                          ...form,
-                          regionalStyle: e.target
-                            .value as (typeof REGIONAL_STYLES)[number]['value'],
-                        })
-                      }
-                      className="focus:ring-brand-500 w-full rounded-lg border border-neutral-300 bg-white px-3 py-2 text-sm text-neutral-900 focus:outline-none"
-                    >
-                      {REGIONAL_STYLES.map((style) => (
-                        <option key={style.value} value={style.value}>
-                          {style.label}
-                        </option>
-                      ))}
-                    </select>
-                    <p className="mt-1 text-sm text-neutral-500">
-                      How you'd like your content to sound locally
-                    </p>
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-neutral-900">
-                      Content Style *
-                    </label>
-                    <select
-                      value={form.contentStyle}
-                      onChange={(e) =>
-                        setForm({
-                          ...form,
-                          contentStyle: e.target.value as (typeof CAMPAIGN_STYLES)[number]['value'],
-                        })
-                      }
-                      className="focus:ring-brand-500 w-full rounded-lg border border-neutral-300 bg-white px-3 py-2 text-sm text-neutral-900 focus:outline-none"
-                    >
-                      {CAMPAIGN_STYLES.map((style) => (
-                        <option key={style.value} value={style.value}>
-                          {style.label}
-                        </option>
-                      ))}
-                    </select>
-                    <p className="mt-1 text-sm text-neutral-500">
-                      The creative approach for your campaigns
-                    </p>
-                  </div>
-
-                  <div className="flex gap-3">
-                    <button type="button" onClick={handleBack} className="flex-1">
-                      Back
-                    </button>
-                    <button
-                      type="button"
-                      onClick={handleNext}
-                      disabled={Object.keys(errors).length > 0}
-                      className="flex-1"
-                    >
-                      Continue
-                    </button>
-                  </div>
-                </form>
-              </div>
+              <Step5Marketing
+                form={form}
+                setForm={setForm}
+                errors={errors}
+                onNext={handleNext}
+                onBack={handleBack}
+              />
             )}
 
+            {/* Review Step */}
             {step === reviewStepNumber && (
-              <div className="rounded-lg border border-neutral-200 bg-white p-6">
-                <h2 className="mb-4 text-xl font-bold text-neutral-900">Review Your Business</h2>
-                <p className="mb-8 text-neutral-500">
-                  Please verify the information is correct before submitting.
-                </p>
-
-                <div className="space-y-4">
-                  <div>
-                    <p className="font-medium text-neutral-900">Business</p>
-                    <p>{form.name}</p>
-                    <p className="text-sm text-neutral-500 capitalize">{form.category}</p>
-                    {form.description && (
-                      <p className="text-sm text-neutral-500">{form.description}</p>
-                    )}
-                  </div>
-
-                  <div>
-                    <p className="font-medium text-neutral-900">Location</p>
-                    <p>
-                      {form.locality || form.city}, {form.state}
-                    </p>
-                    {form.address && <p className="text-sm text-neutral-500">{form.address}</p>}
-                  </div>
-
-                  <div>
-                    <p className="font-medium text-neutral-900">Contact</p>
-                    <p>{form.phone}</p>
-                    <p>{form.whatsapp}</p>
-                  </div>
-
-                  {isSalon ? (
-                    <div>
-                      <p className="font-medium text-neutral-900">Services</p>
-                      {form.services.filter((s) => s.name.trim()).length === 0 ? (
-                        <p className="text-sm text-neutral-500">No services added</p>
-                      ) : (
-                        form.services
-                          .filter((s) => s.name.trim())
-                          .map((s, i) => (
-                            <p key={i} className="text-sm text-neutral-500">
-                              {s.name} — ₹{s.price}
-                            </p>
-                          ))
-                      )}
-                      {form.packages.filter((p) => p.name.trim()).length > 0 && (
-                        <>
-                          <p className="mt-2 font-medium text-neutral-900">Packages</p>
-                          {form.packages
-                            .filter((p) => p.name.trim())
-                            .map((p, i) => (
-                              <p key={i} className="text-sm text-neutral-500">
-                                {p.name} — ₹{p.price}
-                              </p>
-                            ))}
-                        </>
-                      )}
-                      <p className="mt-2 text-sm text-neutral-500">
-                        Booking via {form.bookingChannel.replace('_', ' ')}
-                      </p>
-                    </div>
-                  ) : isRealEstate ? (
-                    <div>
-                      <p className="font-medium text-neutral-900">Properties</p>
-                      {form.properties.filter((p) => p.title.trim()).length === 0 ? (
-                        <p className="text-sm text-neutral-500">No properties added</p>
-                      ) : (
-                        form.properties
-                          .filter((p) => p.title.trim())
-                          .map((p, i) => (
-                            <p key={i} className="text-sm text-neutral-500">
-                              {p.title} — ₹{p.price} ({p.possessionStatus.replace(/_/g, ' ')})
-                            </p>
-                          ))
-                      )}
-                    </div>
-                  ) : (
-                    <div>
-                      <p className="font-medium text-neutral-900">Operations</p>
-                      <p>{form.dining}</p>
-                    </div>
-                  )}
-
-                  <div>
-                    <p className="font-medium text-neutral-900">Marketing</p>
-                    <p>{form.language}</p>
-                    {form.regionalStyle && (
-                      <p className="text-sm text-neutral-500">{form.regionalStyle}</p>
-                    )}
-                    {form.contentStyle && (
-                      <p className="text-sm text-neutral-500">{form.contentStyle}</p>
-                    )}
-                  </div>
-                </div>
-
-                <div className="mt-6">
-                  <p className="font-medium text-neutral-900">Summary</p>
-                  <p className="mt-2 text-sm text-neutral-600">
-                    Business: {form.name} ({form.category})<br />
-                    Location: {form.locality || form.city}, {form.state}
-                    <br />
-                    Contact: {form.phone}
-                    <br />
-                    {isSalon
-                      ? `Services: ${form.services.filter((s) => s.name.trim()).length}`
-                      : isRealEstate
-                        ? `Properties: ${form.properties.filter((p) => p.title.trim()).length}`
-                        : `Operations: ${form.dining}`}
-                    <br />
-                    Language: {form.language}
-                  </p>
-                </div>
-
-                {errors.general && <p className="text-error-600 mt-4 text-sm">{errors.general}</p>}
-
-                <div className="mt-6">
-                  <button type="button" onClick={handleBack} disabled={isSaving}>
-                    Back
-                  </button>
-                  <button type="button" onClick={handleSubmit} disabled={isSaving}>
-                    {isSaving ? 'Saving...' : 'Complete Setup'}
-                  </button>
-                </div>
-              </div>
+              <Step7Review
+                form={form}
+                errors={errors}
+                isSaving={isSaving}
+                onSubmit={handleSubmit}
+                onBack={handleBack}
+                onJumpToStep={(target) => setStep(target)}
+              />
             )}
-          </div>
-        </div>
-      </main>
-    </div>
+          </motion.div>
+        </main>
+      </div>
+    </ScrollReactiveBackground>
   );
 }
-
-export default OnboardingPage;

@@ -4,8 +4,19 @@ import React, { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { format } from 'date-fns';
-import type { Business, Campaign, CampaignAsset, CampaignStatus } from '@/types';
+import { motion, useReducedMotion } from 'motion/react';
+import { staggerContainerVariants } from '@/lib/motion';
+import type {
+  Business,
+  Campaign,
+  CampaignAsset,
+  CampaignStatus,
+  SocialConnection,
+  PublishJob,
+  PostPerformanceRecord,
+} from '@/types';
 import { DetailedChecks } from './DetailedChecks';
+import { PipelineTraceInspector } from './PipelineTraceInspector';
 import { useRegenerateAsset } from '@/hooks/useRegenerateAsset';
 import { useCopyToClipboard } from '@/hooks/useCopyToClipboard';
 import { useToast } from '@/hooks/useToast';
@@ -13,6 +24,15 @@ import { buildWhatsAppShareUrl } from '@/lib/utils/whatsapp';
 import { trackEvent, recordWhatsAppClick } from '@/lib/analytics/trackEvent';
 import { callFunction } from '@/services/api';
 import { CreativeFeedbackControls } from './CreativeFeedbackControls';
+import { metaService } from '@/features/meta/services/metaService';
+import { publishingService } from '@/features/publishing/services/publishingService';
+import { PublishingModal } from '@/features/publishing/components/PublishingModal';
+import { PublishingJobsList } from '@/features/publishing/components/PublishingJobsList';
+import { listCampaignScheduledPosts } from '@/features/scheduling/services/schedulingService';
+import { SchedulingModal } from '@/features/scheduling/components/SchedulingModal';
+import { ScheduledPostsList } from '@/features/scheduling/components/ScheduledPostsList';
+import { CampaignSchedulingSection } from '@/features/scheduling/components/CampaignSchedulingSection';
+import type { ScheduledPost } from '@/types';
 
 /**
  * Phase 8: this used to render every non-poster asset as
@@ -192,22 +212,25 @@ export function CampaignDetailContent({
     };
   }, []);
 
-  // Phase 34 — the real, server-authoritative performance record.
-  // `null` means "hasn't loaded yet / failed to load," which renders
-  // nothing rather than a misleading 0. `inquiriesAvailable: false` is
-  // always true right now (no integrated inquiry source exists anywhere
-  // in this system) — the panel below must show "Not available," never 0.
+  // Phase 34 & Phase 17 — server-authoritative performance record.
   const [performance, setPerformance] = useState<{
     whatsappClicks: number;
     inquiries: number | null;
     inquiriesAvailable: boolean;
+    postsPerformance?: PostPerformanceRecord[];
   } | null>(null);
+  const [isSyncingPerformance, setIsSyncingPerformance] = useState<boolean>(false);
 
   useEffect(() => {
     let cancelled = false;
     callFunction<
       { businessId: string; campaignId: string },
-      { whatsappClicks: number; inquiries: number | null; inquiriesAvailable: boolean }
+      {
+        whatsappClicks: number;
+        inquiries: number | null;
+        inquiriesAvailable: boolean;
+        postsPerformance?: PostPerformanceRecord[];
+      }
     >({
       functionName: 'getCampaignPerformance',
       data: { businessId: campaign.businessId, campaignId: campaign.campaignId },
@@ -222,6 +245,60 @@ export function CampaignDetailContent({
       cancelled = true;
     };
   }, [campaign.businessId, campaign.campaignId]);
+
+  const handleRefreshPerformance = async () => {
+    setIsSyncingPerformance(true);
+    try {
+      const res = await callFunction<
+        { businessId: string; campaignId: string },
+        { success: boolean; postsPerformance: PostPerformanceRecord[] }
+      >({
+        functionName: 'syncCampaignPerformance',
+        data: { businessId: campaign.businessId, campaignId: campaign.campaignId },
+      });
+      if (res?.postsPerformance) {
+        setPerformance((prev) =>
+          prev
+            ? { ...prev, postsPerformance: res.postsPerformance }
+            : {
+                whatsappClicks: 0,
+                inquiries: null,
+                inquiriesAvailable: false,
+                postsPerformance: res.postsPerformance,
+              }
+        );
+      }
+    } catch (err) {
+      console.error('Failed to sync performance:', err);
+    } finally {
+      setIsSyncingPerformance(false);
+    }
+  };
+  const [socialConnections, setSocialConnections] = useState<SocialConnection[]>([]);
+  const [publishJobs, setPublishJobs] = useState<PublishJob[]>([]);
+  const [scheduledPosts, setScheduledPosts] = useState<ScheduledPost[]>([]);
+  const [isPublishModalOpen, setIsPublishModalOpen] = useState<boolean>(false);
+  const [isScheduleModalOpen, setIsScheduleModalOpen] = useState<boolean>(false);
+
+  const fetchPublishData = React.useCallback(() => {
+    metaService
+      .listSocialConnections(campaign.businessId)
+      .then((res) => setSocialConnections(res.connections || []))
+      .catch((err) => console.error('Failed to load social connections:', err));
+
+    publishingService
+      .listCampaignPublishJobs(campaign.campaignId)
+      .then((res) => setPublishJobs(res.jobs || []))
+      .catch((err) => console.error('Failed to load publish jobs:', err));
+
+    listCampaignScheduledPosts(campaign.campaignId)
+      .then((posts) => setScheduledPosts(posts || []))
+      .catch((err) => console.error('Failed to load scheduled posts:', err));
+  }, [campaign.businessId, campaign.campaignId]);
+
+  useEffect(() => {
+    fetchPublishData();
+  }, [fetchPublishData]);
 
   const copyButtonLabel = (key: string) =>
     isItemCopied(key) ? 'Copied!' : isItemCopying(key) ? 'Copying...' : 'Copy';
@@ -255,7 +332,12 @@ export function CampaignDetailContent({
   // deterministic cover-image storyboard (assetId 'asset_reel_storyboard').
   const allReelAssets = activeAssets.filter((a) => a.type === 'reel');
   const reelConceptAssets = allReelAssets.filter((a) => (a.content as ReelConceptContent)?.hook);
-  const reelStoryboardAsset = allReelAssets.find((a) => a.assetId === 'asset_reel_storyboard');
+  // assetId is no longer a stable literal (it's namespaced per campaign to
+  // avoid cross-campaign collisions), so identify the storyboard by shape:
+  // it has scenes but no AI-written hook.
+  const reelStoryboardAsset = allReelAssets.find(
+    (a) => (a.content as { scenes?: unknown })?.scenes && !(a.content as ReelConceptContent)?.hook
+  );
 
   const creativeAssets = [
     ...posterAssets,
@@ -303,6 +385,15 @@ export function CampaignDetailContent({
       showToast('No image to download', 'error');
       return;
     }
+    // P0-1 defense-in-depth: the backend no longer persists imageUrl at all
+    // for a rejected campaign (see generateCampaignStrategy.ts), so this
+    // should be unreachable in practice — but a Truth-Check-failed campaign
+    // must never let its assets download even if this UI state is somehow
+    // stale (e.g. a cached client view from before the verdict landed).
+    if (campaign.status === 'failed') {
+      showToast('This content did not pass verification and cannot be downloaded', 'error');
+      return;
+    }
     setDownloadingAsset(asset.assetId);
     try {
       const response = await fetch(asset.imageUrl);
@@ -310,7 +401,13 @@ export function CampaignDetailContent({
       const url = window.URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;
-      link.download = `${campaign.offer.headline.replace(/\s+/g, '_')}_${label.replace(/\s+/g, '_')}.png`;
+      // Posters/stories are actually SVG (compositor.ts), not PNG — naming
+      // the download .png regardless produced a file whose extension lied
+      // about its own contents. Derive it from the real MIME type instead.
+      const extension = blob.type.includes('svg')
+        ? 'svg'
+        : blob.type.split('/')[1]?.split('+')[0] || 'png';
+      link.download = `${campaign.offer.headline.replace(/\s+/g, '_')}_${label.replace(/\s+/g, '_')}.${extension}`;
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
@@ -452,23 +549,44 @@ export function CampaignDetailContent({
   };
 
   const truthDisplay = truthCheckStatus ? TRUTH_CHECK_DISPLAY[truthCheckStatus] : null;
+  const reduceMotion = useReducedMotion();
 
   return (
     <div className="bg-bg-primary min-h-screen">
-      <div className="border-b border-neutral-200 bg-white">
+      <div className="border-border-light bg-surface border-b">
         <div className="mx-auto max-w-4xl px-4 py-4 sm:px-6 lg:px-8">
-          <Link
-            href="/campaigns"
-            className="text-brand-600 hover:text-brand-700 mb-2 inline-block text-sm"
-          >
-            &larr; Back to campaigns
-          </Link>
+          <div className="mb-2 flex flex-wrap items-center gap-3">
+            <Link
+              href="/campaigns"
+              className="text-brand-600 hover:text-brand-700 text-sm font-medium"
+            >
+              &larr; Back to campaigns
+            </Link>
+            {campaign.sourceCalendarItemId && (
+              <>
+                <span className="text-text-tertiary">|</span>
+                <Link
+                  href="/calendar"
+                  className="text-brand-600 hover:text-brand-700 flex items-center gap-1 text-sm font-medium"
+                >
+                  📆 &larr; Back to Marketing Calendar
+                </Link>
+              </>
+            )}
+          </div>
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div className="min-w-0">
-              <h1 className="truncate text-2xl font-bold text-neutral-900">
-                {campaign.offer.headline}
-              </h1>
-              <p className="mt-1 text-sm text-neutral-500 capitalize">
+              <div className="flex items-center gap-2">
+                <h1 className="text-text-primary truncate text-2xl font-bold tracking-tight">
+                  {campaign.offer.headline}
+                </h1>
+                {campaign.sourceCalendarItemId && (
+                  <span className="bg-brand-50 text-brand-700 border-brand-200/50 inline-flex items-center gap-1 rounded-md border px-2 py-0.5 text-xs font-semibold">
+                    ✨ Created from 30-Day Marketing Plan
+                  </span>
+                )}
+              </div>
+              <p className="text-text-secondary mt-1 text-sm capitalize">
                 {campaign.objective.replace('_', ' ')}
               </p>
             </div>
@@ -497,12 +615,68 @@ export function CampaignDetailContent({
                   May be outdated
                 </span>
               )}
+              {['generated', 'verified', 'completed', 'approved', 'active'].includes(
+                campaign.status
+              ) && (
+                <div className="flex items-center space-x-2">
+                  <button
+                    onClick={() => setIsPublishModalOpen(true)}
+                    className="bg-brand-600 hover:bg-brand-700 flex cursor-pointer items-center space-x-1 rounded-full px-3.5 py-1 text-sm font-semibold text-white shadow-xs transition-all duration-150 hover:-translate-y-[0.5px]"
+                  >
+                    <span>🚀 Publish Now</span>
+                  </button>
+                  <button
+                    onClick={() => setIsScheduleModalOpen(true)}
+                    className="border-border-medium text-text-primary hover:bg-bg-secondary flex cursor-pointer items-center space-x-1 rounded-full border px-3.5 py-1 text-sm font-semibold shadow-xs transition-all duration-150 hover:-translate-y-[0.5px]"
+                  >
+                    <span>📅 Schedule</span>
+                  </button>
+                </div>
+              )}
             </div>
           </div>
         </div>
       </div>
 
-      <div className="mx-auto max-w-4xl space-y-6 px-4 py-8 sm:px-6 lg:px-8">
+      <motion.div
+        variants={reduceMotion ? undefined : staggerContainerVariants}
+        initial={reduceMotion ? undefined : 'hidden'}
+        animate={reduceMotion ? undefined : 'visible'}
+        className="mx-auto max-w-4xl space-y-6 px-4 py-8 sm:px-6 lg:px-8"
+      >
+        <CampaignSchedulingSection
+          campaign={campaign}
+          connections={socialConnections}
+          scheduledPosts={scheduledPosts}
+          publishJobs={publishJobs}
+          onRefresh={fetchPublishData}
+        />
+
+        <PublishingJobsList jobs={publishJobs} onRefresh={fetchPublishData} />
+
+        <PublishingModal
+          isOpen={isPublishModalOpen}
+          onClose={() => setIsPublishModalOpen(false)}
+          campaignId={campaign.campaignId}
+          connections={socialConnections}
+          onJobCreated={(job) => {
+            setPublishJobs((prev) => [job, ...prev]);
+            showToast('Publish job created', 'success');
+          }}
+        />
+
+        <ScheduledPostsList posts={scheduledPosts} onRefresh={fetchPublishData} />
+
+        <SchedulingModal
+          isOpen={isScheduleModalOpen}
+          onClose={() => setIsScheduleModalOpen(false)}
+          campaignId={campaign.campaignId}
+          connections={socialConnections}
+          onSuccess={() => {
+            fetchPublishData();
+            showToast('Post scheduled successfully', 'success');
+          }}
+        />
         <SectionCard title="Creative Feedback">
           <CreativeFeedbackControls
             businessId={campaign.businessId}
@@ -518,6 +692,22 @@ export function CampaignDetailContent({
             docs/PERFORMANCE_DATA_READINESS.md. */}
         {performance && (
           <SectionCard title="Performance">
+            <div className="flex items-center justify-between pb-2">
+              <span className="text-xs text-neutral-500">
+                {performance.postsPerformance && performance.postsPerformance.length > 0
+                  ? `Last updated ${format(new Date(performance.postsPerformance[0]?.fetchedAt || Date.now()), 'd MMM yyyy, h:mm a')}`
+                  : 'Real performance data from Mitra and Meta'}
+              </span>
+              <button
+                type="button"
+                onClick={handleRefreshPerformance}
+                disabled={isSyncingPerformance}
+                className="rounded-md border border-neutral-300 bg-white px-3 py-1 text-xs font-medium text-neutral-700 hover:bg-neutral-50 disabled:opacity-50"
+              >
+                {isSyncingPerformance ? 'Refreshing...' : 'Refresh Performance'}
+              </button>
+            </div>
+
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <div>
                 <p className="text-sm text-neutral-500">WhatsApp clicks</p>
@@ -533,6 +723,92 @@ export function CampaignDetailContent({
                 </p>
               </div>
             </div>
+
+            {performance.postsPerformance && performance.postsPerformance.length > 0 && (
+              <div className="mt-6 space-y-4">
+                <h4 className="text-sm font-semibold text-neutral-900">Meta Published Posts</h4>
+                <div className="space-y-3">
+                  {performance.postsPerformance.map((postPerf) => (
+                    <div
+                      key={postPerf.performanceId}
+                      className="rounded-lg border border-neutral-200 bg-neutral-50 p-4"
+                    >
+                      <div className="flex items-center justify-between pb-3">
+                        <div className="flex items-center gap-2">
+                          <span
+                            className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${
+                              postPerf.platform === 'instagram'
+                                ? 'bg-pink-100 text-pink-800'
+                                : 'bg-blue-100 text-blue-800'
+                            }`}
+                          >
+                            {postPerf.platform === 'instagram' ? 'Instagram' : 'Facebook'}{' '}
+                            {postPerf.contentType}
+                          </span>
+                          <span className="font-mono text-xs text-neutral-400">
+                            ID: {postPerf.externalPostId}
+                          </span>
+                        </div>
+                        <span
+                          className={`text-xs font-medium ${
+                            postPerf.status === 'available'
+                              ? 'text-green-600'
+                              : postPerf.status === 'error'
+                                ? 'text-red-600'
+                                : 'text-amber-600'
+                          }`}
+                        >
+                          {postPerf.status === 'available'
+                            ? 'Synced ✓'
+                            : postPerf.errorMessage || postPerf.status}
+                        </span>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-3 border-t border-neutral-200 pt-2 sm:grid-cols-4">
+                        <div>
+                          <p className="text-xs text-neutral-500">Reach</p>
+                          <p className="text-sm font-semibold text-neutral-900">
+                            {postPerf.metrics.reach != null
+                              ? postPerf.metrics.reach.toLocaleString()
+                              : 'Not available'}
+                          </p>
+                        </div>
+                        <div>
+                          <p className="text-xs text-neutral-500">Likes</p>
+                          <p className="text-sm font-semibold text-neutral-900">
+                            {postPerf.metrics.likes != null
+                              ? postPerf.metrics.likes.toLocaleString()
+                              : 'Not available'}
+                          </p>
+                        </div>
+                        <div>
+                          <p className="text-xs text-neutral-500">Comments</p>
+                          <p className="text-sm font-semibold text-neutral-900">
+                            {postPerf.metrics.comments != null
+                              ? postPerf.metrics.comments.toLocaleString()
+                              : 'Not available'}
+                          </p>
+                        </div>
+                        <div>
+                          <p className="text-xs text-neutral-500">
+                            {postPerf.contentType === 'reel' ? 'Video Views' : 'Clicks'}
+                          </p>
+                          <p className="text-sm font-semibold text-neutral-900">
+                            {postPerf.contentType === 'reel'
+                              ? postPerf.metrics.videoViews != null
+                                ? postPerf.metrics.videoViews.toLocaleString()
+                                : 'Not available'
+                              : postPerf.metrics.clicks != null
+                                ? postPerf.metrics.clicks.toLocaleString()
+                                : 'Not available'}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </SectionCard>
         )}
 
@@ -546,7 +822,7 @@ export function CampaignDetailContent({
                 const label =
                   asset.type === 'poster'
                     ? `Poster ${asset.index + 1}`
-                    : asset.assetId === 'asset_reel_storyboard'
+                    : asset === reelStoryboardAsset
                       ? 'Reel Cover'
                       : `Story Frame ${asset.index + 1}`;
                 return (
@@ -628,6 +904,12 @@ export function CampaignDetailContent({
             <EmptyHint text="Truth Check hasn't run for this campaign yet." />
           )}
         </SectionCard>
+
+        {/* AI PIPELINE EXECUTION TRACE & INSPECTOR */}
+        <PipelineTraceInspector
+          trace={campaign.metadata?.pipelineTrace}
+          truthCheckResult={campaign.metadata?.truthCheckResult}
+        />
 
         {/* HEADLINES */}
         <SectionCard title="Headlines">
@@ -994,7 +1276,37 @@ export function CampaignDetailContent({
             </button>
           )}
         </div>
-      </div>
+
+        {/* PHASE 8: CONTINUATION LOOP - "WANT TO CREATE ANOTHER CAMPAIGN?" */}
+        <div className="mt-10 rounded-2xl border border-brand-500/20 bg-gradient-to-r from-brand-50 via-amber-50 to-orange-50 p-6 sm:p-8 shadow-md">
+          <div className="flex flex-col md:flex-row items-center justify-between gap-6">
+            <div className="space-y-2 text-center md:text-left">
+              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-brand-500/10 text-brand-600 text-xs font-bold">
+                <span>🚀</span> Keep Your Business Moving
+              </span>
+              <h3 className="text-xl sm:text-2xl font-extrabold text-neutral-900">
+                Want to create another campaign?
+              </h3>
+              <p className="text-sm text-neutral-600 max-w-xl">
+                Mitra now understands your business. Turn your next offer, event, or product into a complete campaign in under 2 minutes.
+              </p>
+              <div className="flex flex-wrap justify-center md:justify-start gap-2 pt-2">
+                <span className="text-xs bg-white/80 border border-neutral-200 px-3 py-1 rounded-full text-neutral-700 font-semibold">🍱 Weekend Offer</span>
+                <span className="text-xs bg-white/80 border border-neutral-200 px-3 py-1 rounded-full text-neutral-700 font-semibold">🎉 Festival Special</span>
+                <span className="text-xs bg-white/80 border border-neutral-200 px-3 py-1 rounded-full text-neutral-700 font-semibold">🆕 New Product</span>
+              </div>
+            </div>
+            <Link href="/campaigns/new">
+              <button
+                type="button"
+                className="px-8 py-4 rounded-xl bg-brand-500 hover:bg-brand-600 text-white font-extrabold text-sm shadow-lg shadow-brand-500/25 transition-all hover:scale-105 cursor-pointer whitespace-nowrap"
+              >
+                Create Next Campaign →
+              </button>
+            </Link>
+          </div>
+        </div>
+      </motion.div>
     </div>
   );
 }

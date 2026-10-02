@@ -2,6 +2,7 @@
 
 import type { InputHTMLAttributes } from 'react';
 import { forwardRef } from 'react';
+import { motion, AnimatePresence, useReducedMotion } from 'motion/react';
 
 export interface InputProps extends InputHTMLAttributes<HTMLInputElement> {
   label?: string;
@@ -15,6 +16,7 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
     const inputId = id || label?.toLowerCase().replace(/\s+/g, '-');
     const errorId = error ? `${inputId}-error` : undefined;
     const helperId = helperText ? `${inputId}-helper` : undefined;
+    const reduceMotion = useReducedMotion();
 
     const describedBy = [errorId, helperId].filter(Boolean).join(' ') || undefined;
 
@@ -28,16 +30,27 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
         <input
           ref={ref}
           id={inputId}
-          className={`text-text-primary placeholder:text-text-tertiary bg-surface focus:ring-brand-500 w-full rounded-md border px-4 py-2.5 text-base transition-colors duration-150 focus:border-transparent focus:ring-2 focus:outline-none disabled:pointer-events-none disabled:opacity-50 ${error ? 'border-error-500 focus:ring-error-500' : 'border-border-medium hover:border-text-tertiary'} ${className} `}
+          className={`text-text-primary placeholder:text-text-tertiary bg-surface focus:ring-brand-500 w-full rounded-md border px-4 py-2.5 text-base transition-all duration-200 focus:border-transparent focus:ring-2 focus:outline-none disabled:pointer-events-none disabled:opacity-50 ${error ? 'border-error-500 focus:ring-error-500 animate-shake-sm' : 'border-border-medium hover:border-text-tertiary'} ${className} `}
           aria-invalid={error ? 'true' : 'false'}
           aria-describedby={describedBy}
           {...props}
         />
-        {error && (
-          <p id={errorId} className="text-error-600 mt-1.5 text-sm" role="alert">
-            {error}
-          </p>
-        )}
+        <AnimatePresence mode="wait">
+          {error && (
+            <motion.p
+              key="error"
+              id={errorId}
+              initial={reduceMotion ? { opacity: 1 } : { opacity: 0, y: -4 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={reduceMotion ? { opacity: 0 } : { opacity: 0, y: -4 }}
+              transition={{ duration: 0.15, ease: 'easeOut' }}
+              className="text-error-600 mt-1.5 text-sm font-medium"
+              role="alert"
+            >
+              {error}
+            </motion.p>
+          )}
+        </AnimatePresence>
         {helperText && !error && (
           <p id={helperId} className="text-text-tertiary mt-1.5 text-sm">
             {helperText}

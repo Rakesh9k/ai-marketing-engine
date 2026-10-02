@@ -129,7 +129,16 @@ describeIfEmulator('Firestore Security Rules', () => {
     await expect(userDoc.get())['toDeny']();
   });
 
-  test('User can create business with own userId', async () => {
+  // businesses/{id} is read-only for clients (A2 in the fix plan):
+  // create/update go exclusively through createBusiness/updateBusiness/
+  // updateBusinessBrain (Admin SDK, bypasses these rules), which is the
+  // only thing that keeps businessBrain.identity, custom claims, and
+  // vertical consistency correct. The old unrestricted "owner can update"
+  // rule let a client write userId/agencyId/businessBrain directly,
+  // bypassing every one of those callables' validation. Fixture data below
+  // is seeded with rules disabled, matching the same pattern already used
+  // for users/{uid} above.
+  test('Client cannot create a business document directly (server-only)', async () => {
     const user = testEnv!.authenticatedContext('user1');
     const business = user.firestore().collection('businesses').doc('biz1');
     await expect(
@@ -139,29 +148,17 @@ describeIfEmulator('Firestore Security Rules', () => {
         category: 'restaurant',
         status: 'active',
       })
-    )['toSucceed']();
-  });
-
-  test('User cannot create business with different userId', async () => {
-    const user = testEnv!.authenticatedContext('user1');
-    const business = user.firestore().collection('businesses').doc('biz2');
-    await expect(
-      business.set({
-        userId: 'user2',
-        name: 'Test Restaurant',
-        category: 'restaurant',
-        status: 'active',
-      })
     )['toDeny']();
   });
 
   test('User cannot read business they do not own', async () => {
-    const owner = testEnv!.authenticatedContext('owner1');
-    await owner.firestore().collection('businesses').doc('biz1').set({
-      userId: 'owner1',
-      name: 'Owner Restaurant',
-      category: 'restaurant',
-      status: 'active',
+    await testEnv!.withSecurityRulesDisabled(async (context) => {
+      await context.firestore().collection('businesses').doc('biz1').set({
+        userId: 'owner1',
+        name: 'Owner Restaurant',
+        category: 'restaurant',
+        status: 'active',
+      });
     });
 
     const otherUser = testEnv!.authenticatedContext('user2');
@@ -169,56 +166,44 @@ describeIfEmulator('Firestore Security Rules', () => {
   });
 
   test('User can read own business', async () => {
-    const user = testEnv!.authenticatedContext('user1');
-    const business = user.firestore().collection('businesses').doc('biz1');
-    await business.set({
-      userId: 'user1',
-      name: 'Test Restaurant',
-      category: 'restaurant',
-      status: 'active',
+    await testEnv!.withSecurityRulesDisabled(async (context) => {
+      await context.firestore().collection('businesses').doc('biz1').set({
+        userId: 'user1',
+        name: 'Test Restaurant',
+        category: 'restaurant',
+        status: 'active',
+      });
     });
-    await expect(business.get())['toSucceed']();
+    const user = testEnv!.authenticatedContext('user1');
+    await expect(user.firestore().collection('businesses').doc('biz1').get())['toSucceed']();
   });
 
-  test('User cannot update business they do not own', async () => {
-    const owner = testEnv!.authenticatedContext('owner1');
-    await owner.firestore().collection('businesses').doc('biz1').set({
-      userId: 'owner1',
-      name: 'Owner Restaurant',
-      category: 'restaurant',
-      status: 'active',
+  test('Client cannot update a business document directly, even their own (server-only)', async () => {
+    await testEnv!.withSecurityRulesDisabled(async (context) => {
+      await context.firestore().collection('businesses').doc('biz1').set({
+        userId: 'user1',
+        name: 'Test Restaurant',
+        category: 'restaurant',
+        status: 'active',
+      });
     });
-
-    const otherUser = testEnv!.authenticatedContext('user2');
+    const user = testEnv!.authenticatedContext('user1');
     await expect(
-      otherUser.firestore().collection('businesses').doc('biz1').update({
-        name: 'Hacked Restaurant',
-      })
+      user.firestore().collection('businesses').doc('biz1').update({ name: 'Updated Name' })
     )['toDeny']();
   });
 
-  test('User can update own business', async () => {
-    const user = testEnv!.authenticatedContext('user1');
-    const business = user.firestore().collection('businesses').doc('biz1');
-    await business.set({
-      userId: 'user1',
-      name: 'Test Restaurant',
-      category: 'restaurant',
-      status: 'active',
-    });
-    await expect(business.update({ name: 'Updated Name' }))['toSucceed']();
-  });
-
   test('User cannot delete business (soft delete only)', async () => {
-    const user = testEnv!.authenticatedContext('user1');
-    const business = user.firestore().collection('businesses').doc('biz1');
-    await business.set({
-      userId: 'user1',
-      name: 'Test Restaurant',
-      category: 'restaurant',
-      status: 'active',
+    await testEnv!.withSecurityRulesDisabled(async (context) => {
+      await context.firestore().collection('businesses').doc('biz1').set({
+        userId: 'user1',
+        name: 'Test Restaurant',
+        category: 'restaurant',
+        status: 'active',
+      });
     });
-    await expect(business.delete())['toDeny']();
+    const user = testEnv!.authenticatedContext('user1');
+    await expect(user.firestore().collection('businesses').doc('biz1').delete())['toDeny']();
   });
 
   test('Agency member can access managed business', async () => {
@@ -530,6 +515,422 @@ describeIfEmulator('Firestore Security Rules', () => {
       });
       const userA = testEnv!.authenticatedContext('userA', { businessIds: ['biz_a'] });
       await expect(userA.firestore().collection('brand_kits').doc('biz_b').get())['toDeny']();
+    });
+  });
+
+  // Phase 3: agencies/clients are unimplemented scaffolding (no code
+  // anywhere creates/reads/updates them) but previously had broad,
+  // exploitable rules sitting live regardless.
+  describe('Agencies and clients (unused scaffolding) cannot be mass-assigned', () => {
+    test('Agency owner cannot update their own agency document via Firestore (would previously allow hijacking ownerUserId or reassigning members)', async () => {
+      await testEnv!.withSecurityRulesDisabled(async (context) => {
+        await context
+          .firestore()
+          .collection('agencies')
+          .doc('agency1')
+          .set({
+            agencyId: 'agency1',
+            name: 'Test Agency',
+            ownerUserId: 'owner1',
+            vertical: 'restaurant',
+            members: ['owner1'],
+          });
+      });
+      const owner = testEnv!.authenticatedContext('owner1');
+      const agency = owner.firestore().collection('agencies').doc('agency1');
+      await expect(agency.update({ ownerUserId: 'attacker' }))['toDeny']();
+      await expect(agency.update({ members: ['owner1', 'attacker'] }))['toDeny']();
+    });
+
+    test('Agency owner cannot delete their own agency document via Firestore', async () => {
+      await testEnv!.withSecurityRulesDisabled(async (context) => {
+        await context
+          .firestore()
+          .collection('agencies')
+          .doc('agency2')
+          .set({
+            agencyId: 'agency2',
+            name: 'Test Agency 2',
+            ownerUserId: 'owner1',
+            vertical: 'restaurant',
+            members: ['owner1'],
+          });
+      });
+      const owner = testEnv!.authenticatedContext('owner1');
+      await expect(owner.firestore().collection('agencies').doc('agency2').delete())['toDeny']();
+    });
+
+    test('Owner can still read their own agency document', async () => {
+      await testEnv!.withSecurityRulesDisabled(async (context) => {
+        await context
+          .firestore()
+          .collection('agencies')
+          .doc('agency3')
+          .set({
+            agencyId: 'agency3',
+            name: 'Test Agency 3',
+            ownerUserId: 'owner1',
+            vertical: 'restaurant',
+            members: ['owner1'],
+          });
+      });
+      const owner = testEnv!.authenticatedContext('owner1');
+      await expect(owner.firestore().collection('agencies').doc('agency3').get())['toSucceed']();
+    });
+
+    test('User cannot create a client document directly (the old rule was trivially satisfiable by setting agencyId to one of their own businessIds)', async () => {
+      const user = testEnv!.authenticatedContext('user1', { businessIds: ['biz_own'] });
+      await expect(
+        user
+          .firestore()
+          .collection('clients')
+          .doc('client1')
+          .set({
+            clientId: 'client1',
+            name: 'Forged Client',
+            agencyId: 'biz_own',
+            businessIds: ['biz_own'],
+            userId: 'user1',
+          })
+      )['toDeny']();
+    });
+
+    test('Client-document owner cannot update it via Firestore (previously unrestricted field mass-assignment)', async () => {
+      await testEnv!.withSecurityRulesDisabled(async (context) => {
+        await context
+          .firestore()
+          .collection('clients')
+          .doc('client2')
+          .set({
+            clientId: 'client2',
+            name: 'Test Client',
+            agencyId: 'agency1',
+            businessIds: ['biz1'],
+            userId: 'user1',
+          });
+      });
+      const user = testEnv!.authenticatedContext('user1');
+      await expect(
+        user
+          .firestore()
+          .collection('clients')
+          .doc('client2')
+          .update({ businessIds: ['biz1', 'biz_victim'] })
+      )['toDeny']();
+    });
+  });
+
+  // Phase 3: assets/{assetId} allowed an owner to update ANY field
+  // (including businessId) with no invariant check — the same class of bug
+  // already fixed for products/{productId} and campaigns/{campaignId}.
+  describe('Assets cannot be re-pointed to another tenant via update', () => {
+    test('Owner cannot change businessId on their own asset via Firestore update', async () => {
+      await testEnv!.withSecurityRulesDisabled(async (context) => {
+        await context.firestore().collection('assets').doc('asset1').set({
+          assetId: 'asset1',
+          userId: 'user1',
+          businessId: 'biz_own',
+          type: 'photo',
+          storagePath: 'assets/user1/asset1.jpg',
+        });
+      });
+      const user = testEnv!.authenticatedContext('user1', { businessIds: ['biz_own'] });
+      const asset = user.firestore().collection('assets').doc('asset1');
+      await expect(asset.update({ businessId: 'biz_victim' }))['toDeny']();
+    });
+
+    test('Owner CAN still update ordinary editable asset fields (businessId untouched)', async () => {
+      await testEnv!.withSecurityRulesDisabled(async (context) => {
+        await context.firestore().collection('assets').doc('asset2').set({
+          assetId: 'asset2',
+          userId: 'user1',
+          businessId: 'biz_own',
+          type: 'photo',
+          storagePath: 'assets/user1/asset2.jpg',
+          status: 'active',
+        });
+      });
+      const user = testEnv!.authenticatedContext('user1', { businessIds: ['biz_own'] });
+      const asset = user.firestore().collection('assets').doc('asset2');
+      await expect(asset.update({ status: 'archived' }))['toSucceed']();
+    });
+  });
+
+  // Phase 3: collections with no matching rule block are denied by default,
+  // but these blocks now say so explicitly (see comment in firestore.rules).
+  // These tests confirm the explicit denial actually behaves the same as
+  // the implicit default it replaced, for every server-internal collection.
+  describe('Server-internal collections are fully inaccessible to any client', () => {
+    test('creative_feedback is not readable or writable by any authenticated user', async () => {
+      await testEnv!.withSecurityRulesDisabled(async (context) => {
+        await context.firestore().collection('creative_feedback').doc('fb1').set({
+          feedbackId: 'fb1',
+          userId: 'user1',
+          businessId: 'biz1',
+          sentiment: 'positive',
+        });
+      });
+      const db = testEnv!.authenticatedContext('user1').firestore();
+      await expect(db.collection('creative_feedback').doc('fb1').get())['toDeny']();
+      await expect(db.collection('creative_feedback').doc('fb2').set({ userId: 'user1' }))[
+        'toDeny'
+      ]();
+    });
+
+    test('creative_preferences is not readable or writable by any authenticated user', async () => {
+      await testEnv!.withSecurityRulesDisabled(async (context) => {
+        await context.firestore().collection('creative_preferences').doc('pref1').set({
+          userId: 'user1',
+          businessId: 'biz1',
+        });
+      });
+      const user = testEnv!.authenticatedContext('user1');
+      await expect(user.firestore().collection('creative_preferences').doc('pref1').get())[
+        'toDeny'
+      ]();
+    });
+
+    test('idempotency_keys, rate_limits, and processed_webhook_events are not readable or writable by any authenticated user', async () => {
+      const db = testEnv!.authenticatedContext('user1').firestore();
+      await expect(db.collection('idempotency_keys').doc('k1').set({ key: 'k1' }))['toDeny']();
+      await expect(db.collection('rate_limits').doc('r1').set({ userId: 'user1' }))['toDeny']();
+      await expect(db.collection('processed_webhook_events').doc('e1').set({ eventId: 'e1' }))[
+        'toDeny'
+      ]();
+    });
+  });
+
+  // Phase 15 Campaign Persistence audit — regression test for a real,
+  // verified-broken production bug: src/services/database.ts's
+  // campaignService.getByIdempotencyKey() previously queried
+  // `metadata.idempotencyKey` alone, with no `userId` filter. Firestore
+  // evaluates security rules against a query's POTENTIAL result set, not
+  // just its actual results — since campaigns/{id}'s read rule requires
+  // `resource.data.userId == request.auth.uid`, a query with no `userId`
+  // clause can never be proven safe for every possible match, so Firestore
+  // denies the ENTIRE query rather than silently filtering. This is
+  // confirmed here directly against the real rules, not inferred from
+  // reading the rules file.
+  describe('Idempotency-key campaign lookup query must be scoped by userId (Phase 15)', () => {
+    test('a campaigns query filtered by metadata.idempotencyKey WITHOUT a userId clause is denied outright', async () => {
+      await testEnv!.withSecurityRulesDisabled(async (context) => {
+        await context
+          .firestore()
+          .collection('campaigns')
+          .doc('campA')
+          .set({
+            campaignId: 'campA',
+            userId: 'user1',
+            businessId: 'biz1',
+            status: 'generated',
+            metadata: { idempotencyKey: 'idem-key-1' },
+          });
+      });
+      const db = testEnv!.authenticatedContext('user1', { businessIds: ['biz1'] }).firestore();
+      const unscopedQuery = db
+        .collection('campaigns')
+        .where('metadata.idempotencyKey', '==', 'idem-key-1')
+        .limit(1);
+      await expect(unscopedQuery.get())['toDeny']();
+    });
+
+    test('the SAME query, scoped by userId (the actual fix), succeeds and returns the campaign', async () => {
+      await testEnv!.withSecurityRulesDisabled(async (context) => {
+        await context
+          .firestore()
+          .collection('campaigns')
+          .doc('campB')
+          .set({
+            campaignId: 'campB',
+            userId: 'user1',
+            businessId: 'biz1',
+            status: 'generated',
+            metadata: { idempotencyKey: 'idem-key-2' },
+          });
+      });
+      const db = testEnv!.authenticatedContext('user1', { businessIds: ['biz1'] }).firestore();
+      const scopedQuery = db
+        .collection('campaigns')
+        .where('userId', '==', 'user1')
+        .where('metadata.idempotencyKey', '==', 'idem-key-2')
+        .limit(1);
+      const snap = await scopedQuery.get();
+      expect(snap.empty).toBe(false);
+      expect(snap.docs[0]!.id).toBe('campB');
+    });
+
+    test("the scoped query correctly returns nothing for a DIFFERENT user's idempotency key (no cross-tenant leak)", async () => {
+      await testEnv!.withSecurityRulesDisabled(async (context) => {
+        await context
+          .firestore()
+          .collection('campaigns')
+          .doc('campC')
+          .set({
+            campaignId: 'campC',
+            userId: 'userB',
+            businessId: 'biz_b',
+            status: 'generated',
+            metadata: { idempotencyKey: 'idem-key-shared-guess' },
+          });
+      });
+      const userA = testEnv!.authenticatedContext('userA', { businessIds: ['biz_a'] }).firestore();
+      const q = userA
+        .collection('campaigns')
+        .where('userId', '==', 'userA')
+        .where('metadata.idempotencyKey', '==', 'idem-key-shared-guess')
+        .limit(1);
+      const snap = await q.get();
+      expect(snap.empty).toBe(true);
+    });
+  });
+
+  describe('Meta Social Connections & Server-Only Collections Security', () => {
+    test('user can read their own socialConnections subcollection, but user B cannot read user A socialConnections', async () => {
+      await testEnv!.withSecurityRulesDisabled(async (context) => {
+        await context
+          .firestore()
+          .collection('users')
+          .doc('userA')
+          .collection('socialConnections')
+          .doc('meta_p1')
+          .set({
+            connectionId: 'meta_p1',
+            userId: 'userA',
+            provider: 'meta',
+            status: 'active',
+          });
+      });
+
+      const userADb = testEnv!.authenticatedContext('userA').firestore();
+      const userBDb = testEnv!.authenticatedContext('userB').firestore();
+
+      const userASnap = await userADb
+        .collection('users')
+        .doc('userA')
+        .collection('socialConnections')
+        .doc('meta_p1')
+        .get();
+      expect(userASnap.exists).toBe(true);
+
+      const userBSnap = userBDb
+        .collection('users')
+        .doc('userA')
+        .collection('socialConnections')
+        .doc('meta_p1')
+        .get();
+      await expect(userBSnap).rejects.toThrow();
+    });
+
+    test('clients cannot write directly to socialConnections subcollection (forced server-only callables)', async () => {
+      const userADb = testEnv!.authenticatedContext('userA').firestore();
+      const writeAttempt = userADb
+        .collection('users')
+        .doc('userA')
+        .collection('socialConnections')
+        .doc('meta_p2')
+        .set({
+          connectionId: 'meta_p2',
+          userId: 'userA',
+          provider: 'meta',
+          status: 'active',
+        });
+
+      await expect(writeAttempt).rejects.toThrow();
+    });
+
+    test('clients cannot read or write metaCredentials, metaOAuthStates, or pendingMetaSessions (server-only collections)', async () => {
+      const userADb = testEnv!.authenticatedContext('userA').firestore();
+
+      await expect(userADb.collection('metaCredentials').doc('meta_p1').get()).rejects.toThrow();
+      await expect(
+        userADb.collection('metaCredentials').doc('meta_p1').set({ secret: 'hacked' })
+      ).rejects.toThrow();
+
+      await expect(userADb.collection('metaOAuthStates').doc('s1').get()).rejects.toThrow();
+      await expect(
+        userADb.collection('metaOAuthStates').doc('s1').set({ secret: 'hacked' })
+      ).rejects.toThrow();
+
+      await expect(userADb.collection('pendingMetaSessions').doc('s1').get()).rejects.toThrow();
+      await expect(
+        userADb.collection('pendingMetaSessions').doc('s1').set({ secret: 'hacked' })
+      ).rejects.toThrow();
+    });
+
+    test('publishJobs allows owner read access, denies other users, and denies client write access', async () => {
+      await testEnv!.withSecurityRulesDisabled(async (adminContext) => {
+        const adminDb = adminContext.firestore();
+        await adminDb.collection('publishJobs').doc('job_userA').set({
+          jobId: 'job_userA',
+          userId: 'userA',
+          businessId: 'bizA',
+          campaignId: 'campA',
+          status: 'scheduled',
+        });
+      });
+
+      const userADb = testEnv!.authenticatedContext('userA').firestore();
+      const userBDb = testEnv!.authenticatedContext('userB').firestore();
+
+      // Owner can read
+      const ownerRead = await userADb.collection('publishJobs').doc('job_userA').get();
+      expect(ownerRead.exists).toBe(true);
+
+      // Other user cannot read owner's job
+      await expect(userBDb.collection('publishJobs').doc('job_userA').get()).rejects.toThrow();
+
+      // Client write (create, update, delete) is disallowed
+      await expect(
+        userADb.collection('publishJobs').doc('job_userA_2').set({
+          jobId: 'job_userA_2',
+          userId: 'userA',
+          status: 'published',
+        })
+      ).rejects.toThrow();
+
+      await expect(
+        userADb.collection('publishJobs').doc('job_userA').update({
+          status: 'published',
+        })
+      ).rejects.toThrow();
+    });
+
+    test('scheduledPosts allows owner read access, denies other users, and denies client write access', async () => {
+      await testEnv!.withSecurityRulesDisabled(async (adminContext) => {
+        const adminDb = adminContext.firestore();
+        await adminDb.collection('scheduledPosts').doc('sch_userA').set({
+          scheduledPostId: 'sch_userA',
+          userId: 'userA',
+          businessId: 'bizA',
+          campaignId: 'campA',
+          status: 'scheduled',
+        });
+      });
+
+      const userADb = testEnv!.authenticatedContext('userA').firestore();
+      const userBDb = testEnv!.authenticatedContext('userB').firestore();
+
+      // Owner can read
+      const ownerRead = await userADb.collection('scheduledPosts').doc('sch_userA').get();
+      expect(ownerRead.exists).toBe(true);
+
+      // Other user cannot read owner's scheduled post
+      await expect(userBDb.collection('scheduledPosts').doc('sch_userA').get()).rejects.toThrow();
+
+      // Client write (create, update, delete) is disallowed
+      await expect(
+        userADb.collection('scheduledPosts').doc('sch_userA_2').set({
+          scheduledPostId: 'sch_userA_2',
+          userId: 'userA',
+          status: 'scheduled',
+        })
+      ).rejects.toThrow();
+
+      await expect(
+        userADb.collection('scheduledPosts').doc('sch_userA').update({
+          status: 'published',
+        })
+      ).rejects.toThrow();
     });
   });
 });

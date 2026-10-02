@@ -7,6 +7,9 @@ import { businessService } from '@/services/database';
 import { listReels } from '@/features/reel/services/reelService';
 import { BusinessSelector } from '@/components/shared/BusinessSelector';
 import { Button } from '@/components/ui/Button';
+import { MascotScene } from '@/components/mascot/MascotScene';
+import { PhoneIllustration } from '@/components/illustrations/Illustrations';
+import { PageSkeleton } from '@/components/motion/PageSkeleton';
 import type { Business, ReelProject, ReelStatus } from '@/types';
 
 const STATUS_STYLES: Record<ReelStatus, string> = {
@@ -72,17 +75,19 @@ function ReelCard({ reel }: { reel: ReelProject }) {
 
 function EmptyState() {
   return (
-    <div className="rounded-lg border border-neutral-200 bg-white p-8 text-center">
-      <div className="mx-auto mb-4 text-4xl" aria-hidden="true">
-        🎥
-      </div>
-      <h3 className="text-lg font-medium text-neutral-900">No Reels yet</h3>
-      <p className="mt-1 text-sm text-neutral-500">
-        Upload a few raw clips and let Mitra turn them into a ready-to-post Reel.
-      </p>
-      <Link href="/reels/new" className="mt-6 inline-block">
-        <Button>Create Reel</Button>
-      </Link>
+    <div className="flex justify-center rounded-lg border border-neutral-200 bg-white p-8">
+      <MascotScene
+        pose="point"
+        size="md"
+        align="center"
+        message="No Reels yet."
+        supporting="Upload a few raw clips and let Mitra turn them into a ready-to-post Reel."
+        decoration={<PhoneIllustration size={20} />}
+      >
+        <Link href="/reels/new" className="mt-4 inline-block">
+          <Button size="sm">Create Reel</Button>
+        </Link>
+      </MascotScene>
     </div>
   );
 }
@@ -131,14 +136,7 @@ export default function ReelsPage() {
   }, [selectedBusinessId]);
 
   if (loading) {
-    return (
-      <div className="flex min-h-screen items-center justify-center">
-        <div
-          className="border-brand-600 h-8 w-8 animate-spin rounded-full border-4 border-t-transparent"
-          aria-hidden="true"
-        />
-      </div>
-    );
+    return <PageSkeleton variant="cards" />;
   }
 
   return (

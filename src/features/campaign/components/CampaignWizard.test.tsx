@@ -105,8 +105,8 @@ describe('CampaignWizard', () => {
 
   it('shows a loading spinner before businesses resolve', () => {
     getByUserIdMock.mockReturnValue(new Promise(() => {}));
-    const { container } = render(<CampaignWizard userId="user_1" />);
-    expect(container.querySelector('.animate-spin')).toBeTruthy();
+    render(<CampaignWizard userId="user_1" />);
+    expect(screen.getByRole('status', { name: /loading/i })).toBeInTheDocument();
   });
 
   it('empty state: prompts to set up a business first when the user has none', async () => {

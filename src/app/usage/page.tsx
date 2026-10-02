@@ -5,6 +5,7 @@ import { useAuth } from '@/features/auth/hooks/useAuth';
 import { usageService, subscriptionService } from '@/services/database';
 import type { Usage, Subscription, SubscriptionPlan } from '@/types';
 import { formatINR } from '@/lib/utils';
+import { PageSkeleton } from '@/components/motion/PageSkeleton';
 
 function ProgressBar({ value, max, label }: { value: number; max: number; label: string }) {
   const percentage = max > 0 ? Math.min(100, (value / max) * 100) : 0;
@@ -62,6 +63,7 @@ function PlanDetails({ subscription }: { subscription: Subscription | null }) {
     free: 'Free',
     starter: 'Starter',
     business: 'Business',
+    pro: 'Pro',
     agency: 'Agency',
   };
 
@@ -69,11 +71,12 @@ function PlanDetails({ subscription }: { subscription: Subscription | null }) {
     free: { campaigns: 1, credits: 100 },
     starter: { campaigns: 5, credits: 500 },
     business: { campaigns: 12, credits: 1200 },
-    agency: { campaigns: 30, credits: 3000 },
+    pro: { campaigns: 20, credits: 2500 },
+    agency: { campaigns: 40, credits: 6000 },
   };
 
   const currentPlan = subscription?.planId || 'free';
-  const limits = planLimits[currentPlan];
+  const limits = planLimits[currentPlan] ?? planLimits.free;
 
   return (
     <div className="rounded-lg border border-neutral-200 bg-white p-6">
@@ -93,10 +96,12 @@ function PlanDetails({ subscription }: { subscription: Subscription | null }) {
                 ? 'Free'
                 : formatINR(
                     subscription?.planId === 'starter'
-                      ? 499
+                      ? 999
                       : subscription?.planId === 'business'
-                        ? 999
-                        : 2499
+                        ? 1699
+                        : subscription?.planId === 'pro'
+                          ? 2999
+                          : 4999
                   )}
             </p>
           </div>
@@ -253,14 +258,7 @@ export default function UsagePage() {
   }, [user]);
 
   if (loading) {
-    return (
-      <div className="flex min-h-screen items-center justify-center">
-        <div
-          className="border-brand-600 h-8 w-8 animate-spin rounded-full border-4 border-t-transparent"
-          aria-hidden="true"
-        />
-      </div>
-    );
+    return <PageSkeleton variant="cards" />;
   }
 
   if (error) {

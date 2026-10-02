@@ -3,6 +3,13 @@ import { getFirebaseFunctions } from '@/lib/firebase/client';
 export interface CallableFunctionOptions<TData> {
   functionName: string;
   data: TData;
+  // The Functions SDK defaults to a 70s client-side timeout. Long-running
+  // callables (multi-stage AI generation) exceed that well within a normal
+  // successful run — the client would report failure while the server kept
+  // going, charging credits, with nothing to show for it. Callers of such
+  // functions must pass a timeout that covers the server's own
+  // `timeoutSeconds` (see generateCampaignStrategy.ts/regenerateAsset.ts).
+  timeoutMs?: number;
 }
 
 export async function callFunction<TData, TResponse>(
@@ -15,7 +22,9 @@ export async function callFunction<TData, TResponse>(
   }
 
   const { httpsCallable } = await import('firebase/functions');
-  const callable = httpsCallable<TData, TResponse>(functions, options.functionName);
+  const callable = httpsCallable<TData, TResponse>(functions, options.functionName, {
+    timeout: options.timeoutMs,
+  });
 
   const result = await callable(options.data);
 

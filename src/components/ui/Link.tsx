@@ -28,7 +28,7 @@ export const StyledLink = forwardRef<HTMLAnchorElement, LinkProps>(
       <Link
         ref={ref}
         href={href}
-        className={`${variantStyles[variant]} ${sizeStyles[size]} ${className}`}
+        className={`animated-underline ${variantStyles[variant]} ${sizeStyles[size]} ${className}`}
         {...props}
       >
         {children}

@@ -660,13 +660,34 @@ describe('Truth Check - Deterministic Validation', () => {
       expect(productCheck?.status).toBe('PASS');
     });
 
-    it('FAIL when product name is wrong', async () => {
-      const input = createMockInput({ productName: 'Chicken 65' });
+    it('REVIEW_REQUIRED (not FAIL) when the expected product name is not found in copy (K2)', async () => {
+      // Exact-substring absence alone can't distinguish "this product just
+      // wasn't mentioned" from "a different catalogue product was named
+      // instead" (this check has no catalogue to compare against) — so it
+      // downgrades to REVIEW_REQUIRED rather than an outright, charged FAIL.
+      // This also fixed transliterated/spacing variants ("chicken
+      // dum-biryani" vs "Chicken Dum Biryani") that used to FAIL despite
+      // being factually correct — see functions/src/services/ai/
+      // truthCheck.test.ts for that coverage.
+      // No catalog entry is named in the copy → cannot tell "not mentioned"
+      // from "wrong product", so REVIEW_REQUIRED. (The default fixture
+      // catalog contains "Chicken Biryani", which the default copy names —
+      // G1 (Pass 2) makes that a FAIL, covered in the next test — so the
+      // catalog is emptied here to isolate the absent-name case.)
+      const base = createMockInput({ productName: 'Chicken 65' });
+      const input = { ...base, businessBrain: { ...base.businessBrain, products: [] } };
       const previousResults = createMockPreviousResults();
       const result = await runDeterministicTruthCheck(input, previousResults);
 
       const productCheck = result.checks.find((c) => c.category === 'product');
       expect(productCheck).toBeDefined();
+      expect(productCheck?.status).toBe('REVIEW_REQUIRED');
+    });
+
+    it('FAIL when copy names a different product from the authoritative catalog (G1)', async () => {
+      const input = createMockInput({ productName: 'Chicken 65' });
+      const result = await runDeterministicTruthCheck(input, createMockPreviousResults());
+      const productCheck = result.checks.find((c) => c.category === 'product');
       expect(productCheck?.status).toBe('FAIL');
     });
   });
@@ -833,14 +854,27 @@ describe('Truth Check - Deterministic Validation', () => {
     });
   });
 
+  // G1: Truth Check's operational checks (delivery/hours/minimum-order) now
+  // read the AUTHORITATIVE input.businessBrain.businessRules (the actual
+  // persisted record) rather than previousResults.businessUnderstanding
+  // (Stage 1's own AI-written summary of that same data, which could
+  // itself hallucinate a fact never actually saved). These fixtures
+  // override input.businessBrain accordingly instead of previousResults.
+  const withBusinessRules = (
+    input: GenerationPipelineInput,
+    businessRules: Partial<GenerationPipelineInput['businessBrain']['businessRules']>
+  ): GenerationPipelineInput => ({
+    ...input,
+    businessBrain: {
+      ...input.businessBrain,
+      businessRules: { ...input.businessBrain.businessRules, ...businessRules },
+    },
+  });
+
   describe('Unsupported Claims Check', () => {
     it('REVIEW_REQUIRED when delivery claimed but not supported', async () => {
-      const input = createMockInput();
+      const input = withBusinessRules(createMockInput(), { deliveryRadiusKm: 0 });
       const previousResults = createMockPreviousResults({
-        businessUnderstanding: {
-          businessFacts: [],
-          businessRules: { availability: { deliveryRadiusKm: 0 } },
-        },
         copyPack: {
           headlines: [{ text: 'Delivery available now!' }],
         },
@@ -857,12 +891,8 @@ describe('Truth Check - Deterministic Validation', () => {
 
   describe('Operations Check', () => {
     it('REVIEW_REQUIRED when delivery claimed but not supported', async () => {
-      const input = createMockInput();
+      const input = withBusinessRules(createMockInput(), { deliveryRadiusKm: 0 });
       const previousResults = createMockPreviousResults({
-        businessUnderstanding: {
-          businessFacts: [],
-          businessRules: { availability: { deliveryRadiusKm: 0 } },
-        },
         copyPack: {
           headlines: [{ text: 'Delivery available now!' }],
         },
@@ -879,19 +909,8 @@ describe('Truth Check - Deterministic Validation', () => {
 
   describe('Missing Data Handling', () => {
     it('REVIEW_REQUIRED when delivery claimed but no delivery info in Business Brain', async () => {
-      const input = createMockInput();
+      const input = withBusinessRules(createMockInput(), { deliveryRadiusKm: 0 });
       const previousResults = createMockPreviousResults({
-        businessUnderstanding: {
-          businessFacts: [
-            {
-              category: 'identity',
-              fact: 'Business name: Test',
-              source: 'businessBrain',
-              criticality: 'high',
-            },
-          ],
-          businessRules: {},
-        },
         copyPack: {
           headlines: [{ text: 'Delivery available now!' }],
         },
@@ -914,12 +933,10 @@ describe('Truth Check - Deterministic Validation', () => {
     });
 
     it('REVIEW_REQUIRED when no FAIL but some REVIEW_REQUIRED', async () => {
-      const input = createMockInput({ offerType: 'fixed' });
+      const input = withBusinessRules(createMockInput({ offerType: 'fixed' }), {
+        deliveryRadiusKm: 0,
+      });
       const previousResults = createMockPreviousResults({
-        businessUnderstanding: {
-          businessFacts: [],
-          businessRules: { availability: { deliveryRadiusKm: 0 } },
-        },
         copyPack: {
           headlines: [
             {

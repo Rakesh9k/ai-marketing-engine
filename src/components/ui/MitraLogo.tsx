@@ -15,16 +15,18 @@ const HEIGHT_MAP = {
   lg: 80,
 } as const;
 
-// Intrinsic dimensions of public/brand/mitra-logo-long.png — used only to
-// give next/image the correct aspect ratio for a `public/` asset (which,
-// unlike a statically-imported image, requires explicit width/height).
-const NATIVE_WIDTH = 1774;
-const NATIVE_HEIGHT = 887;
+// Intrinsic dimensions
+const DIMENSIONS = {
+  full: { width: 1330, height: 498, src: '/brand/mitra-logo-long.png' },
+  wordmark: { width: 232, height: 63, src: '/brand/mitra-logo-wordmark.png' },
+} as const;
 
 export type MitraLogoSize = keyof typeof HEIGHT_MAP;
+export type MitraLogoVariant = keyof typeof DIMENSIONS;
 
 interface MitraLogoProps {
   size?: MitraLogoSize;
+  variant?: MitraLogoVariant;
   className?: string;
   ariaLabel?: string;
   /** Set when a wrapping element (e.g. a Link) already carries the accessible name. */
@@ -33,16 +35,18 @@ interface MitraLogoProps {
 
 export function MitraLogo({
   size = 'md',
+  variant = 'full',
   className,
   ariaLabel = 'Mitra — Your AI Marketing Partner',
   decorative = false,
 }: MitraLogoProps) {
+  const config = DIMENSIONS[variant];
   const height = HEIGHT_MAP[size];
-  const width = Math.round((height * NATIVE_WIDTH) / NATIVE_HEIGHT);
+  const width = Math.round((height * config.width) / config.height);
 
   return (
     <Image
-      src="/brand/mitra-logo-long.png"
+      src={config.src}
       alt={decorative ? '' : ariaLabel}
       width={width}
       height={height}

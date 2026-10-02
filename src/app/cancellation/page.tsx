@@ -4,12 +4,18 @@ import { MitraLogo } from '@/components/ui/MitraLogo';
 
 export const metadata: Metadata = {
   title: 'Cancellation Policy — Mitra',
-  description:
-    'How subscription cancellation works in Mitra, the AI marketing engine by Brainwise.',
+  description: 'How cancelling a Mitra subscription works, in plain terms.',
 };
 
-const EFFECTIVE_DATE = '2026-09-22';
+const EFFECTIVE_DATE = '2026-10-02';
 
+/**
+ * Describes ONLY behaviour that is implemented and verified (cancelPaddleSubscription +
+ * the Paddle webhook): cancelling stops the next renewal; the plan and its monthly credit
+ * allowance continue to the end of the paid period; nothing is refunded or removed
+ * automatically. Refund terms live on /refund; this page must not restate or contradict them.
+ * Not yet reviewed by legal counsel.
+ */
 export default function CancellationPage() {
   return (
     <div className="mx-auto max-w-3xl px-4 py-12">
@@ -22,86 +28,90 @@ export default function CancellationPage() {
         Effective date: {EFFECTIVE_DATE} · Version 0.1 (draft) · Not yet reviewed by legal counsel
       </p>
 
-      <div className="border-border-light bg-surface mb-8 rounded-2xl border p-4">
-        <p className="text-body text-text-secondary">
-          <strong>Status of this document:</strong> This page describes exactly what "cancel"
-          technically does in Mitra today. It does not promise a refund for the current billing
-          period — see our{' '}
-          <Link href="/refund" className="text-brand-600 hover:underline">
-            Refund Policy
-          </Link>{' '}
-          for that, which remains a founder decision.
-        </p>
-      </div>
-
       <section className="mb-8">
-        <h2 className="text-h3 text-text-primary mb-2 font-semibold">1. What "cancel" means</h2>
+        <h2 className="text-h3 text-text-primary mb-2 font-semibold">1. Automatic renewal</h2>
         <p className="text-body text-text-secondary">
-          "Cancellation" in Mitra means canceling your recurring paid subscription plan — it stops
-          the plan from automatically renewing and being billed again. It is different from deleting
-          your account (see our{' '}
-          <Link href="/privacy" className="text-brand-600 hover:underline">
-            Privacy Policy
-          </Link>
-          , section 6) and different from stopping a single in-progress campaign generation, which
-          is a normal in-app action, not a billing action.
+          Paid Mitra plans renew automatically at the end of each billing period (monthly or yearly,
+          as you chose) until you cancel. There is no free trial.
         </p>
       </section>
 
       <section className="mb-8">
-        <h2 className="text-h3 text-text-primary mb-2 font-semibold">
-          2. How to cancel your subscription
-        </h2>
+        <h2 className="text-h3 text-text-primary mb-2 font-semibold">2. How to cancel</h2>
         <p className="text-body text-text-secondary">
-          You can cancel a paid subscription plan yourself from the Billing page in the app. When
-          you cancel:
+          Open the Billing page in the app and choose <strong>Cancel subscription</strong>. You do
+          not need to contact us.
         </p>
-        <ul className="text-body text-text-secondary mt-2 list-disc space-y-1 pl-6">
+      </section>
+
+      <section className="mb-8">
+        <h2 className="text-h3 text-text-primary mb-2 font-semibold">3. What cancelling does</h2>
+        <ul className="text-body text-text-secondary list-disc space-y-1 pl-6">
           <li>
-            Your plan stops renewing — PayU (or Razorpay, for a subscription created before PayU was
-            introduced) will not charge you again for this plan.
+            It stops the <strong>next</strong> renewal. You will not be charged again.
           </li>
           <li>
-            Your current billing period is not interrupted: you keep your plan's access and any
-            remaining credits until the end of the period you already paid for.
+            It does not end your access immediately. You keep your paid plan, and the monthly credit
+            allowance that comes with it, until the end of the billing period you have already paid
+            for.
           </li>
-          <li>
-            After that period ends, your account reverts to the Free plan's monthly credit
-            allowance.
-          </li>
-          <li>Canceling does not, by itself, delete your account or your data.</li>
+          <li>At the end of that period your account moves to the Free plan.</li>
+          <li>Your businesses, campaigns and other content are not deleted by cancelling.</li>
         </ul>
       </section>
 
       <section className="mb-8">
         <h2 className="text-h3 text-text-primary mb-2 font-semibold">
-          3. What cancellation does not do
+          4. What cancelling does not do
         </h2>
         <p className="text-body text-text-secondary">
-          Canceling does not issue a refund for the current or any prior billing period — see our{' '}
+          Cancelling does not by itself refund a payment. Refund requests are handled under our{' '}
           <Link href="/refund" className="text-brand-600 hover:underline">
             Refund Policy
           </Link>
-          . It also does not automatically expire or forfeit unused credits at the moment you click
-          cancel; credits remain usable until your current paid period ends.{' '}
-          <strong>
-            What exactly happens to unused credits after your account reverts to the Free plan:
-            founder decision required.
-          </strong>{' '}
-          This has not yet been finalized.
+          .
+        </p>
+      </section>
+
+      <section className="mb-8">
+        <h2 className="text-h3 text-text-primary mb-2 font-semibold">5. Credits</h2>
+        <p className="text-body text-text-secondary">
+          Credits are valid through the calendar month they apply to; unused credits do not roll
+          over into the next month. See our{' '}
+          <Link href="/terms" className="text-brand-600 hover:underline">
+            Terms of Service
+          </Link>{' '}
+          for the credit terms.
+        </p>
+      </section>
+
+      <section className="mb-8">
+        <h2 className="text-h3 text-text-primary mb-2 font-semibold">6. Changing plans</h2>
+        <p className="text-body text-text-secondary">
+          Switching to a different plan inside an active subscription is not available yet. To move
+          to a different plan, cancel your current plan and subscribe to the new one once your
+          current period has ended.
         </p>
       </section>
 
       <section className="mb-8">
         <h2 className="text-h3 text-text-primary mb-2 font-semibold">
-          4. If self-service cancellation isn't working for you
+          7. Credit packs and the Free plan
         </h2>
         <p className="text-body text-text-secondary">
-          If the in-app cancellation option is unavailable or fails, contact{' '}
+          Credit packs are one-time purchases, so there is nothing to cancel. The Free plan has no
+          payment and does not renew.
+        </p>
+      </section>
+
+      <section className="mb-8">
+        <h2 className="text-h3 text-text-primary mb-2 font-semibold">Questions</h2>
+        <p className="text-body text-text-secondary">
+          If you cannot find your subscription in Billing or something looks wrong, email{' '}
           <a href="mailto:support@brain-wise.com" className="text-brand-600 hover:underline">
             support@brain-wise.com
           </a>{' '}
-          and we will process the cancellation manually.
+          with your account email.
         </p>
       </section>
 

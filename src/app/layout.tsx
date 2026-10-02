@@ -75,6 +75,11 @@ export const viewport: Viewport = {
   viewportFit: 'cover',
 };
 
+import { MesurerWrapper } from '@/components/shared/MesurerWrapper';
+import { MascotProvider } from '@/components/mascot/MascotProvider';
+import { MascotWidget } from '@/components/mascot/MascotWidget';
+import { AmbientBackground } from '@/components/motion/AmbientBackground';
+
 export default function RootLayout({ children }: React.PropsWithChildren) {
   return (
     <html lang="en" className={`h-full antialiased ${geistSans.variable}`} suppressHydrationWarning>
@@ -86,7 +91,14 @@ export default function RootLayout({ children }: React.PropsWithChildren) {
       </head>
       <body className="bg-bg-primary text-text-primary flex min-h-full flex-col">
         <ThemeProvider>
-          <ToastProvider>{children}</ToastProvider>
+          <ToastProvider>
+            <MascotProvider>
+              <AmbientBackground />
+              {children}
+              <MascotWidget />
+              <MesurerWrapper />
+            </MascotProvider>
+          </ToastProvider>
         </ThemeProvider>
       </body>
     </html>

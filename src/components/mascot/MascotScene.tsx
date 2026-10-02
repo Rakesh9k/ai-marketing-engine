@@ -1,85 +1,85 @@
-import Image from 'next/image';
-import type { ReactNode } from 'react';
-import {
-  MASCOT_POSE_ASSET,
-  SIZE_MAP,
-  type MitraMascotPose,
-  type MitraMascotSize,
-} from './MitraMascot';
+'use client';
 
-/**
- * An open, composed mascot moment — not `<Card><Mascot /></Card>` (see the
- * design brief's "mascot container rule"). The mascot sits in whitespace
- * alongside a short line of copy and optional small illustration objects
- * passed as `decoration`, rather than being boxed.
- *
- * Use this only where the mascot's presence is earning its place: a
- * beginning, a guidance moment, an empty state, or a completion — not as
- * decoration. If you're reaching for this component because a screen
- * "feels empty," that's the wrong reason (see design brief §38/§48).
- *
- * Which pose belongs on which screen is centralized in
- * mascotPlacement.ts — check there before picking one ad hoc, and add a
- * new entry there (not just inline here) if this is a genuinely new moment.
- *
- * Renders the official photoreal Mitra artwork (public/brand/mascot/*.png,
- * background-removed from the supplied source renders — see
- * scripts/mascot-extract.mjs) rather than the earlier vector character. The
- * pose → asset mapping lives in MitraMascot.tsx as MASCOT_POSE_ASSET.
- */
+import type { ReactNode } from 'react';
+import { motion, useReducedMotion } from 'motion/react';
+import { Mascot } from './Mascot';
+import type { MascotState, MascotSize } from './mascotStates';
+import type { MascotAnimationVariant } from './mascotAnimations';
+
 interface MascotSceneProps {
-  pose?: MitraMascotPose;
-  size?: MitraMascotSize;
-  /** Short line only — Mitra speaks in phrases, not paragraphs. */
+  state?: MascotState | string;
+  pose?: MascotState | string;
+  size?: MascotSize | number;
+  variant?: MascotAnimationVariant;
+  /** Short headline message — Mitra speaks concisely. */
   message: string;
-  /** Optional smaller supporting line under the message. */
+  /** Optional supporting line under the message. */
   supporting?: string;
-  /** Small illustration objects placed around the mascot (see illustrations/). */
+  /** Small illustration objects or badges placed around mascot */
   decoration?: ReactNode;
   align?: 'left' | 'center';
+  glow?: boolean;
+  shadow?: boolean;
   className?: string;
   children?: ReactNode;
 }
 
 export function MascotScene({
+  state,
   pose = 'idle',
   size = 'lg',
+  variant,
   message,
   supporting,
   decoration,
   align = 'left',
-  className,
+  glow = true,
+  shadow = true,
+  className = '',
   children,
 }: MascotSceneProps) {
-  const asset = MASCOT_POSE_ASSET[pose];
-  const height = SIZE_MAP[size];
-  const width = Math.round(height * (asset.width / asset.height));
+  const reduceMotion = useReducedMotion();
+  const activeState = (state || pose) as MascotState;
 
   return (
-    <div
-      className={`animate-scene-enter flex gap-5 ${align === 'center' ? 'flex-col items-center text-center' : 'items-start'} ${className || ''}`.trim()}
+    <motion.div
+      initial={reduceMotion ? { opacity: 1 } : { opacity: 0, y: 12 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ type: 'spring', stiffness: 350, damping: 26 }}
+      className={`relative flex gap-6 ${
+        align === 'center' ? 'flex-col items-center text-center' : 'items-start'
+      } ${className}`.trim()}
     >
+      {/* Mascot Anchor */}
       <div className="relative shrink-0">
-        <Image
-          src={asset.src}
-          alt=""
-          aria-hidden="true"
-          width={width}
-          height={height}
-          className="animate-mascot-idle object-contain"
-          style={{ width, height }}
+        <Mascot
+          state={activeState}
+          size={size}
+          variant={variant}
+          glow={glow}
+          shadow={shadow}
+          animated
+          interactive
         />
         {decoration && (
-          <div className="pointer-events-none absolute -top-2 -right-2" aria-hidden="true">
+          <div className="pointer-events-none absolute -top-3 -right-3 z-10" aria-hidden="true">
             {decoration}
           </div>
         )}
       </div>
-      <div className={align === 'center' ? '' : 'pt-2'}>
-        <p className="text-text-primary text-lg font-semibold">{message}</p>
-        {supporting && <p className="text-text-secondary mt-1 text-sm">{supporting}</p>}
-        {children}
+
+      {/* Narrative Speech / Copy Container */}
+      <div className={align === 'center' ? 'max-w-xl' : 'pt-2 max-w-lg'}>
+        <p className="text-text-primary text-xl font-bold tracking-tight text-neutral-900 dark:text-white">
+          {message}
+        </p>
+        {supporting && (
+          <p className="text-text-secondary mt-1.5 text-sm font-medium text-neutral-600 dark:text-neutral-400 leading-relaxed">
+            {supporting}
+          </p>
+        )}
+        {children && <div className="mt-4">{children}</div>}
       </div>
-    </div>
+    </motion.div>
   );
 }

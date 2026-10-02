@@ -71,8 +71,8 @@ describe('AnalyticsPage (Phase 32)', () => {
 
   it('shows a loading spinner before the business list resolves', () => {
     getByUserIdMock.mockReturnValue(new Promise(() => {})); // never resolves
-    const { container } = render(<AnalyticsPage />);
-    expect(container.querySelector('.animate-spin')).toBeTruthy();
+    render(<AnalyticsPage />);
+    expect(screen.getByRole('status', { name: /loading/i })).toBeInTheDocument();
     expect(callFunctionMock).not.toHaveBeenCalled();
   });
 

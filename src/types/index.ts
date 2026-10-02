@@ -53,6 +53,146 @@ export type SlangIntensity = 'none' | 'light' | 'moderate' | 'heavy';
 
 export type LanguageMixing = 'minimal' | 'natural' | 'heavy';
 
+export type MetaPerformanceStatus = 'pending' | 'available' | 'partial' | 'unavailable' | 'error';
+
+export type MetaPerformanceErrorCode =
+  | 'AUTH_REQUIRED'
+  | 'CONNECTION_REVOKED'
+  | 'PERMISSION_DENIED'
+  | 'POST_NOT_FOUND'
+  | 'METRIC_UNAVAILABLE'
+  | 'RATE_LIMITED'
+  | 'META_API_ERROR'
+  | 'NETWORK_ERROR'
+  | 'UNKNOWN';
+
+export interface MetaMetrics {
+  likes?: number | null;
+  comments?: number | null;
+  reach?: number | null;
+  impressions?: number | null;
+  shares?: number | null;
+  videoViews?: number | null;
+  clicks?: number | null;
+}
+
+export type HookType =
+  | 'price'
+  | 'problem_solution'
+  | 'question'
+  | 'curiosity'
+  | 'urgency'
+  | 'local_identity'
+  | 'product_first'
+  | 'offer_first'
+  | 'story'
+  | 'social_proof'
+  | 'unknown';
+
+export interface PerformanceAttributes {
+  hookType?: HookType;
+  contentType?: 'post' | 'reel' | 'story';
+  language?: LanguageCode;
+  tone?: string;
+  offerType?: string;
+  creativeFormat?: string;
+  postingHour?: number;
+  dayOfWeek?: number;
+  platform?: 'facebook' | 'instagram';
+}
+
+export interface PerformanceObservationMetrics {
+  reach?: number | null;
+  impressions?: number | null;
+  likes?: number | null;
+  comments?: number | null;
+  shares?: number | null;
+  videoViews?: number | null;
+  clicks?: number | null;
+}
+
+export interface PerformanceObservationFeedback {
+  liked?: boolean;
+  disliked?: boolean;
+  regenerated?: boolean;
+}
+
+export interface PerformanceObservation {
+  observationId: string;
+  campaignId: string;
+  businessId: string;
+  userId: string;
+  publishJobId?: string;
+  platform: 'facebook' | 'instagram';
+  externalPostId?: string;
+
+  attributes: PerformanceAttributes;
+  metrics: PerformanceObservationMetrics;
+  feedback?: PerformanceObservationFeedback;
+
+  observedAt: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export type RecommendationEvidenceLevel = 'insufficient_data' | 'low' | 'moderate' | 'high';
+
+export interface PerformanceRecommendationItem {
+  recommendedContentType?: 'post' | 'reel' | 'story';
+  recommendedLanguage?: LanguageCode;
+  recommendedTone?: string;
+  recommendedHookType?: HookType;
+  recommendedOfferType?: string;
+  recommendedPostingWindow?: {
+    startHour: number;
+    endHour: number;
+  };
+  reason: string;
+  confidence: RecommendationEvidenceLevel;
+  evidenceCount: number;
+}
+
+export interface PerformanceRecommendationResult {
+  businessId: string;
+  hasEnoughEvidence: boolean;
+  evidenceLevel: RecommendationEvidenceLevel;
+  sampleSize: number;
+  recommendations: PerformanceRecommendationItem[];
+  summaryMessage: string;
+  generatedAt: string;
+  dataVersion: number;
+}
+
+export interface PostPerformanceRecord {
+  performanceId: string;
+  campaignId: string;
+  businessId: string;
+  userId: string;
+  publishJobId?: string | null;
+  scheduledPostId?: string | null;
+  calendarItemId?: string | null;
+  platform: 'instagram' | 'facebook';
+  contentType: 'post' | 'reel';
+  externalPostId: string;
+  status: MetaPerformanceStatus;
+  metrics: MetaMetrics;
+  errorCode?: MetaPerformanceErrorCode | null;
+  errorMessage?: string | null;
+  fetchedAt: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CampaignPerformance {
+  campaignId: string;
+  businessId: string;
+  whatsappClicks: number;
+  inquiries: number | null;
+  postsPerformance?: PostPerformanceRecord[];
+  updatedAt: string;
+  lastEventAt?: string;
+}
+
 export type CampaignStatus =
   | 'draft'
   | 'validating'
@@ -83,7 +223,9 @@ export type AssetType =
 
 export type AssetStatus = 'generating' | 'completed' | 'failed' | 'superseded';
 
-export type SubscriptionPlan = 'free' | 'starter' | 'business' | 'agency';
+export type SubscriptionPlan = 'free' | 'starter' | 'business' | 'pro' | 'agency';
+
+export type BillingCycle = 'monthly' | 'yearly';
 
 export type SubscriptionStatus = 'active' | 'canceled' | 'past_due' | 'trialing' | 'incomplete';
 
@@ -96,7 +238,7 @@ export type TransactionType =
   | 'grant'
   | 'setup_fee';
 
-export type TransactionStatus = 'pending' | 'completed' | 'failed' | 'refunded';
+export type TransactionStatus = 'pending' | 'completed' | 'failed' | 'refunded' | 'expired';
 
 export interface LocalizationProfile {
   country: string;
@@ -357,10 +499,153 @@ export interface ExtractedFacts {
   marketingClaims: string[];
 }
 
+export interface PipelineTraceStep<T = unknown> {
+  stepId: string;
+  name: string;
+  status: 'passed' | 'failed' | 'warning' | 'skipped';
+  timestamp: string;
+  data: T;
+  summary?: string;
+}
+
+export interface UserRequestStageData {
+  request: string;
+  language: string;
+  style: string;
+  objective: string;
+  targetProduct?: string;
+  rawInput?: Record<string, unknown>;
+}
+
+export interface IntentExtractionStageData {
+  extractedLanguage: string;
+  extractedStyle: string;
+  extractedProduct: string;
+  extractedObjective: string;
+  extractedOccasion?: string;
+  confidence: number;
+}
+
+export interface BusinessBrainRetrievalStageData {
+  business: string;
+  location: string;
+  product: string;
+  price: string;
+  brandTone: string;
+  languagePreference: string;
+  audience: string;
+  businessRules?: Record<string, unknown>;
+}
+
+export interface ContextSelectedStageData {
+  selectedContext: {
+    businessIdentity: boolean;
+    productInformation: boolean;
+    currentOffer: boolean;
+    location: boolean;
+    language: boolean;
+    tone: boolean;
+    relevantPreviousCampaignPreferences: boolean;
+    brandRules: boolean;
+  };
+  contextSummary: string;
+}
+
+export interface GeminiRequestStageData {
+  systemInstruction: string;
+  businessContext: string;
+  userRequest: string;
+  task: string;
+  outputSchema: Record<string, unknown> | string;
+}
+
+export interface GeminiResponseStageData {
+  headline?: string;
+  caption?: string;
+  language?: string;
+  tone?: string;
+  cta?: string;
+  rawOutput?: Record<string, unknown>;
+}
+
+export interface ValidationCheckItem {
+  name: string;
+  status: 'PASS' | 'FAIL' | 'REVIEW_REQUIRED';
+  expected?: string;
+  actual?: string;
+  details?: string;
+}
+
+export interface ValidationStageData {
+  passed: boolean;
+  checks: ValidationCheckItem[];
+  summary: string;
+}
+
+export interface MitraTransformationsStageData {
+  appliedTransformations: Array<{
+    name: string;
+    description: string;
+  }>;
+  textOverlay?: Record<string, unknown>;
+}
+
+export interface CreativeGenerationStageData {
+  generatedPostersCount: number;
+  storyFramesCount: number;
+  reelStoryboardCount: number;
+  assetsMetadata: Array<{
+    type: string;
+    url?: string;
+    prompt?: string;
+  }>;
+}
+
+export interface FinalCampaignStageData {
+  campaignId: string;
+  status: string;
+  deliveredAssetsCount: number;
+  customerSummary: string;
+  headlinePreview?: string;
+  captionPreview?: string;
+  whatsappMessagePreview?: string;
+}
+
+export interface PipelineTrace {
+  traceId: string;
+  campaignId: string;
+  businessId: string;
+  createdAt: string;
+  conflictResolution?: {
+    conflictsDetected: Array<{
+      id: string;
+      category: string;
+      description: string;
+      appliedHierarchy: string;
+      winningResolution: string;
+      geminiDirective: string;
+    }>;
+    nonNegotiables: Record<string, string>;
+    geminiConflictDirectives: string[];
+  };
+  userRequest: PipelineTraceStep<UserRequestStageData>;
+  mitraUi: PipelineTraceStep<Record<string, unknown>>;
+  intentExtraction: PipelineTraceStep<IntentExtractionStageData>;
+  businessBrainRetrieval: PipelineTraceStep<BusinessBrainRetrievalStageData>;
+  contextAssembly: PipelineTraceStep<ContextSelectedStageData>;
+  promptBuilder: PipelineTraceStep<GeminiRequestStageData>;
+  geminiResponse: PipelineTraceStep<GeminiResponseStageData>;
+  validationTruthCheck: PipelineTraceStep<ValidationStageData>;
+  mitraTransformations: PipelineTraceStep<MitraTransformationsStageData>;
+  creativeGeneration: PipelineTraceStep<CreativeGenerationStageData>;
+  finalCampaign: PipelineTraceStep<FinalCampaignStageData>;
+}
+
 export interface Campaign {
   campaignId: string;
   businessId: string;
   userId: string;
+  sourceCalendarItemId?: string;
   objective: CampaignObjective;
   templateId?: string;
   creativeObjective?: CreativeObjective;
@@ -411,6 +696,7 @@ export interface Campaign {
     truthCheckResult?: TruthCheckResult;
     savedStyleId?: string;
     savedStyleVersion?: number;
+    pipelineTrace?: PipelineTrace;
   };
   createdAt: string;
   updatedAt: string;
@@ -592,8 +878,6 @@ export interface Subscription {
   userId: string;
   planId: SubscriptionPlan;
   status: SubscriptionStatus;
-  razorpaySubscriptionId?: string;
-  razorpayCustomerId?: string;
   currentPeriodStart: string;
   currentPeriodEnd: string;
   creditsIncluded: number;
@@ -632,9 +916,6 @@ export interface Transaction {
   currency: 'INR';
   balanceAfter: number;
   description: string;
-  razorpayPaymentId?: string;
-  razorpayOrderId?: string;
-  razorpaySubscriptionId?: string;
   status: TransactionStatus;
   metadata?: Record<string, unknown>;
   createdAt: string;
@@ -810,3 +1091,240 @@ export interface Asset {
   createdAt: string;
   updatedAt: string;
 }
+
+export type SocialConnectionStatus =
+  'pending' | 'active' | 'expired' | 'revoked' | 'error' | 'disconnected';
+
+export interface MetaFacebookPageMetadata {
+  id: string;
+  name: string;
+  username?: string;
+  pictureUrl?: string;
+}
+
+export interface MetaInstagramAccountMetadata {
+  id?: string;
+  username?: string;
+  accountType?: string;
+  name?: string;
+  profilePictureUrl?: string;
+}
+
+export interface SocialConnection {
+  connectionId: string;
+  userId: string;
+  businessId?: string;
+  provider: 'meta';
+  status: SocialConnectionStatus;
+  facebookPage: MetaFacebookPageMetadata;
+  instagram: MetaInstagramAccountMetadata;
+  permissions: string[];
+  tokenReference: string;
+  connectedAt: string;
+  updatedAt: string;
+  lastValidatedAt?: string;
+  metadata: {
+    metaApiVersion: string;
+  };
+}
+
+export interface PendingMetaPage {
+  pageId: string;
+  pageName: string;
+  pageUsername?: string;
+  pictureUrl?: string;
+  instagramAccount?: {
+    id: string;
+    username?: string;
+    accountType?: string;
+    name?: string;
+    profilePictureUrl?: string;
+  };
+}
+
+export type PublishPlatform = 'instagram' | 'facebook';
+
+export type PublishContentType = 'post' | 'reel';
+
+export type PublishStatus =
+  | 'draft'
+  | 'approved'
+  | 'scheduled'
+  | 'processing'
+  | 'publishing'
+  | 'published'
+  | 'failed'
+  | 'cancelled';
+
+export type PublishErrorCode =
+  | 'AUTH_REQUIRED'
+  | 'CONNECTION_REVOKED'
+  | 'PERMISSION_DENIED'
+  | 'INVALID_MEDIA'
+  | 'UNSUPPORTED_CONTENT'
+  | 'RATE_LIMITED'
+  | 'META_API_ERROR'
+  | 'NETWORK_ERROR'
+  | 'PROCESSING_TIMEOUT'
+  | 'UNKNOWN';
+
+export interface PublishJob {
+  jobId: string;
+  userId: string;
+  businessId: string;
+  campaignId: string;
+  socialConnectionId: string;
+  platform: PublishPlatform;
+  contentType: PublishContentType;
+  mediaUrl: string;
+  caption: string;
+  scheduledAt?: string | null;
+  status: PublishStatus;
+  attempts: number;
+  maxAttempts: number;
+  lastAttemptAt?: string | null;
+  nextAttemptAt?: string | null;
+  publishedAt?: string | null;
+  externalPostId?: string | null;
+  externalContainerId?: string | null;
+  idempotencyKey: string;
+  errorCode?: PublishErrorCode | null;
+  errorMessage?: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface PublishInput {
+  campaignId: string;
+  socialConnectionId: string;
+  platform: PublishPlatform;
+  contentType: PublishContentType;
+  scheduledAt?: string | null;
+  captionOverride?: string;
+  idempotencyKey?: string;
+}
+
+export interface PublishResult {
+  success: boolean;
+  job: PublishJob;
+  externalPostId?: string | null;
+  error?: {
+    code: PublishErrorCode;
+    message: string;
+    retryable: boolean;
+  };
+}
+
+export type ScheduledPostStatus = 'scheduled' | 'processing' | 'published' | 'failed' | 'cancelled';
+
+export interface ScheduledPost {
+  scheduledPostId: string;
+  userId: string;
+  businessId: string;
+  campaignId: string;
+  socialConnectionId: string;
+  platform: PublishPlatform;
+  contentType: PublishContentType;
+  mediaUrls: string[];
+  caption: string;
+  scheduledAt: string;
+  timezone: string;
+  status: ScheduledPostStatus;
+  processingBy?: string | null;
+  processingAt?: string | null;
+  leaseExpiresAt?: string | null;
+  attemptId?: string | null;
+  publishJobId?: string | null;
+  externalPostId?: string | null;
+  attempts: number;
+  maxAttempts: number;
+  lastAttemptAt?: string | null;
+  nextAttemptAt?: string | null;
+  errorCode?: PublishErrorCode | string | null;
+  errorMessage?: string | null;
+  publishedAt?: string | null;
+  idempotencyKey: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CreateScheduleInput {
+  campaignId: string;
+  socialConnectionId: string;
+  platform: PublishPlatform;
+  contentType: PublishContentType;
+  scheduledAt: string;
+  timezone: string;
+  captionOverride?: string;
+  idempotencyKey?: string;
+}
+
+export interface RescheduleInput {
+  scheduledPostId: string;
+  newScheduledAt: string;
+  timezone: string;
+}
+
+// Phase 14 — 30-Day AI Marketing Calendar V1 Types
+export type MarketingGoal =
+  'get_customers' | 'promote_offers' | 'build_awareness' | 'promote_products';
+
+export type PostingFrequency = 'three_per_week' | 'five_per_week' | 'daily';
+
+export type CalendarItemStatus =
+  'planned' | 'content_created' | 'scheduled' | 'published' | 'skipped';
+
+export interface MarketingPlan {
+  planId: string;
+  userId: string;
+  businessId: string;
+  goal: MarketingGoal;
+  frequency: PostingFrequency;
+  startDate: string;
+  endDate: string;
+  timezone: string;
+  status: 'active' | 'archived';
+  totalItems: number;
+  createdCount: number;
+  metadata?: {
+    promptVersion?: string;
+    aiModel?: string;
+    businessBrainVersion?: string;
+  };
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface MarketingCalendarItem {
+  itemId: string;
+  planId: string;
+  userId: string;
+  businessId: string;
+  scheduledDate: string;
+  suggestedTime: string;
+  timezone: string;
+  contentType: PublishContentType;
+  strategy: string;
+  topic: string;
+  hook: string;
+  offerHeadline?: string | null;
+  productId?: string | null;
+  productName?: string | null;
+  callToAction: string;
+  status: CalendarItemStatus;
+  campaignId?: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface GeneratePlanInput {
+  businessId: string;
+  goal: MarketingGoal;
+  frequency: PostingFrequency;
+  specificProductId?: string;
+  startDate?: string;
+  timezone?: string;
+  idempotencyKey?: string;
+}
+
+export * from './beta';

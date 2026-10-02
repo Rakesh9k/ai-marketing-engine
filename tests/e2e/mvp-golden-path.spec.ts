@@ -21,7 +21,7 @@
  *   3. GEMINI_API_KEY/OPENAI_API_KEY set on the Functions emulator process
  *      for steps 15-26 (AI pipeline) to complete — see report §"AI Provider
  *      Strategy" for why no stub provider is substituted here instead.
- *   4. RAZORPAY_KEY_ID/RAZORPAY_KEY_SECRET (Razorpay TEST mode only) for
+ *   4. RAZORPAY_KEY_ID/RAZORPAY_KEY_SECRET (Payment Gateway TEST mode only) for
  *      steps 24-25/37 (payment) to complete — see report §"Payment Strategy".
  *
  * Steps 15-26 and 34-37 are written to perform the real UI actions
@@ -202,7 +202,7 @@ test.describe('MVP Golden Path — fresh customer journey (Phase 16)', () => {
     expect(whatsappPopup.url()).toMatch(/wa\.me|api\.whatsapp\.com/);
     await whatsappPopup.close();
 
-    // ---- Steps 23-25: credits + payment (requires Razorpay TEST keys) --------
+    // ---- Steps 23-25: credits + payment (requires Payment Gateway TEST keys) --------
     await page.goto('/usage');
     const creditsBefore = await page
       .getByTestId('credits-remaining')
@@ -220,7 +220,7 @@ test.describe('MVP Golden Path — fresh customer journey (Phase 16)', () => {
     const buyButton = page.getByRole('button', { name: /buy|purchase|top.?up/i }).first();
     if (await buyButton.isVisible().catch(() => false)) {
       await buyButton.click();
-      // Razorpay's checkout renders in an iframe/popup; test-mode
+      // Payment Gateway's checkout renders in an iframe/popup; test-mode
       // completion is environment-specific and intentionally not scripted
       // with fabricated success — see report §"Payment Strategy".
     } else {

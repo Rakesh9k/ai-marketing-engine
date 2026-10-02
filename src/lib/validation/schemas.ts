@@ -394,7 +394,7 @@ export const transactionSchema = z.object({
   razorpayPaymentId: z.string().optional(),
   razorpayOrderId: z.string().optional(),
   razorpaySubscriptionId: z.string().optional(),
-  status: z.enum(['pending', 'completed', 'failed', 'refunded']),
+  status: z.enum(['pending', 'completed', 'failed', 'refunded', 'expired']),
   metadata: z.record(z.unknown()).optional(),
   createdAt: z.string().datetime(),
 }) as z.ZodType<Transaction>;

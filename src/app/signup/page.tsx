@@ -8,8 +8,9 @@ export default function SignupPage() {
   return (
     <PublicOnlyRoute>
       <AuthLayout
-        title="Create your account"
-        description="Start building campaigns for your business"
+        mode="signup"
+        title="Let's make something for your business."
+        subtitle="Get started with Mitra in under a minute."
       >
         <SignupForm />
       </AuthLayout>

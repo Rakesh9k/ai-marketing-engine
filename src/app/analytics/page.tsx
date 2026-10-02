@@ -4,10 +4,15 @@ import { useState, useEffect, useMemo } from 'react';
 import { useAuth } from '@/features/auth/hooks/useAuth';
 import { businessService } from '@/services/database';
 import { callFunction } from '@/services/api';
-import type { Business } from '@/types';
+import type {
+  Business,
+  PerformanceRecommendationResult,
+  PerformanceRecommendationItem,
+} from '@/types';
 import { Button } from '@/components/ui/Button';
 import Link from 'next/link';
 import { MascotScene } from '@/components/mascot/MascotScene';
+import { PageSkeleton } from '@/components/motion/PageSkeleton';
 import {
   ChartIllustration,
   WrenchIllustration,
@@ -30,6 +35,8 @@ import {
 interface DailyActivityPoint {
   date: string;
   campaignsGenerated: number;
+  campaignsScheduled: number;
+  campaignsPublished: number;
   assetsDownloaded: number;
   whatsappClicks: number;
 }
@@ -42,6 +49,13 @@ interface AnalyticsDashboardResult {
   totals: {
     campaignsStarted: number;
     campaignsGenerated: number;
+    campaignsApproved: number;
+    campaignsScheduled: number;
+    campaignsPublished: number;
+    campaignsFailed: number;
+    campaignsRegenerated: number;
+    creativeLikes: number;
+    creativeDislikes: number;
     assetsDownloaded: number;
     whatsappClicks: number;
   };
@@ -49,6 +63,7 @@ interface AnalyticsDashboardResult {
   eventsAggregated: number;
   truncated: boolean;
   subscription: { planId: string; status: string } | null;
+  performanceRecommendations?: PerformanceRecommendationResult;
 }
 
 const RANGE_OPTIONS: ReadonlyArray<{ value: 7 | 30 | 90; label: string }> = [
@@ -203,14 +218,7 @@ export default function AnalyticsPage() {
   const hasAnyActivity = useMemo(() => data !== null && data.eventsAggregated > 0, [data]);
 
   if (loading) {
-    return (
-      <div className="flex min-h-screen items-center justify-center">
-        <div
-          className="border-brand-600 h-8 w-8 animate-spin rounded-full border-4 border-t-transparent"
-          aria-hidden="true"
-        />
-      </div>
-    );
+    return <PageSkeleton variant="cards" />;
   }
 
   if (businesses.length === 0) {
@@ -295,14 +303,7 @@ export default function AnalyticsPage() {
         </div>
       )}
 
-      {!error && dataLoading && (
-        <div className="flex justify-center p-12">
-          <div
-            className="border-brand-600 h-8 w-8 animate-spin rounded-full border-4 border-t-transparent"
-            aria-hidden="true"
-          />
-        </div>
-      )}
+      {!error && dataLoading && <PageSkeleton variant="cards" label="Loading analytics" />}
 
       {!error && !dataLoading && data && !hasAnyActivity && (
         <div className="flex justify-center p-8">
@@ -321,11 +322,32 @@ export default function AnalyticsPage() {
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
             <StatCard
               title="Campaigns Generated"
-              value={data.totals.campaignsGenerated.toString()}
-              description={`of ${data.totals.campaignsStarted} started`}
+              value={(data.totals.campaignsGenerated ?? 0).toString()}
+              description={`of ${data.totals.campaignsStarted ?? 0} started (${data.totals.campaignsApproved ?? 0} approved)`}
             />
-            <StatCard title="Assets Downloaded" value={data.totals.assetsDownloaded.toString()} />
-            <StatCard title="WhatsApp Clicks" value={data.totals.whatsappClicks.toString()} />
+            <StatCard
+              title="Scheduled Posts"
+              value={(data.totals.campaignsScheduled ?? 0).toString()}
+              description="queued for auto-publishing"
+            />
+            <StatCard
+              title="Published Posts"
+              value={(data.totals.campaignsPublished ?? 0).toString()}
+              description={`${data.totals.campaignsFailed ?? 0} failed publish attempts`}
+            />
+            <StatCard
+              title="Creative Feedback"
+              value={`${data.totals.creativeLikes ?? 0} 👍 / ${data.totals.creativeDislikes ?? 0} 👎`}
+              description={`${data.totals.campaignsRegenerated ?? 0} asset regenerations`}
+            />
+            <StatCard
+              title="Assets Downloaded"
+              value={(data.totals.assetsDownloaded ?? 0).toString()}
+            />
+            <StatCard
+              title="WhatsApp Clicks"
+              value={(data.totals.whatsappClicks ?? 0).toString()}
+            />
             <StatCard
               title="Plan"
               value={
@@ -347,6 +369,47 @@ export default function AnalyticsPage() {
             </div>
             <ActivityChart data={data.dailyActivity} />
           </div>
+
+          {/* Phase 18 — What Mitra Is Learning */}
+          {data.performanceRecommendations && (
+            <div className="rounded-lg border border-neutral-200 bg-white p-6">
+              <div className="mb-3 flex items-center gap-2">
+                <MagnifyingGlassIllustration size={24} />
+                <h2 className="text-lg font-semibold text-neutral-900">What Mitra Is Learning</h2>
+              </div>
+              <p className="mb-4 text-sm text-neutral-600">
+                {data.performanceRecommendations.summaryMessage}
+              </p>
+              {data.performanceRecommendations.hasEnoughEvidence &&
+              data.performanceRecommendations.recommendations.length > 0 ? (
+                <div className="space-y-3">
+                  {data.performanceRecommendations.recommendations.map(
+                    (rec: PerformanceRecommendationItem, idx: number) => (
+                      <div
+                        key={idx}
+                        className="flex items-start justify-between rounded-md border border-neutral-100 bg-neutral-50 p-4"
+                      >
+                        <div className="space-y-1">
+                          <p className="text-sm font-medium text-neutral-900">{rec.reason}</p>
+                          <p className="text-xs text-neutral-500">
+                            Based on {rec.evidenceCount} observed campaign results
+                          </p>
+                        </div>
+                        <span className="bg-brand-50 text-brand-700 rounded px-2 py-1 text-xs font-semibold capitalize">
+                          {rec.confidence} confidence
+                        </span>
+                      </div>
+                    )
+                  )}
+                </div>
+              ) : (
+                <div className="rounded-md border border-dashed border-neutral-200 bg-neutral-50 p-4 text-xs text-neutral-500">
+                  Insufficient published history to form strong recommendations yet. Continue
+                  publishing content to build personalized performance insights.
+                </div>
+              )}
+            </div>
+          )}
 
           {data.truncated && (
             <p className="text-sm text-neutral-500">

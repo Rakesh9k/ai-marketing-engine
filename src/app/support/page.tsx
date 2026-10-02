@@ -23,7 +23,7 @@ export default function SupportPage() {
       <section className="mb-8">
         <h2 className="text-h3 text-text-primary mb-2 font-semibold">Self-service, in the app</h2>
         <ul className="text-body text-text-secondary list-disc space-y-1 pl-6">
-          <li>Upgrade your subscription plan (Billing page)</li>
+          <li>Subscribe to a plan or buy a credit pack (Billing page)</li>
           <li>
             Cancel your subscription — stops future renewal; see our{' '}
             <Link href="/cancellation" className="text-brand-600 hover:underline">

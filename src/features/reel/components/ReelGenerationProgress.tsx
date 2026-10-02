@@ -1,7 +1,9 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { motion, AnimatePresence, useReducedMotion } from 'motion/react';
 import { Button } from '@/components/ui/Button';
+import { MitraMark } from '@/components/ui/MitraMark';
 import { REEL_STATUS_COPY } from '@/features/reel/constants';
 import { watchReel } from '@/features/reel/services/reelService';
 import type { ReelProject } from '@/types';
@@ -30,6 +32,7 @@ export function ReelGenerationProgress({
 }: ReelGenerationProgressProps) {
   const [reel, setReel] = useState<ReelProject | null>(initialReel);
   const [watchError, setWatchError] = useState<string | null>(null);
+  const reduceMotion = useReducedMotion();
 
   useEffect(() => {
     const unsubscribe = watchReel(
@@ -53,35 +56,60 @@ export function ReelGenerationProgress({
   const isTerminal = TERMINAL_STATUSES.has(status);
   const isFailed = status === 'failed';
 
+  const fadeProps = reduceMotion
+    ? {}
+    : {
+        initial: { opacity: 0, y: 6 },
+        animate: { opacity: 1, y: 0 },
+        exit: { opacity: 0, y: -6 },
+        transition: { duration: 0.25, ease: 'easeOut' as const },
+      };
+
   return (
     <div className="rounded-lg border border-neutral-200 bg-white p-8 text-center">
-      {!isTerminal && (
-        <div
-          className="border-brand-600 mx-auto mb-4 h-10 w-10 animate-spin rounded-full border-4 border-t-transparent"
-          aria-hidden="true"
-        />
-      )}
+      <AnimatePresence mode="wait">
+        {!isTerminal && (
+          <motion.div key="loading" {...fadeProps}>
+            <MitraMark size="xl" state="loading" decorative className="mx-auto mb-4" />
+          </motion.div>
+        )}
 
-      {isFailed && (
-        <div className="bg-error-50 mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full">
-          <svg className="text-error-600 h-6 w-6" fill="currentColor" viewBox="0 0 20 20">
-            <path
-              fillRule="evenodd"
-              d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z"
-              clipRule="evenodd"
-            />
-          </svg>
-        </div>
-      )}
+        {isFailed && (
+          <motion.div
+            key="failed"
+            {...fadeProps}
+            className="bg-error-50 mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full"
+          >
+            <svg className="text-error-600 h-6 w-6" fill="currentColor" viewBox="0 0 20 20">
+              <path
+                fillRule="evenodd"
+                d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z"
+                clipRule="evenodd"
+              />
+            </svg>
+          </motion.div>
+        )}
 
-      {status === 'completed' && (
-        <div className="mx-auto mb-4 text-4xl" aria-hidden="true">
-          🎬
-        </div>
-      )}
+        {status === 'completed' && (
+          <motion.div
+            key="completed"
+            initial={reduceMotion ? { opacity: 1 } : { opacity: 0, scale: 0.8 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ type: 'spring', stiffness: 300, damping: 20 }}
+            className="mx-auto mb-4 text-4xl"
+            aria-hidden="true"
+          >
+            🎬
+          </motion.div>
+        )}
+      </AnimatePresence>
 
-      <h2 className="text-lg font-semibold text-neutral-900">{copy.title}</h2>
-      {copy.subtitle && <p className="mt-1 text-neutral-500">{copy.subtitle}</p>}
+      <AnimatePresence mode="wait">
+        <motion.div key={status} {...fadeProps}>
+          <h2 className="text-lg font-semibold text-neutral-900">{copy.title}</h2>
+          {copy.subtitle && <p className="mt-1 text-neutral-500">{copy.subtitle}</p>}
+        </motion.div>
+      </AnimatePresence>
 
       {isFailed && (
         <div className="mx-auto mt-4 max-w-md space-y-3">

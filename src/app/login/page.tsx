@@ -1,18 +1,23 @@
 'use client';
 
 import { Suspense } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { AuthLayout } from '@/features/auth/components/AuthLayout';
 import { LoginForm } from '@/features/auth/components/LoginForm';
 import { PublicOnlyRoute } from '@/features/auth/components/ProtectedRoute';
+import { MitraMark } from '@/components/ui/MitraMark';
 
 function LoginPageContent() {
-  const { useSearchParams } = require('next/navigation');
   const searchParams = useSearchParams();
   const redirect = searchParams.get('redirect') || '/dashboard';
 
   return (
     <PublicOnlyRoute>
-      <AuthLayout title="Welcome back" description="Sign in to continue to your dashboard">
+      <AuthLayout
+        mode="login"
+        title="Welcome Back"
+        subtitle="Sign in to your Mitra account"
+      >
         <LoginForm onSuccess={() => (window.location.href = redirect)} />
       </AuthLayout>
     </PublicOnlyRoute>
@@ -24,14 +29,11 @@ export default function LoginPage() {
     <Suspense
       fallback={
         <div
-          className="flex min-h-screen items-center justify-center"
+          className="flex min-h-screen items-center justify-center bg-[#FDFBF8]"
           role="status"
           aria-label="Loading"
         >
-          <div
-            className="border-brand-600 h-8 w-8 animate-spin rounded-full border-4 border-t-transparent"
-            aria-hidden="true"
-          />
+          <MitraMark size="lg" state="loading" decorative />
         </div>
       }
     >

@@ -121,21 +121,81 @@ function initializeFirebase(): {
   }
 
   if (app) {
-    // App Check first: it must be attached to this `app` instance before
-    // getFunctions()'s callables are ever invoked, so that the SDK's
-    // per-request App Check token attachment is active from the start.
-    appCheck = initializeFirebaseAppCheck(app);
+    try {
+      appCheck = initializeFirebaseAppCheck(app);
+    } catch (err) {
+      console.warn('[Firebase] AppCheck initialization skipped:', err);
+    }
 
-    auth = getAuth(app);
-    db = getFirestore(app);
-    storage = getStorage(app);
-    functions = getFunctions(app, 'asia-south1');
+    try {
+      auth = getAuth(app);
+    } catch (err) {
+      console.warn('[Firebase] Auth initialization skipped:', err);
+    }
+
+    try {
+      db = getFirestore(app);
+    } catch (err) {
+      console.warn('[Firebase] Firestore initialization skipped:', err);
+    }
+
+    try {
+      storage = getStorage(app);
+    } catch (err) {
+      console.warn('[Firebase] Storage initialization skipped:', err);
+    }
+
+    try {
+      functions = getFunctions(app, 'asia-south1');
+    } catch (err) {
+      console.warn('[Firebase] Functions initialization skipped:', err);
+    }
 
     if (process.env['NEXT_PUBLIC_USE_EMULATORS'] === 'true') {
-      connectAuthEmulator(auth, 'http://localhost:9099');
-      connectFirestoreEmulator(db, 'localhost', 8080);
-      connectStorageEmulator(storage, 'localhost', 9199);
-      connectFunctionsEmulator(functions, 'localhost', 5001);
+      if (auth) {
+        try {
+          connectAuthEmulator(auth, 'http://localhost:9099');
+        } catch {}
+      }
+      if (db) {
+        try {
+          connectFirestoreEmulator(db, 'localhost', 8080);
+        } catch {}
+      }
+      if (storage) {
+        try {
+          connectStorageEmulator(storage, 'localhost', 9199);
+        } catch {}
+      }
+      if (functions) {
+        try {
+          connectFunctionsEmulator(functions, 'localhost', 5001);
+        } catch {}
+      }
+    } else if (
+      typeof window !== 'undefined' &&
+      ['localhost', '127.0.0.1'].includes(window.location.hostname)
+    ) {
+      // Phase 11 Prod/Dev Separation Audit: this project has a single
+      // Firebase project shared by local dev and production (see the
+      // Phase 2 audit — no separate dev project exists), so the ONLY thing
+      // that stops a local `next dev` session from reading/writing REAL
+      // production Firestore/Storage/Auth data is this one env var being
+      // 'true'. If it's ever unset or misspelled in a developer's own
+      // .env.local while real (non-placeholder) Firebase config is still
+      // present, this silently falls through to the real backend with no
+      // other signal that anything is wrong. This is deliberately a loud
+      // warning, not a thrown error: pointing localhost at the real
+      // backend is a legitimate, documented workflow for verifying App
+      // Check/reCAPTCHA against production (see
+      // docs/PHASE_20B_APP_CHECK_AUTH_LOCAL_FIX_REPORT.md) — this must not
+      // block that, only make an accidental version of it impossible to miss.
+      // eslint-disable-next-line no-console
+      console.warn(
+        '[Mitra] Running on localhost but NEXT_PUBLIC_USE_EMULATORS is not "true" — ' +
+          'this session is connected to the REAL Firebase backend, not local emulators. ' +
+          'If this is unintentional, set NEXT_PUBLIC_USE_EMULATORS=true in .env.local.'
+      );
     }
   }
 
@@ -146,7 +206,7 @@ const firebaseInstances = initializeFirebase();
 
 export const firebaseApp = firebaseInstances.app;
 export const firebaseAuth = firebaseInstances.auth;
-export const firebaseDb = firebaseInstances.db;
+export let firebaseDb: Firestore | undefined = firebaseInstances.db;
 export const firebaseStorage = firebaseInstances.storage;
 export const firebaseFunctions = firebaseInstances.functions;
 export const firebaseAppCheck = firebaseInstances.appCheck;
@@ -159,8 +219,36 @@ export function getFirebaseAuth(): Auth | undefined {
   return firebaseAuth;
 }
 
+/**
+ * Firestore, created lazily with a retry.
+ *
+ * Creating it only once, at module evaluation, was fragile: under some bundle evaluation
+ * orders (observed with the Turbopack dev server) `getFirestore()` runs before Firestore's
+ * service registration has executed and throws "Service firestore is not available". That
+ * error was only console.warn'ed, so `firebaseDb` stayed undefined for the whole session and
+ * every Firestore read in the app (billing, usage, subscriptions, ...) silently returned
+ * nothing — a paying customer saw the Free plan. The registration has always completed by the
+ * time a component actually needs the database, so resolve it on demand instead.
+ */
 export function getFirebaseDb(): Firestore | undefined {
-  return firebaseDb;
+  if (firebaseDb) return firebaseDb;
+  if (typeof window === 'undefined' || !firebaseApp) return undefined;
+
+  try {
+    const instance = getFirestore(firebaseApp);
+    if (process.env['NEXT_PUBLIC_USE_EMULATORS'] === 'true') {
+      try {
+        connectFirestoreEmulator(instance, 'localhost', 8080);
+      } catch {
+        // Already connected (or already started): safe to ignore.
+      }
+    }
+    firebaseDb = instance;
+    return instance;
+  } catch (err) {
+    console.error('[Firebase] Firestore is not available yet:', err);
+    return undefined;
+  }
 }
 
 export function getFirebaseStorage(): FirebaseStorage | undefined {

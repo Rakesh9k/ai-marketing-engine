@@ -1,53 +1,112 @@
-import { StyledLink } from '@/components/ui/Link';
+'use client';
+
+import { useRouter } from 'next/navigation';
 import { MitraLogo } from '@/components/ui/MitraLogo';
 
 export function LandingFooter() {
+  const router = useRouter();
+
+  const productLinks = [
+    { label: 'Create Campaign', href: '/signup' },
+    { label: 'My Business', href: '/business' },
+    { label: 'Templates', href: '/solutions' },
+    { label: 'Analytics', href: '/analytics' },
+  ];
+
+  const companyLinks = [
+    { label: 'About', href: '/about' },
+    { label: 'Contact', href: '/contact' },
+  ];
+
+  const resourceLinks = [
+    { label: 'Help & Support', href: '/support' },
+    { label: 'Privacy Policy', href: '/privacy' },
+    { label: 'Terms of Service', href: '/terms' },
+    { label: 'Refund Policy', href: '/refund' },
+    { label: 'Cancellation Policy', href: '/cancellation' },
+  ];
+
   return (
-    <footer className="border-border-light bg-bg-secondary border-t">
-      <div className="mx-auto max-w-6xl px-4 py-10 sm:px-6">
-        <div className="flex flex-col gap-8 sm:flex-row sm:justify-between">
-          <div>
-            <MitraLogo size="sm" />
-            <p className="text-text-tertiary mt-1 text-center text-sm">by Brainwise</p>
+    <footer className="border-border-light bg-bg-secondary border-t py-16">
+      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+        <div className="grid gap-10 sm:grid-cols-2 md:grid-cols-5">
+          {/* BRAND COLUMN */}
+          <div className="md:col-span-2">
+            <a href="#top" className="inline-block" aria-label="Mitra by Brainwise Home">
+              <MitraLogo size="sm" decorative />
+            </a>
+            <p className="text-text-tertiary mt-1 text-xs font-semibold">by Brainwise</p>
+            <p className="text-text-secondary mt-4 max-w-sm text-xs leading-relaxed">
+              Mitra is an AI marketing partner for small businesses, helping restaurants, salons,
+              and local stores create, promote, and grow with complete local-language campaigns.
+            </p>
           </div>
 
-          <nav aria-label="Footer" className="flex flex-col gap-2 sm:flex-row sm:gap-8">
-            <a href="#how-it-works" className="text-text-secondary hover:text-text-primary text-sm">
-              How it works
-            </a>
-            <a href="#pricing" className="text-text-secondary hover:text-text-primary text-sm">
-              Pricing
-            </a>
-            <StyledLink href="/login" variant="secondary" size="sm">
-              Login
-            </StyledLink>
-            <StyledLink href="/signup" variant="secondary" size="sm">
-              Signup
-            </StyledLink>
-            <StyledLink href="/terms" variant="secondary" size="sm">
-              Terms
-            </StyledLink>
-            <StyledLink href="/privacy" variant="secondary" size="sm">
-              Privacy
-            </StyledLink>
-            <StyledLink href="/refund" variant="secondary" size="sm">
-              Refund
-            </StyledLink>
-            <StyledLink href="/cancellation" variant="secondary" size="sm">
-              Cancellation
-            </StyledLink>
-            <StyledLink href="/support" variant="secondary" size="sm">
-              Support
-            </StyledLink>
-            <StyledLink href="/contact" variant="secondary" size="sm">
-              Contact
-            </StyledLink>
-          </nav>
+          {/* PRODUCT LINKS */}
+          <div>
+            <h4 className="text-text-primary text-xs font-bold tracking-wider uppercase">
+              Product
+            </h4>
+            <ul className="text-text-secondary mt-4 space-y-2.5 text-xs">
+              {productLinks.map((link) => (
+                <li key={link.label}>
+                  <button
+                    onClick={() => router.push(link.href)}
+                    className="hover:text-brand-600 cursor-pointer text-left transition-colors"
+                  >
+                    {link.label}
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </div>
+
+          {/* COMPANY LINKS */}
+          <div>
+            <h4 className="text-text-primary text-xs font-bold tracking-wider uppercase">
+              Company
+            </h4>
+            <ul className="text-text-secondary mt-4 space-y-2.5 text-xs">
+              {companyLinks.map((link) => (
+                <li key={link.label}>
+                  <button
+                    onClick={() => router.push(link.href)}
+                    className="hover:text-brand-600 cursor-pointer text-left transition-colors"
+                  >
+                    {link.label}
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </div>
+
+          {/* RESOURCES LINKS */}
+          <div>
+            <h4 className="text-text-primary text-xs font-bold tracking-wider uppercase">
+              Resources
+            </h4>
+            <ul className="text-text-secondary mt-4 space-y-2.5 text-xs">
+              {resourceLinks.map((link) => (
+                <li key={link.label}>
+                  <button
+                    onClick={() => router.push(link.href)}
+                    className="hover:text-brand-600 cursor-pointer text-left transition-colors"
+                  >
+                    {link.label}
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </div>
         </div>
 
-        <p className="text-text-tertiary mt-8 text-xs">
-          © {new Date().getFullYear()} Mitra by Brainwise. All rights reserved.
-        </p>
+        {/* BOTTOM COPYRIGHT BAR */}
+        <div className="border-border-light text-text-tertiary mt-12 flex flex-col items-center justify-between gap-4 border-t pt-8 text-xs sm:flex-row">
+          <p>© {new Date().getFullYear()} Mitra by Brainwise. All rights reserved.</p>
+          <p className="flex items-center gap-1">
+            <span>Built with care for Indian local businesses 🇮🇳</span>
+          </p>
+        </div>
       </div>
     </footer>
   );

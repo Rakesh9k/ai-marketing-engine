@@ -28,6 +28,7 @@ import type {
   CampaignAsset,
   Subscription,
   Usage,
+  Transaction,
   AnalyticsEvent,
   GenerationLog,
 } from '@/types';
@@ -40,6 +41,7 @@ import {
   campaignAssetConverter,
   subscriptionConverter,
   usageConverter,
+  transactionConverter,
   analyticsEventConverter,
   generationLogConverter,
 } from '@/lib/firebase/converters';
@@ -233,6 +235,38 @@ export const campaignService = {
     return snap.exists() ? snap.data() : null;
   },
 
+  // Used when a generateCampaignStrategy call itself times out client-side
+  // (the Functions SDK default/configured timeout) while the server keeps
+  // running and eventually finishes — the client never got a campaignId
+  // back, so this recovers it from the idempotency key it already sent,
+  // instead of treating a slow success as a failure and letting a retry
+  // double-charge (see CampaignWizard.tsx's deadline-exceeded handling).
+  //
+  // Phase 15 Campaign Persistence audit: this previously queried by
+  // `metadata.idempotencyKey` alone, with no `userId` filter. Firestore
+  // evaluates security rules against a query's POTENTIAL result set, not
+  // just what it actually returns — since campaigns/{id}'s read rule
+  // requires `resource.data.userId == request.auth.uid`, and nothing in
+  // the query constrained userId, Firestore could not prove every possible
+  // match would satisfy the rule and denied the query outright
+  // (confirmed against the real emulator: "Property userId is undefined on
+  // object. for 'list'"). This meant the entire client-timeout recovery
+  // path silently never worked — every call threw, was caught, and fell
+  // through to the generic "still checking on it" message, never actually
+  // resuming the user's in-progress campaign. Adding the userId clause
+  // lets the rule engine verify it statically, exactly like every other
+  // per-user query in this file already does.
+  async getByIdempotencyKey(idempotencyKey: string, userId: string): Promise<Campaign | null> {
+    const q = query(
+      getCollectionRef<Campaign>('campaigns', campaignConverter),
+      where('userId', '==', userId),
+      where('metadata.idempotencyKey', '==', idempotencyKey),
+      limit(1)
+    );
+    const snap = await getDocs(q);
+    return snap.docs[0]?.data() || null;
+  },
+
   async listByBusiness(
     businessId: string,
     status?: Campaign['status'],
@@ -315,10 +349,16 @@ export const campaignAssetService = {
     return snap.exists() ? snap.data() : null;
   },
 
-  async listByCampaign(campaignId: string): Promise<CampaignAsset[]> {
+  // businessId is required, not optional: the campaign_assets Firestore
+  // rule allows read only when resource.data.businessId is in the caller's
+  // token.businessIds (or userId/agency match), and passing it here lets
+  // callers fail fast with a clear denial instead of the whole query
+  // rejecting with an opaque permission error.
+  async listByCampaign(campaignId: string, businessId: string): Promise<CampaignAsset[]> {
     const q = query(
       getCollectionRef<CampaignAsset>('campaign_assets', campaignAssetConverter),
       where('campaignId', '==', campaignId),
+      where('businessId', '==', businessId),
       orderBy('type', 'asc'),
       orderBy('index', 'asc')
     );
@@ -350,15 +390,35 @@ export const subscriptionService = {
     return snap.exists() ? snap.data() : null;
   },
 
+  /**
+   * The user's current subscription. A paying user has several live docs (the Free one from
+   * signup stays active), so an unordered limit(1) query could return Free for a paid
+   * customer. Resolve via the users/{uid}.subscriptionId pointer the payment webhook keeps
+   * current, else prefer a paid live subscription over Free.
+   */
   async getByUserId(userId: string): Promise<Subscription | null> {
+    const live = ['active', 'trialing', 'past_due'];
+
+    const userSnap = await getDoc(doc(getDb(), 'users', userId));
+    const pointer = userSnap.exists()
+      ? (userSnap.data()['subscriptionId'] as string | undefined)
+      : undefined;
+    if (pointer) {
+      const pointed = await subscriptionService.get(pointer);
+      if (pointed && pointed.userId === userId && live.includes(pointed.status)) {
+        return pointed;
+      }
+    }
+
     const q = query(
       getCollectionRef<Subscription>('subscriptions', subscriptionConverter),
       where('userId', '==', userId),
-      where('status', 'in', ['active', 'trialing', 'past_due']),
-      limit(1)
+      where('status', 'in', live),
+      limit(10)
     );
     const snap = await getDocs(q);
-    return snap.docs[0]?.data() || null;
+    const subs = snap.docs.map((d) => d.data());
+    return subs.find((sub) => sub.planId !== 'free') ?? subs[0] ?? null;
   },
 
   async create(subscription: Subscription): Promise<void> {
@@ -391,7 +451,7 @@ export const usageService = {
   async getCurrentPeriod(userId: string): Promise<Usage | null> {
     const now = new Date();
     // The usage document ID is built server-side from the UTC month start
-    // (onUserCreated / the Razorpay webhook), so the client must derive the
+    // (onUserCreated / the payment gateway webhook), so the client must derive the
     // same UTC date. Using local time here produced the previous day's date
     // for any timezone ahead of UTC (e.g. IST: 2026-08-31 instead of
     // 2026-09-01), which points at a document that does not exist — and the
@@ -407,6 +467,19 @@ export const usageService = {
       getCollectionRef<Usage>('usage', usageConverter),
       where('userId', '==', userId),
       orderBy('periodStart', 'desc'),
+      limit(limitCount)
+    );
+    const snap = await getDocs(q);
+    return snap.docs.map((doc) => doc.data());
+  },
+};
+
+export const transactionService = {
+  async listByUser(userId: string, limitCount = 20): Promise<Transaction[]> {
+    const q = query(
+      getCollectionRef<Transaction>('transactions', transactionConverter),
+      where('userId', '==', userId),
+      orderBy('createdAt', 'desc'),
       limit(limitCount)
     );
     const snap = await getDocs(q);

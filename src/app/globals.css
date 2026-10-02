@@ -70,8 +70,8 @@
      the literal fallback stack keeps this file (and Storybook/tests, if any)
      working even before that variable is present. */
   --font-sans:
-    var(--font-geist-sans), ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont,
-    'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+    var(--font-geist-sans), ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI',
+    Roboto, 'Helvetica Neue', Arial, sans-serif;
   --font-sans-indic: 'Noto Sans Telugu', 'Noto Sans Devanagari', var(--font-sans);
   --font-mono: ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, monospace;
 
@@ -512,50 +512,9 @@ body {
 }
 
 /* Mitra Brand Motion — the M mark's animated states (MitraMark `state`
-   prop). Kept to transform/opacity so they stay cheap, and collapse under
-   the global prefers-reduced-motion rule above. */
-@keyframes mitra-pulse {
-  0%,
-  100% {
-    opacity: 1;
-    transform: scale(1);
-  }
-  50% {
-    opacity: 0.45;
-    transform: scale(0.82);
-  }
-}
-
-@keyframes mitra-orbit {
-  to {
-    transform: rotate(360deg);
-  }
-}
-
-@keyframes mitra-ring {
-  from {
-    r: 20;
-    opacity: 0.5;
-  }
-  to {
-    r: 94;
-    opacity: 0;
-  }
-}
-
-.animate-mitra-pulse {
-  transform-origin: 100px 18px;
-  animation: mitra-pulse 1.4s var(--ease-standard) infinite;
-}
-
-.animate-mitra-orbit {
-  transform-origin: 100px 40px;
-  animation: mitra-orbit 2.2s linear infinite;
-}
-
-.animate-mitra-ring {
-  animation: mitra-ring 900ms var(--ease-out-expo) forwards;
-}
+   prop) are now driven by the `motion` library directly in MitraMark.tsx,
+   which lets state transitions (e.g. loading -> success) interpolate and
+   lets reduced-motion be honored explicitly via useReducedMotion. */
 
 /* Mascot Motion — deliberately quiet. The idle loop is a few pixels of
    drift, not a bounce; scene entrances are a short settle, not a slide
@@ -581,6 +540,22 @@ body {
   }
 }
 
+/* Micro-interaction error shake animation */
+@keyframes shake-sm {
+  0%,
+  100% {
+    transform: translateX(0);
+  }
+  20%,
+  60% {
+    transform: translateX(-3px);
+  }
+  40%,
+  80% {
+    transform: translateX(3px);
+  }
+}
+
 /* The 'thinking' pose's three small orbiting dots — the only mascot prop
    that spins, because it's standing in for active AI processing. Slow and
    quiet on purpose; the M mark remains the primary intelligence indicator. */
@@ -603,4 +578,131 @@ body {
 
 .animate-scene-enter {
   animation: scene-enter 420ms var(--ease-out-expo) both;
+}
+
+.animate-shake-sm {
+  animation: shake-sm 300ms var(--ease-standard);
+}
+
+/* Tactile Micro-Interactions */
+.interactive-hover-lift {
+  transition:
+    transform var(--duration-fast) var(--ease-out-expo),
+    box-shadow var(--duration-fast) var(--ease-out-expo);
+}
+.interactive-hover-lift:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-md);
+}
+
+.active-press {
+  transition: transform var(--duration-instant) var(--ease-standard);
+}
+.active-press:active {
+  transform: scale(0.98);
+}
+
+/* Animated underline — slides in from left on hover, fades out on leave.
+   Used by StyledLink and anywhere a brand-colored reveal underline is needed. */
+.animated-underline {
+  position: relative;
+  text-decoration: none;
+}
+.animated-underline::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  bottom: -1px;
+  width: 100%;
+  height: 1.5px;
+  background-color: currentColor;
+  transform: scaleX(0);
+  transform-origin: left;
+  transition: transform var(--duration-fast) var(--ease-out-expo);
+}
+.animated-underline:hover::after {
+  transform: scaleX(1);
+}
+
+/* Card-level micro-interaction — use on any card/surface that should respond
+   to hover with a subtle lift + shadow deepening. Pairs with the brand's
+   rounded corners and warm shadows. */
+.card-interactive {
+  transition:
+    transform var(--duration-fast) var(--ease-out-expo),
+    box-shadow var(--duration-fast) var(--ease-out-expo),
+    border-color var(--duration-fast) var(--ease-standard);
+}
+.card-interactive:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-md);
+  border-color: var(--color-border-medium);
+}
+
+
+/* Click ripple — spawned by MagneticButton. */
+.btn-ripple {
+  width: 12px;
+  height: 12px;
+  margin: -6px 0 0 -6px;
+  animation: btn-ripple 600ms var(--ease-out-expo) forwards;
+}
+@keyframes btn-ripple {
+  from { transform: scale(1); opacity: 0.6; }
+  to { transform: scale(24); opacity: 0; }
+}
+
+/* Border tracing — a conic highlight sweeps the outline on hover/focus. */
+@property --trace-angle {
+  syntax: '<angle>';
+  inherits: false;
+  initial-value: 0deg;
+}
+.border-trace::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  padding: 1.5px;
+  background: conic-gradient(from var(--trace-angle), transparent 70%, var(--color-brand-500, #e84d1a) 100%);
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--duration-fast) var(--ease-standard);
+}
+.border-trace:hover::before,
+.border-trace:focus-visible::before {
+  opacity: 1;
+  animation: border-trace 1.6s linear infinite;
+}
+@keyframes border-trace {
+  to { --trace-angle: 360deg; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .btn-ripple,
+  .border-trace:hover::before,
+  .border-trace:focus-visible::before {
+    animation: none;
+  }
+}
+
+/* Route entrance — played by app/template.tsx on every navigation. Opacity
+   only: a transform here would create a containing block for fixed children. */
+.page-enter {
+  display: contents;
+}
+.page-enter > * {
+  animation: page-enter var(--duration-normal) var(--ease-out-expo) both;
+}
+@keyframes page-enter {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .page-enter > * {
+    animation: none;
+  }
 }

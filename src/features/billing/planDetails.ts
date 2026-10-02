@@ -12,60 +12,111 @@ import type { SubscriptionPlan } from '@/types';
  */
 export const PLAN_DETAILS: Record<
   SubscriptionPlan,
-  { name: string; price: number; credits: number; campaigns: number; features: string[] }
+  {
+    name: string;
+    price: number;
+    yearlyPrice: number;
+    reels: number;
+    creatives: number;
+    stories: number;
+    maxBusinesses: number;
+    credits: number;
+    features: string[];
+  }
 > = {
   free: {
     name: 'Free',
     price: 0,
+    yearlyPrice: 0,
+    reels: 0,
+    creatives: 5,
+    stories: 0,
+    maxBusinesses: 1,
     credits: 100,
-    campaigns: 1,
     features: [
-      '1 campaign per month',
-      '100 credits/month',
-      'Basic templates',
-      'Watermark on creatives',
+      '5 social creatives',
+      '0 AI reels',
       '1 business',
+      'Business Brain',
+      'Captions & copy',
     ],
   },
   starter: {
     name: 'Starter',
-    price: 499,
+    price: 999,
+    yearlyPrice: 9990,
+    reels: 3,
+    creatives: 15,
+    stories: 9,
+    maxBusinesses: 1,
     credits: 500,
-    campaigns: 5,
     features: [
-      '5 campaigns per month',
-      '500 credits/month',
-      'Basic templates',
-      'No watermark',
+      '3 AI reels / month',
+      '15 social creatives / month',
+      '9 stories / month',
       '1 business',
+      'Business Brain',
+      'Captions, hooks & CTAs',
     ],
   },
   business: {
     name: 'Business',
-    price: 999,
+    price: 1699,
+    yearlyPrice: 16990,
+    reels: 10,
+    creatives: 30,
+    stories: 30,
+    maxBusinesses: 1,
     credits: 1200,
-    campaigns: 12,
     features: [
-      '12 campaigns per month',
-      '1,200 credits/month',
-      'Premium templates',
-      'Brand Kit access',
-      'Priority generation',
+      '10 AI reels / month',
+      '30 social creatives / month',
+      '30 stories / month',
       '1 business',
+      'Business Brain',
+      'Content variations',
+      'Captions, hooks & CTAs',
+    ],
+  },
+  pro: {
+    name: 'Pro',
+    price: 2999,
+    yearlyPrice: 24990,
+    reels: 20,
+    creatives: 60,
+    stories: 60,
+    maxBusinesses: 3,
+    credits: 2500,
+    features: [
+      '20 AI reels / month',
+      '60 social creatives / month',
+      '60 stories / month',
+      '3 businesses',
+      'Full Business Brain',
+      'Premium creative generation',
+      'Advanced variations',
+      'Captions, hooks & CTAs',
     ],
   },
   agency: {
     name: 'Agency',
-    price: 2499,
-    credits: 3000,
-    campaigns: 30,
+    price: 4999,
+    yearlyPrice: 49990,
+    reels: 40,
+    creatives: 120,
+    stories: 120,
+    maxBusinesses: 10,
+    credits: 6000,
     features: [
-      '30 campaigns per month',
-      '3,000 credits/month',
-      'Multi-business',
-      'Client management',
-      'Partner dashboard',
-      'White-label path',
+      '40 AI reels / month',
+      '120 social creatives / month',
+      '120 stories / month',
+      '10 businesses',
+      'Agency workspace',
+      'Client/brand management',
+      'Priority processing',
+      'Advanced generation',
     ],
   },
 };
+

@@ -81,8 +81,8 @@ describe('DashboardPage', () => {
 
   it('shows a loading spinner before business data resolves', () => {
     getByUserIdMock.mockReturnValue(new Promise(() => {}));
-    const { container } = render(<DashboardPage />);
-    expect(container.querySelector('.animate-spin')).toBeTruthy();
+    render(<DashboardPage />);
+    expect(screen.getByRole('status', { name: /loading/i })).toBeInTheDocument();
   });
 
   it('empty state: shows "No business set up yet" and a link to onboarding when the user has no business', async () => {

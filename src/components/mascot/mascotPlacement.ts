@@ -108,6 +108,27 @@ export const MASCOT_PLACEMENT: Record<string, MascotPlacement> = {
     screen: 'src/app/products/page.tsx',
     implemented: true,
   },
+  'reels.empty': {
+    pose: 'point',
+    size: 'md',
+    trigger: 'No Reels created yet for the selected business',
+    screen: 'src/app/reels/page.tsx',
+    implemented: true,
+  },
+  'business-profile.no-business': {
+    pose: 'point',
+    size: 'lg',
+    trigger: 'Business Profile page, user has no business set up yet',
+    screen: 'src/app/business-profile/page.tsx',
+    implemented: true,
+  },
+  'business-profile.error': {
+    pose: 'concerned',
+    size: 'lg',
+    trigger: 'Business Profile data failed to load',
+    screen: 'src/app/business-profile/page.tsx',
+    implemented: true,
+  },
   'onboarding.welcome': {
     pose: 'point',
     size: 'lg',

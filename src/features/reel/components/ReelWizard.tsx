@@ -19,6 +19,8 @@ import { ReelGenerationProgress } from '@/features/reel/components/ReelGeneratio
 import { ReelPreview } from '@/features/reel/components/ReelPreview';
 import { SavedStylePicker } from '@/features/style/components/SavedStylePicker';
 import { createReelProject, generateReel } from '@/features/reel/services/reelService';
+import { PageSkeleton } from '@/components/motion/PageSkeleton';
+import { MagneticWrap } from '@/components/motion/MagneticWrap';
 import type {
   Business,
   CreativeObjective,
@@ -306,14 +308,7 @@ export function ReelWizard() {
   }, []);
 
   if (loadingBusinesses) {
-    return (
-      <div className="flex min-h-[40vh] items-center justify-center">
-        <div
-          className="border-brand-600 h-8 w-8 animate-spin rounded-full border-4 border-t-transparent"
-          aria-hidden="true"
-        />
-      </div>
-    );
+    return <PageSkeleton variant="form" />;
   }
 
   if (businesses.length === 0) {
@@ -516,13 +511,15 @@ export function ReelWizard() {
             onClipsChange={setClips}
           />
           <div className="flex justify-end">
-            <Button
-              loading={startingGeneration}
-              disabled={!canGenerate || startingGeneration}
-              onClick={() => void handleGenerate()}
-            >
-              Generate Reel
-            </Button>
+            <MagneticWrap strength={5}>
+              <Button
+                loading={startingGeneration}
+                disabled={!canGenerate || startingGeneration}
+                onClick={() => void handleGenerate()}
+              >
+                Generate Reel
+              </Button>
+            </MagneticWrap>
           </div>
         </div>
       )}

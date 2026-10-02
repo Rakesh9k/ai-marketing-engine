@@ -55,7 +55,11 @@ export function useRegenerateAsset() {
       try {
         const regenerateFn = httpsCallable<RegenerateAssetOptions, RegenerateAssetResult>(
           functions,
-          'regenerateAsset'
+          'regenerateAsset',
+          // Matches the server's own timeoutSeconds (regenerateAsset.ts)
+          // rather than the Functions SDK's 70s default — see the same fix
+          // in CampaignWizard.tsx's generateCampaignStrategy call.
+          { timeout: 540_000 }
         );
 
         const result = await regenerateFn({

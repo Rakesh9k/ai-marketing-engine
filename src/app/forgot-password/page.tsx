@@ -8,8 +8,8 @@ export default function ForgotPasswordPage() {
   return (
     <PublicOnlyRoute>
       <AuthLayout
-        title="Forgot your password?"
-        description="Enter your email and we'll send you a reset link"
+        mode="forgot-password"
+        topRightLink={{ text: 'Remember your password?', href: '/login', label: 'Log in' }}
       >
         <ForgotPasswordForm />
       </AuthLayout>
