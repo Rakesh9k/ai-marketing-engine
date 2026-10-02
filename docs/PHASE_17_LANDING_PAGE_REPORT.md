@@ -27,18 +27,18 @@ In the absence of a design-system doc, `src/app/globals.css`'s actual CSS custom
 
 ## 4. Sections Implemented
 
-| Section | File | Notes |
-|---|---|---|
-| Navigation | `src/features/landing/components/LandingNav.tsx` | Sticky header, section anchor links (How it works / What it creates / Pricing), Login + Get Started, mobile hamburger menu |
-| Hero | `src/features/landing/LandingPage.tsx` (`Hero`) | Headline "One photo. A month of marketing.", supporting line, primary + secondary CTA, product-outcome visual (`HeroVisual`) |
-| How It Works | `LandingPage.tsx` (`HowItWorks`) | 4 steps: business info → photos → choose objective/offer/audience/language/style → get content |
-| What Mitra Creates | `LandingPage.tsx` (`WhatMitraCreates`) | Campaign copy, Offers, Stories, Reels, WhatsApp message, Creative — plus a Truth Check mention |
-| Local-Business Differentiation | `LandingPage.tsx` (`Differentiation`) | Built around your business, local language/style, real offers checked, WhatsApp-first; one clearly-labeled example (not a case study) |
-| Before/After | `LandingPage.tsx` (`BeforeAfter`) | Workflow-effort transformation only — no business-performance numbers |
-| Pricing | `LandingPage.tsx` (`Pricing`) | Free/Starter/Business cards from the shared `PLAN_DETAILS` constant |
-| Final CTA | `LandingPage.tsx` (`FinalCTA`) | Closing CTA to `/signup` |
-| Footer | `src/features/landing/components/LandingFooter.tsx` | Brand, section links, Login/Signup — no Privacy/Terms links (see §11) |
-| Login / Signup | Reused existing `/login`, `/signup` routes | No new auth routes created |
+| Section                        | File                                                | Notes                                                                                                                                 |
+| ------------------------------ | --------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------- |
+| Navigation                     | `src/features/landing/components/LandingNav.tsx`    | Sticky header, section anchor links (How it works / What it creates / Pricing), Login + Get Started, mobile hamburger menu            |
+| Hero                           | `src/features/landing/LandingPage.tsx` (`Hero`)     | Headline "One photo. A month of marketing.", supporting line, primary + secondary CTA, product-outcome visual (`HeroVisual`)          |
+| How It Works                   | `LandingPage.tsx` (`HowItWorks`)                    | 4 steps: business info → photos → choose objective/offer/audience/language/style → get content                                        |
+| What Mitra Creates             | `LandingPage.tsx` (`WhatMitraCreates`)              | Campaign copy, Offers, Stories, Reels, WhatsApp message, Creative — plus a Truth Check mention                                        |
+| Local-Business Differentiation | `LandingPage.tsx` (`Differentiation`)               | Built around your business, local language/style, real offers checked, WhatsApp-first; one clearly-labeled example (not a case study) |
+| Before/After                   | `LandingPage.tsx` (`BeforeAfter`)                   | Workflow-effort transformation only — no business-performance numbers                                                                 |
+| Pricing                        | `LandingPage.tsx` (`Pricing`)                       | Free/Starter/Business cards from the shared `PLAN_DETAILS` constant                                                                   |
+| Final CTA                      | `LandingPage.tsx` (`FinalCTA`)                      | Closing CTA to `/signup`                                                                                                              |
+| Footer                         | `src/features/landing/components/LandingFooter.tsx` | Brand, section links, Login/Signup — no Privacy/Terms links (see §11)                                                                 |
+| Login / Signup                 | Reused existing `/login`, `/signup` routes          | No new auth routes created                                                                                                            |
 
 ## 5. Routes
 
@@ -47,17 +47,17 @@ In the absence of a design-system doc, `src/app/globals.css`'s actual CSS custom
 
 ## 6. Product Claims Audit
 
-| Claim area | Copy | Status |
-|---|---|---|
-| Primary headline | "One photo. A month of marketing." | Positioning, not a factual claim |
-| Workflow | "Give Mitra your business + photos → get a month's worth of marketing content" | SUPPORTED — matches the actual campaign-creation flow |
-| Output types | Campaign copy, Offers, Stories, Reels, WhatsApp message, Creative | SUPPORTED — matches `CampaignDetailContent.tsx`'s actual rendered fields (headline/caption/offer/story/reel concept/WhatsApp message/creative image) |
-| Languages | English, Telugu, Telugu + English | SUPPORTED — exact match to `src/features/campaign/constants.ts`'s `LANGUAGES` (MVP-restricted; Hindi/Hindi+English intentionally excluded because the product UI doesn't expose them even though the backend schema technically accepts them) |
-| Regional style | Hyderabadi | SUPPORTED — exact match to `REGIONAL_STYLES` |
-| Truth Check | "a server-side check that your generated content matches your real price, offer and business details before you see it" | SUPPORTED — matches the actual deterministic Truth Check behavior (Phase 6/13 reports) |
-| Verticals | Restaurants/cloud kitchens (primary), salons and real estate (supported) | SUPPORTED — `category` enum in `createBusiness.ts` includes `restaurant`/`salon`/`real_estate`; campaign-wizard copy (`src/features/campaign/constants.ts`) is itself restaurant-flavored, so restaurants are presented as the lead vertical rather than claiming equal depth across all three |
-| Pricing | Free / ₹499 / ₹999, credits per plan | SUPPORTED — pulled from the same values as `functions/src/config/pricing.ts` (see §7) |
-| Example | "a restaurant in Kondapur uploads a photo..." | Explicitly labeled "Example:" — not presented as a real customer |
+| Claim area       | Copy                                                                                                                    | Status                                                                                                                                                                                                                                                                                         |
+| ---------------- | ----------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Primary headline | "One photo. A month of marketing."                                                                                      | Positioning, not a factual claim                                                                                                                                                                                                                                                               |
+| Workflow         | "Give Mitra your business + photos → get a month's worth of marketing content"                                          | SUPPORTED — matches the actual campaign-creation flow                                                                                                                                                                                                                                          |
+| Output types     | Campaign copy, Offers, Stories, Reels, WhatsApp message, Creative                                                       | SUPPORTED — matches `CampaignDetailContent.tsx`'s actual rendered fields (headline/caption/offer/story/reel concept/WhatsApp message/creative image)                                                                                                                                           |
+| Languages        | English, Telugu, Telugu + English                                                                                       | SUPPORTED — exact match to `src/features/campaign/constants.ts`'s `LANGUAGES` (MVP-restricted; Hindi/Hindi+English intentionally excluded because the product UI doesn't expose them even though the backend schema technically accepts them)                                                  |
+| Regional style   | Hyderabadi                                                                                                              | SUPPORTED — exact match to `REGIONAL_STYLES`                                                                                                                                                                                                                                                   |
+| Truth Check      | "a server-side check that your generated content matches your real price, offer and business details before you see it" | SUPPORTED — matches the actual deterministic Truth Check behavior (Phase 6/13 reports)                                                                                                                                                                                                         |
+| Verticals        | Restaurants/cloud kitchens (primary), salons and real estate (supported)                                                | SUPPORTED — `category` enum in `createBusiness.ts` includes `restaurant`/`salon`/`real_estate`; campaign-wizard copy (`src/features/campaign/constants.ts`) is itself restaurant-flavored, so restaurants are presented as the lead vertical rather than claiming equal depth across all three |
+| Pricing          | Free / ₹499 / ₹999, credits per plan                                                                                    | SUPPORTED — pulled from the same values as `functions/src/config/pricing.ts` (see §7)                                                                                                                                                                                                          |
+| Example          | "a restaurant in Kondapur uploads a photo..."                                                                           | Explicitly labeled "Example:" — not presented as a real customer                                                                                                                                                                                                                               |
 
 No instance of `%`, `+N`, `Nx`, customer/user/business counts, revenue, sales, engagement, ROI, "trusted by", "leading", "#1", "best", "fastest", "guaranteed", or `★` appears as a marketing claim anywhere on the page. (A grep for these terms across the landing-page source does surface a few incidental matches — Tailwind's `leading-tight`/`leading-none` CSS utility classes, and the words "customers"/"businesses" used descriptively, e.g. "a ready-to-send message for your customers" — none of which are statistical or performance claims; verified line-by-line in §"Fake Social Proof Check" below.)
 

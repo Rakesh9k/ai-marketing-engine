@@ -177,8 +177,8 @@ App Check: `ReCaptchaEnterpriseProvider`, enforced declaratively per-function
 (`enforceAppCheck: true`). **The local Functions emulator never
 cryptographically verifies Auth or App Check tokens** (`FIREBASE_DEBUG_MODE`
 unsafe-decode path, confirmed via a direct controlled experiment in Phase
-20C) — every local/emulator test proves token *presence*, never token
-*validity*. Real verification has never been exercised against a live,
+20C) — every local/emulator test proves token _presence_, never token
+_validity_. Real verification has never been exercised against a live,
 deployed environment in any documented phase.
 
 ---
@@ -387,47 +387,47 @@ scope).
 
 # Architecture Truth Table
 
-| Component | Documentation | Actual Code | Status | Notes |
-|---|---|---|---|---|
-| Firebase Auth | README claims email/password + phone OTP + Google | Only email/password wired to UI; phone/Google service functions exist unused | DRIFT | Documentation overstates shipped auth methods |
-| App Check | Phase 20A/20B/20C describe integration and its emulator limitation | `ReCaptchaEnterpriseProvider`, declarative `enforceAppCheck: true`, confirmed never cryptographically verified locally | VERIFIED | Matches docs; caveat about emulator unsafe-decode is itself documented and confirmed |
-| Firestore rules | No dedicated SECURITY.md; scattered phase-report mentions | 245-line rules file, credit fields fully locked, campaigns field-locked, `users` privilege-escalation bug fixed and tested | VERIFIED | Strongest-verified area of the whole system |
-| Storage | No dedicated doc | Signed-URL two-phase upload, business-scoped rules, no App Check on Storage (structural limitation, not a bug) | VERIFIED | |
-| Cloud Functions | No dedicated doc | ~11 domains, `asia-south1`, uniform `validatedCallable` pattern except one exception | VERIFIED | |
-| Authorization | No dedicated doc | `verifyBusinessAccess` primitive, consistently applied except `trackAnalyticsEvent` | PARTIALLY VERIFIED | One confirmed live gap |
-| Business Brain | Referenced across phase reports | Embedded field in `businesses`, real read/write paths, one dead sub-field (`campaignHistory[].performance`) | VERIFIED | |
-| AI | README claims Gemini + GPT-4o + NVIDIA | Gemini (text/vision) + OpenAI DALL-E 3 only; no NVIDIA code found | DRIFT | Documentation gap (NVIDIA), otherwise matches |
-| Campaigns | Phase 4-8 reports describe pipeline | 13-stage pipeline confirmed; 3 of 13 stages (8-10) appear inert; a vestigial second entry point (`createCampaign`) leaks credit reservations | PARTIALLY VERIFIED | |
-| Truth Check | Phase 6 report | Fully deterministic, confirmed sole gate for activation, confirmed regeneration-safety invariant | VERIFIED | |
-| Regeneration | Phase 6 report | New-version-only, never overwrites in place, fail-closed on REVIEW_REQUIRED | VERIFIED | |
-| Credits | Phase 10 report | Primary system correct and tested; a second, parallel, non-finalizing system also live | DRIFT | Two credit-reservation code paths is a genuine inconsistency |
-| Razorpay | Phase 10, 19, 19A reports | Webhook-authoritative, HMAC-verified, transactional/idempotent; `verifyPayment`'s signature field unused; real checkout never exercised end-to-end | PARTIALLY VERIFIED | |
-| Analytics | Phase 32 report | Real events + real dashboard aggregation; one endpoint has a stubbed ownership check | PARTIALLY VERIFIED | |
-| Performance | PERFORMANCE_ENGINE.md, PERFORMANCE_DATA_READINESS.md | Confirmed accurate — no ranking logic exists, one real metric | VERIFIED | Docs and code agree; both explicitly warn against overclaiming |
-| Restaurant (vertical) | README, Phase 4-28 | Fully implemented, primary/original vertical | VERIFIED | |
-| Salon (vertical) | Phase 28 said cosmetic; Phase 30 says real | Confirmed real as of current code (server-enforced logic, dedicated Truth Check) | VERIFIED | Phase 28→30 is resolved historical drift, not current drift |
-| Real Estate (vertical) | Phase 28 said cosmetic; Phase 31 says real | Confirmed real as of current code | VERIFIED | Same as above |
-| Agency | README/rules mention it; `tests/phase27-authz.test.ts` tests the authorization primitive | Authorization branch exists and is tested; no UI, no `agencies`/`clients` collection usage anywhere | PARTIALLY VERIFIED | Backend primitive real, feature surface absent |
-| Deployment | README describes Vercel + Firebase split | Confirmed matches; staging/production Firebase project split unconfirmed; CI `test` job references nonexistent npm scripts | DRIFT | Config/CI defect found, not previously flagged in any phase report read |
-| Testing | Phase 36 gives specific pass/fail counts | Counts corroborated by direct file enumeration; E2E/Playwright coverage confirmed effectively zero despite the spec file's existence | PARTIALLY VERIFIED | "Test suite passes" ≠ "production verified" |
+| Component              | Documentation                                                                            | Actual Code                                                                                                                                        | Status             | Notes                                                                                |
+| ---------------------- | ---------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------ | ------------------------------------------------------------------------------------ |
+| Firebase Auth          | README claims email/password + phone OTP + Google                                        | Only email/password wired to UI; phone/Google service functions exist unused                                                                       | DRIFT              | Documentation overstates shipped auth methods                                        |
+| App Check              | Phase 20A/20B/20C describe integration and its emulator limitation                       | `ReCaptchaEnterpriseProvider`, declarative `enforceAppCheck: true`, confirmed never cryptographically verified locally                             | VERIFIED           | Matches docs; caveat about emulator unsafe-decode is itself documented and confirmed |
+| Firestore rules        | No dedicated SECURITY.md; scattered phase-report mentions                                | 245-line rules file, credit fields fully locked, campaigns field-locked, `users` privilege-escalation bug fixed and tested                         | VERIFIED           | Strongest-verified area of the whole system                                          |
+| Storage                | No dedicated doc                                                                         | Signed-URL two-phase upload, business-scoped rules, no App Check on Storage (structural limitation, not a bug)                                     | VERIFIED           |                                                                                      |
+| Cloud Functions        | No dedicated doc                                                                         | ~11 domains, `asia-south1`, uniform `validatedCallable` pattern except one exception                                                               | VERIFIED           |                                                                                      |
+| Authorization          | No dedicated doc                                                                         | `verifyBusinessAccess` primitive, consistently applied except `trackAnalyticsEvent`                                                                | PARTIALLY VERIFIED | One confirmed live gap                                                               |
+| Business Brain         | Referenced across phase reports                                                          | Embedded field in `businesses`, real read/write paths, one dead sub-field (`campaignHistory[].performance`)                                        | VERIFIED           |                                                                                      |
+| AI                     | README claims Gemini + GPT-4o + NVIDIA                                                   | Gemini (text/vision) + OpenAI DALL-E 3 only; no NVIDIA code found                                                                                  | DRIFT              | Documentation gap (NVIDIA), otherwise matches                                        |
+| Campaigns              | Phase 4-8 reports describe pipeline                                                      | 13-stage pipeline confirmed; 3 of 13 stages (8-10) appear inert; a vestigial second entry point (`createCampaign`) leaks credit reservations       | PARTIALLY VERIFIED |                                                                                      |
+| Truth Check            | Phase 6 report                                                                           | Fully deterministic, confirmed sole gate for activation, confirmed regeneration-safety invariant                                                   | VERIFIED           |                                                                                      |
+| Regeneration           | Phase 6 report                                                                           | New-version-only, never overwrites in place, fail-closed on REVIEW_REQUIRED                                                                        | VERIFIED           |                                                                                      |
+| Credits                | Phase 10 report                                                                          | Primary system correct and tested; a second, parallel, non-finalizing system also live                                                             | DRIFT              | Two credit-reservation code paths is a genuine inconsistency                         |
+| Razorpay               | Phase 10, 19, 19A reports                                                                | Webhook-authoritative, HMAC-verified, transactional/idempotent; `verifyPayment`'s signature field unused; real checkout never exercised end-to-end | PARTIALLY VERIFIED |                                                                                      |
+| Analytics              | Phase 32 report                                                                          | Real events + real dashboard aggregation; one endpoint has a stubbed ownership check                                                               | PARTIALLY VERIFIED |                                                                                      |
+| Performance            | PERFORMANCE_ENGINE.md, PERFORMANCE_DATA_READINESS.md                                     | Confirmed accurate — no ranking logic exists, one real metric                                                                                      | VERIFIED           | Docs and code agree; both explicitly warn against overclaiming                       |
+| Restaurant (vertical)  | README, Phase 4-28                                                                       | Fully implemented, primary/original vertical                                                                                                       | VERIFIED           |                                                                                      |
+| Salon (vertical)       | Phase 28 said cosmetic; Phase 30 says real                                               | Confirmed real as of current code (server-enforced logic, dedicated Truth Check)                                                                   | VERIFIED           | Phase 28→30 is resolved historical drift, not current drift                          |
+| Real Estate (vertical) | Phase 28 said cosmetic; Phase 31 says real                                               | Confirmed real as of current code                                                                                                                  | VERIFIED           | Same as above                                                                        |
+| Agency                 | README/rules mention it; `tests/phase27-authz.test.ts` tests the authorization primitive | Authorization branch exists and is tested; no UI, no `agencies`/`clients` collection usage anywhere                                                | PARTIALLY VERIFIED | Backend primitive real, feature surface absent                                       |
+| Deployment             | README describes Vercel + Firebase split                                                 | Confirmed matches; staging/production Firebase project split unconfirmed; CI `test` job references nonexistent npm scripts                         | DRIFT              | Config/CI defect found, not previously flagged in any phase report read              |
+| Testing                | Phase 36 gives specific pass/fail counts                                                 | Counts corroborated by direct file enumeration; E2E/Playwright coverage confirmed effectively zero despite the spec file's existence               | PARTIALLY VERIFIED | "Test suite passes" ≠ "production verified"                                          |
 
 ---
 
 # Architectural Drift
 
-| Item | Severity |
-|---|---|
-| Two independent credit-reservation systems, one leaking reservations forever | HIGH |
-| `trackAnalyticsEvent` stubbed ownership check, live | MEDIUM |
-| Duplicate `TruthCheckResult`/`TruthCheckItem` type declarations in `functions/src/types/index.ts` | LOW |
-| Rate-limit config key mismatches (silently lenient, not silently strict) | LOW |
-| CI `test` job references nonexistent `test:unit`/`test:integration` npm scripts | MEDIUM |
-| `.firebaserc` single-project vs. CI's assumed staging/production split | MEDIUM (unconfirmed severity — could be a non-issue if secrets correctly override) |
-| `src/features/ai/*` and `src/features/business-brain/services/businessBrainService.ts` appear dead/unused | LOW |
-| `.cursorrules` actively contradicts current shipped state | INFORMATIONAL (misleading to future readers, no runtime effect) |
-| `agencies`/`clients` rules have no field lock / apparent bug, currently unreachable | LOW (dead code today; would be HIGH if activated without revisiting rules) |
-| Reels lack a deterministic Truth Check equivalent | MEDIUM |
-| AI-based validation stages 8-10 in the campaign pipeline appear inert | LOW-MEDIUM (uncertain — flagged, not confirmed) |
+| Item                                                                                                      | Severity                                                                           |
+| --------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------- |
+| Two independent credit-reservation systems, one leaking reservations forever                              | HIGH                                                                               |
+| `trackAnalyticsEvent` stubbed ownership check, live                                                       | MEDIUM                                                                             |
+| Duplicate `TruthCheckResult`/`TruthCheckItem` type declarations in `functions/src/types/index.ts`         | LOW                                                                                |
+| Rate-limit config key mismatches (silently lenient, not silently strict)                                  | LOW                                                                                |
+| CI `test` job references nonexistent `test:unit`/`test:integration` npm scripts                           | MEDIUM                                                                             |
+| `.firebaserc` single-project vs. CI's assumed staging/production split                                    | MEDIUM (unconfirmed severity — could be a non-issue if secrets correctly override) |
+| `src/features/ai/*` and `src/features/business-brain/services/businessBrainService.ts` appear dead/unused | LOW                                                                                |
+| `.cursorrules` actively contradicts current shipped state                                                 | INFORMATIONAL (misleading to future readers, no runtime effect)                    |
+| `agencies`/`clients` rules have no field lock / apparent bug, currently unreachable                       | LOW (dead code today; would be HIGH if activated without revisiting rules)         |
+| Reels lack a deterministic Truth Check equivalent                                                         | MEDIUM                                                                             |
+| AI-based validation stages 8-10 in the campaign pipeline appear inert                                     | LOW-MEDIUM (uncertain — flagged, not confirmed)                                    |
 
 ---
 

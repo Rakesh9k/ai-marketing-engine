@@ -11,13 +11,19 @@ const id = {
   businessName: `[E2E-19C TEST] Biryani House ${stamp}`,
   productName: `E2E Biryani ${stamp}`,
 };
-const R = { steps: {}, net: { hosts: {}, callables: [], appcheck: [], auth: [], failed: [], emulatorHits: [] }, console: [] };
+const R = {
+  steps: {},
+  net: { hosts: {}, callables: [], appcheck: [], auth: [], failed: [], emulatorHits: [] },
+  console: [],
+};
 fs.mkdirSync(path.join(OUT, 'shots'), { recursive: true });
-const shot = (p, n) => p.screenshot({ path: path.join(OUT, 'shots', n + '.png'), fullPage: true }).catch(() => {});
+const shot = (p, n) =>
+  p.screenshot({ path: path.join(OUT, 'shots', n + '.png'), fullPage: true }).catch(() => {});
 
 function wire(page) {
   page.on('console', (m) => {
-    if (['error', 'warning'].includes(m.type())) R.console.push(m.type() + ': ' + m.text().slice(0, 300));
+    if (['error', 'warning'].includes(m.type()))
+      R.console.push(m.type() + ': ' + m.text().slice(0, 300));
   });
   page.on('pageerror', (e) => R.console.push('pageerror: ' + e.message.slice(0, 300)));
   page.on('request', (r) => {
@@ -25,7 +31,9 @@ function wire(page) {
     R.net.hosts[u.host] = (R.net.hosts[u.host] || 0) + 1;
     if (/localhost|127\.0\.0\.1/.test(u.host)) R.net.emulatorHits.push(r.url());
   });
-  page.on('requestfailed', (r) => R.net.failed.push(r.url().slice(0, 140) + ' :: ' + (r.failure()?.errorText || '')));
+  page.on('requestfailed', (r) =>
+    R.net.failed.push(r.url().slice(0, 140) + ' :: ' + (r.failure()?.errorText || ''))
+  );
   page.on('response', (r) => {
     const u = r.url();
     const s = r.status();
@@ -46,8 +54,15 @@ async function bodyText(page) {
 }
 
 async function run() {
-  const browser = await chromium.launch({ headless: false, args: ['--disable-blink-features=AutomationControlled'] });
-  const ctx = await browser.newContext({ viewport: { width: 1280, height: 900 }, locale: 'en-IN', timezoneId: 'Asia/Kolkata' });
+  const browser = await chromium.launch({
+    headless: false,
+    args: ['--disable-blink-features=AutomationControlled'],
+  });
+  const ctx = await browser.newContext({
+    viewport: { width: 1280, height: 900 },
+    locale: 'en-IN',
+    timezoneId: 'Asia/Kolkata',
+  });
   const page = await ctx.newPage();
   page.setDefaultTimeout(20000);
   wire(page);
@@ -101,17 +116,23 @@ async function run() {
       : 'FAIL url=' + page.url() + ' body=' + (await bodyText(page)).slice(0, 250);
     await page.reload();
     await page.waitForTimeout(2500);
-    S.D_businessPersists = (await bodyText(page)).includes('No business set up yet') ? 'FAIL' : 'PASS';
+    S.D_businessPersists = (await bodyText(page)).includes('No business set up yet')
+      ? 'FAIL'
+      : 'PASS';
 
     await page.goto(BASE + '/products/new');
     await page.waitForTimeout(2000);
     await page.locator('input[placeholder="e.g., Chicken Biryani"]').fill(id.productName);
     await page.locator('input[placeholder="e.g., 299"]').fill('299');
-    await page.locator('input[type="file"]').setInputFiles(path.resolve('tests/e2e/fixtures/test-product.jpg'));
+    await page
+      .locator('input[type="file"]')
+      .setInputFiles(path.resolve('tests/e2e/fixtures/test-product.jpg'));
     await page.getByRole('button', { name: 'Upload Image' }).click();
     await page.waitForTimeout(6000);
     await shot(page, '04-upload');
-    S.E_storageUpload = /uploaded successfully|remove photo/i.test(await bodyText(page)) ? 'PASS' : 'FAIL/UNKNOWN';
+    S.E_storageUpload = /uploaded successfully|remove photo/i.test(await bodyText(page))
+      ? 'PASS'
+      : 'FAIL/UNKNOWN';
     await page.getByRole('button', { name: 'Save Product' }).click();
     await page.waitForURL(/\/products$/, { timeout: 20000 }).catch(() => {});
     await page.waitForTimeout(2500);
@@ -152,7 +173,9 @@ async function run() {
     await page.goto(BASE + '/campaigns/abc123');
     await page.waitForTimeout(3000);
     await shot(page, '07-campaign-nonexistent');
-    S.campaignRoute_nonexistent = /not found|doesn.t exist|don.t have access/i.test(await bodyText(page))
+    S.campaignRoute_nonexistent = /not found|doesn.t exist|don.t have access/i.test(
+      await bodyText(page)
+    )
       ? 'PASS (proper not-found state)'
       : 'UNKNOWN';
 
@@ -160,7 +183,9 @@ async function run() {
     await page.goto(BASE + '/dashboard');
     await page.waitForTimeout(2000);
     await shot(page, '08-mobile-dashboard');
-    S.mobile_noHorizontalOverflow = (await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 2))
+    S.mobile_noHorizontalOverflow = (await page.evaluate(
+      () => document.documentElement.scrollWidth <= window.innerWidth + 2
+    ))
       ? 'PASS'
       : 'FAIL';
   } catch (e) {
@@ -181,7 +206,10 @@ async function run() {
   R.net.appcheck = summarize(R.net.appcheck);
   R.net.auth = summarize(R.net.auth);
   R.net.failed = [...new Set(R.net.failed)].slice(0, 25);
-  fs.writeFileSync(path.join(OUT, 'cred.json'), JSON.stringify({ email: id.email, password: id.password }));
+  fs.writeFileSync(
+    path.join(OUT, 'cred.json'),
+    JSON.stringify({ email: id.email, password: id.password })
+  );
   fs.writeFileSync(path.join(OUT, 'results.json'), JSON.stringify({ email: id.email, R }, null, 2));
   console.log(JSON.stringify({ email: id.email, R }, null, 2));
 }

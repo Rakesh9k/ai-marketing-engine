@@ -55,6 +55,7 @@ code — reservation, Firestore writes, status transitions, and refund logic
 all run for real.
 
 **Additional findings and fixes**, smaller in scope but real:
+
 - `Campaign.error` — a field already defined in the type and already read
   by the frontend (`CampaignWizard.tsx`'s `handleSettled`) — was never
   actually written by the backend anywhere. Now populated on both failure
@@ -76,7 +77,7 @@ all run for real.
   in-flight `campaignId` is now mirrored into the URL so a refresh resumes
   the same live progress view.
 - `uploadImage()`'s asset-dimension patch (a client-side Firestore write
-  that runs *after* the server has already durably created the real asset
+  that runs _after_ the server has already durably created the real asset
   record) could report "Upload failed" to the user for a transient failure
   of that cosmetic patch alone, even though the upload had already fully
   succeeded — inviting a wasteful duplicate re-upload via Retry. Now
@@ -157,7 +158,7 @@ side effect (unchanged, already correct).
 throws before `confirmUpload` (the actual asset-creating step) is ever
 called — no asset record is created (unchanged, already correct).
 
-**Firestore metadata failure (Phase 12 finding, fixed):** the *authoritative*
+**Firestore metadata failure (Phase 12 finding, fixed):** the _authoritative_
 asset record is created server-side by `confirmUpload` (Admin SDK,
 `createAssetDoc`) — the frontend's subsequent client-side
 `saveAssetRecord()` call only patches in the image's real pixel dimensions
@@ -191,6 +192,7 @@ undiscoverable storage until a future cleanup pass.
 ## 5. Payment Failure Recovery
 
 Re-verifies (does not rebuild) Phase 10's proven mechanisms:
+
 - Failed/cancelled/pending payment → no entitlement, no credit grant
   (`verifyPayment` requires `payment.status === 'captured'`; the webhook's
   `payment.captured` handler is the sole credit-granting path — Phase 10).
@@ -264,15 +266,15 @@ touched this phase).
 
 ## 8. Idempotency
 
-| Operation | Idempotent? | Mechanism |
-|---|---|---|
-| Credit reservation | Yes | Atomic transaction keyed on `operationId` (Phase 10 fix, reused) |
-| Credit finalize | Yes | Status-guarded, re-finalize is a no-op (Phase 10) |
-| Credit refund | Yes | Status-guarded, re-refund is a no-op (Phase 10) |
-| Razorpay webhook | Yes | Atomic per-event-ID claim (Phase 10 fix, reused) |
-| `generateCampaignStrategy` retry | New attempt, not a replay | Fresh `campaignId`/`idempotencyKey` per click (by design) — proven not to corrupt state (Phase 12, this report) |
-| `regenerateAsset` retry | Idempotent per attempt | `idempotencyKey`-keyed reservation (Phase 10 fix, reused) |
-| Upload confirm | Not idempotent, not financial | Each call mints a fresh assetId; acceptable (§4) |
+| Operation                        | Idempotent?                   | Mechanism                                                                                                       |
+| -------------------------------- | ----------------------------- | --------------------------------------------------------------------------------------------------------------- |
+| Credit reservation               | Yes                           | Atomic transaction keyed on `operationId` (Phase 10 fix, reused)                                                |
+| Credit finalize                  | Yes                           | Status-guarded, re-finalize is a no-op (Phase 10)                                                               |
+| Credit refund                    | Yes                           | Status-guarded, re-refund is a no-op (Phase 10)                                                                 |
+| Razorpay webhook                 | Yes                           | Atomic per-event-ID claim (Phase 10 fix, reused)                                                                |
+| `generateCampaignStrategy` retry | New attempt, not a replay     | Fresh `campaignId`/`idempotencyKey` per click (by design) — proven not to corrupt state (Phase 12, this report) |
+| `regenerateAsset` retry          | Idempotent per attempt        | `idempotencyKey`-keyed reservation (Phase 10 fix, reused)                                                       |
+| Upload confirm                   | Not idempotent, not financial | Each call mints a fresh assetId; acceptable (§4)                                                                |
 
 ## 9. Concurrency
 
@@ -296,17 +298,17 @@ few lines earlier, never a client-supplied value.
 
 ## 11. Tests
 
-| Test | Result | Evidence |
-|---|---|---|
-| Pipeline exception → campaign reaches terminal `failed`, `error` populated, credits fully refunded | **PASS** | `generateCampaignStrategy.recovery.test.ts`, real Firestore emulator |
-| Truth Check FAIL → `failed` + `error.code = TRUTH_CHECK_FAILED`, credits finalized (not refunded) | **PASS** | same file |
-| Failed generation does not block a legitimate retry from succeeding | **PASS** | same file |
-| Credit reservation/finalize/refund idempotency + concurrency (golden tests) | **PASS** | `usageControl.test.ts` + `usageControl.concurrency.test.ts` (Phase 10, re-run clean) |
-| Duplicate/concurrent webhook → one credit grant | **PASS** | `razorpayWebhook.test.ts` (Phase 10, re-run clean) |
-| Cross-tenant recovery-adjacent authorization (business/campaign ownership) | **PASS** | `auth.test.ts`, `security.test.ts` (Phase 11, re-run clean) |
-| Mass-assignment / extra-field stripping | **PASS** | `validation.security.test.ts` (Phase 11, re-run clean) |
-| Upload failure → no fake asset (code review, not a new automated test) | **VERIFIED BY CODE REVIEW** | §4 — `uploadImage()` only calls `saveAssetRecord` after `confirmUpload` already durably created the record; earlier failures throw before any asset exists |
-| Refresh during generation → resumes authoritative live state | **VERIFIED BY CODE REVIEW + BUILD**, not browser-tested | §6 — no live Firebase project in this environment (same limitation as every prior phase); `next build` confirms the URL-param wiring compiles and the route still prerenders |
+| Test                                                                                               | Result                                                  | Evidence                                                                                                                                                                     |
+| -------------------------------------------------------------------------------------------------- | ------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Pipeline exception → campaign reaches terminal `failed`, `error` populated, credits fully refunded | **PASS**                                                | `generateCampaignStrategy.recovery.test.ts`, real Firestore emulator                                                                                                         |
+| Truth Check FAIL → `failed` + `error.code = TRUTH_CHECK_FAILED`, credits finalized (not refunded)  | **PASS**                                                | same file                                                                                                                                                                    |
+| Failed generation does not block a legitimate retry from succeeding                                | **PASS**                                                | same file                                                                                                                                                                    |
+| Credit reservation/finalize/refund idempotency + concurrency (golden tests)                        | **PASS**                                                | `usageControl.test.ts` + `usageControl.concurrency.test.ts` (Phase 10, re-run clean)                                                                                         |
+| Duplicate/concurrent webhook → one credit grant                                                    | **PASS**                                                | `razorpayWebhook.test.ts` (Phase 10, re-run clean)                                                                                                                           |
+| Cross-tenant recovery-adjacent authorization (business/campaign ownership)                         | **PASS**                                                | `auth.test.ts`, `security.test.ts` (Phase 11, re-run clean)                                                                                                                  |
+| Mass-assignment / extra-field stripping                                                            | **PASS**                                                | `validation.security.test.ts` (Phase 11, re-run clean)                                                                                                                       |
+| Upload failure → no fake asset (code review, not a new automated test)                             | **VERIFIED BY CODE REVIEW**                             | §4 — `uploadImage()` only calls `saveAssetRecord` after `confirmUpload` already durably created the record; earlier failures throw before any asset exists                   |
+| Refresh during generation → resumes authoritative live state                                       | **VERIFIED BY CODE REVIEW + BUILD**, not browser-tested | §6 — no live Firebase project in this environment (same limitation as every prior phase); `next build` confirms the URL-param wiring compiles and the route still prerenders |
 
 ## 12. Commands Executed
 
@@ -354,6 +356,7 @@ test in this report — not left skipped.
 ## 14. Production Risk Assessment
 
 **P0 (found and fixed this phase):**
+
 - `generateCampaignStrategy`'s success-path `ReferenceError` — every
   generation that reached its final step crashed. **FIXED.**
 - `createCampaignDoc`'s `undefined`-field crash for new-product campaigns.
@@ -362,6 +365,7 @@ test in this report — not left skipped.
   exception (infinite frontend spinner). **FIXED.**
 
 **P1 (found and fixed this phase):**
+
 - Inaccurate/unverified credit-refund claims in the wizard's failure
   messaging. **FIXED.**
 - Refresh during generation loses all reference to the in-flight
@@ -370,6 +374,7 @@ test in this report — not left skipped.
   reported as a full upload failure. **FIXED.**
 
 **P2 (documented, not fixed — genuinely low-severity or out of scope):**
+
 - No orphaned-Storage-object cleanup job.
 - No dedicated `CampaignWizard` component test.
 

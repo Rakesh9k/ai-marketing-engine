@@ -39,6 +39,7 @@ test passing after.** This is the single most severe finding across every
 phase of this project so far.
 
 **Other findings, fixed:**
+
 - `tests/storage.test.ts` used the wrong SDK entirely
   (`.bucket('test-bucket').file(...)`, the Node.js admin
   `@google-cloud/storage` API) against `RulesTestContext.storage()`, which
@@ -89,7 +90,7 @@ access-control boundary around them (§17).
 ## 3. Authentication
 
 - Every sensitive Cloud Function uses `onCall(..., validatedCallable(schema,
-  handler))`. `validatedCallable` throws `HttpsError('unauthenticated', ...)`
+handler))`. `validatedCallable` throws `HttpsError('unauthenticated', ...)`
   immediately if `request.auth` is absent — **before** any handler code
   runs, before any Zod validation, before any Firestore access. This is
   standard Firebase-verified-ID-token authentication; there is no bypass
@@ -99,7 +100,7 @@ access-control boundary around them (§17).
 - `regenerateAsset`, `createSubscription`, `verifyPayment`, and 18 other
   functions previously re-verified auth a second time inside their handler
   via `verifyAuth(context as any)`/`verifyAuthAndBusinessAccess(context as
-  any, ...)` — **this was completely broken** (Phase 10 finding, fixed
+any, ...)` — **this was completely broken** (Phase 10 finding, fixed
   there): `context` is `{userId, token}`, not a `CallableRequest`, so
   `request.auth` was always `undefined` and every such call threw
   unconditionally. This meant these functions never actually worked for
@@ -126,12 +127,12 @@ access-control boundary around them (§17).
   `functions/src/functions/`).
 - **Business ownership:** `verifyBusinessAccess(userId, businessId)`
   (`functions/src/middleware/auth.ts`) checks `businesses/{businessId}
-  .userId === userId` (or agency membership) before allowing any
+.userId === userId` (or agency membership) before allowing any
   business-scoped operation — proven via `auth.test.ts`.
 - **Agency membership:** `request.auth.token.role == 'agency_member' &&
-  request.auth.token.agencyId == <target>` — proven extensively via
+request.auth.token.agencyId == <target>` — proven extensively via
   `tests/phase27-authz.test.ts` and `tests/phase27-bulk-approval-auth-
-  roles.test.ts`'s "Cross-Tenant Isolation" suite (10 passing tests).
+roles.test.ts`'s "Cross-Tenant Isolation" suite (10 passing tests).
 - **IDOR protection:** proven directly — see §18's attack-test table.
   Knowing a `campaignId`/`assetId`/`businessId`/`usageId` does not, by
   itself, grant access; every read/write is gated on the resource's own
@@ -331,59 +332,60 @@ Razorpay event types via a `switch`, silently ignoring anything else).
 All run for real against the Firestore/Storage emulators (not
 theoretical):
 
-| Attack | Expected | Actual | Status |
-|---|---|---|---|
-| User A reads User B's `users` doc | DENY | Denied | **PASS** |
-| User A self-writes `role: 'admin'` to their own user doc | DENY | Denied (was **ALLOW** before this phase's fix — critical finding) | **PASS** |
-| User A self-writes `agencyId: '<victim agency>'` | DENY | Denied (was **ALLOW** before fix) | **PASS** |
-| User A self-writes `businessIds: [..., '<victim business>']` | DENY | Denied (was **ALLOW** before fix) | **PASS** |
-| User A creates their own `users` doc via client SDK | DENY (server-only) | Denied | **PASS** |
-| User A reads/updates Business B | DENY | Denied | **PASS** |
-| User A deletes their own business | DENY (soft-delete only) | Denied | **PASS** |
-| Agency member reads a business their agency manages | ALLOW | Allowed | **PASS** |
-| Agency member reads an unmanaged business | DENY | Denied | **PASS** |
-| Owner forges campaign `status` → `'completed'` | DENY | Denied | **PASS** |
-| Owner forges `metadata.truthCheckStatus` FAIL→PASS | DENY | Denied | **PASS** |
-| Owner forges `creditsReserved`/`creditsUsed` | DENY | Denied | **PASS** |
-| Client writes directly to `campaign_assets` | DENY (server-only) | Denied | **PASS** |
-| User A reads User B's campaign by ID (IDOR) | DENY | Denied | **PASS** |
-| User A updates User B's campaign by ID (IDOR) | DENY | Denied | **PASS** |
-| User A reads User B's campaign asset by ID (IDOR) | DENY | Denied | **PASS** |
-| User A reads User B's usage/credit history (IDOR) | DENY | Denied | **PASS** |
-| User A reads User B's transaction record (IDOR) | DENY | Denied | **PASS** |
-| User A reads User B's subscription (IDOR) | DENY | Denied | **PASS** |
-| User A (with their own valid businessId) reads Business B's brand kit by ID | DENY | Denied | **PASS** |
-| Agency A reads Agency B's `agencies` doc | DENY | Denied | **PASS** |
-| Agency A reads Agency B's clients | DENY | Denied | **PASS** |
-| Agency A reads Agency B's businesses/campaigns/assets | DENY | Denied | **PASS** |
-| Client mass-assignment (`role`, `credits`, `ownerId`, `agencyId`, `status`, `amount` as extra fields) | Stripped/ignored | Stripped by Zod | **PASS** |
-| User A reads Business B's product image (Storage) | DENY | Denied | **PASS** |
-| User A reads Business B's generated creative (Storage) | DENY | Denied | **PASS** |
-| User A reads User B's temp upload (Storage) | DENY | Denied | **PASS** |
-| User A writes to Business B's assets (Storage) | DENY | Denied | **PASS** |
-| User A writes to User B's temp uploads (Storage) | DENY | Denied | **PASS** |
-| Agency member reads a managed business's Storage assets | ALLOW | Allowed | **PASS** |
-| Agency member reads an unmanaged business's Storage assets | DENY | Denied | **PASS** |
-| Server secret present in built frontend bundle | ABSENT | Absent | **PASS** |
+| Attack                                                                                                | Expected                | Actual                                                            | Status   |
+| ----------------------------------------------------------------------------------------------------- | ----------------------- | ----------------------------------------------------------------- | -------- |
+| User A reads User B's `users` doc                                                                     | DENY                    | Denied                                                            | **PASS** |
+| User A self-writes `role: 'admin'` to their own user doc                                              | DENY                    | Denied (was **ALLOW** before this phase's fix — critical finding) | **PASS** |
+| User A self-writes `agencyId: '<victim agency>'`                                                      | DENY                    | Denied (was **ALLOW** before fix)                                 | **PASS** |
+| User A self-writes `businessIds: [..., '<victim business>']`                                          | DENY                    | Denied (was **ALLOW** before fix)                                 | **PASS** |
+| User A creates their own `users` doc via client SDK                                                   | DENY (server-only)      | Denied                                                            | **PASS** |
+| User A reads/updates Business B                                                                       | DENY                    | Denied                                                            | **PASS** |
+| User A deletes their own business                                                                     | DENY (soft-delete only) | Denied                                                            | **PASS** |
+| Agency member reads a business their agency manages                                                   | ALLOW                   | Allowed                                                           | **PASS** |
+| Agency member reads an unmanaged business                                                             | DENY                    | Denied                                                            | **PASS** |
+| Owner forges campaign `status` → `'completed'`                                                        | DENY                    | Denied                                                            | **PASS** |
+| Owner forges `metadata.truthCheckStatus` FAIL→PASS                                                    | DENY                    | Denied                                                            | **PASS** |
+| Owner forges `creditsReserved`/`creditsUsed`                                                          | DENY                    | Denied                                                            | **PASS** |
+| Client writes directly to `campaign_assets`                                                           | DENY (server-only)      | Denied                                                            | **PASS** |
+| User A reads User B's campaign by ID (IDOR)                                                           | DENY                    | Denied                                                            | **PASS** |
+| User A updates User B's campaign by ID (IDOR)                                                         | DENY                    | Denied                                                            | **PASS** |
+| User A reads User B's campaign asset by ID (IDOR)                                                     | DENY                    | Denied                                                            | **PASS** |
+| User A reads User B's usage/credit history (IDOR)                                                     | DENY                    | Denied                                                            | **PASS** |
+| User A reads User B's transaction record (IDOR)                                                       | DENY                    | Denied                                                            | **PASS** |
+| User A reads User B's subscription (IDOR)                                                             | DENY                    | Denied                                                            | **PASS** |
+| User A (with their own valid businessId) reads Business B's brand kit by ID                           | DENY                    | Denied                                                            | **PASS** |
+| Agency A reads Agency B's `agencies` doc                                                              | DENY                    | Denied                                                            | **PASS** |
+| Agency A reads Agency B's clients                                                                     | DENY                    | Denied                                                            | **PASS** |
+| Agency A reads Agency B's businesses/campaigns/assets                                                 | DENY                    | Denied                                                            | **PASS** |
+| Client mass-assignment (`role`, `credits`, `ownerId`, `agencyId`, `status`, `amount` as extra fields) | Stripped/ignored        | Stripped by Zod                                                   | **PASS** |
+| User A reads Business B's product image (Storage)                                                     | DENY                    | Denied                                                            | **PASS** |
+| User A reads Business B's generated creative (Storage)                                                | DENY                    | Denied                                                            | **PASS** |
+| User A reads User B's temp upload (Storage)                                                           | DENY                    | Denied                                                            | **PASS** |
+| User A writes to Business B's assets (Storage)                                                        | DENY                    | Denied                                                            | **PASS** |
+| User A writes to User B's temp uploads (Storage)                                                      | DENY                    | Denied                                                            | **PASS** |
+| Agency member reads a managed business's Storage assets                                               | ALLOW                   | Allowed                                                           | **PASS** |
+| Agency member reads an unmanaged business's Storage assets                                            | DENY                    | Denied                                                            | **PASS** |
+| Server secret present in built frontend bundle                                                        | ABSENT                  | Absent                                                            | **PASS** |
 
 ## 19. Firestore/Storage Emulator Tests
 
 Both emulators were actually started and used in this environment (Java 21
-+ `firebase-tools` 15.29.0, confirmed working — same infrastructure
-established in Phase 10):
 
-- `tests/security.test.ts`: **25/25 passed** (Firestore).
-- `tests/storage.test.ts`: **10/10 passed** (Storage) — rewritten this
+- `firebase-tools` 15.29.0, confirmed working — same infrastructure
+  established in Phase 10):
+
+* `tests/security.test.ts`: **25/25 passed** (Firestore).
+* `tests/storage.test.ts`: **10/10 passed** (Storage) — rewritten this
   phase; every test in the file had never actually run before (wrong SDK).
-- `tests/phase27-authz.test.ts`: **11/11 passed** (Firestore, agency
+* `tests/phase27-authz.test.ts`: **11/11 passed** (Firestore, agency
   isolation) — one test fixed this phase (missing seed data).
-- `tests/phase27-bulk-approval-auth-roles.test.ts`: **9/9 passed, 5
+* `tests/phase27-bulk-approval-auth-roles.test.ts`: **9/9 passed, 5
   explicitly skipped** (testing a `bulk_jobs` collection and
   `'agency_admin'` role that don't exist in this codebase — pre-existing,
   out of scope, documented in-file).
-- `functions/src/middleware/auth.test.ts` (new): **3/3 passed** —
+* `functions/src/middleware/auth.test.ts` (new): **3/3 passed** —
   `verifyBusinessAccess` grant/deny/not-found.
-- `functions/src/middleware/validation.security.test.ts` (new): **2/2
+* `functions/src/middleware/validation.security.test.ts` (new): **2/2
   passed** — mass-assignment stripping.
 
 ## 20. Regression Tests
@@ -440,7 +442,7 @@ Functions Build: **PASS** (`npm run functions:build`).
    remove).
 5. Cross-agency isolation was tested against the emulator with
    synthetic custom claims (`testEnv.authenticatedContext(uid, {role,
-   agencyId})`), which is the correct and standard way to test Firestore
+agencyId})`), which is the correct and standard way to test Firestore
    rules — but real production custom claims still flow through
    `createBusiness.ts`/`onUserCreated.ts`, which were separately audited
    (§2/§4) rather than exercised end-to-end through a live signup+
@@ -450,6 +452,7 @@ Functions Build: **PASS** (`npm run functions:build`).
 ## 23. Files Changed
 
 **Critical fix:**
+
 - `firestore.rules` — `users/{userId}`: removed unrestricted client write;
   added `allow create: if false` (server-only) and an `allow update` rule
   that locks `role`, `businessIds`, `agencyId`, `subscriptionId`, and
@@ -462,6 +465,7 @@ Functions Build: **PASS** (`npm run functions:build`).
   rules fix.
 
 **Test infrastructure fixes and new coverage:**
+
 - `tests/security.test.ts` — fixed three tests with missing/incorrect
   setup (unseeded documents, a double-`.firestore()` call that triggered
   an SDK "already started" error); added the critical role-escalation

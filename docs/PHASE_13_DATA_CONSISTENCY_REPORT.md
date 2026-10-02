@@ -34,7 +34,7 @@ historical Truth Check result itself.
 Two further real hierarchy-validation checks were **confirmed already
 correct** by direct testing (not assumed): `generateCampaignStrategy.ts`
 already rejects a request combining a valid `businessId` with a
-`productId` belonging to a *different* business, and the AI pipeline is
+`productId` belonging to a _different_ business, and the AI pipeline is
 structurally guaranteed to receive only the single, authorized business's
 Business Brain context (a single object reference from one Firestore read
 — there is no code path that could merge in a second business's data).
@@ -84,17 +84,17 @@ after creation (confirmed by grep across `functions/src/functions/`: no
 
 ## 3. Relationship Matrix
 
-| Entity | Parent | Ownership Field | Server Validation | Status |
-|---|---|---|---|---|
-| Business | User | `userId` | `create`/`update` rule: `resource.data.userId == request.auth.uid` | PASS |
-| BrandKit | Business | doc ID = `businessId` | `verifyBusinessAccess` | PASS |
-| Product | Business | `businessId` | `verifyBusinessAccess` + create schema requires `businessId in token.businessIds` | PASS |
-| CampaignAsset | Campaign + Business | `campaignId`, `businessId` | server-only writes (Admin SDK, `regenerateAsset`/pipeline), never client-supplied | PASS |
-| Campaign | Business | `businessId` | `verifyBusinessAccess(userId, data.businessId)` | PASS |
-| Campaign | Product | `productId` | **`existingProduct.businessId !== data.businessId` → reject** — proven with a real emulator test this phase | PASS |
-| Transaction (reservation) | User/Campaign | `userId`, `metadata.operationId` | Phase 10, atomic, re-verified this phase | PASS |
-| Payment/Subscription | User | `userId` | Phase 10, re-verified | PASS |
-| Analytics event | User/Business/Campaign | `userId` (server-derived), `businessId`/`campaignId` (caller-supplied, informational) | Phase 9/10 | PASS |
+| Entity                    | Parent                 | Ownership Field                                                                       | Server Validation                                                                                           | Status |
+| ------------------------- | ---------------------- | ------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------- | ------ |
+| Business                  | User                   | `userId`                                                                              | `create`/`update` rule: `resource.data.userId == request.auth.uid`                                          | PASS   |
+| BrandKit                  | Business               | doc ID = `businessId`                                                                 | `verifyBusinessAccess`                                                                                      | PASS   |
+| Product                   | Business               | `businessId`                                                                          | `verifyBusinessAccess` + create schema requires `businessId in token.businessIds`                           | PASS   |
+| CampaignAsset             | Campaign + Business    | `campaignId`, `businessId`                                                            | server-only writes (Admin SDK, `regenerateAsset`/pipeline), never client-supplied                           | PASS   |
+| Campaign                  | Business               | `businessId`                                                                          | `verifyBusinessAccess(userId, data.businessId)`                                                             | PASS   |
+| Campaign                  | Product                | `productId`                                                                           | **`existingProduct.businessId !== data.businessId` → reject** — proven with a real emulator test this phase | PASS   |
+| Transaction (reservation) | User/Campaign          | `userId`, `metadata.operationId`                                                      | Phase 10, atomic, re-verified this phase                                                                    | PASS   |
+| Payment/Subscription      | User                   | `userId`                                                                              | Phase 10, re-verified                                                                                       | PASS   |
+| Analytics event           | User/Business/Campaign | `userId` (server-derived), `businessId`/`campaignId` (caller-supplied, informational) | Phase 9/10                                                                                                  | PASS   |
 
 ## 4. User/Business Consistency
 
@@ -233,7 +233,7 @@ business. Structurally, a `Product`/`Campaign` with a nonexistent parent
 
 **Golden Test 10, proven this phase, end-to-end against a real emulator**
 (`getCampaign.test.ts`): a campaign verified (Truth Check PASS) while a
-product's price is ₹299 is *not* flagged stale immediately after
+product's price is ₹299 is _not_ flagged stale immediately after
 verification; after the product's price changes to ₹399,
 `getCampaign` correctly reports `isVerificationStale: true` — and the
 stored `metadata.truthCheckStatus` remains `'PASS'` throughout (the
@@ -274,14 +274,14 @@ beyond what tests already cover): this environment has no accessible
 production Firestore instance to audit — only a local emulator seeded
 fresh for each test run — so a "scan production for orphans" script would
 have nothing to scan and could not produce a real finding here. Instead,
-the *structural* question ("can an orphan be created going forward?") was
+the _structural_ question ("can an orphan be created going forward?") was
 answered directly: every child-creating code path (`createProductDoc`,
 `createCampaignDoc`, `createCampaignAssets`, `createTransactionDoc`-
 equivalent reservation writes) is called only after its parent reference
 was already validated to exist and be owned by the caller in the same
 function invocation (traced through every relevant file this phase and in
-Phase 10/11/12) — so no *new* orphan-creation path was found. Whether
-*historical* production data already contains orphans is unknown and
+Phase 10/11/12) — so no _new_ orphan-creation path was found. Whether
+_historical_ production data already contains orphans is unknown and
 unknowable from this environment; if the team has production Firestore
 access, a read-only version of the same relationship checks in
 `getCampaignStrategy.consistency.test.ts`/`getCampaign.test.ts` could be
@@ -290,17 +290,17 @@ since it would need production credentials this environment doesn't have.
 
 ## 20. Tests Executed
 
-| Test | Result | Evidence |
-|---|---|---|
-| Campaign → Product cross-business rejection (Golden Test 2) | **PASS** | `generateCampaignStrategy.consistency.test.ts`, real emulator |
-| Business Brain scoped to single authorized business | **PASS** | same file — asserts actual pipeline input |
-| Truth Check staleness detection on product price change (Golden Test 10) | **PASS** | `getCampaign.test.ts`, real emulator |
-| Cross-tenant `getCampaign` access denied | **PASS** | same file |
-| Stale-verification UI warning (does not alter underlying badge) | **PASS** | `CampaignDetailContent.test.tsx` (2 new tests) |
-| User/Business/Campaign/Asset/Agency cross-tenant isolation | **PASS** (reused) | Phase 11's `security.test.ts`, `storage.test.ts`, `phase27-*.test.ts` — re-run clean this phase |
-| Credit reservation/finalize/refund attribution & concurrency | **PASS** (reused) | Phase 10's `usageControl*.test.ts` — re-run clean |
-| Payment/webhook entitlement idempotency | **PASS** (reused) | Phase 10's `razorpayWebhook.test.ts`, `verifyPayment.test.ts` — re-run clean |
-| Generation failure leaves no partial campaign/credit state | **PASS** (reused + extended) | Phase 12's `generateCampaignStrategy.recovery.test.ts` — re-run clean |
+| Test                                                                     | Result                       | Evidence                                                                                        |
+| ------------------------------------------------------------------------ | ---------------------------- | ----------------------------------------------------------------------------------------------- |
+| Campaign → Product cross-business rejection (Golden Test 2)              | **PASS**                     | `generateCampaignStrategy.consistency.test.ts`, real emulator                                   |
+| Business Brain scoped to single authorized business                      | **PASS**                     | same file — asserts actual pipeline input                                                       |
+| Truth Check staleness detection on product price change (Golden Test 10) | **PASS**                     | `getCampaign.test.ts`, real emulator                                                            |
+| Cross-tenant `getCampaign` access denied                                 | **PASS**                     | same file                                                                                       |
+| Stale-verification UI warning (does not alter underlying badge)          | **PASS**                     | `CampaignDetailContent.test.tsx` (2 new tests)                                                  |
+| User/Business/Campaign/Asset/Agency cross-tenant isolation               | **PASS** (reused)            | Phase 11's `security.test.ts`, `storage.test.ts`, `phase27-*.test.ts` — re-run clean this phase |
+| Credit reservation/finalize/refund attribution & concurrency             | **PASS** (reused)            | Phase 10's `usageControl*.test.ts` — re-run clean                                               |
+| Payment/webhook entitlement idempotency                                  | **PASS** (reused)            | Phase 10's `razorpayWebhook.test.ts`, `verifyPayment.test.ts` — re-run clean                    |
+| Generation failure leaves no partial campaign/credit state               | **PASS** (reused + extended) | Phase 12's `generateCampaignStrategy.recovery.test.ts` — re-run clean                           |
 
 ## 21. Commands Executed
 

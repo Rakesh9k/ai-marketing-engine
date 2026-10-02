@@ -2,7 +2,8 @@ import { chromium } from '@playwright/test';
 import fs from 'node:fs';
 import path from 'node:path';
 
-const SHOT_DIR = 'C:\\Users\\admin\\AppData\\Local\\Temp\\claude\\d--brainwise-AI-marketing-Agent-ai-marketing-engine\\076e192b-625d-46b7-a73a-16076ee9cd94\\scratchpad\\shots';
+const SHOT_DIR =
+  'C:\\Users\\admin\\AppData\\Local\\Temp\\claude\\d--brainwise-AI-marketing-Agent-ai-marketing-engine\\076e192b-625d-46b7-a73a-16076ee9cd94\\scratchpad\\shots';
 fs.mkdirSync(SHOT_DIR, { recursive: true });
 
 const stamp = Date.now();
@@ -17,7 +18,9 @@ const log = (...args) => console.log(new Date().toISOString(), ...args);
 const results = {};
 
 async function shot(page, name) {
-  await page.screenshot({ path: path.join(SHOT_DIR, `${name}.png`), fullPage: true }).catch(() => {});
+  await page
+    .screenshot({ path: path.join(SHOT_DIR, `${name}.png`), fullPage: true })
+    .catch(() => {});
 }
 
 async function main() {
@@ -60,7 +63,7 @@ async function main() {
     let onboardingUrl = page.url();
     if (!onboardingUrl.includes('onboarding')) {
       const createBusinessBtn = page.getByRole('button', { name: /create business/i });
-      if (await createBusinessBtn.count() > 0) {
+      if ((await createBusinessBtn.count()) > 0) {
         await createBusinessBtn.first().click();
         await page.waitForURL(/onboarding/, { timeout: 10000 });
       } else {
@@ -117,19 +120,26 @@ async function main() {
     const preProductText = await page.locator('body').innerText();
     if (preProductText.includes('set up a business') || preProductText.includes('No business')) {
       results.addProduct = 'FAIL - business not found on /products/new';
-      log('STEP 5 FAILED: business not detected on /products/new. Body:', preProductText.slice(0, 200));
+      log(
+        'STEP 5 FAILED: business not detected on /products/new. Body:',
+        preProductText.slice(0, 200)
+      );
     } else {
       await page.locator('input[placeholder="e.g., Chicken Biryani"]').fill(identity.productName);
       await page.locator('input[placeholder="e.g., 299"]').fill('299');
 
       const fileInput = page.locator('input[type="file"]');
-      await fileInput.setInputFiles('D:\\brainwise AI marketing Agent\\ai-marketing-engine\\tests\\e2e\\fixtures\\test-product.jpg');
+      await fileInput.setInputFiles(
+        'D:\\brainwise AI marketing Agent\\ai-marketing-engine\\tests\\e2e\\fixtures\\test-product.jpg'
+      );
       await shot(page, '06-photo-selected');
       await page.getByRole('button', { name: 'Upload Image' }).click();
       await page.waitForTimeout(4000);
       await shot(page, '06-photo-uploaded');
       const uploadStateText = await page.locator('body').innerText();
-      results.uploadPhoto = /uploaded successfully|remove photo/i.test(uploadStateText) ? 'PASS' : 'UNKNOWN';
+      results.uploadPhoto = /uploaded successfully|remove photo/i.test(uploadStateText)
+        ? 'PASS'
+        : 'UNKNOWN';
 
       await page.getByRole('button', { name: 'Save Product' }).click();
       await page.waitForURL(/\/products$/, { timeout: 15000 });
@@ -155,12 +165,20 @@ async function main() {
     await page.waitForTimeout(500);
     await shot(page, '07-campaign-step1-objective');
 
-    await page.getByRole('button', { name: new RegExp(identity.productName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')) }).click();
+    await page
+      .getByRole('button', {
+        name: new RegExp(identity.productName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')),
+      })
+      .click();
     const campaignFileInput = page.locator('input[type="file"]');
-    if (await campaignFileInput.count() > 0) {
-      await campaignFileInput.first().setInputFiles('D:\\brainwise AI marketing Agent\\ai-marketing-engine\\tests\\e2e\\fixtures\\test-product.jpg');
+    if ((await campaignFileInput.count()) > 0) {
+      await campaignFileInput
+        .first()
+        .setInputFiles(
+          'D:\\brainwise AI marketing Agent\\ai-marketing-engine\\tests\\e2e\\fixtures\\test-product.jpg'
+        );
       const uploadBtn = page.getByRole('button', { name: 'Upload Image' });
-      if (await uploadBtn.count() > 0) {
+      if ((await uploadBtn.count()) > 0) {
         await uploadBtn.click().catch(() => {});
         await page.waitForTimeout(3000);
       }
@@ -170,7 +188,9 @@ async function main() {
     await page.waitForTimeout(500);
 
     await page.locator('select').first().selectOption('percentage');
-    await page.locator('input[placeholder="e.g., Weekend Biryani Special"]').fill('Weekend Biryani Special');
+    await page
+      .locator('input[placeholder="e.g., Weekend Biryani Special"]')
+      .fill('Weekend Biryani Special');
     await page.locator('input[placeholder="e.g., 349"]').fill('349');
     await page.locator('input[placeholder="e.g., 299"]').fill('299');
     const today = new Date();
@@ -224,10 +244,11 @@ async function main() {
     log('URL after generate:', page.url());
 
     if (/\/campaigns\/[^/]+$/.test(page.url())) {
-      await page.waitForFunction(
-        () => /verified|failed|truth check/i.test(document.body.innerText),
-        { timeout: 90000 }
-      ).catch(() => {});
+      await page
+        .waitForFunction(() => /verified|failed|truth check/i.test(document.body.innerText), {
+          timeout: 90000,
+        })
+        .catch(() => {});
       const campaignDetailText = await page.locator('body').innerText();
       results.pipelineOutcome = /failed/i.test(campaignDetailText)
         ? 'FAIL-SAFE (pipeline reached failed state, as expected without AI credentials)'
@@ -239,14 +260,17 @@ async function main() {
 
       results.campaignUrl = page.url();
     } else {
-      results.pipelineOutcome = 'UNKNOWN - did not reach campaign detail page, still at ' + page.url();
+      results.pipelineOutcome =
+        'UNKNOWN - did not reach campaign detail page, still at ' + page.url();
     }
 
     // ---- Logout / Login persistence ----
     const logoutBtn = page.getByRole('button', { name: /log ?out|sign ?out/i });
-    if (await logoutBtn.count() > 0) {
+    if ((await logoutBtn.count()) > 0) {
       await logoutBtn.first().click();
-      await page.waitForURL(/login|signup|^http:\/\/localhost:3000\/$/, { timeout: 10000 }).catch(() => {});
+      await page
+        .waitForURL(/login|signup|^http:\/\/localhost:3000\/$/, { timeout: 10000 })
+        .catch(() => {});
       await page.waitForTimeout(1000);
       results.logout = /login|signup/.test(page.url()) ? 'PASS' : 'UNKNOWN - url=' + page.url();
       log('Logout:', results.logout, page.url());
@@ -255,7 +279,9 @@ async function main() {
       // Try direct protected navigation while logged out
       await page.goto('http://localhost:3000/dashboard');
       await page.waitForTimeout(1500);
-      results.unauthAccessBlocked = /login/.test(page.url()) ? 'PASS' : 'FAIL - reached ' + page.url() + ' while logged out';
+      results.unauthAccessBlocked = /login/.test(page.url())
+        ? 'PASS'
+        : 'FAIL - reached ' + page.url() + ' while logged out';
       log('Unauth access to /dashboard blocked:', results.unauthAccessBlocked);
       await shot(page, '12-unauth-dashboard-attempt');
 
@@ -274,7 +300,9 @@ async function main() {
       await page.goto('http://localhost:3000/campaigns');
       await page.waitForTimeout(1500);
       const campaignsListText = await page.locator('body').innerText();
-      results.campaignPersistsAfterRelogin = campaignsListText.includes(identity.productName) ? 'PASS' : 'UNKNOWN';
+      results.campaignPersistsAfterRelogin = campaignsListText.includes(identity.productName)
+        ? 'PASS'
+        : 'UNKNOWN';
       log('Campaign persists after relogin:', results.campaignPersistsAfterRelogin);
       await shot(page, '14-campaigns-after-relogin');
     } else {
@@ -287,13 +315,20 @@ async function main() {
     await shot(page, '15-billing');
     const billingText = await page.locator('body').innerText();
     results.billingPageRenders = /Billing|Plan|Credits/i.test(billingText) ? 'PASS' : 'FAIL';
-    results.billingHasUpgradeButton = /Upgrade to this Plan/i.test(billingText) ? 'PASS' : 'UNKNOWN';
-    log('Billing page:', results.billingPageRenders, 'upgrade button present:', results.billingHasUpgradeButton);
+    results.billingHasUpgradeButton = /Upgrade to this Plan/i.test(billingText)
+      ? 'PASS'
+      : 'UNKNOWN';
+    log(
+      'Billing page:',
+      results.billingPageRenders,
+      'upgrade button present:',
+      results.billingHasUpgradeButton
+    );
 
     // Attempt clicking Upgrade to see real behavior (will fail server-side
     // without Razorpay credentials - want to observe exactly how).
     const upgradeBtn = page.getByRole('button', { name: /Upgrade to this Plan/i }).first();
-    if (await upgradeBtn.count() > 0) {
+    if ((await upgradeBtn.count()) > 0) {
       await upgradeBtn.click();
       await page.waitForTimeout(4000);
       await shot(page, '16-billing-after-upgrade-click');

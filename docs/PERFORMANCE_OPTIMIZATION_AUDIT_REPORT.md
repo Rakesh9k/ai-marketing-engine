@@ -28,7 +28,7 @@ The phase brief lists `docs/PRODUCT.md`, `ARCHITECTURE.md`, `DATABASE.md`, `AI_A
 names (confirmed by direct existence check, not by search miss). The following DO exist and were
 read:
 
-- `docs/PERFORMANCE_ENGINE.md` — describes the (unimplemented) campaign-performance *learning*
+- `docs/PERFORMANCE_ENGINE.md` — describes the (unimplemented) campaign-performance _learning_
   engine, a different subject from this phase's runtime/network/caching performance work. Not
   applicable to this audit beyond confirming it doesn't already cache anything sensitive.
 - `docs/PERFORMANCE_DATA_READINESS.md` — same subject, confirms `inquiries` is intentionally null;
@@ -99,19 +99,19 @@ observing live `Cache-Control` headers on a running deployment — see §13.
 
 ## 4. Baseline Performance Matrix
 
-| Area | Metric | Baseline | Measurement Method | Status |
-|------|--------|----------|--------------------|--------|
-| Frontend | JS bundle (shared floor) | 163 kB First Load JS | `next build` output | VERIFIED |
-| Frontend | JS bundle (heaviest route) | 312 kB (`/campaigns/[campaignId]`) | `next build` output | VERIFIED |
-| Frontend | image payload | `next/image` derivatives, not raw source size | code read (§7) | VERIFIED (mechanism), size NOT MEASURED (no running server to request a derivative from) |
-| Frontend | route rendering | 21 static / 2 dynamic routes | `next build` output | VERIFIED |
-| Frontend | hydration | all pages except a handful of shared UI atoms are `'use client'` (58 files) | `grep` count | VERIFIED (count), cost NOT MEASURED |
-| Backend | function latency | — | no emulator running | NOT MEASURED — TOOLING/ENVIRONMENT LIMITATION |
-| Backend | Firestore reads | 1 redundant read per `getAnalyticsDashboard` call (fixed, §8) | source read | OPTIMIZED |
-| Backend | AI latency | — | no emulator/live calls | NOT MEASURED — TOOLING/ENVIRONMENT LIMITATION |
-| Network | request count | — | no browser/network panel | NOT MEASURED — TOOLING/ENVIRONMENT LIMITATION |
-| Network | payload size | callable responses return aggregates, not raw collections (§9) | source read | VERIFIED (shape), bytes NOT MEASURED |
-| Cache | cache behavior | no `Cache-Control`/`revalidate`/`unstable_cache` usage found anywhere in `src/app` or Storage upload paths | `grep` (0 matches) | VERIFIED (absence confirmed, not assumed) |
+| Area     | Metric                     | Baseline                                                                                                   | Measurement Method       | Status                                                                                   |
+| -------- | -------------------------- | ---------------------------------------------------------------------------------------------------------- | ------------------------ | ---------------------------------------------------------------------------------------- |
+| Frontend | JS bundle (shared floor)   | 163 kB First Load JS                                                                                       | `next build` output      | VERIFIED                                                                                 |
+| Frontend | JS bundle (heaviest route) | 312 kB (`/campaigns/[campaignId]`)                                                                         | `next build` output      | VERIFIED                                                                                 |
+| Frontend | image payload              | `next/image` derivatives, not raw source size                                                              | code read (§7)           | VERIFIED (mechanism), size NOT MEASURED (no running server to request a derivative from) |
+| Frontend | route rendering            | 21 static / 2 dynamic routes                                                                               | `next build` output      | VERIFIED                                                                                 |
+| Frontend | hydration                  | all pages except a handful of shared UI atoms are `'use client'` (58 files)                                | `grep` count             | VERIFIED (count), cost NOT MEASURED                                                      |
+| Backend  | function latency           | —                                                                                                          | no emulator running      | NOT MEASURED — TOOLING/ENVIRONMENT LIMITATION                                            |
+| Backend  | Firestore reads            | 1 redundant read per `getAnalyticsDashboard` call (fixed, §8)                                              | source read              | OPTIMIZED                                                                                |
+| Backend  | AI latency                 | —                                                                                                          | no emulator/live calls   | NOT MEASURED — TOOLING/ENVIRONMENT LIMITATION                                            |
+| Network  | request count              | —                                                                                                          | no browser/network panel | NOT MEASURED — TOOLING/ENVIRONMENT LIMITATION                                            |
+| Network  | payload size               | callable responses return aggregates, not raw collections (§9)                                             | source read              | VERIFIED (shape), bytes NOT MEASURED                                                     |
+| Cache    | cache behavior             | no `Cache-Control`/`revalidate`/`unstable_cache` usage found anywhere in `src/app` or Storage upload paths | `grep` (0 matches)       | VERIFIED (absence confirmed, not assumed)                                                |
 
 ## 5. Frontend Audit
 
@@ -165,7 +165,7 @@ optimization mechanism; **NOT VERIFIED** in production per the risk above.
 **Finding**: `functions/src/functions/analytics/getAnalyticsDashboard.ts` called
 `verifyBusinessAccess(userId, businessId)` — which itself does a `businesses/{businessId}.get()`
 internally (`functions/src/middleware/auth.ts:22`) — and then, on the next line, called
-`getBusinessDoc(businessId)`, a *second*, fully redundant read of the exact same document, executed
+`getBusinessDoc(businessId)`, a _second_, fully redundant read of the exact same document, executed
 sequentially (two round trips instead of one).
 
 **Fix applied**: the two calls now run inside `Promise.all`, since neither depends on the other's
@@ -179,11 +179,12 @@ const [, business] = await Promise.all([
 ```
 
 **Why this is safe**:
+
 - Both calls are read-only; there is no ordering dependency between them.
 - If `verifyBusinessAccess` rejects, `Promise.all` rejects immediately and `business` is never read
   or returned — authorization-before-data-use is preserved exactly as before.
 - No credit, payment, or Truth Check logic is touched.
-- This does not eliminate the underlying duplicate Firestore *read* (that would require changing
+- This does not eliminate the underlying duplicate Firestore _read_ (that would require changing
   `verifyBusinessAccess`'s signature/return type, which is shared by every other authorization call
   site in the codebase — out of scope for a single-function performance fix, and a much larger,
   riskier change than the latency this saves).
@@ -195,8 +196,9 @@ passed, 0 failed (22 suites skipped, all emulator-backed — no emulator was run
 authorization/business-isolation guarantees hold with the concurrent read.
 
 **Other candidates found, not changed**:
+
 - `getCampaign.ts` also calls `verifyBusinessAccess` then `getCampaignDoc` sequentially — but these
-  read *different* documents (no redundant read), and the function already uses `Promise.all`
+  read _different_ documents (no redundant read), and the function already uses `Promise.all`
   correctly for its second, genuinely independent pair of reads (`getBusinessDoc` +
   `getProductDoc`). Parallelizing the first pair too would save at most one round trip for a
   marginal, unmeasured benefit; left unchanged to avoid touching more of the authorization path than
@@ -219,6 +221,7 @@ not exhaustive.
 ## 10. Firestore Listeners
 
 Two realtime patterns exist:
+
 - `GenerationProgress.tsx` (campaign generation) — polls `campaignService.get()` every 2500ms via
   `setTimeout`, stops at a terminal status, cleans up on unmount (`cancelled` flag +
   `clearTimeout`). This is a bounded poll (a single generation run, seconds to ~1 minute per the
@@ -250,13 +253,13 @@ calls were made in this session).
 
 ## 13. Cache Audit
 
-| Data | Cache? | Location | TTL | Invalidation | Tenant-safe? |
-|------|--------|----------|-----|--------------|--------------|
-| Authenticated app pages (`/dashboard`, `/campaigns`, etc.) | No | — | — | — | N/A (correctly uncached) |
-| Static/public assets (`/public/**`) | Browser default (no explicit `Cache-Control` set) | Next.js default static handling | framework default | framework default | Yes (non-tenant data) |
-| Storage-uploaded assets (product photos, campaign creatives) | No explicit `cacheControl` metadata found on any `uploadBytes`/signed-URL path | Firebase Storage | N/A | N/A | Tenant-safe by construction (per-object security rules), just not optimized for repeat-view speed |
-| Firestore reads (business, campaign, analytics) | No server-side memoization (`unstable_cache`, in-memory cache) anywhere in `functions/src` | — | — | — | N/A — always live |
-| Credit balance / reservation | Not cached anywhere (confirmed by grep — no cache-adjacent code near `usageControl.ts`/credit paths) | — | — | — | Correct — must stay live |
+| Data                                                         | Cache?                                                                                               | Location                        | TTL               | Invalidation      | Tenant-safe?                                                                                      |
+| ------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------- | ------------------------------- | ----------------- | ----------------- | ------------------------------------------------------------------------------------------------- |
+| Authenticated app pages (`/dashboard`, `/campaigns`, etc.)   | No                                                                                                   | —                               | —                 | —                 | N/A (correctly uncached)                                                                          |
+| Static/public assets (`/public/**`)                          | Browser default (no explicit `Cache-Control` set)                                                    | Next.js default static handling | framework default | framework default | Yes (non-tenant data)                                                                             |
+| Storage-uploaded assets (product photos, campaign creatives) | No explicit `cacheControl` metadata found on any `uploadBytes`/signed-URL path                       | Firebase Storage                | N/A               | N/A               | Tenant-safe by construction (per-object security rules), just not optimized for repeat-view speed |
+| Firestore reads (business, campaign, analytics)              | No server-side memoization (`unstable_cache`, in-memory cache) anywhere in `functions/src`           | —                               | —                 | —                 | N/A — always live                                                                                 |
+| Credit balance / reservation                                 | Not cached anywhere (confirmed by grep — no cache-adjacent code near `usageControl.ts`/credit paths) | —                               | —                 | —                 | Correct — must stay live                                                                          |
 
 No `unstable_cache`, `revalidate`, or custom in-memory cache was found anywhere in `src/` or
 `functions/src/`. This means: nothing is over-cached (good — no authorization/credit/Truth-Check
@@ -288,13 +291,13 @@ implemented speculatively.
 
 ## 15. Tests Run (original pass — see §Closure Validation for the re-run with a real emulator)
 
-| Suite | Result |
-|---|---|
-| `functions`: `tsc --noEmit` | 0 errors |
-| root: `tsc --noEmit` | 0 errors |
-| root: `next build` | succeeded, 21 static + 2 dynamic routes |
-| `functions`: `npm test` | 201 passed, 0 failed, 22 skipped (emulator-backed, no emulator running in that session) |
-| root: `npx jest` | 248 passed, 0 failed, 67 skipped (pre-existing skip set) |
+| Suite                       | Result                                                                                  |
+| --------------------------- | --------------------------------------------------------------------------------------- |
+| `functions`: `tsc --noEmit` | 0 errors                                                                                |
+| root: `tsc --noEmit`        | 0 errors                                                                                |
+| root: `next build`          | succeeded, 21 static + 2 dynamic routes                                                 |
+| `functions`: `npm test`     | 201 passed, 0 failed, 22 skipped (emulator-backed, no emulator running in that session) |
+| root: `npx jest`            | 248 passed, 0 failed, 67 skipped (pre-existing skip set)                                |
 
 No test was weakened, skipped, or deleted to make this report pass.
 
@@ -315,15 +318,15 @@ available in this environment) and ran the function's dedicated emulator test,
 `getAnalyticsDashboard.emulator.test.ts`, which exercises the exact authorization paths the
 optimization touches, against real Firestore documents (not mocks):
 
-| Scenario | Result |
-|---|---|
-| Business owner reads their own business's analytics, counts match seeded events exactly | PASS |
-| 7-day range correctly excludes an event seeded 30 days ago | PASS |
-| **Business A's owner cannot read Business B's analytics** (cross-tenant isolation) | PASS |
-| Authorized agency member CAN read an assigned client business | PASS |
-| Agency member from a **different** agency CANNOT read this client business | PASS |
-| Business with zero events in range returns real zeros, not an error | PASS |
-| Request for a nonexistent business is rejected with a "not found" error | PASS |
+| Scenario                                                                                | Result |
+| --------------------------------------------------------------------------------------- | ------ |
+| Business owner reads their own business's analytics, counts match seeded events exactly | PASS   |
+| 7-day range correctly excludes an event seeded 30 days ago                              | PASS   |
+| **Business A's owner cannot read Business B's analytics** (cross-tenant isolation)      | PASS   |
+| Authorized agency member CAN read an assigned client business                           | PASS   |
+| Agency member from a **different** agency CANNOT read this client business              | PASS   |
+| Business with zero events in range returns real zeros, not an error                     | PASS   |
+| Request for a nonexistent business is rejected with a "not found" error                 | PASS   |
 
 Result: **15/15 tests passed, 2/2 suites passed** (`getAnalyticsDashboard.test.ts` +
 `getAnalyticsDashboard.emulator.test.ts`), 0 failed. Log output from the run additionally confirms
@@ -345,15 +348,15 @@ production-measured latency (see C1a).
 recorded `latencyMs: 30` and `latencyMs: 11` for two `getAnalyticsDashboard` invocations during the
 test run. This is a genuine, observed number — **EMULATOR**, not production, not representative of
 real network/Firestore latency at production scale, and n=2 is not a benchmark. It is reported here
-only to be honest that *some* runtime number now exists, not to claim it validates a production
+only to be honest that _some_ runtime number now exists, not to claim it validates a production
 improvement.
 
 ### C2 — Full regression suite, re-run with the emulator actually running
 
-| Suite | Original session (no emulator) | Closure pass (real emulator) |
-|---|---|---|
-| `functions`: `npm test` | 201 passed / 0 failed / 22 skipped (19 of 41 suites ran) | **296 passed / 0 failed / 2 skipped (39 of 41 suites ran)** |
-| root: `npx jest` | 248 passed / 0 failed / 67 skipped | 248 passed / 0 failed / 67 skipped (unchanged — root tests don't depend on the Firestore emulator) |
+| Suite                   | Original session (no emulator)                           | Closure pass (real emulator)                                                                       |
+| ----------------------- | -------------------------------------------------------- | -------------------------------------------------------------------------------------------------- |
+| `functions`: `npm test` | 201 passed / 0 failed / 22 skipped (19 of 41 suites ran) | **296 passed / 0 failed / 2 skipped (39 of 41 suites ran)**                                        |
+| root: `npx jest`        | 248 passed / 0 failed / 67 skipped                       | 248 passed / 0 failed / 67 skipped (unchanged — root tests don't depend on the Firestore emulator) |
 
 20 additional emulator-gated suites ran and passed this time, none newly failing. Two suites
 (`verifyPayment.test.ts`, `razorpayWebhook.test.ts`) remained skipped despite gating on the same
@@ -376,15 +379,15 @@ The App Hosting URL from `docs/PHASE_19C_FIREBASE_APP_HOSTING_PRODUCTION_REPORT.
 this session's network (unlike the original pass). Direct `curl` requests were made — read-only,
 nothing deployed or changed:
 
-| Request | Result |
-|---|---|
-| `GET /` (landing page) | `200 OK` |
-| `GET /icon.png` (committed, deployed static asset) | `200 OK`, `cache-control: public, immutable, no-transform, max-age=31536000` |
-| `GET /brand/mitra-m.svg` (committed, deployed static asset) | `200 OK`, `cache-control: public, max-age=0` |
-| `GET /_next/image?url=%2Ficon.png&w=384&q=75` (optimize a real, deployed, committed asset) | **`404 Not Found`** (HTML 404 page, not an image) |
-| `GET /_next/image?url=%2Fbrand%2Fmitra-m.svg&w=128&q=75` | **`404 Not Found`** |
-| `GET /_next/image` (no params at all — should be `400` if the route existed, per Next.js's own validation) | **`404 Not Found`** |
-| `GET /_next/image?garbage=1` | **`404 Not Found`** |
+| Request                                                                                                    | Result                                                                       |
+| ---------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------- |
+| `GET /` (landing page)                                                                                     | `200 OK`                                                                     |
+| `GET /icon.png` (committed, deployed static asset)                                                         | `200 OK`, `cache-control: public, immutable, no-transform, max-age=31536000` |
+| `GET /brand/mitra-m.svg` (committed, deployed static asset)                                                | `200 OK`, `cache-control: public, max-age=0`                                 |
+| `GET /_next/image?url=%2Ficon.png&w=384&q=75` (optimize a real, deployed, committed asset)                 | **`404 Not Found`** (HTML 404 page, not an image)                            |
+| `GET /_next/image?url=%2Fbrand%2Fmitra-m.svg&w=128&q=75`                                                   | **`404 Not Found`**                                                          |
+| `GET /_next/image` (no params at all — should be `400` if the route existed, per Next.js's own validation) | **`404 Not Found`**                                                          |
+| `GET /_next/image?garbage=1`                                                                               | **`404 Not Found`**                                                          |
 
 Every request to `/_next/image` returns 404 unconditionally — including malformed requests that a
 functioning route would reject with `400`, not `404`. This means **the Image Optimization endpoint
@@ -446,13 +449,13 @@ static assets; not implemented speculatively, verified against production, not a
 
 ## 16. Risk Register
 
-| ID | Finding | Severity | Evidence | Impact | Recommendation | Status |
-|----|---------|----------|----------|--------|-----------------|--------|
-| R1 | `/_next/image` returns 404 unconditionally on the deployed App Hosting revision — the Image Optimization endpoint is not functioning | **High** (upgraded from Medium — confirmed, not theoretical) | Direct `curl` against the live production URL: valid asset, invalid asset, no params, and garbage params all return 404; deployed adapter reports `x-fah-adapter: nextjs-14.0.21` against a `^15.5.25` app (§Closure Validation C4) | `CampaignDetailContent.tsx` (already-committed, production code) uses `next/image` for campaign creative images from Firebase Storage — these likely render broken in production today | Investigate the App Hosting Next adapter/version alignment and redeploy; re-test `/_next/image` after. This is a deployment fix, not a code change this phase should make blindly | **CONFIRMED BROKEN — escalate as P1, separate from performance-phase scope** |
-| R2 | No long-lived `Cache-Control`/`immutable` headers on `/public/brand/**` (logos, mascot, marketing assets) | Low | Original: code read found no header rule. Closure: production probe shows `/icon.png` already gets `public, immutable, max-age=31536000` from the platform without any app-level header rule; `/brand/mitra-m.svg` gets only `public, max-age=0` (§Closure Validation C5) | Negligible — the platform already covers the main case (hashed/known static assets) | None needed now; optionally add an explicit rule for `/brand/**` specifically if it's ever shown to matter | **NO CHANGE REQUIRED — re-confirmed against production, not implemented speculatively** |
-| R3 | Core Web Vitals, real request waterfalls, Firestore read/write counts at scale, and AI provider latency are unmeasured | Medium (blocks full confidence in "performant enough for MVP") | No browser/Lighthouse tooling in this environment at any point in either pass; TTFB and n=2 emulator latency were obtained this pass (§Closure Validation C1a, C6) as partial, honestly-labeled data points | Cannot confirm or deny full real-world performance beyond code-level review + the partial data obtained | Run Lighthouse + sustained Firestore/function profiling in an environment with real browser + Cloud Monitoring access | **PARTIALLY UNBLOCKED (TTFB, emulator latency); Core Web Vitals/waterfalls/load testing remain BLOCKED** |
-| R4 | `getCampaign.ts`'s `verifyBusinessAccess` + `getCampaignDoc` sequential pair is a smaller, unmeasured latency opportunity, left unchanged | Low | Code read, §8 | One extra round trip per `getCampaign` call | Consider parallelizing if profiling in a real environment shows this path is hot | Open, deferred — no new evidence this pass changes this |
-| R5 | Two functions-test suites (`verifyPayment.test.ts`, `razorpayWebhook.test.ts`) stayed skipped even with the emulator running, despite gating on the same env check as suites that ran | Low | Observed in §Closure Validation C2; cause not identified within this pass's budget | Unknown — not attributable to the performance change (neither file touches anything this phase modified) | Investigate separately; not a performance-phase blocker | Open, unexplained, flagged rather than ignored |
+| ID  | Finding                                                                                                                                                                               | Severity                                                       | Evidence                                                                                                                                                                                                                                                                  | Impact                                                                                                                                                                                 | Recommendation                                                                                                                                                                    | Status                                                                                                   |
+| --- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------- |
+| R1  | `/_next/image` returns 404 unconditionally on the deployed App Hosting revision — the Image Optimization endpoint is not functioning                                                  | **High** (upgraded from Medium — confirmed, not theoretical)   | Direct `curl` against the live production URL: valid asset, invalid asset, no params, and garbage params all return 404; deployed adapter reports `x-fah-adapter: nextjs-14.0.21` against a `^15.5.25` app (§Closure Validation C4)                                       | `CampaignDetailContent.tsx` (already-committed, production code) uses `next/image` for campaign creative images from Firebase Storage — these likely render broken in production today | Investigate the App Hosting Next adapter/version alignment and redeploy; re-test `/_next/image` after. This is a deployment fix, not a code change this phase should make blindly | **CONFIRMED BROKEN — escalate as P1, separate from performance-phase scope**                             |
+| R2  | No long-lived `Cache-Control`/`immutable` headers on `/public/brand/**` (logos, mascot, marketing assets)                                                                             | Low                                                            | Original: code read found no header rule. Closure: production probe shows `/icon.png` already gets `public, immutable, max-age=31536000` from the platform without any app-level header rule; `/brand/mitra-m.svg` gets only `public, max-age=0` (§Closure Validation C5) | Negligible — the platform already covers the main case (hashed/known static assets)                                                                                                    | None needed now; optionally add an explicit rule for `/brand/**` specifically if it's ever shown to matter                                                                        | **NO CHANGE REQUIRED — re-confirmed against production, not implemented speculatively**                  |
+| R3  | Core Web Vitals, real request waterfalls, Firestore read/write counts at scale, and AI provider latency are unmeasured                                                                | Medium (blocks full confidence in "performant enough for MVP") | No browser/Lighthouse tooling in this environment at any point in either pass; TTFB and n=2 emulator latency were obtained this pass (§Closure Validation C1a, C6) as partial, honestly-labeled data points                                                               | Cannot confirm or deny full real-world performance beyond code-level review + the partial data obtained                                                                                | Run Lighthouse + sustained Firestore/function profiling in an environment with real browser + Cloud Monitoring access                                                             | **PARTIALLY UNBLOCKED (TTFB, emulator latency); Core Web Vitals/waterfalls/load testing remain BLOCKED** |
+| R4  | `getCampaign.ts`'s `verifyBusinessAccess` + `getCampaignDoc` sequential pair is a smaller, unmeasured latency opportunity, left unchanged                                             | Low                                                            | Code read, §8                                                                                                                                                                                                                                                             | One extra round trip per `getCampaign` call                                                                                                                                            | Consider parallelizing if profiling in a real environment shows this path is hot                                                                                                  | Open, deferred — no new evidence this pass changes this                                                  |
+| R5  | Two functions-test suites (`verifyPayment.test.ts`, `razorpayWebhook.test.ts`) stayed skipped even with the emulator running, despite gating on the same env check as suites that ran | Low                                                            | Observed in §Closure Validation C2; cause not identified within this pass's budget                                                                                                                                                                                        | Unknown — not attributable to the performance change (neither file touches anything this phase modified)                                                                               | Investigate separately; not a performance-phase blocker                                                                                                                           | Open, unexplained, flagged rather than ignored                                                           |
 
 ## 17. Remaining Work
 
@@ -469,16 +472,16 @@ static assets; not implemented speculatively, verified against production, not a
 
 ## 18. Final Performance Matrix
 
-| Area | Previous Status | Closure Result | Evidence | Final Status |
-|------|------------------|-----------------|----------|---------------|
-| Frontend | NO CHANGE REQUIRED | Bundle re-built, byte-identical (163 kB shared / 312 kB heaviest route) | §Closure Validation C3 | **NO CHANGE REQUIRED, re-confirmed** |
-| Backend | PARTIAL (logic-verified only) | `getAnalyticsDashboard` optimization re-verified against a real Firestore emulator; authorization/isolation confirmed at runtime | §Closure Validation C1, C1a | **VERIFIED (code + runtime-tested); production latency still not measured** |
-| Network | PARTIAL | Unchanged — payload shapes still spot-checked, not exhaustive; no waterfall tool available | §9, §Closure Validation C6 | PARTIAL, unchanged |
-| Caching | NO CHANGE REQUIRED | R2 re-examined against live production: platform already provides immutable caching for static assets | §Closure Validation C5 | **NO CHANGE REQUIRED, upgraded from speculative to production-verified** |
-| AI pipeline | NO CHANGE REQUIRED | Not re-examined this pass (no new evidence) — original finding stands | §12 | NO CHANGE REQUIRED, unchanged |
-| Firestore | PARTIAL (one instance fixed) | Same one fix, now runtime-verified; no new duplicate reads found | §Closure Validation C1 | **PARTIAL → the one known instance is now fully verified; broader audit still not exhaustive** |
-| Storage | NOT VERIFIED | Not re-examined this pass beyond what R2/C5 covers (public assets only, not user-uploaded private assets) | §Closure Validation C5 | NOT VERIFIED (private asset caching), unchanged |
-| Reels | NO CHANGE REQUIRED | Not re-examined this pass (no new evidence); original finding stands | §10 | NO CHANGE REQUIRED, unchanged |
+| Area        | Previous Status               | Closure Result                                                                                                                   | Evidence                    | Final Status                                                                                   |
+| ----------- | ----------------------------- | -------------------------------------------------------------------------------------------------------------------------------- | --------------------------- | ---------------------------------------------------------------------------------------------- |
+| Frontend    | NO CHANGE REQUIRED            | Bundle re-built, byte-identical (163 kB shared / 312 kB heaviest route)                                                          | §Closure Validation C3      | **NO CHANGE REQUIRED, re-confirmed**                                                           |
+| Backend     | PARTIAL (logic-verified only) | `getAnalyticsDashboard` optimization re-verified against a real Firestore emulator; authorization/isolation confirmed at runtime | §Closure Validation C1, C1a | **VERIFIED (code + runtime-tested); production latency still not measured**                    |
+| Network     | PARTIAL                       | Unchanged — payload shapes still spot-checked, not exhaustive; no waterfall tool available                                       | §9, §Closure Validation C6  | PARTIAL, unchanged                                                                             |
+| Caching     | NO CHANGE REQUIRED            | R2 re-examined against live production: platform already provides immutable caching for static assets                            | §Closure Validation C5      | **NO CHANGE REQUIRED, upgraded from speculative to production-verified**                       |
+| AI pipeline | NO CHANGE REQUIRED            | Not re-examined this pass (no new evidence) — original finding stands                                                            | §12                         | NO CHANGE REQUIRED, unchanged                                                                  |
+| Firestore   | PARTIAL (one instance fixed)  | Same one fix, now runtime-verified; no new duplicate reads found                                                                 | §Closure Validation C1      | **PARTIAL → the one known instance is now fully verified; broader audit still not exhaustive** |
+| Storage     | NOT VERIFIED                  | Not re-examined this pass beyond what R2/C5 covers (public assets only, not user-uploaded private assets)                        | §Closure Validation C5      | NOT VERIFIED (private asset caching), unchanged                                                |
+| Reels       | NO CHANGE REQUIRED            | Not re-examined this pass (no new evidence); original finding stands                                                             | §10                         | NO CHANGE REQUIRED, unchanged                                                                  |
 
 ## Files Changed
 
@@ -495,10 +498,12 @@ Vercel leftovers, Agency features) was touched.
 ## 19. Final Verdict
 
 ### Frontend Optimization
+
 NO CHANGE REQUIRED — re-confirmed by re-running the build; byte-identical output. Core Web Vitals
 remain unmeasured (BLOCKED — no browser tooling).
 
 ### Backend Optimization
+
 **VERIFIED at the code + runtime-test level** for the one change made (`getAnalyticsDashboard`):
 re-run against a real Firestore emulator, all 15 authorization/isolation tests pass, no security
 ordering regression. Production latency itself is still not measured (no Cloud Monitoring access) —
@@ -506,10 +511,12 @@ do not read "VERIFIED" here as a production latency claim, only as "the fix does
 do and doesn't break authorization."
 
 ### Network Optimization
+
 PARTIAL — unchanged from the original pass; no new evidence obtained this pass beyond what backend
 verification already covered.
 
 ### Caching Strategy
+
 **NO CHANGE REQUIRED, now production-verified** — the live App Hosting deployment already serves
 long-lived immutable caching for static assets (`/icon.png` confirmed via direct probe) without any
 app-level header rule; the original "open recommendation" (R2) is closed as unnecessary, not

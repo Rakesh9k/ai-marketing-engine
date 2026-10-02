@@ -5,21 +5,23 @@
 ## Credit reservation system
 
 Two implementations exist in `functions/src/services/`:
-- **`usageControl.ts`** — `reserveCreditsForOperation` / `finalizeReservation` / `refundReservation` / `executeWithUsageControl`, keyed by an `operationId`, Firestore-transactional, idempotency check performed *inside* the transaction. **This is the live, used system.**
+
+- **`usageControl.ts`** — `reserveCreditsForOperation` / `finalizeReservation` / `refundReservation` / `executeWithUsageControl`, keyed by an `operationId`, Firestore-transactional, idempotency check performed _inside_ the transaction. **This is the live, used system.**
 - **`firestore.ts`** — legacy `reserveCredits` / `confirmCredits` / `refundCredits`. `confirmCredits` and `refundCredits` have **zero call sites anywhere in the repo** — dead code, except that `reserveCredits` (the reservation half only) is still called by `createCampaign.ts` (see Critical Finding below).
 
 ## Operation → credit pipeline
 
-| Operation | Check | Reserve | Execute (AI) strictly after reserve | Finalize | Refund on failure | Idempotent vs retry | Verdict |
-|---|---|---|---|---|---|---|---|
-| `generateCampaignStrategy` | `executeWithUsageControl`, cost from server-side `getGenerationCost('campaign_generation')` | Yes | Yes (pipeline runs inside the callback) | Yes, incl. on Truth Check FAIL (intentionally charged) | Yes, on thrown error | Yes (checked in-transaction) | **REAL/PRODUCTION-READY** |
-| `regenerateAsset` | Same pattern, cost `getGenerationCost('regeneration')` | Yes | Yes | Yes | Yes | Yes, keyed by client-supplied per-attempt `idempotencyKey`, checked in-transaction | **REAL/PRODUCTION-READY** |
-| `generateReel` | Same pattern, plus a pre-check that short-circuits if reel status already in `analyzing/planning/rendering/completed` | Yes | Yes (AI clip analysis + ffmpeg render both inside the controlled callback) | Yes | Yes | Yes | **REAL/PRODUCTION-READY** |
-| `createCampaign` (legacy callable, still deployed) | Computes its own cost independently (`campaignBaseCredits + extraImages * imageGenerationCredits`) | Yes, via legacy `reserveCredits()` | N/A — **does no AI work at all** | **Never called** | **Never called** | N/A | **BROKEN / CRITICAL** |
+| Operation                                          | Check                                                                                                                 | Reserve                            | Execute (AI) strictly after reserve                                        | Finalize                                               | Refund on failure    | Idempotent vs retry                                                                | Verdict                   |
+| -------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------- | ---------------------------------- | -------------------------------------------------------------------------- | ------------------------------------------------------ | -------------------- | ---------------------------------------------------------------------------------- | ------------------------- |
+| `generateCampaignStrategy`                         | `executeWithUsageControl`, cost from server-side `getGenerationCost('campaign_generation')`                           | Yes                                | Yes (pipeline runs inside the callback)                                    | Yes, incl. on Truth Check FAIL (intentionally charged) | Yes, on thrown error | Yes (checked in-transaction)                                                       | **REAL/PRODUCTION-READY** |
+| `regenerateAsset`                                  | Same pattern, cost `getGenerationCost('regeneration')`                                                                | Yes                                | Yes                                                                        | Yes                                                    | Yes                  | Yes, keyed by client-supplied per-attempt `idempotencyKey`, checked in-transaction | **REAL/PRODUCTION-READY** |
+| `generateReel`                                     | Same pattern, plus a pre-check that short-circuits if reel status already in `analyzing/planning/rendering/completed` | Yes                                | Yes (AI clip analysis + ffmpeg render both inside the controlled callback) | Yes                                                    | Yes                  | Yes                                                                                | **REAL/PRODUCTION-READY** |
+| `createCampaign` (legacy callable, still deployed) | Computes its own cost independently (`campaignBaseCredits + extraImages * imageGenerationCredits`)                    | Yes, via legacy `reserveCredits()` | N/A — **does no AI work at all**                                           | **Never called**                                       | **Never called**     | N/A                                                                                | **BROKEN / CRITICAL**     |
 
 ## CRITICAL FINDING — `createCampaign` orphaned reservation
 
 `functions/src/functions/campaigns/createCampaign.ts` is exported live in `functions/src/index.ts` with `enforceAppCheck: true` — a real, currently-deployed, directly-invocable Cloud Function. It:
+
 - Reserves credits (increments `creditsUsed`, writes a `pending` transaction) via the legacy path.
 - Creates a `status: 'draft'` campaign document. No AI generation is invoked.
 - Never finalizes (`confirmCredits`) and never refunds (`refundCredits`) the reservation — both are dead code with zero call sites elsewhere.
@@ -35,7 +37,7 @@ Grepped every callable in `functions/src/functions/**` for AI-pipeline imports (
 
 ## Double-spend / retry safety
 
-`reserveCreditsForOperation` and legacy `reserveCredits` both perform their existing-transaction/idempotency check *inside* a single `db.runTransaction`, before any write — confirmed via code read, and per an in-code comment documenting a previously-real concurrency bug (140-credit double-reservation under load) that this in-transaction check now fixes. **REAL/PRODUCTION-READY** for the three live-used operations.
+`reserveCreditsForOperation` and legacy `reserveCredits` both perform their existing-transaction/idempotency check _inside_ a single `db.runTransaction`, before any write — confirmed via code read, and per an in-code comment documenting a previously-real concurrency bug (140-credit double-reservation under load) that this in-transaction check now fixes. **REAL/PRODUCTION-READY** for the three live-used operations.
 
 ## Server-side cost authority
 
@@ -52,10 +54,10 @@ Not independently re-derived this pass (would require live AI provider cost data
 
 ## Summary verdicts
 
-| Item | Verdict |
-|---|---|
-| Campaign strategy / regeneration / reel generation credit pipeline | REAL/PRODUCTION-READY |
-| `createCampaign` legacy callable | **BROKEN — CRITICAL, live credit-loss bug** |
-| Double-spend/retry protection | REAL/PRODUCTION-READY |
-| Server-side cost authority | REAL/PRODUCTION-READY |
-| Plan-tier feature enforcement | **NOT IMPLEMENTED** (credits-only; not a security vulnerability per se, but confirms no tier differentiation beyond raw credit balance) |
+| Item                                                               | Verdict                                                                                                                                 |
+| ------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------- |
+| Campaign strategy / regeneration / reel generation credit pipeline | REAL/PRODUCTION-READY                                                                                                                   |
+| `createCampaign` legacy callable                                   | **BROKEN — CRITICAL, live credit-loss bug**                                                                                             |
+| Double-spend/retry protection                                      | REAL/PRODUCTION-READY                                                                                                                   |
+| Server-side cost authority                                         | REAL/PRODUCTION-READY                                                                                                                   |
+| Plan-tier feature enforcement                                      | **NOT IMPLEMENTED** (credits-only; not a security vulnerability per se, but confirms no tier differentiation beyond raw credit balance) |

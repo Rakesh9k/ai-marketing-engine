@@ -12,6 +12,7 @@ verified (all nine named files confirmed absent by direct existence check) and i
 duplicated.
 
 Two real, verified gaps existed and were filled this phase:
+
 1. **No canonical API inventory existed anywhere.** Created `docs/API.md`, built by reading every
    `onCall`/`onRequest` registration in `functions/src/functions/**` and `functions/src/index.ts`,
    not by inferring from names.
@@ -31,7 +32,7 @@ contains comments asserting "the frontend is deployed by Vercel, not this workfl
 the App Hosting migration and not updated by the later commits that touched this same file (`Fix
 CI/CD workflow branch triggers and working-directory paths`, `Fix broken emulator-backed test jobs`).
 This is flagged, not edited, per the phase rule against modifying code without an actual
-documentation-caused bug — the workflow's *behavior* (build/lint/test frontend and functions, deploy
+documentation-caused bug — the workflow's _behavior_ (build/lint/test frontend and functions, deploy
 functions only) is unaffected by the stale comment; only the comment's claim is wrong.
 
 Large parts of the requested scope (a full `docs/USER_GUIDE.md`, tutorials, an exhaustive TSDoc pass,
@@ -41,21 +42,21 @@ done.
 
 ## Documentation Inventory
 
-| Document | Purpose | Audience | Current? | Accuracy | Action |
-|---|---|---|---|---|---|
-| `README.md` (root) | Setup, stack, commands, deployment | Developer/operator | Yes (actively maintained) | Was WRONG on deployment platform | **UPDATED** |
-| `docs/API.md` | Callable function inventory | Developer | N/A — did not exist | N/A | **CREATED** |
-| `docs/README.md` | Documentation index | Everyone | N/A — did not exist | N/A | **CREATED** |
-| `docs/ARCHITECTURE_AI_CONTEXT.md` | Architecture context | Developer | Not re-verified line-by-line this pass | Not re-verified | NO CHANGE REQUIRED (out of this pass's time budget to fully re-verify; not found to be wrong where spot-checked) |
-| `docs/ARCHITECTURE_DISCOVERY_REPORT.md` | Architecture discovery | Developer | Historical audit | Historical | KEEP (historical) |
-| `docs/PRODUCTION_FRONTEND_DEPLOYMENT_ARCHITECTURE.md` | Hosting options audit | Operator | Written *before* App Hosting was actually deployed; recommends Vercel | Its own §18 explicitly flags Vercel vs. App Hosting as a close call, resolved afterward by Phase 19C | KEEP, now cross-referenced from `docs/README.md` and the root README with a note that Phase 19C is what actually happened |
-| `docs/PERFORMANCE_ENGINE.md`, `docs/PERFORMANCE_DATA_READINESS.md` | Performance-learning-engine readiness | Developer | Current, self-consistent | Verified consistent with each other | NO CHANGE REQUIRED |
-| `docs/PERFORMANCE_OPTIMIZATION_AUDIT_REPORT.md` | Runtime performance audit | Developer | Current (this session's prior phase) | Verified | NO CHANGE REQUIRED — cross-checked, no contradiction introduced |
-| `docs/OBSERVABILITY_AUDIT_REPORT.md` | Observability audit | Developer/operator | Current | Not re-verified line-by-line this pass | NO CHANGE REQUIRED |
-| `docs/PHASE_36_FINAL_MITRA_READINESS_REPORT.md` | Evidence-based per-area product status | Everyone | Current, explicitly the authoritative status doc | Treated as authoritative per its own design | KEEP |
-| 40+ other `docs/PHASE_*.md` files | Per-phase implementation/verification record | Developer | Historical by design | Historical | KEEP (historical, now indexed) |
-| `.env.example` | Environment variable template | Developer | Verified against README's env table (§Environment Documentation) | Consistent | NO CHANGE REQUIRED |
-| `.github/workflows/ci-cd.yml` | CI/CD pipeline | Developer/operator | Behavior current; **comments stale** re: frontend hosting | Flagged, not edited (see Executive Summary) | **FLAGGED, not modified** |
+| Document                                                           | Purpose                                      | Audience           | Current?                                                              | Accuracy                                                                                             | Action                                                                                                                    |
+| ------------------------------------------------------------------ | -------------------------------------------- | ------------------ | --------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------- |
+| `README.md` (root)                                                 | Setup, stack, commands, deployment           | Developer/operator | Yes (actively maintained)                                             | Was WRONG on deployment platform                                                                     | **UPDATED**                                                                                                               |
+| `docs/API.md`                                                      | Callable function inventory                  | Developer          | N/A — did not exist                                                   | N/A                                                                                                  | **CREATED**                                                                                                               |
+| `docs/README.md`                                                   | Documentation index                          | Everyone           | N/A — did not exist                                                   | N/A                                                                                                  | **CREATED**                                                                                                               |
+| `docs/ARCHITECTURE_AI_CONTEXT.md`                                  | Architecture context                         | Developer          | Not re-verified line-by-line this pass                                | Not re-verified                                                                                      | NO CHANGE REQUIRED (out of this pass's time budget to fully re-verify; not found to be wrong where spot-checked)          |
+| `docs/ARCHITECTURE_DISCOVERY_REPORT.md`                            | Architecture discovery                       | Developer          | Historical audit                                                      | Historical                                                                                           | KEEP (historical)                                                                                                         |
+| `docs/PRODUCTION_FRONTEND_DEPLOYMENT_ARCHITECTURE.md`              | Hosting options audit                        | Operator           | Written _before_ App Hosting was actually deployed; recommends Vercel | Its own §18 explicitly flags Vercel vs. App Hosting as a close call, resolved afterward by Phase 19C | KEEP, now cross-referenced from `docs/README.md` and the root README with a note that Phase 19C is what actually happened |
+| `docs/PERFORMANCE_ENGINE.md`, `docs/PERFORMANCE_DATA_READINESS.md` | Performance-learning-engine readiness        | Developer          | Current, self-consistent                                              | Verified consistent with each other                                                                  | NO CHANGE REQUIRED                                                                                                        |
+| `docs/PERFORMANCE_OPTIMIZATION_AUDIT_REPORT.md`                    | Runtime performance audit                    | Developer          | Current (this session's prior phase)                                  | Verified                                                                                             | NO CHANGE REQUIRED — cross-checked, no contradiction introduced                                                           |
+| `docs/OBSERVABILITY_AUDIT_REPORT.md`                               | Observability audit                          | Developer/operator | Current                                                               | Not re-verified line-by-line this pass                                                               | NO CHANGE REQUIRED                                                                                                        |
+| `docs/PHASE_36_FINAL_MITRA_READINESS_REPORT.md`                    | Evidence-based per-area product status       | Everyone           | Current, explicitly the authoritative status doc                      | Treated as authoritative per its own design                                                          | KEEP                                                                                                                      |
+| 40+ other `docs/PHASE_*.md` files                                  | Per-phase implementation/verification record | Developer          | Historical by design                                                  | Historical                                                                                           | KEEP (historical, now indexed)                                                                                            |
+| `.env.example`                                                     | Environment variable template                | Developer          | Verified against README's env table (§Environment Documentation)      | Consistent                                                                                           | NO CHANGE REQUIRED                                                                                                        |
+| `.github/workflows/ci-cd.yml`                                      | CI/CD pipeline                               | Developer/operator | Behavior current; **comments stale** re: frontend hosting             | Flagged, not edited (see Executive Summary)                                                          | **FLAGGED, not modified**                                                                                                 |
 
 Full historical-report grouping is in the new `docs/README.md` rather than repeated here.
 
@@ -80,7 +81,7 @@ Phase reports, not invented.
 
 - Deployment architecture: **corrected** (README, see Executive Summary). Verified current state by
   reading `docs/PHASE_19C_FIREBASE_APP_HOSTING_PRODUCTION_REPORT.md` and confirming `apphosting.yaml`
-  + the `apphosting` block in `firebase.json` exist in the repo (they do).
+  - the `apphosting` block in `firebase.json` exist in the repo (they do).
 - Data model (`docs/DATABASE.md`): does not exist, and was not created this pass. The nearest
   equivalent is scattered across `functions/src/types` and individual Phase reports (e.g. Phase 10
   for credits/transactions, Phase 32 for `analytics_events`, Phase 34 for `campaign_performance`).
@@ -124,10 +125,10 @@ compounding any small inaccuracy; recorded as a genuine remaining gap, not a sil
 
 ## Documentation Accuracy — Discrepancy Found and Resolved
 
-| Discrepancy | Where | Authoritative source | Resolution |
-|---|---|---|---|
-| Frontend deploys via Vercel | Root `README.md`, Technology Stack table + Git Workflow section | `docs/PHASE_19C_FIREBASE_APP_HOSTING_PRODUCTION_REPORT.md` (2026-09-21, live-verified) — App Hosting is the current target, Vercel is explicitly "NOT USED" | README updated to state Firebase App Hosting, with the architecture diagram and links to the verifying reports; branch name corrected from `main` to the repo's actual default branch `master` (`staging` branch reference removed — not evidenced anywhere in the repo) |
-| CI/CD comments say frontend is deployed by Vercel | `.github/workflows/ci-cd.yml` (comments only) | Same as above | **Flagged, not edited** — comment-only staleness, doesn't change job behavior, and editing CI config is outside a documentation-only phase's remit per the "do not modify application code unless a documentation inconsistency reveals an actual bug" rule. Recorded here so a future infra-focused pass can fix it deliberately. |
+| Discrepancy                                       | Where                                                           | Authoritative source                                                                                                                                        | Resolution                                                                                                                                                                                                                                                                                                                         |
+| ------------------------------------------------- | --------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Frontend deploys via Vercel                       | Root `README.md`, Technology Stack table + Git Workflow section | `docs/PHASE_19C_FIREBASE_APP_HOSTING_PRODUCTION_REPORT.md` (2026-09-21, live-verified) — App Hosting is the current target, Vercel is explicitly "NOT USED" | README updated to state Firebase App Hosting, with the architecture diagram and links to the verifying reports; branch name corrected from `main` to the repo's actual default branch `master` (`staging` branch reference removed — not evidenced anywhere in the repo)                                                           |
+| CI/CD comments say frontend is deployed by Vercel | `.github/workflows/ci-cd.yml` (comments only)                   | Same as above                                                                                                                                               | **Flagged, not edited** — comment-only staleness, doesn't change job behavior, and editing CI config is outside a documentation-only phase's remit per the "do not modify application code unless a documentation inconsistency reveals an actual bug" rule. Recorded here so a future infra-focused pass can fix it deliberately. |
 
 No other code/documentation disagreement was found in the files read this pass.
 
@@ -153,14 +154,14 @@ adding one was out of scope per "do not add a large documentation toolchain sole
 
 ## Missing Documentation
 
-| Gap | Why it matters | Status |
-|---|---|---|
-| `docs/DATABASE.md` (consolidated data model) | New developers currently have to read Phase reports + TypeScript types to reconstruct the schema | Still open — not created |
-| `docs/SECURITY.md` (consolidated security architecture) | Security facts are correct but scattered across 6+ documents | **CREATED** in the follow-up phase — see §Documentation Changes below |
-| `docs/USER_GUIDE.md` | No single customer-facing walkthrough exists | **CREATED** in the follow-up phase |
-| Tutorials (§28 of the follow-up phase's brief) | None exist | Still open — deliberately deferred until the user guide has been reviewed once |
-| Full TSDoc pass on public service functions | Some services have good WHY-comments already (spot-checked); coverage not verified exhaustively | Still open |
-| `docs/AI_ARCHITECTURE.md` (consolidated) | AI pipeline facts scattered across Phase 5/6/7 reports | Still open |
+| Gap                                                     | Why it matters                                                                                   | Status                                                                         |
+| ------------------------------------------------------- | ------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------ |
+| `docs/DATABASE.md` (consolidated data model)            | New developers currently have to read Phase reports + TypeScript types to reconstruct the schema | Still open — not created                                                       |
+| `docs/SECURITY.md` (consolidated security architecture) | Security facts are correct but scattered across 6+ documents                                     | **CREATED** in the follow-up phase — see §Documentation Changes below          |
+| `docs/USER_GUIDE.md`                                    | No single customer-facing walkthrough exists                                                     | **CREATED** in the follow-up phase                                             |
+| Tutorials (§28 of the follow-up phase's brief)          | None exist                                                                                       | Still open — deliberately deferred until the user guide has been reviewed once |
+| Full TSDoc pass on public service functions             | Some services have good WHY-comments already (spot-checked); coverage not verified exhaustively  | Still open                                                                     |
+| `docs/AI_ARCHITECTURE.md` (consolidated)                | AI pipeline facts scattered across Phase 5/6/7 reports                                           | Still open                                                                     |
 
 These are genuine open items, not silently dropped — each is carried into §Remaining Gaps.
 
@@ -205,11 +206,11 @@ for documentation verification"). Verification performed instead:
 
 ## Security-Sensitive Documentation
 
-`docs/API.md` documents *that* App Check/rate-limiting/authorization exist and where, but
+`docs/API.md` documents _that_ App Check/rate-limiting/authorization exist and where, but
 deliberately does not restate exact rate-limit thresholds (pointing to the rate-limit Phase reports
 instead, since those values are tuned and change) or reproduce Firestore/Storage rule text verbatim.
 No secret value, credential, DSN, or webhook secret was written into any document this phase — the
-Razorpay key note in `docs/API.md` states only that the *configured mode* is `rzp_test_...` (test),
+Razorpay key note in `docs/API.md` states only that the _configured mode_ is `rzp_test_...` (test),
 not any secret value, sourced from an existing report (`PHASE_19C_FIREBASE_APP_HOSTING_PRODUCTION_REPORT.md`),
 not discovered independently.
 
@@ -241,15 +242,15 @@ Secret pattern scan performed against both new documents (`AIza`, `sk-`, `rzp_li
 
 ## Risk Register
 
-| ID | Finding | Severity | Evidence | Impact | Action | Status |
-|----|---------|----------|----------|--------|--------|--------|
-| D1 | Root README claimed Vercel deployment; actual is Firebase App Hosting | Medium | `docs/PHASE_19C_FIREBASE_APP_HOSTING_PRODUCTION_REPORT.md` §11 | A new developer/operator would configure or debug the wrong platform | Fixed this phase | FIXED |
-| D2 | `.github/workflows/ci-cd.yml` comments still assert Vercel deploys the frontend | Low | File read, contradicts D1's resolution | Misleading to a future maintainer reading the workflow, though job behavior is unaffected | Flag for a future infra-focused change (comment-only edit) | OPEN |
-| D3 | No consolidated `docs/DATABASE.md` exists (`docs/SECURITY.md` created in the follow-up phase, no longer part of this finding) | Low–Medium | Confirmed absent | Slower onboarding for new engineers reconstructing the data model | Create in a future documentation pass | OPEN (narrowed — security half CLOSED) |
-| D4 | No user-facing guide existed | Medium (blocked the "user documentation" objective) | Confirmed absent at the time | Customers/support had no single reference | `docs/USER_GUIDE.md` created and source-verified in the follow-up phase | **CLOSED** — tutorials remain a separate, still-open item (see D6) |
-| D5 | No link-checker tooling exists; pre-existing documents' internal links not exhaustively verified | Low | No tool found in `package.json`/repo | A pre-existing broken link elsewhere in `docs/` could be undiscovered | Add a lightweight link check only if/when justified — not done speculatively | OPEN |
-| D6 | Tutorials (per the follow-up phase's own §28) were deliberately deferred | Low | `docs/USER_GUIDE.md` exists; tutorials do not | New customers have no step-by-step walkthrough beyond the guide's own workflow section | Create only once the guide has been used/reviewed at least once, per that phase's own instruction not to create tutorials merely to raise completion | OPEN, deliberately deferred |
-| D7 | Razorpay webhook signature comparison uses `===`, not a constant-time comparison | Low (theoretical timing side-channel) | `functions/src/services/razorpay.ts`, quoted in `docs/SECURITY.md` §15 | A discovered-during-documentation code finding, not a documentation defect | Recorded in `docs/SECURITY.md` §28 as a known gap; fixing it is a code change, explicitly out of scope for a documentation-only phase | OPEN, flagged not fixed |
+| ID  | Finding                                                                                                                       | Severity                                            | Evidence                                                               | Impact                                                                                    | Action                                                                                                                                               | Status                                                             |
+| --- | ----------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------- | ---------------------------------------------------------------------- | ----------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------ |
+| D1  | Root README claimed Vercel deployment; actual is Firebase App Hosting                                                         | Medium                                              | `docs/PHASE_19C_FIREBASE_APP_HOSTING_PRODUCTION_REPORT.md` §11         | A new developer/operator would configure or debug the wrong platform                      | Fixed this phase                                                                                                                                     | FIXED                                                              |
+| D2  | `.github/workflows/ci-cd.yml` comments still assert Vercel deploys the frontend                                               | Low                                                 | File read, contradicts D1's resolution                                 | Misleading to a future maintainer reading the workflow, though job behavior is unaffected | Flag for a future infra-focused change (comment-only edit)                                                                                           | OPEN                                                               |
+| D3  | No consolidated `docs/DATABASE.md` exists (`docs/SECURITY.md` created in the follow-up phase, no longer part of this finding) | Low–Medium                                          | Confirmed absent                                                       | Slower onboarding for new engineers reconstructing the data model                         | Create in a future documentation pass                                                                                                                | OPEN (narrowed — security half CLOSED)                             |
+| D4  | No user-facing guide existed                                                                                                  | Medium (blocked the "user documentation" objective) | Confirmed absent at the time                                           | Customers/support had no single reference                                                 | `docs/USER_GUIDE.md` created and source-verified in the follow-up phase                                                                              | **CLOSED** — tutorials remain a separate, still-open item (see D6) |
+| D5  | No link-checker tooling exists; pre-existing documents' internal links not exhaustively verified                              | Low                                                 | No tool found in `package.json`/repo                                   | A pre-existing broken link elsewhere in `docs/` could be undiscovered                     | Add a lightweight link check only if/when justified — not done speculatively                                                                         | OPEN                                                               |
+| D6  | Tutorials (per the follow-up phase's own §28) were deliberately deferred                                                      | Low                                                 | `docs/USER_GUIDE.md` exists; tutorials do not                          | New customers have no step-by-step walkthrough beyond the guide's own workflow section    | Create only once the guide has been used/reviewed at least once, per that phase's own instruction not to create tutorials merely to raise completion | OPEN, deliberately deferred                                        |
+| D7  | Razorpay webhook signature comparison uses `===`, not a constant-time comparison                                              | Low (theoretical timing side-channel)               | `functions/src/services/razorpay.ts`, quoted in `docs/SECURITY.md` §15 | A discovered-during-documentation code finding, not a documentation defect                | Recorded in `docs/SECURITY.md` §28 as a known gap; fixing it is a code change, explicitly out of scope for a documentation-only phase                | OPEN, flagged not fixed                                            |
 
 ## Remaining Gaps
 
@@ -267,39 +268,44 @@ Secret pattern scan performed against both new documents (`AIza`, `sk-`, `rzp_li
 
 ## Final Documentation Matrix
 
-| Area | Document | Audience | Accuracy | Completeness | Status |
-|------|----------|----------|----------|---------------|--------|
-| API | `docs/API.md` | Developer | Verified against code | Auth/App Check/rate-limit/errors complete; per-field schemas intentionally not duplicated | COMPLETE for its stated scope |
-| Architecture | `README.md` + `docs/PRODUCTION_FRONTEND_DEPLOYMENT_ARCHITECTURE.md` + Phase 19C reports | Engineer/Operator | Corrected | Deployment now accurate; consolidated architecture doc still missing | PARTIAL |
-| Security | `docs/SECURITY.md` (new, consolidated) | Engineer/Auditor | Source/test-verified; unverifiable claims explicitly marked NOT VERIFIED | Covers all 29 sections the follow-up phase's brief asked for; one new gap discovered (D7) and disclosed, not hidden | **COMPLETE for its stated scope** |
-| Database | Scattered across Phase 10/32/34 + types | Engineer | Not independently re-verified | No consolidated document | NOT VERIFIED / gap |
-| AI | Scattered across Phase 5/6/7 + `docs/API.md` pointers | Engineer | Accurate where checked | Not consolidated | PARTIAL |
-| Deployment | `README.md` (updated) + Phase 19C/20C reports | Operator | Corrected | Current state documented; GitHub-linked continuous deployment explicitly marked pending, not assumed done | PARTIAL — accurate, not exhaustive |
-| User Guide | `docs/USER_GUIDE.md` (new) | Customer | Source-verified against onboarding/pricing/Truth Check/regeneration code | Covers all sections the follow-up phase's brief asked for that correspond to real functionality; sections for non-implemented features explicitly say so | **COMPLETE for the current implementation** |
-| Tutorial | — | Customer | N/A | Does not exist | DEFERRED (D6) — intentional, not a false completion |
-| Code docs | Spot-checked, TODO/FIXME audit complete (zero found) | Developer | Accurate where checked | Not exhaustive | PARTIAL |
-| Secrets safety | Both new documents | Everyone | Pattern-scanned (`AIza`, `sk-`, `rzp_live_`, private-key header, `password=`, `secret=`, `token=`) | Zero matches found | **VERIFIED** |
+| Area           | Document                                                                                | Audience          | Accuracy                                                                                           | Completeness                                                                                                                                             | Status                                              |
+| -------------- | --------------------------------------------------------------------------------------- | ----------------- | -------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------- |
+| API            | `docs/API.md`                                                                           | Developer         | Verified against code                                                                              | Auth/App Check/rate-limit/errors complete; per-field schemas intentionally not duplicated                                                                | COMPLETE for its stated scope                       |
+| Architecture   | `README.md` + `docs/PRODUCTION_FRONTEND_DEPLOYMENT_ARCHITECTURE.md` + Phase 19C reports | Engineer/Operator | Corrected                                                                                          | Deployment now accurate; consolidated architecture doc still missing                                                                                     | PARTIAL                                             |
+| Security       | `docs/SECURITY.md` (new, consolidated)                                                  | Engineer/Auditor  | Source/test-verified; unverifiable claims explicitly marked NOT VERIFIED                           | Covers all 29 sections the follow-up phase's brief asked for; one new gap discovered (D7) and disclosed, not hidden                                      | **COMPLETE for its stated scope**                   |
+| Database       | Scattered across Phase 10/32/34 + types                                                 | Engineer          | Not independently re-verified                                                                      | No consolidated document                                                                                                                                 | NOT VERIFIED / gap                                  |
+| AI             | Scattered across Phase 5/6/7 + `docs/API.md` pointers                                   | Engineer          | Accurate where checked                                                                             | Not consolidated                                                                                                                                         | PARTIAL                                             |
+| Deployment     | `README.md` (updated) + Phase 19C/20C reports                                           | Operator          | Corrected                                                                                          | Current state documented; GitHub-linked continuous deployment explicitly marked pending, not assumed done                                                | PARTIAL — accurate, not exhaustive                  |
+| User Guide     | `docs/USER_GUIDE.md` (new)                                                              | Customer          | Source-verified against onboarding/pricing/Truth Check/regeneration code                           | Covers all sections the follow-up phase's brief asked for that correspond to real functionality; sections for non-implemented features explicitly say so | **COMPLETE for the current implementation**         |
+| Tutorial       | —                                                                                       | Customer          | N/A                                                                                                | Does not exist                                                                                                                                           | DEFERRED (D6) — intentional, not a false completion |
+| Code docs      | Spot-checked, TODO/FIXME audit complete (zero found)                                    | Developer         | Accurate where checked                                                                             | Not exhaustive                                                                                                                                           | PARTIAL                                             |
+| Secrets safety | Both new documents                                                                      | Everyone          | Pattern-scanned (`AIza`, `sk-`, `rzp_live_`, private-key header, `password=`, `secret=`, `token=`) | Zero matches found                                                                                                                                       | **VERIFIED**                                        |
 
 ## Final Verdict
 
 ### API Documentation
+
 **COMPLETE** for the scope it declares (existence, auth/App Check/rate-limit posture, error
 semantics, credit/Truth Check/payment pointers) — verified against code, not inferred.
 
 ### Technical Documentation
+
 **PARTIAL** — deployment inaccuracy fixed; security is now consolidated and complete for its scope;
 database and AI-architecture consolidation remain open gaps.
 
 ### User Guides & Tutorials
+
 **PARTIAL** — the user guide itself is now **COMPLETE** for the current implementation, source-verified
 section by section; tutorials remain a deliberately deferred, genuine gap (D6), not fabricated as
 done.
 
 ### Code Documentation
+
 **PARTIAL** — TODO/FIXME audit complete (clean); comment-accuracy spot-checks passed, including the
 security-sensitive files read for `docs/SECURITY.md`; not exhaustive across the full codebase.
 
 ### Overall Documentation
+
 **PARTIAL** — the two highest-value missing documents (`docs/USER_GUIDE.md`, `docs/SECURITY.md`)
 are now complete and source-verified, on top of the original phase's API inventory, documentation
 index, and deployment-platform correction. Genuine remaining gaps (a consolidated database

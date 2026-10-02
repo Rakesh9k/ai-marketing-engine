@@ -23,26 +23,26 @@ this repo's workflow files.
 
 ## 2. Backend inventory
 
-| Property | `ai-marketing-engine` | `mitra-web` |
-|---|---|---|
-| Backend ID | `ai-marketing-engine` | `mitra-web` |
-| Firebase project | `brainwise-ai-marketing-engine` | `brainwise-ai-marketing-engine` |
-| Region | `asia-southeast1` | `asia-southeast1` |
-| Hosted URL | `ai-marketing-engine--brainwise-ai-marketing-engine.asia-southeast1.hosted.app` | `mitra-web--brainwise-ai-marketing-engine.asia-southeast1.hosted.app` |
-| Create time | 2026-09-22T05:50:15 UTC | 2026-09-21T10:48:05 UTC |
-| Last update time (per API) | 2026-09-22T08:06:37 UTC | 2026-09-22T14:46:09 UTC (this session's CLI deploy) |
-| Creation labels | none (`deployment-tool` label absent) | `deployment-tool: cli-firebase` |
-| Repository link (`codebase.repository`) | `.../connections/apphosting-github-conn-dhsk43e/gitRepositoryLinks/Rakesh9k-ai-marketing-engine` | **identical string** — same GitHub connection resource |
-| Root directory | `/` | `/` |
-| Runtime | `nodejs24` | `nodejs24` (was `nodejs22` at Phase 19C creation, per that report — appears to have been auto-upgraded or updated since) |
-| App ID (`appId`) | `1:691254604957:web:caf76181c86efb6a7b5074` | identical — same Firebase Web App resource |
-| Service account | `firebase-app-hosting-compute@...` | identical |
-| Managed Cloud Run service | `projects/691254604957/locations/asia-southeast1/services/ai-marketing-engine` | `.../services/mitra-web` |
-| Custom domain (see §3) | **`www.brain-wise.com`** (strong indirect evidence) | none observed |
-| Secret configuration | Not independently visible via CLI metadata for either backend (no secrets field surfaced by `apphosting:backends:get`) | same limitation |
-| Live branch / auto-deploy flag | **Not exposed by any `firebase apphosting:backends:*` CLI command available in this environment** — see Stop Conditions note below | same limitation |
-| GitHub App integration existence | The `codebase.repository` field proves a GitHub *connection resource* exists and is shared by both backends — this does **not** by itself prove which backend (if either, or both) has automatic-rollout-on-push actually enabled; that flag lives in App Hosting's rollout/trigger config, which this CLI does not surface | same limitation |
-| Intended role | See §9 — evidence points to this being the **currently-live production frontend** by virtue of serving the custom domain, but not necessarily the *intended* one | See §9 — evidence points to this being the **originally-intended** production backend per its own creation documentation |
+| Property                                | `ai-marketing-engine`                                                                                                                                                                                                                                                                                                       | `mitra-web`                                                                                                              |
+| --------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------ |
+| Backend ID                              | `ai-marketing-engine`                                                                                                                                                                                                                                                                                                       | `mitra-web`                                                                                                              |
+| Firebase project                        | `brainwise-ai-marketing-engine`                                                                                                                                                                                                                                                                                             | `brainwise-ai-marketing-engine`                                                                                          |
+| Region                                  | `asia-southeast1`                                                                                                                                                                                                                                                                                                           | `asia-southeast1`                                                                                                        |
+| Hosted URL                              | `ai-marketing-engine--brainwise-ai-marketing-engine.asia-southeast1.hosted.app`                                                                                                                                                                                                                                             | `mitra-web--brainwise-ai-marketing-engine.asia-southeast1.hosted.app`                                                    |
+| Create time                             | 2026-09-22T05:50:15 UTC                                                                                                                                                                                                                                                                                                     | 2026-09-21T10:48:05 UTC                                                                                                  |
+| Last update time (per API)              | 2026-09-22T08:06:37 UTC                                                                                                                                                                                                                                                                                                     | 2026-09-22T14:46:09 UTC (this session's CLI deploy)                                                                      |
+| Creation labels                         | none (`deployment-tool` label absent)                                                                                                                                                                                                                                                                                       | `deployment-tool: cli-firebase`                                                                                          |
+| Repository link (`codebase.repository`) | `.../connections/apphosting-github-conn-dhsk43e/gitRepositoryLinks/Rakesh9k-ai-marketing-engine`                                                                                                                                                                                                                            | **identical string** — same GitHub connection resource                                                                   |
+| Root directory                          | `/`                                                                                                                                                                                                                                                                                                                         | `/`                                                                                                                      |
+| Runtime                                 | `nodejs24`                                                                                                                                                                                                                                                                                                                  | `nodejs24` (was `nodejs22` at Phase 19C creation, per that report — appears to have been auto-upgraded or updated since) |
+| App ID (`appId`)                        | `1:691254604957:web:caf76181c86efb6a7b5074`                                                                                                                                                                                                                                                                                 | identical — same Firebase Web App resource                                                                               |
+| Service account                         | `firebase-app-hosting-compute@...`                                                                                                                                                                                                                                                                                          | identical                                                                                                                |
+| Managed Cloud Run service               | `projects/691254604957/locations/asia-southeast1/services/ai-marketing-engine`                                                                                                                                                                                                                                              | `.../services/mitra-web`                                                                                                 |
+| Custom domain (see §3)                  | **`www.brain-wise.com`** (strong indirect evidence)                                                                                                                                                                                                                                                                         | none observed                                                                                                            |
+| Secret configuration                    | Not independently visible via CLI metadata for either backend (no secrets field surfaced by `apphosting:backends:get`)                                                                                                                                                                                                      | same limitation                                                                                                          |
+| Live branch / auto-deploy flag          | **Not exposed by any `firebase apphosting:backends:*` CLI command available in this environment** — see Stop Conditions note below                                                                                                                                                                                          | same limitation                                                                                                          |
+| GitHub App integration existence        | The `codebase.repository` field proves a GitHub _connection resource_ exists and is shared by both backends — this does **not** by itself prove which backend (if either, or both) has automatic-rollout-on-push actually enabled; that flag lives in App Hosting's rollout/trigger config, which this CLI does not surface | same limitation                                                                                                          |
+| Intended role                           | See §9 — evidence points to this being the **currently-live production frontend** by virtue of serving the custom domain, but not necessarily the _intended_ one                                                                                                                                                            | See §9 — evidence points to this being the **originally-intended** production backend per its own creation documentation |
 
 ## 3. Custom-domain mapping
 
@@ -56,7 +56,7 @@ denied by the permission system, and this audit did not repeat or route around t
 **Strong indirect evidence, cross-checked three independent ways, all agreeing:**
 
 1. **Cache-tag header match**: `https://www.brain-wise.com/` returns `cache-tag:
-   691254604957:ai-marketing-engine`. `https://ai-marketing-engine--....hosted.app/` returns the
+691254604957:ai-marketing-engine`. `https://ai-marketing-engine--....hosted.app/` returns the
    **identical** cache-tag. `https://mitra-web--....hosted.app/` was not re-checked for its own
    cache-tag this pass, but its route behavior (below) is independently conclusive.
 2. **Route-availability fingerprint**: `www.brain-wise.com/terms` → 404. `ai-marketing-engine`'s own
@@ -87,6 +87,7 @@ management UI or via an authenticated Domains API call, neither available here.
 ## 4. Repository configuration
 
 `firebase.json`'s `apphosting` block (introduced in a single commit, never edited since — see §6):
+
 ```json
 "apphosting": {
   "backendId": "mitra-web",
@@ -95,6 +96,7 @@ management UI or via an authenticated Domains API call, neither available here.
   "alwaysDeployFromSource": true
 }
 ```
+
 This is the **sole** selector for which backend any `firebase deploy --only apphosting` (or
 `--only functions,apphosting`, as used earlier this session) targets. There is no Firebase "target"
 alias (`firebase target:apply`) configured in `.firebaserc` that could redirect this — `.firebaserc`
@@ -143,16 +145,16 @@ in its metadata suggests that happened.
 
 ## 6. Deployment history (timeline, from git log + backend metadata + Phase 19C report)
 
-| When (UTC) | Event | Evidence |
-|---|---|---|
-| 2026-09-21 10:48:05 | `mitra-web` backend created | `apphosting:backends:get mitra-web` → `createTime` |
-| 2026-09-21 ~11:03 | Commit `f5fbada` adds `firebase.json`'s `apphosting.backendId: "mitra-web"` and `apphosting.yaml` | `git show f5fbada` |
-| 2026-09-21 (same session) | `mitra-web` deployed from local source via CLI; Phase 19C report written; report explicitly instructs, as a pending next step, connecting **this backend** to GitHub via Console | `docs/PHASE_19C_FIREBASE_APP_HOSTING_PRODUCTION_REPORT.md` §12, Appendix |
-| 2026-09-21 (same report) | Custom domain explicitly confirmed **untouched**: "`brain-wise.com`: UNTOUCHED... `www`: UNTOUCHED. DNS: UNTOUCHED." | same report, §10 |
-| 2026-09-22 05:50:15 | `ai-marketing-engine` backend created — **no `cli-firebase` label**, i.e. not created by this repo's CLI workflow | `apphosting:backends:get ai-marketing-engine` |
-| 2026-09-22 08:06:37 | `ai-marketing-engine`'s last recorded update before this session | same |
-| 2026-09-22 (this session, ~14:46) | `mitra-web` redeployed via CLI (`firebase deploy --only functions,apphosting`) — Functions updated project-wide; `mitra-web` gained the legal/consent/Google-Auth/PayU-era frontend code | this session's deploy log; `mitra-web`'s `updateTime` now 14:46:09 |
-| 2026-09-22 (this session, after the above) | `www.brain-wise.com` confirmed still serving the **pre-legal-work** build (404 on `/terms` etc.) | `curl` checks, this and the prior session |
+| When (UTC)                                 | Event                                                                                                                                                                                    | Evidence                                                                 |
+| ------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------ |
+| 2026-09-21 10:48:05                        | `mitra-web` backend created                                                                                                                                                              | `apphosting:backends:get mitra-web` → `createTime`                       |
+| 2026-09-21 ~11:03                          | Commit `f5fbada` adds `firebase.json`'s `apphosting.backendId: "mitra-web"` and `apphosting.yaml`                                                                                        | `git show f5fbada`                                                       |
+| 2026-09-21 (same session)                  | `mitra-web` deployed from local source via CLI; Phase 19C report written; report explicitly instructs, as a pending next step, connecting **this backend** to GitHub via Console         | `docs/PHASE_19C_FIREBASE_APP_HOSTING_PRODUCTION_REPORT.md` §12, Appendix |
+| 2026-09-21 (same report)                   | Custom domain explicitly confirmed **untouched**: "`brain-wise.com`: UNTOUCHED... `www`: UNTOUCHED. DNS: UNTOUCHED."                                                                     | same report, §10                                                         |
+| 2026-09-22 05:50:15                        | `ai-marketing-engine` backend created — **no `cli-firebase` label**, i.e. not created by this repo's CLI workflow                                                                        | `apphosting:backends:get ai-marketing-engine`                            |
+| 2026-09-22 08:06:37                        | `ai-marketing-engine`'s last recorded update before this session                                                                                                                         | same                                                                     |
+| 2026-09-22 (this session, ~14:46)          | `mitra-web` redeployed via CLI (`firebase deploy --only functions,apphosting`) — Functions updated project-wide; `mitra-web` gained the legal/consent/Google-Auth/PayU-era frontend code | this session's deploy log; `mitra-web`'s `updateTime` now 14:46:09       |
+| 2026-09-22 (this session, after the above) | `www.brain-wise.com` confirmed still serving the **pre-legal-work** build (404 on `/terms` etc.)                                                                                         | `curl` checks, this and the prior session                                |
 
 **No commit in this repository's history ever mentions `ai-marketing-engine` as a backend name, ever
 edits `firebase.json` to reference it, or documents its creation.** It is entirely absent from the
@@ -163,14 +165,14 @@ Console, not through any change this repository's own history records.
 
 Directly tested (this session), not inferred from names:
 
-| Route | `www.brain-wise.com` | `ai-marketing-engine` (own URL) | `mitra-web` (own URL) |
-|---|---|---|---|
-| `/login` | 200 | 200 | 200 |
-| `/dashboard` | 200 | 200 | 200 |
-| `/terms` | 404 | 404 | **200** |
-| `/privacy` | 404 | 404 | **200** |
-| `/refund` | 404 | 404 | **200** |
-| `/support` | 404 | 404 | **200** |
+| Route        | `www.brain-wise.com` | `ai-marketing-engine` (own URL) | `mitra-web` (own URL) |
+| ------------ | -------------------- | ------------------------------- | --------------------- |
+| `/login`     | 200                  | 200                             | 200                   |
+| `/dashboard` | 200                  | 200                             | 200                   |
+| `/terms`     | 404                  | 404                             | **200**               |
+| `/privacy`   | 404                  | 404                             | **200**               |
+| `/refund`    | 404                  | 404                             | **200**               |
+| `/support`   | 404                  | 404                             | **200**               |
 
 **`ai-marketing-engine` is confirmed behind `mitra-web`**, not just "different" — it has the
 baseline application (auth pages, dashboard) but is missing every route this session's work added
@@ -191,7 +193,7 @@ older build of the same application.
    the Console (not the CLI — no `cli-firebase` label), and is absent from all repository history.
 4. **(Inference, best-supported by all available evidence, not independently proven via Console
    audit logs)**: rather than using App Hosting → `mitra-web` → Settings → "connect repository" (which
-   attaches GitHub to the *existing* backend), the operator most likely used App Hosting → "Add
+   attaches GitHub to the _existing_ backend), the operator most likely used App Hosting → "Add
    backend" → connect-to-GitHub, which is Firebase Console's default entry point for first-time
    GitHub-backed App Hosting setup and **creates a new backend** rather than modifying an existing
    one — defaulting its name to the repository name (`ai-marketing-engine`), which matches exactly
@@ -204,7 +206,7 @@ older build of the same application.
    revisiting that file after its initial Sep 21 commit.
 
 **Root cause, stated plainly**: the intended single-backend architecture (create `mitra-web` → deploy
-→ connect *that same backend* to GitHub → point the domain at it) was not followed through on step 2
+→ connect _that same backend_ to GitHub → point the domain at it) was not followed through on step 2
 of its own documented plan. Instead, a second backend was created via a different Console entry
 point, and the domain and (likely) the GitHub auto-deploy trigger both ended up attached to that new,
 second backend — while the repository's own deploy configuration (`firebase.json`) was never told
@@ -217,11 +219,12 @@ conclusively determined from available evidence, but the evidence strongly disfa
 intentionally required."**
 
 Reasoning:
+
 - Not **A** (`ai-marketing-engine` intended, `mitra-web` obsolete) — nothing in the repository ever
   names or documents `ai-marketing-engine` as an intentional choice; it has no corresponding phase
   report, no commit, no configuration reference anywhere.
 - Not cleanly **B** either (`mitra-web` intended, `ai-marketing-engine` obsolete) — while `mitra-web`
-  is the *documented*, deliberately-created backend, `ai-marketing-engine` is the one **actually
+  is the _documented_, deliberately-created backend, `ai-marketing-engine` is the one **actually
   serving production traffic on the real domain right now**, which is a very significant fact this
   audit cannot simply override by pointing at older documentation. Calling `ai-marketing-engine`
   "obsolete" would be asserting an intent not evidenced anywhere.
@@ -277,7 +280,7 @@ either way.
 **Deploying to `ai-marketing-engine`** (not done, risk assessment only): would bring the live domain
 current with today's work, but (a) requires knowing that backend's correct target syntax
 (`firebase deploy --only apphosting:ai-marketing-engine` or a temporary `firebase.json` edit — either
-way, not the current default), (b) if `ai-marketing-engine` *does* have a working GitHub auto-deploy
+way, not the current default), (b) if `ai-marketing-engine` _does_ have a working GitHub auto-deploy
 trigger, a manual CLI deploy could race with or be immediately overwritten by the next push-triggered
 rollout, producing confusing, non-reproducible state, (c) unknown whether its environment
 variables/secrets configuration matches `mitra-web`'s (not independently visible from here).
@@ -288,8 +291,8 @@ elsewhere — repeating this without addressing the mismatch just continues upda
 public never sees.
 
 **Changing the custom domain mapping**: explicitly out of scope for this audit and not investigated
-as an action (only as a fact-finding target) — doing so without first confirming *why* it currently
-points to `ai-marketing-engine` (§8's unresolved inference) risks breaking whatever *does* currently
+as an action (only as a fact-finding target) — doing so without first confirming _why_ it currently
+points to `ai-marketing-engine` (§8's unresolved inference) risks breaking whatever _does_ currently
 work for real visitors today, however imperfect.
 
 **Changing GitHub automation**: also out of scope for this audit — since this repo's own
@@ -301,6 +304,7 @@ a clear decision about which backend should own that trigger first.
 ## 14. Recommended remediation options (NOT executed)
 
 **Option 1 — Make `mitra-web` authoritative again (point the domain back to it).**
+
 - What changes: custom domain mapping (Console-side), no code/config change required in this repo.
 - What remains unchanged: `firebase.json` (already correct for this option), `ai-marketing-engine`
   backend itself (could be left running or later decommissioned separately).
@@ -319,6 +323,7 @@ a clear decision about which backend should own that trigger first.
 
 **Option 2 — Make `ai-marketing-engine` authoritative instead (update `firebase.json`'s
 `backendId`, deploy there going forward).**
+
 - What changes: `firebase.json`'s `apphosting.backendId` → `"ai-marketing-engine"`; all future CLI
   deploys target it; one deploy needed to bring it current with today's work.
 - What remains unchanged: the custom domain mapping (already correct for this option); `mitra-web`
@@ -337,6 +342,7 @@ a clear decision about which backend should own that trigger first.
 
 **Option 3 — Consolidate to one backend, decommission the other, only after confirming which one
 Firebase's native GitHub integration actually targets (via Console).**
+
 - What changes: eventually, deletion of one backend (`firebase apphosting:backends:delete`) — a
   destructive, hard-to-reverse action explicitly out of scope for this audit and any near-term
   action without a clear, confirmed decision.

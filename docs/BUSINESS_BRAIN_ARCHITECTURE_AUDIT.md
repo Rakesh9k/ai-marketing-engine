@@ -42,26 +42,26 @@ simply: read the whole `businesses.businessBrain` field and the whole `brand_kit
 unconditionally, on every generation call, and pass them wholesale into `GenerationPipelineInput`.
 There is no selective/task-specific context assembly — every pipeline stage receives access to the
 same full input object (`input.businessBrain`, `input.brandProfile`, `input.localizationProfile`),
-even though, per the fresh stage-by-stage trace below, individual stages only actually *read* a
+even though, per the fresh stage-by-stage trace below, individual stages only actually _read_ a
 subset of it in their prompts. What the task's diagram calls "AI Orchestrator" is, in the current
 code, a fixed, hardcoded 1:1 mapping (Gemini for all text/vision, OpenAI for the one image) with no
 routing logic — see §E.
 
 ## B. Existing Business Brain Map
 
-| Field/document | Location | Owner/source | Authoritative? | Editable? | Historical? | Used in generation? | Used in localization? |
-|---|---|---|---|---|---|---|---|
-| `identity` (name, category, description, location, contact) | `businesses.businessBrain.identity` | `createBusiness` (write), `updateBusinessBrain` (partial write) | Yes | Yes | No (current-state only, no versioning) | Yes — Stage 1 | Indirectly (location feeds Stage 4) |
-| `products[]` | `businesses.businessBrain.products` | `createBusiness`/updates | Yes | Yes | No | Yes — Stage 2 | No |
-| `brand` (tone, personality, visualPreferences, colors, fonts) | `businesses.businessBrain.brand` | `createBusiness`/updates | Yes (but see `BrandKit` duplication below) | Yes | No | Yes — Stage 3/5/6 (prompt text) | No |
-| `audience` (targetCustomer, ageRange, localities, preferences) | `businesses.businessBrain.audience` | `createBusiness`/updates | Yes | Yes | No | Partial — referenced in prompts, not deeply used | Yes — feeds Stage 4 |
-| `localization` (primaryLanguage, secondaryLanguage, regionalStyle, slangIntensity, languageMixing) | `businesses.businessBrain.localization` | `createBusiness`/updates | Yes | Yes | No | Yes — direct input to Stage 4 | Yes — this **is** the localization input |
-| `businessRules` (openingHours, deliveryRadiusKm, minimumOrder, offerValidityRules, pricingRules) | `businesses.businessBrain.businessRules` | `createBusiness`/updates | Yes | Yes | No | Yes — Truth Check + Stage 3 | No |
-| `verticalProfile` (salon services/packages/appointmentSettings, or real_estate properties) | `businesses.businessBrain.verticalProfile` | `createBusiness`/updates | Yes | Yes | No | Yes — vertical-specific Truth Check fact-checkers (§18 of prior audit) | No |
-| `campaignHistory[]` | `businesses.businessBrain.campaignHistory` | `createBusiness` only (initialized `[]`) | **No — never written after creation** | No | Intended to be, but isn't | **No — MISSING, confirmed by fresh grep this pass** | No |
-| `campaignHistory[].performance` | same array, nested | Never written by any code | No | No | No | No | No |
-| **Separate `BrandKit` doc** (`brand_kits/{businessId}`) | Own collection, 1:1 with business | `createBrandKit`/`updateBrandKit`, **and** one direct client write path (`brandKitService.upsert` on `/brand` — bypasses Cloud Functions, per prior audit §29) | Yes, for its own fields | Yes | No | Yes — loaded and passed as `brandProfile` into pipeline stages 3/5/6 prompt text; only 2 of 5 color fields and 0 of 2 font fields actually reach the deterministic compositor (see §F) | No |
-| `LocalizationProfile` (frontend request shape) | Not persisted — submitted fresh with each `generateCampaignStrategy` call from `CampaignWizard` | Client, per-request | N/A — this is request input, not stored Business Brain | N/A | No | Yes — becomes `input.localizationProfile` | Yes |
+| Field/document                                                                                     | Location                                                                                        | Owner/source                                                                                                                                                   | Authoritative?                                         | Editable? | Historical?                            | Used in generation?                                                                                                                                                                    | Used in localization?                    |
+| -------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------ | --------- | -------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------- |
+| `identity` (name, category, description, location, contact)                                        | `businesses.businessBrain.identity`                                                             | `createBusiness` (write), `updateBusinessBrain` (partial write)                                                                                                | Yes                                                    | Yes       | No (current-state only, no versioning) | Yes — Stage 1                                                                                                                                                                          | Indirectly (location feeds Stage 4)      |
+| `products[]`                                                                                       | `businesses.businessBrain.products`                                                             | `createBusiness`/updates                                                                                                                                       | Yes                                                    | Yes       | No                                     | Yes — Stage 2                                                                                                                                                                          | No                                       |
+| `brand` (tone, personality, visualPreferences, colors, fonts)                                      | `businesses.businessBrain.brand`                                                                | `createBusiness`/updates                                                                                                                                       | Yes (but see `BrandKit` duplication below)             | Yes       | No                                     | Yes — Stage 3/5/6 (prompt text)                                                                                                                                                        | No                                       |
+| `audience` (targetCustomer, ageRange, localities, preferences)                                     | `businesses.businessBrain.audience`                                                             | `createBusiness`/updates                                                                                                                                       | Yes                                                    | Yes       | No                                     | Partial — referenced in prompts, not deeply used                                                                                                                                       | Yes — feeds Stage 4                      |
+| `localization` (primaryLanguage, secondaryLanguage, regionalStyle, slangIntensity, languageMixing) | `businesses.businessBrain.localization`                                                         | `createBusiness`/updates                                                                                                                                       | Yes                                                    | Yes       | No                                     | Yes — direct input to Stage 4                                                                                                                                                          | Yes — this **is** the localization input |
+| `businessRules` (openingHours, deliveryRadiusKm, minimumOrder, offerValidityRules, pricingRules)   | `businesses.businessBrain.businessRules`                                                        | `createBusiness`/updates                                                                                                                                       | Yes                                                    | Yes       | No                                     | Yes — Truth Check + Stage 3                                                                                                                                                            | No                                       |
+| `verticalProfile` (salon services/packages/appointmentSettings, or real_estate properties)         | `businesses.businessBrain.verticalProfile`                                                      | `createBusiness`/updates                                                                                                                                       | Yes                                                    | Yes       | No                                     | Yes — vertical-specific Truth Check fact-checkers (§18 of prior audit)                                                                                                                 | No                                       |
+| `campaignHistory[]`                                                                                | `businesses.businessBrain.campaignHistory`                                                      | `createBusiness` only (initialized `[]`)                                                                                                                       | **No — never written after creation**                  | No        | Intended to be, but isn't              | **No — MISSING, confirmed by fresh grep this pass**                                                                                                                                    | No                                       |
+| `campaignHistory[].performance`                                                                    | same array, nested                                                                              | Never written by any code                                                                                                                                      | No                                                     | No        | No                                     | No                                                                                                                                                                                     | No                                       |
+| **Separate `BrandKit` doc** (`brand_kits/{businessId}`)                                            | Own collection, 1:1 with business                                                               | `createBrandKit`/`updateBrandKit`, **and** one direct client write path (`brandKitService.upsert` on `/brand` — bypasses Cloud Functions, per prior audit §29) | Yes, for its own fields                                | Yes       | No                                     | Yes — loaded and passed as `brandProfile` into pipeline stages 3/5/6 prompt text; only 2 of 5 color fields and 0 of 2 font fields actually reach the deterministic compositor (see §F) | No                                       |
+| `LocalizationProfile` (frontend request shape)                                                     | Not persisted — submitted fresh with each `generateCampaignStrategy` call from `CampaignWizard` | Client, per-request                                                                                                                                            | N/A — this is request input, not stored Business Brain | N/A       | No                                     | Yes — becomes `input.localizationProfile`                                                                                                                                              | Yes                                      |
 
 **Key finding**: there are **two, not one, sources of "brand" data** — `businessBrain.brand`
 (embedded) and the standalone `BrandKit` document — with a confirmed type-shape mismatch between
@@ -73,7 +73,7 @@ expects (see §F). This is duplication with drift, not just duplication.
 Distinguishing real memory from "exists in Firestore":
 
 - **Persistent business-state memory**: REAL. `businesses.businessBrain` is genuinely persistent,
-  genuinely read on every generation. This is real, working memory of *current business facts*.
+  genuinely read on every generation. This is real, working memory of _current business facts_.
 - **Campaign memory** (remembering what was generated before, to stay consistent or avoid
   repetition): **MISSING**. `campaignHistory[]` is schema-only, confirmed dead (never written past
   initialization — re-confirmed this pass via fresh grep, corroborating the type file's own Phase-34
@@ -85,22 +85,22 @@ Distinguishing real memory from "exists in Firestore":
   — no mechanism exists to derive or store this, since there's no feedback signal to derive it from.
 - **Business rules memory**: REAL — `businessRules` is genuinely persistent and genuinely enforced
   (Truth Check reads it; Stage 3 prompt includes it).
-- **Localization memory**: **PARTIAL, and this is an important nuance**. The *static* localization
-  *preferences* (`primaryLanguage`, `regionalStyle`, etc.) are real persistent memory. But the *rich*
+- **Localization memory**: **PARTIAL, and this is an important nuance**. The _static_ localization
+  _preferences_ (`primaryLanguage`, `regionalStyle`, etc.) are real persistent memory. But the _rich_
   localization content — actual slang terms, humor style, cultural references, a 20+ entry vocabulary
   — is **regenerated fresh by the AI on every single campaign** (Stage 4, `LocalizationStrategySchema`,
   confirmed this pass: `stageResults.localizationStrategy` lives only in an in-memory object for the
   duration of one pipeline run — `pipeline.ts:440,486`; never written to Firestore, confirmed by grep
   for `localizationStrategy` finding zero persistence call sites). This means Mitra does not
   accumulate or reuse a consistent "voice" for a given business across campaigns — it re-derives an
-  equally plausible but *potentially different* slang/humor/vocabulary set each time. This directly
+  equally plausible but _potentially different_ slang/humor/vocabulary set each time. This directly
   affects the user's stated goal ("feel specifically created for that business... rather than
-  generic") — right now, consistency *within* one campaign is real, but consistency *across*
+  generic") — right now, consistency _within_ one campaign is real, but consistency _across_
   campaigns over time is not engineered at all, just incidentally likely if the AI happens to produce
   similar output for similar inputs.
 - **Asset memory** (remembering what was generated as a file, for reuse/reference): PARTIAL — assets
   are stored and retrievable (`campaign_assets`, `assets` collections are real, per prior audit §11),
-  but nothing in generation reads *prior* assets as reference material for a *new* generation.
+  but nothing in generation reads _prior_ assets as reference material for a _new_ generation.
 
 ## D. Current Context Retrieval
 
@@ -115,7 +115,7 @@ Distinguishing real memory from "exists in Firestore":
   "brand" — genuinely duplicated, with a confirmed shape mismatch (§B, §F).
 - **Stale context risk**: since `businessBrain` and `BrandKit` are read fresh on every call (not
   cached), staleness isn't a caching problem — but there is no versioning/change-tracking, so a
-  business that updates its offerings mid-campaign-history has no記録 of what it looked like *when*
+  business that updates its offerings mid-campaign-history has no記録 of what it looked like _when_
   a past campaign was generated (moot today since past campaigns aren't read at all, but relevant to
   any future longitudinal feature).
 - **Irrelevant/missing context**: `businessWebsite`/`businessInstagram` fields and vertical catalog
@@ -161,13 +161,12 @@ Per the dispatched sub-agent's fresh trace:
 - **Logo variants**: **MISSING as a functioning system**. The two slots exist but have no attached
   semantics (no light/dark, no square/wide distinction encoded or branched on anywhere).
 - **Brand colors**: **PARTIAL** in the compositor. Only 2 of 5 `BrandKit.colors` fields
-  (`primary`/`accent`, accessed by *array position*, not by key — `pipeline.ts:826-827`) ever reach
+  (`primary`/`accent`, accessed by _array position_, not by key — `pipeline.ts:826-827`) ever reach
   the deterministic SVG compositor; `colors.text`/`colors.background`/`colors.secondary` are never
   used there. `textColor` in the composited creative is **always** the hardcoded default
   (`#FFFFFF`), never the business's actual configured text color.
 - **Fonts**: **HARD-CODED**. Every `<text>` element in `compositor.ts` uses `font-family="Arial,
-  sans-serif"` unconditionally. `BrandKit.fonts.heading`/`.body` are read into AI *prompt text* (Stage
-  6) but never reach the deterministic compositor at all.
+sans-serif"` unconditionally. `BrandKit.fonts.heading`/`.body` are read into AI _prompt text_ (Stage 6) but never reach the deterministic compositor at all.
 - **Logo compositing**: **MISSING entirely**. `compositor.ts` has exactly one `<image>` reference —
   the AI-generated hero photo. No brand logo is ever overlaid onto a poster/story creative, despite
   `BrandKit.logo` existing in the schema and being uploadable via the `/brand` UI.
@@ -175,18 +174,18 @@ Per the dispatched sub-agent's fresh trace:
   (what pipeline/creativeBrief code actually reads) are structurally different — `generateCampaignStrategy.ts`
   passes a real `BrandKit` document into a slot typed as `BrandProfile` (typed `any`, so TypeScript
   never catches the mismatch). In practice, a business's actual uploaded logo URL likely never
-  successfully reaches even the *prompt text* that's supposed to reference it, let alone the
+  successfully reaches even the _prompt text_ that's supposed to reference it, let alone the
   compositor. **This is a concrete, fixable bug**, not a design gap — flagged for the implementation
   phase, not fixed in this audit.
 - **Mascot**: no field exists in `BrandKit` or `BusinessBrain` at all (the app's own `MitraMascot`
-  component is Mitra's own product mascot, unrelated to a *business's* brand identity).
+  component is Mitra's own product mascot, unrelated to a _business's_ brand identity).
 
 ## G. Current Localization System
 
 - **Structural preferences** (language, region, city, locality, slang intensity, language mixing,
   regional style enum): REAL, persistent, genuinely used as direct input to Stage 4.
 - **Rich cultural content** (actual slang terms with usage guidance, humor style, cultural
-  references, ≥20-entry vocabulary): REAL as a *per-campaign, AI-generated artifact* (Stage 4's
+  references, ≥20-entry vocabulary): REAL as a _per-campaign, AI-generated artifact_ (Stage 4's
   structured output is genuinely rich and well-specified — not a stub), but **not persisted or
   reused across campaigns** for the same business (§C). Every campaign effectively re-invents this
   business's "local voice" from the same static inputs, rather than building on a growing,
@@ -204,14 +203,15 @@ Per the dispatched sub-agent's fresh trace:
 
 **MISSING, confirmed.** No mechanism anywhere — UI or backend — lets a business owner mark generated
 content as good/bad/approved/rejected, and consequently there is nothing for any future generation to
-learn from. Truth Check (`PASS`/`FAIL`/`REVIEW_REQUIRED`) is a *fact-accuracy* gate, not an owner
-*preference/quality* signal, and its results aren't fed back into future prompt construction either
+learn from. Truth Check (`PASS`/`FAIL`/`REVIEW_REQUIRED`) is a _fact-accuracy_ gate, not an owner
+_preference/quality_ signal, and its results aren't fed back into future prompt construction either
 (each generation's Truth Check runs fresh against that generation's own output).
 
 ## I. Current Campaign History
 
 **MISSING, confirmed with fresh, direct evidence this pass** (corroborating the type file's own
 Phase-34 comment and an independent sub-agent trace):
+
 - `getCampaignsByBusiness()` (a real, working query function in `services/firestore.ts`) exists and
   is used **only** by the read-only `listCampaigns` UI-listing callable — never by generation.
 - `createCampaign.ts` imports `getCampaignsByBusiness` but never calls it (dead import) — and
@@ -229,6 +229,7 @@ Phase-34 comment and an independent sub-agent trace):
 
 **Do not invent performance data — and the audit confirms none needs to be invented, because the
 honest answer is there isn't much yet.**
+
 - Only one real, end-to-end metric exists: `whatsappClicks` (`campaign_performance` collection,
   written idempotently by `recordWhatsAppClick`, sourced from a real click event).
 - `inquiries` is a schema field that is **permanently `null`** — no WhatsApp Business API, booking
@@ -248,43 +249,43 @@ honest answer is there isn't much yet.**
 
 ## Classification Summary
 
-| Capability | Classification |
-|---|---|
-| Business identity (name/category/location/contact) | REAL |
-| Product/service catalog | REAL |
-| Brand tone/personality/visual-preferences (text fields) | REAL |
-| Brand colors reaching AI prompts | REAL |
-| Brand colors reaching deterministic compositor | PARTIAL (2 of 5 fields, positional not keyed, text color never used) |
-| Brand fonts reaching AI prompts | REAL |
-| Brand fonts reaching deterministic compositor | MISSING (hard-coded Arial always) |
-| Logo storage (schema) | REAL |
-| Logo reaching AI prompts | BROKEN (type-shape mismatch between `BrandKit` and `BrandProfile`) |
-| Logo compositing onto creatives | MISSING |
-| Logo variants (light/dark, square/wide) | MISSING (fields exist, no semantics, unused) |
-| Business rules (hours, delivery radius, pricing rules) | REAL |
-| Vertical-specific profile (salon/real-estate) | REAL |
-| Localization preferences (language/region/slang-intensity) | REAL |
+| Capability                                                       | Classification                                                                            |
+| ---------------------------------------------------------------- | ----------------------------------------------------------------------------------------- |
+| Business identity (name/category/location/contact)               | REAL                                                                                      |
+| Product/service catalog                                          | REAL                                                                                      |
+| Brand tone/personality/visual-preferences (text fields)          | REAL                                                                                      |
+| Brand colors reaching AI prompts                                 | REAL                                                                                      |
+| Brand colors reaching deterministic compositor                   | PARTIAL (2 of 5 fields, positional not keyed, text color never used)                      |
+| Brand fonts reaching AI prompts                                  | REAL                                                                                      |
+| Brand fonts reaching deterministic compositor                    | MISSING (hard-coded Arial always)                                                         |
+| Logo storage (schema)                                            | REAL                                                                                      |
+| Logo reaching AI prompts                                         | BROKEN (type-shape mismatch between `BrandKit` and `BrandProfile`)                        |
+| Logo compositing onto creatives                                  | MISSING                                                                                   |
+| Logo variants (light/dark, square/wide)                          | MISSING (fields exist, no semantics, unused)                                              |
+| Business rules (hours, delivery radius, pricing rules)           | REAL                                                                                      |
+| Vertical-specific profile (salon/real-estate)                    | REAL                                                                                      |
+| Localization preferences (language/region/slang-intensity)       | REAL                                                                                      |
 | Localization rich content (slang/humor/vocabulary/cultural refs) | REAL, but PARTIAL for longitudinal use — regenerated per-campaign, never persisted/reused |
-| Regional humor memory (business-specific, learned over time) | MISSING |
-| Local metaphors / cultural references | REAL within one campaign; MISSING across campaigns (not persisted) |
-| Festival/seasonal context | MISSING (no structured calendar/injection; only a Truth Check exception rule) |
-| Locality knowledge base beyond place name | MISSING |
-| Customer/audience characteristics | PARTIAL (fields exist, referenced in prompts, not deeply used) |
-| Campaign history storage | REAL |
-| Campaign history retrieval for generation | MISSING |
-| `campaignHistory[]` field on Business Brain | DEAD (confirmed, matches its own type-file's documented status) |
-| Content approval/rejection feedback | MISSING |
-| Customer feedback | MISSING |
-| Performance data collection | PARTIAL (one real metric: WhatsApp clicks) |
-| Performance data influencing generation | MISSING (by design/documented status, not oversight) |
-| Truth Check (fact-accuracy gate) | REAL |
-| Truth Check as owner-preference/quality feedback loop | MISSING (different concern entirely) |
-| AI provider abstraction (capability-named call sites) | PARTIAL (good naming, zero real swappability) |
-| Model/task routing registry | DEAD CODE (`modelRouting.ts`) |
-| Model version tracking (for reproducibility) | PARTIAL (intended model logged, not actual served version) |
-| Context retrieval (selective, task-specific) | MISSING (full-document reads, no slicing) |
-| Business Brain vs. BrandKit duplication | DUPLICATED, with a confirmed type-shape bug |
-| Longitudinal "business voice" consistency across campaigns | MISSING (mechanism doesn't exist; any observed consistency is incidental) |
+| Regional humor memory (business-specific, learned over time)     | MISSING                                                                                   |
+| Local metaphors / cultural references                            | REAL within one campaign; MISSING across campaigns (not persisted)                        |
+| Festival/seasonal context                                        | MISSING (no structured calendar/injection; only a Truth Check exception rule)             |
+| Locality knowledge base beyond place name                        | MISSING                                                                                   |
+| Customer/audience characteristics                                | PARTIAL (fields exist, referenced in prompts, not deeply used)                            |
+| Campaign history storage                                         | REAL                                                                                      |
+| Campaign history retrieval for generation                        | MISSING                                                                                   |
+| `campaignHistory[]` field on Business Brain                      | DEAD (confirmed, matches its own type-file's documented status)                           |
+| Content approval/rejection feedback                              | MISSING                                                                                   |
+| Customer feedback                                                | MISSING                                                                                   |
+| Performance data collection                                      | PARTIAL (one real metric: WhatsApp clicks)                                                |
+| Performance data influencing generation                          | MISSING (by design/documented status, not oversight)                                      |
+| Truth Check (fact-accuracy gate)                                 | REAL                                                                                      |
+| Truth Check as owner-preference/quality feedback loop            | MISSING (different concern entirely)                                                      |
+| AI provider abstraction (capability-named call sites)            | PARTIAL (good naming, zero real swappability)                                             |
+| Model/task routing registry                                      | DEAD CODE (`modelRouting.ts`)                                                             |
+| Model version tracking (for reproducibility)                     | PARTIAL (intended model logged, not actual served version)                                |
+| Context retrieval (selective, task-specific)                     | MISSING (full-document reads, no slicing)                                                 |
+| Business Brain vs. BrandKit duplication                          | DUPLICATED, with a confirmed type-shape bug                                               |
+| Longitudinal "business voice" consistency across campaigns       | MISSING (mechanism doesn't exist; any observed consistency is incidental)                 |
 
 ---
 
@@ -297,6 +298,7 @@ safely," "do not replace working systems unnecessarily"), the recommendation bel
 second AI provider, a new database system, or a parallel "Business Brain v2."
 
 ### What should NOT change
+
 - The 12-stage `GenerationPipeline` structure, its Zod-schema-validated stage outputs, and its
   deterministic Truth Check gate are all REAL, working, and load-bearing — keep them exactly as they
   are.
@@ -334,10 +336,10 @@ second AI provider, a new database system, or a parallel "Business Brain v2."
 4. **Add a minimal, real feedback signal before attempting to use performance data for generation.**
    Per the task's own rule ("do not treat generated AI content as factual... do not let the AI
    silently invent"), and per §J's finding that performance data is too thin to safely drive
-   generation today, the recommended sequence is: first close the *feedback* gap (a simple
+   generation today, the recommended sequence is: first close the _feedback_ gap (a simple
    approve/reject/rating action on a generated asset — reusing the existing `campaign_assets`
    document shape by adding a status field, not a new collection), accumulate real signal, and only
-   *then* consider using it in generation — building a "Performance Engine" on top of a single
+   _then_ consider using it in generation — building a "Performance Engine" on top of a single
    WhatsApp-click counter, as the current schema's richer-but-fake fields (`inquiries: null`) already
    warn against, would mean inventing signal that doesn't exist.
 

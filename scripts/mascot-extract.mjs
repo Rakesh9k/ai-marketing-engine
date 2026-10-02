@@ -34,6 +34,19 @@ const POSE_SOURCE = {
   discovering: 'in search',
 };
 
+// Optional pre-crop region (in the *source* image's own pixel coordinates)
+// applied before background removal. Background removal here only clears
+// the white/near-white studio backdrop connected to the image border — it
+// never isolates the character from other foreground props in the same
+// shot. "Confused" is a full desk/multi-monitor scene, not an isolated
+// character, so without this the whole scene ships as concerned.png and is
+// illegible at the ~88px this pose actually renders at in the app. Crop
+// coordinates are calibrated against that specific source file's pixels
+// (1686x2528) and would need re-tuning if the source render changes.
+const POSE_PRECROP = {
+  concerned: { left: 950, top: 560, width: 430, height: 560 },
+};
+
 function findSource(substr) {
   const files = fs.readdirSync(SRC_DIR);
   const norm = (s) => s.toLowerCase().replace(/\s+/g, ' ').trim();
@@ -61,9 +74,7 @@ async function colorDistanceBackground(inputPath) {
     sample(2, height - 3),
     sample(width - 3, height - 3),
   ];
-  const ref = [0, 1, 2].map(
-    (c) => corners.reduce((sum, p) => sum + p[c], 0) / corners.length
-  );
+  const ref = [0, 1, 2].map((c) => corners.reduce((sum, p) => sum + p[c], 0) / corners.length);
 
   const dist = (x, y) => {
     const idx = (y * width + x) * channels;
@@ -115,7 +126,9 @@ async function colorDistanceBackground(inputPath) {
 }
 
 async function processOne(pose, srcPath, outPath) {
-  const { data, info, alpha } = await colorDistanceBackground(srcPath);
+  const precrop = POSE_PRECROP[pose];
+  const input = precrop ? await sharp(srcPath).extract(precrop).toBuffer() : srcPath;
+  const { data, info, alpha } = await colorDistanceBackground(input);
   const { width, height, channels } = info;
 
   // Feather the mask edges (soft-alpha keying) so hair/finger/hoodie edges

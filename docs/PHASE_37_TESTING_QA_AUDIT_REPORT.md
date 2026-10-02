@@ -17,6 +17,7 @@ No code was changed. Baseline = current state of `master` at the time of this au
 ## 3. Automated Test Results
 
 **Root suite** (`npm test` / `npx jest`, Next.js app + shared services), no emulator:
+
 ```
 Test Suites: 32 passed, 32 total
 Tests:       7 skipped, 307 passed, 314 total
@@ -24,27 +25,33 @@ Time:        10.3s
 ```
 
 **Functions suite** (`functions/`, `npx jest`), no emulator env vars set:
+
 ```
 Test Suites: 17 skipped, 19 passed, 36 total
 Tests:       82 skipped, 199 passed, 281 total
 Time:        7.3s
 ```
+
 The 17 skipped suites are gated by `describeIfEmulator = FIRESTORE_EMULATOR_HOST ? describe : describe.skip` — they are real integration tests, not dead code.
 
 **Functions suite, re-run with `firebase emulators:start --only auth,firestore,storage --project demo-mitra` live** and `FIRESTORE_EMULATOR_HOST` / `FIREBASE_AUTH_EMULATOR_HOST` / `FIREBASE_STORAGE_EMULATOR_HOST` / `GCLOUD_PROJECT=demo-mitra` exported:
+
 ```
 Test Suites: 36 passed, 36 total
 Tests:       281 passed, 281 total
 Time:        28.2s
 ```
+
 Every previously-skipped emulator test now executes and passes. This is real emulator-verified evidence, not a mock.
 
 **Root `tests/` suite, re-run with emulators live** (Firestore/Storage security-rules tests, which self-skip identically to the pattern above but via `if (!firestoreEmulatorHost) { console.log('Skipping...'); return; }` inside `beforeAll`):
+
 ```
 Test Suites: 10 passed, 10 total
 Tests:       6 skipped, 121 passed, 127 total
 Time:        4.1s
 ```
+
 The 6 remaining skips are `test.skip(...)` with inline reasons — 1 is an environment limitation (`browser environment` compression test doesn't run under jsdom), 5 are `docs/PHASE_27`-documented "not implemented" gaps (no `agency_admin` role, no `bulk_jobs` collection/rules) — honestly labeled in the test file itself, not silently disabled.
 
 **Combined, emulator-backed total: 42 suites, 595 tests, 588 passed, 0 failed, 7 skipped (all explained, none hidden).**
@@ -58,13 +65,13 @@ The 6 remaining skips are `test.skip(...)` with inline reasons — 1 is an envir
 
 ## 4. Actual Test Count
 
-| Category | Tests | Passed | Failed | Skipped | Notes |
-|---|---:|---:|---:|---:|---|
-| Root unit/component (no emulator) | 314 | 307 | 0 | 7 | jsdom, React Testing Library |
-| Functions unit (no emulator) | 199 | 199 | 0 | 0 | pure logic, mocked Admin SDK |
-| Functions integration (emulator-gated) | 82 | 82 | 0 | 0 | ran for real once emulators started |
-| Root Firestore/Storage rules (emulator-gated) | 121 | 121 | 0 | 6 | `@firebase/rules-unit-testing`, real rules evaluation |
-| **Total (emulator live)** | **595** | **588** | **0** | **7** | see §3 |
+| Category                                      |   Tests |  Passed | Failed | Skipped | Notes                                                 |
+| --------------------------------------------- | ------: | ------: | -----: | ------: | ----------------------------------------------------- |
+| Root unit/component (no emulator)             |     314 |     307 |      0 |       7 | jsdom, React Testing Library                          |
+| Functions unit (no emulator)                  |     199 |     199 |      0 |       0 | pure logic, mocked Admin SDK                          |
+| Functions integration (emulator-gated)        |      82 |      82 |      0 |       0 | ran for real once emulators started                   |
+| Root Firestore/Storage rules (emulator-gated) |     121 |     121 |      0 |       6 | `@firebase/rules-unit-testing`, real rules evaluation |
+| **Total (emulator live)**                     | **595** | **588** |  **0** |   **7** | see §3                                                |
 
 The claimed "534 tests" is neither the mocked-only count (513: 314+199) nor the full emulator-backed count (595). It doesn't match either evaluation mode cleanly — most likely it was counted at some earlier commit before later phases (e.g. Phase 35 frontend hardening, this phase's own confirmUpload fix test) added suites. **Reported here as the actual, freshly-executed number: 595, not adjusted to hit 534.**
 
@@ -80,7 +87,7 @@ Spot-checked representative files across categories:
 - `tests/phase27-bulk-approval-auth-roles.test.ts` — 5 of its tests are `test.skip` with an inline reason naming the exact missing feature (no `agency_admin` role, no `bulk_jobs` collection) — **GOOD PRACTICE**: an honest gap marker rather than a deleted or silently-passing test.
 - No `expect(true).toBe(true)` or bare `toHaveBeenCalled()`-only assertions found in the sampled files.
 
-No file in the sample was classified as a weak/misleading *test* (as opposed to the one misleading *harness default* noted above).
+No file in the sample was classified as a weak/misleading _test_ (as opposed to the one misleading _harness default_ noted above).
 
 ## 6. Critical User Journey Results
 
@@ -98,22 +105,22 @@ Full manual walk of every journey step (e.g. actually clicking through onboardin
 
 **NOT PERFORMED as browser interaction** — no browser automation is available in this non-interactive CLI environment, and driving a real browser by hand is outside what this session can do. Screen inventory only (static, from routing):
 
-| Screen | Route | Test file exists |
-|---|---|---|
-| Landing | `/` | — |
-| Login | `/login` | `LoginForm.test.tsx` |
-| Signup | `/signup` | `SignupForm.test.tsx` |
-| Forgot password | `/forgot-password` | — |
-| Onboarding | `/onboarding` | `onboarding/page.test.tsx` |
-| Dashboard | `/dashboard` | — |
-| Business profile | `/business-profile` | — |
-| Brand | `/brand` | — |
-| Products | `/products`, `/products/new` | — |
-| Campaigns | `/campaigns`, `/campaigns/new`, `/campaigns/[campaignId]` | `CampaignWizard.test.tsx` |
-| Reels | `/reels`, `/reels/new` | — |
-| Analytics | `/analytics` | — |
-| Billing | `/billing` | — |
-| Usage | `/usage` | — |
+| Screen           | Route                                                     | Test file exists           |
+| ---------------- | --------------------------------------------------------- | -------------------------- |
+| Landing          | `/`                                                       | —                          |
+| Login            | `/login`                                                  | `LoginForm.test.tsx`       |
+| Signup           | `/signup`                                                 | `SignupForm.test.tsx`      |
+| Forgot password  | `/forgot-password`                                        | —                          |
+| Onboarding       | `/onboarding`                                             | `onboarding/page.test.tsx` |
+| Dashboard        | `/dashboard`                                              | —                          |
+| Business profile | `/business-profile`                                       | —                          |
+| Brand            | `/brand`                                                  | —                          |
+| Products         | `/products`, `/products/new`                              | —                          |
+| Campaigns        | `/campaigns`, `/campaigns/new`, `/campaigns/[campaignId]` | `CampaignWizard.test.tsx`  |
+| Reels            | `/reels`, `/reels/new`                                    | —                          |
+| Analytics        | `/analytics`                                              | —                          |
+| Billing          | `/billing`                                                | —                          |
+| Usage            | `/usage`                                                  | —                          |
 
 Screens without a component/page test are marked **NOT VERIFIED**, not "assumed working." This table is a starting point for the next phase where a browser is available, not a QA pass.
 
@@ -169,30 +176,30 @@ Not manually exercised (no browser). No dedicated localization/Unicode test file
 
 ## 23. Defect Register
 
-| ID | Severity | Area | Finding | Evidence | Fixed? | Remaining Action |
-|---|---|---|---|---|---|---|
-| D-1 | MEDIUM | Security test coverage | `confirmReelClipUpload` has the same cross-tenant `storagePath` guard as `confirmUpload` in code, but no test file exists to prove it holds, unlike `confirmUpload.test.ts` | `functions/src/functions/reels/confirmReelClipUpload.ts:57-68`; no `confirmReelClipUpload.test.ts` found anywhere in repo | No | Add an emulator-backed test mirroring `confirmUpload.test.ts`'s two cases (foreign business storagePath, unscoped storagePath) |
-| D-2 | LOW | Test coverage | `getReel`, `listReels`, `getReelClipUploadUrl`, `createReelProject`, `generateReel` have no test files | `find functions/src/functions/reels` | No | Lower priority than D-1 (read paths / non-authorization-critical), but still a gap |
-| D-3 | LOW | Test-harness honesty | `tests/security.test.ts` reports its Firestore-rules assertions as **PASS** (not SKIP) when run without `FIRESTORE_EMULATOR_HOST` set, via an early `return` in `beforeAll` rather than `describe.skip`/`test.skip` | `tests/security.test.ts:19-24`; confirmed by running `npm test` before vs. after starting emulators — suite count and pass count identical either way, only a console.log differs | No | Switch the guard to `describeIfEmulator` pattern already used in `functions/` tests, so a CI run without emulators reports SKIPPED tests, not PASSED ones |
-| D-4 | LOW | Build hygiene | `functions:lint` fails with 70 errors, mostly ESLint parsing errors on 8 test files not covered by the type-aware tsconfig project, plus ~9 real unused-var findings | `npm run functions:lint` output, §3 | No (explicitly out of scope this phase per Rule/§30 instruction) | Extend `functions/tsconfig.eslint.json`'s `include` to cover `*.test.ts`, `testSetup.ts`; remove the flagged unused imports/vars |
-| D-5 | INFORMATIONAL | Dependencies | `npm audit` reports 12 vulnerabilities (10 moderate, 2 high) in root, all transitive via `undici`/`@firebase/*` compat packages; 11 moderate in `functions/` via `google-gax`/`teeny-request`/`uuid` transitives | `npm audit --omit=dev` output, both packages | No | Track upstream Firebase SDK / google-gax releases; `--force` fix would be a breaking-change bump, not appropriate to apply silently |
+| ID  | Severity      | Area                   | Finding                                                                                                                                                                                                             | Evidence                                                                                                                                                                          | Fixed?                                                           | Remaining Action                                                                                                                                          |
+| --- | ------------- | ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| D-1 | MEDIUM        | Security test coverage | `confirmReelClipUpload` has the same cross-tenant `storagePath` guard as `confirmUpload` in code, but no test file exists to prove it holds, unlike `confirmUpload.test.ts`                                         | `functions/src/functions/reels/confirmReelClipUpload.ts:57-68`; no `confirmReelClipUpload.test.ts` found anywhere in repo                                                         | No                                                               | Add an emulator-backed test mirroring `confirmUpload.test.ts`'s two cases (foreign business storagePath, unscoped storagePath)                            |
+| D-2 | LOW           | Test coverage          | `getReel`, `listReels`, `getReelClipUploadUrl`, `createReelProject`, `generateReel` have no test files                                                                                                              | `find functions/src/functions/reels`                                                                                                                                              | No                                                               | Lower priority than D-1 (read paths / non-authorization-critical), but still a gap                                                                        |
+| D-3 | LOW           | Test-harness honesty   | `tests/security.test.ts` reports its Firestore-rules assertions as **PASS** (not SKIP) when run without `FIRESTORE_EMULATOR_HOST` set, via an early `return` in `beforeAll` rather than `describe.skip`/`test.skip` | `tests/security.test.ts:19-24`; confirmed by running `npm test` before vs. after starting emulators — suite count and pass count identical either way, only a console.log differs | No                                                               | Switch the guard to `describeIfEmulator` pattern already used in `functions/` tests, so a CI run without emulators reports SKIPPED tests, not PASSED ones |
+| D-4 | LOW           | Build hygiene          | `functions:lint` fails with 70 errors, mostly ESLint parsing errors on 8 test files not covered by the type-aware tsconfig project, plus ~9 real unused-var findings                                                | `npm run functions:lint` output, §3                                                                                                                                               | No (explicitly out of scope this phase per Rule/§30 instruction) | Extend `functions/tsconfig.eslint.json`'s `include` to cover `*.test.ts`, `testSetup.ts`; remove the flagged unused imports/vars                          |
+| D-5 | INFORMATIONAL | Dependencies           | `npm audit` reports 12 vulnerabilities (10 moderate, 2 high) in root, all transitive via `undici`/`@firebase/*` compat packages; 11 moderate in `functions/` via `google-gax`/`teeny-request`/`uuid` transitives    | `npm audit --omit=dev` output, both packages                                                                                                                                      | No                                                               | Track upstream Firebase SDK / google-gax releases; `--force` fix would be a breaking-change bump, not appropriate to apply silently                       |
 
 No CRITICAL or HIGH-severity application-logic defects were found in this pass — the one HIGH-adjacent item (D-1) is a coverage gap for an already-fixed code path, not an unfixed vulnerability.
 
 ## 24. Remaining Blockers
 
-| # | Item | Status |
-|---|---|---|
-| 1 | Razorpay live testing | BLOCKED — no live/sandbox Razorpay credentials in this environment; webhook logic tested with mocked signatures only |
-| 2 | Production AI generation testing | NOT VERIFIED — would spend real provider credits; pipeline tested with mocked provider responses |
-| 3 | Production load testing | BLOCKED — no load-test tooling present, no staging/prod endpoint safe to hammer from this session |
-| 4 | iOS/Safari testing | NOT VERIFIED — no such device/browser available here |
-| 5 | Functions lint/tsconfig issue | OPEN (D-4), unchanged, not silently fixed per instruction |
-| 6 | Rate-limit precision | OPEN, unchanged — generic limiter logic tested, deployed-limit precision not independently verified |
-| 7 | CSP/HSTS | NOT VERIFIED this session — no HTTP response headers available to inspect without a live deployment |
-| 8 | Dependency vulnerabilities | DEFERRED — see D-5, tracked not fixed |
-| 9 | Browser E2E | BLOCKED — WDAC policy blocks Chromium on this machine (pre-existing, documented) |
-| 10 | Manual screen-by-screen QA, accessibility, cross-browser | NOT VERIFIED — no browser available in this session |
+| #   | Item                                                     | Status                                                                                                               |
+| --- | -------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------- |
+| 1   | Razorpay live testing                                    | BLOCKED — no live/sandbox Razorpay credentials in this environment; webhook logic tested with mocked signatures only |
+| 2   | Production AI generation testing                         | NOT VERIFIED — would spend real provider credits; pipeline tested with mocked provider responses                     |
+| 3   | Production load testing                                  | BLOCKED — no load-test tooling present, no staging/prod endpoint safe to hammer from this session                    |
+| 4   | iOS/Safari testing                                       | NOT VERIFIED — no such device/browser available here                                                                 |
+| 5   | Functions lint/tsconfig issue                            | OPEN (D-4), unchanged, not silently fixed per instruction                                                            |
+| 6   | Rate-limit precision                                     | OPEN, unchanged — generic limiter logic tested, deployed-limit precision not independently verified                  |
+| 7   | CSP/HSTS                                                 | NOT VERIFIED this session — no HTTP response headers available to inspect without a live deployment                  |
+| 8   | Dependency vulnerabilities                               | DEFERRED — see D-5, tracked not fixed                                                                                |
+| 9   | Browser E2E                                              | BLOCKED — WDAC policy blocks Chromium on this machine (pre-existing, documented)                                     |
+| 10  | Manual screen-by-screen QA, accessibility, cross-browser | NOT VERIFIED — no browser available in this session                                                                  |
 
 ## 25. Files Changed
 
@@ -220,24 +227,31 @@ Raw pass/fail/skip counts and error output quoted verbatim in §3-4 above are ta
 ## 28. Final Verdict
 
 ### Automated Testing
+
 **PARTIAL** — real, emulator-backed, 100% pass rate on everything that exists (588/595, 7 honestly-skipped), but with two coverage gaps (D-1, D-2) and one misleading-pass harness pattern (D-3).
 
 ### Manual QA
+
 **BLOCKED** — no browser available in this session; screen inventory only, no interaction testing performed.
 
 ### API Testing
+
 **PARTIAL** — strong coverage on write/authorization-sensitive endpoints, gap on `confirmReelClipUpload` and reel read-endpoints.
 
 ### Security Testing
+
 **PARTIAL** — core tenant-isolation and the `confirmUpload` regression are VERIFIED and emulator-backed; `confirmReelClipUpload`'s equivalent fix is present in code but not test-covered (D-1).
 
 ### Performance Testing
+
 **BLOCKED** — no tooling configured, no live instance to measure.
 
 ### Load Testing
+
 **BLOCKED** — no tooling, no safe target environment.
 
 ### Overall Testing & QA Phase
+
 **PARTIAL.** The automated foundation is real and genuinely passing under real Firebase emulators — this is meaningfully stronger evidence than a "534 tests, all green" headline number would suggest on its own, because it was independently re-verified against live services, not just re-read from a prior report. But per Rule/§39, this cannot be marked COMPLETE: manual QA, browser E2E, performance, and load testing are all BLOCKED by real environment constraints (not skipped for convenience), and one real coverage gap (D-1) touches the exact security control this audit was asked to re-confirm.
 
 ## 26. Recommended Next Phase
@@ -263,24 +277,25 @@ Narrow follow-up to the audit above. Scope: **only D-1 and D-3.** No general ref
 2. **Unscoped path rejection** — `storagePath: 'temp/not-scoped.mp4'` (no `businesses/` prefix at all). Asserts rejection and no `inputClipIds` mutation.
 3. **Valid same-business success** — real clip bytes uploaded to the Storage emulator under `businesses/{businessId}/reels/{reelId}/input/...`, then `confirmReelClipUpload` called with that same path. Asserts a real `assetId` and signed `downloadURL` are returned, the `assets` Firestore doc is persisted with the correct `businessId`/`storagePath`, and the reel's `inputClipIds`/`status` are updated — proving the security check does not break legitimate uploads. This case has no equivalent in `confirmUpload.test.ts` (which only covers the two rejection cases).
 
-**Supporting infrastructure change:** `functions/src/testSetup.ts` previously initialized the Admin SDK with no `storageBucket` and no credential. That's sufficient for every existing test (none of them call `admin.storage()`), but the new success-path test needs a real Storage emulator round-trip including `getSignedUrl()`, which the Admin SDK refuses to attempt without both a bucket name and *some* credential to sign with locally (`Bucket name not specified or invalid` / `Could not load the default credentials`). Added a `storageBucket` and a throwaway, locally-generated RSA keypair passed as `credential.cert(...)` — signing is computed locally from the private key and never touches the network or a real GCP project; it only needs to satisfy the SDK's precondition, and the resulting URL is only ever checked against the Storage *emulator* (which does not verify signatures), never real GCS. No security-relevant code path is mocked — the ownership check, Firestore writes, and Storage read/write all execute for real. Confirmed harmless: full functions suite still 0 failures after this change.
+**Supporting infrastructure change:** `functions/src/testSetup.ts` previously initialized the Admin SDK with no `storageBucket` and no credential. That's sufficient for every existing test (none of them call `admin.storage()`), but the new success-path test needs a real Storage emulator round-trip including `getSignedUrl()`, which the Admin SDK refuses to attempt without both a bucket name and _some_ credential to sign with locally (`Bucket name not specified or invalid` / `Could not load the default credentials`). Added a `storageBucket` and a throwaway, locally-generated RSA keypair passed as `credential.cert(...)` — signing is computed locally from the private key and never touches the network or a real GCP project; it only needs to satisfy the SDK's precondition, and the resulting URL is only ever checked against the Storage _emulator_ (which does not verify signatures), never real GCS. No security-relevant code path is mocked — the ownership check, Firestore writes, and Storage read/write all execute for real. Confirmed harmless: full functions suite still 0 failures after this change.
 
 **Comparison table (as requested by §7 of the remediation brief):**
 
-| Security property | confirmUpload | confirmReelClipUpload |
-|---|---|---|
-| Auth required | Yes (`verifyAuth`/`validatedCallable`) | Yes (same) |
-| App Check | Yes (`enforceAppCheck: true`) | Yes (same) |
-| Business authorization | Yes (`verifyBusinessAccess`) | Yes (same) |
-| storagePath validation | Yes (`expectedPrefix` check) | Yes (same, identical pattern) |
-| Cross-business rejection | Yes — tested | Yes — tested (new) |
-| Unscoped path rejection | Yes — tested | Yes — tested (new) |
-| Valid same-business path | Not tested (no test exists) | Tested (new — stronger coverage than the reference file) |
-| Regression test | `confirmUpload.test.ts` | `confirmReelClipUpload.test.ts` (new) |
+| Security property        | confirmUpload                          | confirmReelClipUpload                                    |
+| ------------------------ | -------------------------------------- | -------------------------------------------------------- |
+| Auth required            | Yes (`verifyAuth`/`validatedCallable`) | Yes (same)                                               |
+| App Check                | Yes (`enforceAppCheck: true`)          | Yes (same)                                               |
+| Business authorization   | Yes (`verifyBusinessAccess`)           | Yes (same)                                               |
+| storagePath validation   | Yes (`expectedPrefix` check)           | Yes (same, identical pattern)                            |
+| Cross-business rejection | Yes — tested                           | Yes — tested (new)                                       |
+| Unscoped path rejection  | Yes — tested                           | Yes — tested (new)                                       |
+| Valid same-business path | Not tested (no test exists)            | Tested (new — stronger coverage than the reference file) |
+| Regression test          | `confirmUpload.test.ts`                | `confirmReelClipUpload.test.ts` (new)                    |
 
 No implementation mismatch found; both endpoints already had equivalent security code. Nothing in `confirmUpload.ts`/`confirmReelClipUpload.ts` was changed.
 
 **Test evidence (real Firebase emulator, Auth+Firestore+Storage, project `demo-mitra`):**
+
 ```
 PASS src/functions/reels/confirmReelClipUpload.test.ts
   confirmReelClipUpload — storagePath ownership (Phase 37 D-1)
@@ -290,7 +305,9 @@ PASS src/functions/reels/confirmReelClipUpload.test.ts
 Test Suites: 1 passed, 1 total
 Tests:       3 passed, 3 total
 ```
+
 `confirmUpload.test.ts` re-run immediately after (same emulator session) — no regression:
+
 ```
 PASS src/functions/assets/confirmUpload.test.ts
 Tests:       2 passed, 2 total
@@ -301,9 +318,10 @@ Tests:       2 passed, 2 total
 **Root cause (independently verified, not merely trusted from the prior audit):** `tests/security.test.ts`'s `beforeAll` set `testEnv = null` and only logged+returned when `FIRESTORE_EMULATOR_HOST` was unset; every one of its 30 `test(...)` bodies then began with `if (skipIfNoEnv()) return;`. A Jest test whose callback returns without throwing is recorded as **PASSED**. Confirmed by running the suite with no emulator env vars set: all 30 tests reported PASSED with a single `console.log('Skipping...')` as the only evidence anything was different — the Jest summary was indistinguishable from a real pass.
 
 **Same defect found in three more files during the required sweep (§13 of the brief)** — not just `tests/security.test.ts`:
+
 - `tests/storage.test.ts` — identical `skipIfNoEnv()`-in-every-test pattern, gated on `STORAGE_EMULATOR_HOST`.
 - `tests/phase27-authz.test.ts` — identical pattern, gated on `FIRESTORE_EMULATOR_HOST`.
-- `tests/phase27-bulk-approval-auth-roles.test.ts` — identical pattern for its real (non-skipped) tests. (Its five `test.skip('... not implemented ...')` calls are a *different*, legitimate pattern — an honest "feature doesn't exist yet" marker — and were left untouched.)
+- `tests/phase27-bulk-approval-auth-roles.test.ts` — identical pattern for its real (non-skipped) tests. (Its five `test.skip('... not implemented ...')` calls are a _different_, legitimate pattern — an honest "feature doesn't exist yet" marker — and were left untouched.)
 
 All four were fixed the same way, since all four exhibited the exact same defect (a required security test silently reporting PASS despite not executing), not a different one requiring a different judgment call.
 
@@ -311,11 +329,12 @@ All four were fixed the same way, since all four exhibited the exact same defect
 
 **Why this satisfies "no false PASS":** `describe.skip` makes Jest itself classify every test inside as **SKIPPED** in the run summary (a distinct, visible count), never PASSED. This is a structural guarantee from Jest's own test runner, not a convention that can be silently violated by a future edit the way a manual `if (...) return;` could be.
 
-**CI fail-closed behavior confirmed unchanged:** `.github/workflows/ci-cd.yml`'s `security-rules-test` job (`ci-cd.yml:92-127`) always wraps the security test run in `firebase emulators:exec --only firestore,auth,storage ... "npm run test -- --testPathPattern=\"security\" ..."` — `emulators:exec` itself fails the whole CI step if the emulator doesn't start, before any test runs. So CI was already fail-closed at the process level regardless of this in-file guard; this fix closes the *local/manual* blind spot (a developer running `npm test` on a laptop with no emulator running, who would previously see 30 green checkmarks and reasonably conclude tenant-isolation was verified).
+**CI fail-closed behavior confirmed unchanged:** `.github/workflows/ci-cd.yml`'s `security-rules-test` job (`ci-cd.yml:92-127`) always wraps the security test run in `firebase emulators:exec --only firestore,auth,storage ... "npm run test -- --testPathPattern=\"security\" ..."` — `emulators:exec` itself fails the whole CI step if the emulator doesn't start, before any test runs. So CI was already fail-closed at the process level regardless of this in-file guard; this fix closes the _local/manual_ blind spot (a developer running `npm test` on a laptop with no emulator running, who would previously see 30 green checkmarks and reasonably conclude tenant-isolation was verified).
 
 **Harness evidence — both required states, this session:**
 
 CASE A (emulator present — `FIRESTORE_EMULATOR_HOST=127.0.0.1:8080`, `STORAGE_EMULATOR_HOST=http://127.0.0.1:9199`, live `firebase emulators:start --only auth,firestore,storage --project demo-mitra`):
+
 ```
 PASS tests/security.test.ts
 PASS tests/storage.test.ts
@@ -325,23 +344,28 @@ PASS tests/phase27-bulk-approval-auth-roles.test.ts
 Test Suites: 10 passed, 10 total
 Tests:       6 skipped, 121 passed, 127 total
 ```
+
 The 6 skips here are the pre-existing, individually-labeled `test.skip(...)` feature-gap markers (§5/§21 of the audit above), unrelated to D-3.
 
 CASE B (no emulator env vars set):
+
 ```
 Test Suites: 4 skipped, 28 passed, 28 of 32 total
 Tests:       67 skipped, 247 passed, 314 total
 ```
+
 All four affected files now show as **skipped suites** (`security.test.ts`, `storage.test.ts`, `phase27-authz.test.ts`, `phase27-bulk-approval-auth-roles.test.ts`) — 60 tests that previously reported PASSED with zero assertions now honestly report SKIPPED (67 skipped now vs. 7 skipped in the original audit's no-emulator baseline; the delta of 60 is exactly the number of tests these four files contain). No test that used to fail now fails; no test that used to genuinely pass now fails.
 
 ## Post-Remediation Test Results
 
 **No emulator** (`npx jest --ci`):
+
 - Root: `Test Suites: 4 skipped, 28 passed, 28 of 32 total` / `Tests: 67 skipped, 247 passed, 314 total`
 - Functions: `Test Suites: 22 skipped, 19 passed, 19 of 41 total` / `Tests: 96 skipped, 199 passed, 295 total`
 - Combined: **73 suites (47 passed, 26 skipped-as-suites), 609 tests (446 passed, 163 skipped, 0 failed)**
 
 **With real Firebase emulators (Auth :9099, Firestore :8080, Storage :9199, project `demo-mitra`, `--runInBand` for the functions run to avoid the pre-existing timing-sensitive concurrency test's parallel-worker flakiness — see note below):**
+
 - Root: `Test Suites: 32 passed, 32 total` / `Tests: 7 skipped, 307 passed, 314 total` — **identical to the original audit's emulator-live baseline**, confirming D-3's fix changed only the no-emulator behavior, not the emulator-present behavior.
 - Functions: `Test Suites: 2 skipped, 39 passed, 39 of 41 total` / `Tests: 2 skipped, 293 passed, 295 total`. The 2 skipped tests are pre-existing, individually-labeled Phase 30/31 "no verticalProfile" cases, unrelated to this remediation.
 - **Combined: 73 suites (39+32=71 passed as full suites, 2 skipped), 609 tests, 600 passed, 9 skipped, 0 failed.**
@@ -359,15 +383,15 @@ The 595→609 change vs. the original audit's headline number is **not test-coun
 
 ## Files Changed (D-1 + D-3 only)
 
-| File | Purpose | Summary |
-|---|---|---|
-| `functions/src/functions/reels/confirmReelClipUpload.test.ts` | New | D-1: emulator-backed cross-business/unscoped/valid-path regression coverage for `confirmReelClipUpload`, mirroring `confirmUpload.test.ts` |
-| `functions/src/testSetup.ts` | Modified | D-1 support: added `storageBucket` + a throwaway local signing credential to the shared test Admin SDK app, so the new success-path test can exercise a real `getSignedUrl()` round-trip against the Storage emulator |
-| `tests/security.test.ts` | Modified | D-3: replaced the per-test `skipIfNoEnv()` early-return with `describeIfEmulator` (whole-suite skip) so a missing emulator reports SKIPPED, not PASSED |
-| `tests/storage.test.ts` | Modified | D-3: same fix, same defect, found during the required pattern sweep |
-| `tests/phase27-authz.test.ts` | Modified | D-3: same fix, same defect, found during the required pattern sweep |
-| `tests/phase27-bulk-approval-auth-roles.test.ts` | Modified | D-3: same fix, same defect (its unrelated `test.skip` feature-gap markers were left untouched) |
-| `docs/PHASE_37_TESTING_QA_AUDIT_REPORT.md` | Modified | This remediation section |
+| File                                                          | Purpose  | Summary                                                                                                                                                                                                               |
+| ------------------------------------------------------------- | -------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `functions/src/functions/reels/confirmReelClipUpload.test.ts` | New      | D-1: emulator-backed cross-business/unscoped/valid-path regression coverage for `confirmReelClipUpload`, mirroring `confirmUpload.test.ts`                                                                            |
+| `functions/src/testSetup.ts`                                  | Modified | D-1 support: added `storageBucket` + a throwaway local signing credential to the shared test Admin SDK app, so the new success-path test can exercise a real `getSignedUrl()` round-trip against the Storage emulator |
+| `tests/security.test.ts`                                      | Modified | D-3: replaced the per-test `skipIfNoEnv()` early-return with `describeIfEmulator` (whole-suite skip) so a missing emulator reports SKIPPED, not PASSED                                                                |
+| `tests/storage.test.ts`                                       | Modified | D-3: same fix, same defect, found during the required pattern sweep                                                                                                                                                   |
+| `tests/phase27-authz.test.ts`                                 | Modified | D-3: same fix, same defect, found during the required pattern sweep                                                                                                                                                   |
+| `tests/phase27-bulk-approval-auth-roles.test.ts`              | Modified | D-3: same fix, same defect (its unrelated `test.skip` feature-gap markers were left untouched)                                                                                                                        |
+| `docs/PHASE_37_TESTING_QA_AUDIT_REPORT.md`                    | Modified | This remediation section                                                                                                                                                                                              |
 
 No application/production code (`confirmUpload.ts`, `confirmReelClipUpload.ts`, security rules, middleware) was modified by this remediation — the pre-existing uncommitted changes to some of those files (visible in git status at session start) predate this remediation and were not touched further.
 
@@ -399,15 +423,19 @@ npm run functions:typecheck / npm run functions:build / npm run functions:lint  
 ## Final Verdict
 
 ### D-1 — confirmReelClipUpload Regression Coverage
+
 **VERIFIED**
 
 ### D-3 — Security Test Harness Integrity
+
 **VERIFIED**
 
 ### Automated QA Remediation
+
 **VERIFIED**
 
 ### Overall Phase 37 Testing & QA
+
 **PARTIAL** — D-1 and D-3 are closed with real, emulator-backed evidence, but browser E2E, manual QA, performance, and load testing remain BLOCKED by the same pre-existing environment constraints documented in the audit above. This remediation does not change that verdict.
 
 ---
@@ -423,6 +451,7 @@ Independent closure audit. This section does not repeat the remediation itself (
 **Remediation (re-inspected via `git diff`, not re-derived from the prior report's prose):** `functions/src/functions/reels/confirmReelClipUpload.test.ts` (new, 3 tests) + `functions/src/testSetup.ts` (`storageBucket` + throwaway local-signing credential added to the shared Admin SDK test app, needed only for `getSignedUrl()` to succeed against the Storage emulator). Confirmed via `git diff -- functions/src/functions/assets/confirmUpload.ts functions/src/functions/reels/confirmReelClipUpload.ts` that the `storagePath` ownership check itself (`expectedPrefix` / `permission-denied`) is present, unweakened, and identical in shape between both endpoints.
 
 **Verification — independently re-run this session, real Firebase emulator (Auth :9099, Firestore :8080, Storage :9199, project `demo-mitra`, confirmed listening via `curl` before running):**
+
 ```
 $ npx jest --ci --runInBand src/functions/reels/confirmReelClipUpload.test.ts src/functions/assets/confirmUpload.test.ts
 PASS src/functions/reels/confirmReelClipUpload.test.ts
@@ -436,6 +465,7 @@ PASS src/functions/assets/confirmUpload.test.ts
 Test Suites: 2 passed, 2 total
 Tests:       5 passed, 5 total
 ```
+
 Maps directly to the three required cases: TEST A (valid same-business path succeeds — `accepts a valid storagePath...`, real signed URL + Firestore asset doc + reel `inputClipIds` update, all verified in the test body), TEST B (cross-business rejection — `CRITICAL: rejects...`, plus an explicit post-assertion that `inputClipIds`/`status` are untouched, proving no side effect beyond the thrown error), TEST C (unscoped path rejection — `rejects a storagePath with no business prefix...`, same no-mutation check). `confirmUpload.test.ts` re-run in the same session confirms no regression to the reference implementation.
 
 **Status: VERIFIED**
@@ -451,6 +481,7 @@ Re-run above alongside D-1 (same emulator session, same command) — both pre-ex
 **Remediation (re-confirmed via `git diff -- tests/security.test.ts` this session):** top-level `describe(...)` replaced with `const describeIfEmulator = emulatorHost ? describe : describe.skip; describeIfEmulator(...)`; every `if (skipIfNoEnv()) return;` line and the now-dead `skipIfNoEnv` helper removed. No assertion, rule text, or Firestore/Storage operation in any test body was touched — confirmed by reading the full diff, which touches only the gating mechanism (`+29 -31` lines, entirely header comment + gating boilerplate).
 
 **Verification without emulator (this session, `FIRESTORE_EMULATOR_HOST`/`STORAGE_EMULATOR_HOST` unset):**
+
 ```
 $ npx jest --ci --verbose tests/
 PASS tests/environment.test.ts
@@ -462,9 +493,11 @@ PASS tests/assetService.test.ts
 Test Suites: 4 skipped, 6 passed, 6 of 10 total
 Tests:       66 skipped, 61 passed, 127 total
 ```
+
 `security.test.ts` is one of the 4 **skipped suites** — it does not appear in the PASS list at all, and its 30 tests are among the 66 SKIPPED, not among the 61 PASSED. This is the direct, structural proof the false-PASS defect is gone: Jest's own suite-level skip mechanism, not a self-reported log line, is what now marks these tests unavailable.
 
 **Verification with real emulator (this session, same live instance as D-1):**
+
 ```
 $ FIRESTORE_EMULATOR_HOST=127.0.0.1:8080 FIREBASE_AUTH_EMULATOR_HOST=127.0.0.1:9099 \
   FIREBASE_STORAGE_EMULATOR_HOST=127.0.0.1:9199 STORAGE_EMULATOR_HOST=http://127.0.0.1:9199 \
@@ -475,6 +508,7 @@ PASS tests/security.test.ts
 Test Suites: 10 passed, 10 total
 Tests:       6 skipped, 121 passed, 127 total
 ```
+
 All 10 suites in `tests/` — including `security.test.ts` — now execute and pass for real. The 6 remaining skips are the pre-existing, individually-labeled `test.skip(...)` feature-gap markers (agency_admin role / bulk_jobs collection not implemented, one jsdom-incompatible compression test) — unrelated to D-3, unchanged, and correctly still classified as skipped rather than passed-by-omission.
 
 **Status: VERIFIED**
@@ -491,18 +525,18 @@ Each file was verified independently (its own diff read, its own no-emulator run
 
 ## Test Inventory — reconciled, no double counting
 
-| Suite group | Files | Tests (total) | No-emulator: passed / skipped | Emulator: passed / skipped | Failed |
-|---|---:|---:|---|---|---|
-| Root, non-`tests/` (`src/**/*.test.tsx`, component/service unit) | 22 | 187 | 187 / 0 | 187 / 0 (unaffected by emulator) | 0 |
-| Root `tests/` dir (Firestore/Storage rules + service-level) | 10 | 127 | 61 / 66 | 121 / 6 | 0 |
-| Functions unit (no Firestore/Storage dependency) | ~19 | 199 | 199 / 0 | 199 / 0 (unaffected by emulator) | 0 |
-| Functions integration (emulator-gated, incl. new `confirmReelClipUpload.test.ts`) | ~20 | 94 | 0 / 94 | 92 / 2 | 0 |
-| Functions, special-env-gated (`SIMULATE_FIRESTORE_OUTAGE`, unrelated Phase 38 work) | 2 | 2 | 0 / 2 | 0 / 2 (needs a different env var, not just the emulator) | 0 |
-| **Root total** | **32** | **314** | **247 / 67** | **307 / 7** | **0** |
-| **Functions total** | **41** | **295** | **199 / 96** | **293 / 2** | **0** |
-| **Grand total** | **73** | **609** | **446 / 163** | **600 / 9** | **0** |
+| Suite group                                                                         |  Files | Tests (total) | No-emulator: passed / skipped | Emulator: passed / skipped                               | Failed |
+| ----------------------------------------------------------------------------------- | -----: | ------------: | ----------------------------- | -------------------------------------------------------- | ------ |
+| Root, non-`tests/` (`src/**/*.test.tsx`, component/service unit)                    |     22 |           187 | 187 / 0                       | 187 / 0 (unaffected by emulator)                         | 0      |
+| Root `tests/` dir (Firestore/Storage rules + service-level)                         |     10 |           127 | 61 / 66                       | 121 / 6                                                  | 0      |
+| Functions unit (no Firestore/Storage dependency)                                    |    ~19 |           199 | 199 / 0                       | 199 / 0 (unaffected by emulator)                         | 0      |
+| Functions integration (emulator-gated, incl. new `confirmReelClipUpload.test.ts`)   |    ~20 |            94 | 0 / 94                        | 92 / 2                                                   | 0      |
+| Functions, special-env-gated (`SIMULATE_FIRESTORE_OUTAGE`, unrelated Phase 38 work) |      2 |             2 | 0 / 2                         | 0 / 2 (needs a different env var, not just the emulator) | 0      |
+| **Root total**                                                                      | **32** |       **314** | **247 / 67**                  | **307 / 7**                                              | **0**  |
+| **Functions total**                                                                 | **41** |       **295** | **199 / 96**                  | **293 / 2**                                              | **0**  |
+| **Grand total**                                                                     | **73** |       **609** | **446 / 163**                 | **600 / 9**                                              | **0**  |
 
-Derivation, to make the reconciliation checkable by another engineer: `609 = 314 (root, one `npx jest --ci` run at repo root) + 295 (functions, one `npx jest --ci` run inside `functions/`)`. These are two disjoint Jest projects (separate `jest.config`s, separate `package.json`s, no shared test files) — there is no overlap to double-count. The prior audit's "595 total, 42 suites" figure came from summing "Root suite... 314 total" and "Root tests/ suite, re-run with emulators live... 127 total" as if additive in its own §4 table, when `tests/` is a subdirectory already included inside the 314 — the same physical files counted once under no-emulator conditions and again under emulator conditions. This closure audit re-derives 609 from two clean, non-overlapping `npx jest --ci` invocations and confirms the arithmetic holds exactly (32+41=73 suites; 314+295=609 tests; 247+199=446 no-emulator passed; 307+293=600 emulator passed).
+Derivation, to make the reconciliation checkable by another engineer: `609 = 314 (root, one `npx jest --ci`run at repo root) + 295 (functions, one`npx jest --ci`run inside`functions/`)`. These are two disjoint Jest projects (separate `jest.config`s, separate `package.json`s, no shared test files) — there is no overlap to double-count. The prior audit's "595 total, 42 suites" figure came from summing "Root suite... 314 total" and "Root tests/ suite, re-run with emulators live... 127 total" as if additive in its own §4 table, when `tests/` is a subdirectory already included inside the 314 — the same physical files counted once under no-emulator conditions and again under emulator conditions. This closure audit re-derives 609 from two clean, non-overlapping `npx jest --ci` invocations and confirms the arithmetic holds exactly (32+41=73 suites; 314+295=609 tests; 247+199=446 no-emulator passed; 307+293=600 emulator passed).
 
 Re-run twice this session (once via `--verbose tests/`-scoped commands, once via full suite) — numbers were bit-for-bit identical both times for the no-emulator case, and identical for the emulator case except for the pre-existing, already-documented `usageControl.concurrency.test.ts` parallel-worker flakiness (fails under default parallel workers roughly 1 in 3 runs, passes every time under `--runInBand` or in isolation — confirmed again this session, unrelated to D-1/D-3, not touched).
 
@@ -538,6 +572,7 @@ $ git status --porcelain -- functions/src tests/ docs/ | grep -v "^??"
  M tests/security.test.ts                                  <- D-3 (this remediation)
  M tests/storage.test.ts                                   <- D-3 (this remediation)
 ```
+
 Plus new/untracked, attributable to D-1/D-3: `functions/src/functions/reels/confirmReelClipUpload.test.ts` (D-1), `docs/PHASE_37_TESTING_QA_AUDIT_REPORT.md` content (both the prior remediation section and this closure section). All other untracked files (`.vercelignore`, mascot art/scripts, `docs/PHASE_19B_*`/`PHASE_38*` reports, `functions/tsconfig.eslint.json`, the rate-limit/campaign-strategy test files, `golden-path-manual.mjs`, the `_*.mjs` scratch files, `src/app/icon.png`, `MitraShortLogo.tsx`) are pre-existing, unrelated work already present in the working tree before this remediation began (confirmed against the git status captured at the start of the original remediation session) and were not modified, staged, or reverted by this closure audit.
 
 **Scope verdict: clean.** Every file this remediation or this closure audit touched maps to D-1 or D-3. Every file that changed for an unrelated reason was left exactly as found.
@@ -558,20 +593,20 @@ No interactive browser session, Lighthouse run, or load-testing tool was availab
 
 ## FINAL PHASE 37 STATUS
 
-| Item | Result |
-|---|---|
-| Automated tests | VERIFIED |
-| Security regression | VERIFIED |
-| D-1 | VERIFIED |
-| D-3 | VERIFIED |
-| Typecheck (root + functions) | VERIFIED — both PASS, clean |
-| Build (`next build`) | VERIFIED — PASS, 22 routes |
-| Functions build (`tsc`) | VERIFIED — PASS, clean |
-| Functions lint | DEFERRED — 74 errors, 3 warnings, unchanged from the D-1/D-3 remediation, not fixed here (out of scope) |
-| Browser E2E | NOT VERIFIED — WDAC block did not reproduce this session, but the golden path still did not pass (no dev server running); not claimed as working |
-| Manual QA | BLOCKED / NOT VERIFIED — no interactive browser session available |
-| Performance | BLOCKED / NOT VERIFIED — no Lighthouse/measurement tooling run |
-| Load testing | BLOCKED / NOT VERIFIED — no safe load-testing environment available |
+| Item                         | Result                                                                                                                                           |
+| ---------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Automated tests              | VERIFIED                                                                                                                                         |
+| Security regression          | VERIFIED                                                                                                                                         |
+| D-1                          | VERIFIED                                                                                                                                         |
+| D-3                          | VERIFIED                                                                                                                                         |
+| Typecheck (root + functions) | VERIFIED — both PASS, clean                                                                                                                      |
+| Build (`next build`)         | VERIFIED — PASS, 22 routes                                                                                                                       |
+| Functions build (`tsc`)      | VERIFIED — PASS, clean                                                                                                                           |
+| Functions lint               | DEFERRED — 74 errors, 3 warnings, unchanged from the D-1/D-3 remediation, not fixed here (out of scope)                                          |
+| Browser E2E                  | NOT VERIFIED — WDAC block did not reproduce this session, but the golden path still did not pass (no dev server running); not claimed as working |
+| Manual QA                    | BLOCKED / NOT VERIFIED — no interactive browser session available                                                                                |
+| Performance                  | BLOCKED / NOT VERIFIED — no Lighthouse/measurement tooling run                                                                                   |
+| Load testing                 | BLOCKED / NOT VERIFIED — no safe load-testing environment available                                                                              |
 
 **Overall: PARTIAL**
 
@@ -579,24 +614,24 @@ No interactive browser session, Lighthouse run, or load-testing tool was availab
 
 ## Final Verification Matrix
 
-| Area | Verification Method | Result | Status |
-|---|---|---|---|
-| D-1 confirmReelClipUpload | Real Firebase emulator, `confirmReelClipUpload.test.ts` | 3/3 passed | VERIFIED |
-| confirmUpload regression | Real Firebase emulator, `confirmUpload.test.ts` | 2/2 passed | VERIFIED |
-| D-3 `security.test.ts` | No-emulator + real emulator, both states re-run | No emulator: suite SKIPPED (not PASSED). Emulator: 30/30 passed | VERIFIED |
-| `storage.test.ts` | No-emulator + real emulator | No emulator: suite SKIPPED. Emulator: 9/9 passed | VERIFIED |
-| `phase27-authz.test.ts` | No-emulator + real emulator | No emulator: suite SKIPPED. Emulator: all passed | VERIFIED |
-| `phase27-bulk-approval-auth-roles.test.ts` | No-emulator + real emulator | No emulator: suite SKIPPED. Emulator: non-`test.skip` cases passed, 5 legitimate `test.skip`s untouched | VERIFIED |
-| Full automated suite | `npx jest --ci` (root) + `npx jest --ci --runInBand` (functions), both emulator states | No emulator: 609 total, 446 passed, 163 skipped, 0 failed. Emulator: 609 total, 600 passed, 9 skipped, 0 failed | VERIFIED |
-| Typecheck | `npm run typecheck` + `npm run functions:typecheck` | Both PASS, clean | VERIFIED |
-| App build | `npm run build` | PASS, 22 routes | VERIFIED |
-| Functions build | `npm run functions:build` | PASS, clean | VERIFIED |
-| Functions lint | `npm run functions:lint` | 74 errors, 3 warnings (unchanged, pre-existing) | DEFERRED |
-| Browser E2E | `npx playwright test` (real attempt, this session) | Chromium launches (WDAC block did not reproduce); golden path failed on `ERR_CONNECTION_REFUSED` (no dev server running) | NOT VERIFIED |
-| Manual QA | N/A — no interactive session available | Not attempted | BLOCKED / NOT VERIFIED |
-| Performance | N/A — no measurement tooling run | Not attempted | BLOCKED / NOT VERIFIED |
-| Load testing | N/A — no safe environment | Not attempted | BLOCKED / NOT VERIFIED |
-| Overall Phase 37 | Combined evidence above | Two named defects closed; four QA categories remain unresolved | **PARTIAL** |
+| Area                                       | Verification Method                                                                    | Result                                                                                                                   | Status                 |
+| ------------------------------------------ | -------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------ | ---------------------- |
+| D-1 confirmReelClipUpload                  | Real Firebase emulator, `confirmReelClipUpload.test.ts`                                | 3/3 passed                                                                                                               | VERIFIED               |
+| confirmUpload regression                   | Real Firebase emulator, `confirmUpload.test.ts`                                        | 2/2 passed                                                                                                               | VERIFIED               |
+| D-3 `security.test.ts`                     | No-emulator + real emulator, both states re-run                                        | No emulator: suite SKIPPED (not PASSED). Emulator: 30/30 passed                                                          | VERIFIED               |
+| `storage.test.ts`                          | No-emulator + real emulator                                                            | No emulator: suite SKIPPED. Emulator: 9/9 passed                                                                         | VERIFIED               |
+| `phase27-authz.test.ts`                    | No-emulator + real emulator                                                            | No emulator: suite SKIPPED. Emulator: all passed                                                                         | VERIFIED               |
+| `phase27-bulk-approval-auth-roles.test.ts` | No-emulator + real emulator                                                            | No emulator: suite SKIPPED. Emulator: non-`test.skip` cases passed, 5 legitimate `test.skip`s untouched                  | VERIFIED               |
+| Full automated suite                       | `npx jest --ci` (root) + `npx jest --ci --runInBand` (functions), both emulator states | No emulator: 609 total, 446 passed, 163 skipped, 0 failed. Emulator: 609 total, 600 passed, 9 skipped, 0 failed          | VERIFIED               |
+| Typecheck                                  | `npm run typecheck` + `npm run functions:typecheck`                                    | Both PASS, clean                                                                                                         | VERIFIED               |
+| App build                                  | `npm run build`                                                                        | PASS, 22 routes                                                                                                          | VERIFIED               |
+| Functions build                            | `npm run functions:build`                                                              | PASS, clean                                                                                                              | VERIFIED               |
+| Functions lint                             | `npm run functions:lint`                                                               | 74 errors, 3 warnings (unchanged, pre-existing)                                                                          | DEFERRED               |
+| Browser E2E                                | `npx playwright test` (real attempt, this session)                                     | Chromium launches (WDAC block did not reproduce); golden path failed on `ERR_CONNECTION_REFUSED` (no dev server running) | NOT VERIFIED           |
+| Manual QA                                  | N/A — no interactive session available                                                 | Not attempted                                                                                                            | BLOCKED / NOT VERIFIED |
+| Performance                                | N/A — no measurement tooling run                                                       | Not attempted                                                                                                            | BLOCKED / NOT VERIFIED |
+| Load testing                               | N/A — no safe environment                                                              | Not attempted                                                                                                            | BLOCKED / NOT VERIFIED |
+| Overall Phase 37                           | Combined evidence above                                                                | Two named defects closed; four QA categories remain unresolved                                                           | **PARTIAL**            |
 
 ## Phase 37 Closure Decision
 

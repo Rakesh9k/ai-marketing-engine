@@ -24,7 +24,7 @@ findings materially shaped the design:
    recorded against. This is also why "subscription status" is sourced from the `subscriptions`
    collection directly (via the existing `getSubscriptionByUser`), not from analytics events.
 
-The five events that *do* carry a real `businessId`: `onboarding_complete`, `campaign_started`,
+The five events that _do_ carry a real `businessId`: `onboarding_complete`, `campaign_started`,
 `campaign_generated`, `asset_downloaded`, `whatsapp_clicked`. The dashboard aggregates four of
 these as ongoing metrics (`campaign_started`/`campaign_generated`/`asset_downloaded`/
 `whatsapp_clicked`); `onboarding_complete` is a one-time setup event, not a repeating usage metric,
@@ -34,7 +34,7 @@ Also confirmed and **not fixed in this phase** (out of scope — this is a read 
 write-path fix): `trackAnalyticsEvent.ts`'s ownership verification for `asset_downloaded`/
 `whatsapp_clicked` is a stub (confirmed still present, quoted verbatim in the audit) — any
 authenticated user can currently attach an arbitrary `businessId` to those two event types when
-*writing* them. See Known Limitations.
+_writing_ them. See Known Limitations.
 
 Also confirmed dead, unrelated to `analytics_events`: `firestore.indexes.json` defines indexes for
 `campaign_performance` and `whatsapp_leads` collections that **no code anywhere writes to**. These
@@ -46,14 +46,14 @@ index exists for it.
 
 ## Data Model
 
-| Question | Answer |
-|---|---|
-| Storage | `analytics_events/{eventId}`, one document per event, written only by `trackEvent()` (Cloud Functions / Admin SDK — client writes are blocked by `firestore.rules`: `allow write: if false`). |
-| Tenant/business ownership | The `businessId` field, present on 5 of 7 event types (see above). |
-| Event timestamp | `timestamp`: an ISO 8601 string (not a Firestore `Timestamp`) — confirmed and matched exactly in the new query. |
-| Event metadata | `metadata: Record<string, unknown>` — not used by this dashboard's aggregation (no metric here depends on metadata content). |
-| Authorization | **Not enforceable client-side.** `firestore.rules` only allows reading an event where `resource.data.userId == request.auth.uid` — there is no rule permitting a `businessId`-scoped read, so an agency member could never read a client business's events directly from the browser even if they had the right code. This is why aggregation happens in a new Cloud Function using the Admin SDK (bypasses rules) gated by the same `verifyBusinessAccess` used everywhere else in this app. |
-| Aggregation | Server-side, in the Cloud Function, per request — see Performance below for why precomputation isn't warranted yet. |
+| Question                  | Answer                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
+| ------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Storage                   | `analytics_events/{eventId}`, one document per event, written only by `trackEvent()` (Cloud Functions / Admin SDK — client writes are blocked by `firestore.rules`: `allow write: if false`).                                                                                                                                                                                                                                                                                                 |
+| Tenant/business ownership | The `businessId` field, present on 5 of 7 event types (see above).                                                                                                                                                                                                                                                                                                                                                                                                                            |
+| Event timestamp           | `timestamp`: an ISO 8601 string (not a Firestore `Timestamp`) — confirmed and matched exactly in the new query.                                                                                                                                                                                                                                                                                                                                                                               |
+| Event metadata            | `metadata: Record<string, unknown>` — not used by this dashboard's aggregation (no metric here depends on metadata content).                                                                                                                                                                                                                                                                                                                                                                  |
+| Authorization             | **Not enforceable client-side.** `firestore.rules` only allows reading an event where `resource.data.userId == request.auth.uid` — there is no rule permitting a `businessId`-scoped read, so an agency member could never read a client business's events directly from the browser even if they had the right code. This is why aggregation happens in a new Cloud Function using the Admin SDK (bypasses rules) gated by the same `verifyBusinessAccess` used everywhere else in this app. |
+| Aggregation               | Server-side, in the Cloud Function, per request — see Performance below for why precomputation isn't warranted yet.                                                                                                                                                                                                                                                                                                                                                                           |
 
 ---
 
@@ -65,6 +65,7 @@ A new callable, exported from `functions/src/index.ts` alongside `trackAnalytics
 shape: `{ businessId: string, days: 7 | 30 | 90 }` (Zod-validated, `days` defaults to 30).
 
 Flow:
+
 1. `verifyBusinessAccess(context.userId, businessId)` — the exact same authorization function
    every other business-scoped callable in this app uses (owner match, or `agency_member` role +
    matching `agencyId`). This is the entire isolation guarantee — nothing else in the function
@@ -89,6 +90,7 @@ five destinations," so Analytics joins Usage/Billing in the account menu instead
 that stated design intent rather than overriding it).
 
 The page:
+
 - Loads the user's businesses, defaults to the first, and (if more than one) shows a plain
   `<select>` business switcher.
 - Time-range control: three buttons (7/30/90 days), calling the backend with the selected value —
@@ -116,16 +118,17 @@ The page:
 
 ## Dashboard Metrics — what's shown and why each one is real
 
-| Metric | Source | Notes |
-|---|---|---|
-| Campaigns Generated | Count of `campaign_generated` events in range | Shown with "of N started" as context (from `campaign_started`), not a separate tile — both are real counts, not a computed ratio. |
-| Assets Downloaded | Count of `asset_downloaded` events in range | |
-| WhatsApp Clicks | Count of `whatsapp_clicked` events in range | See Known Limitations — this event's *write-time* ownership check is a stub, a pre-existing integrity caveat, not something this dashboard invents. |
-| Plan | The business owner's real `subscriptions` document (`planId`, `status`) | `null` (shown as "Free" / "No active subscription") is a genuine, known state — not "data unavailable." |
-| Activity over time | Daily count of `campaign_generated` events, one bar per calendar day in the selected range | Zero-event days are real zeros, included explicitly (never silently dropped). |
+| Metric              | Source                                                                                     | Notes                                                                                                                                               |
+| ------------------- | ------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Campaigns Generated | Count of `campaign_generated` events in range                                              | Shown with "of N started" as context (from `campaign_started`), not a separate tile — both are real counts, not a computed ratio.                   |
+| Assets Downloaded   | Count of `asset_downloaded` events in range                                                |                                                                                                                                                     |
+| WhatsApp Clicks     | Count of `whatsapp_clicked` events in range                                                | See Known Limitations — this event's _write-time_ ownership check is a stub, a pre-existing integrity caveat, not something this dashboard invents. |
+| Plan                | The business owner's real `subscriptions` document (`planId`, `status`)                    | `null` (shown as "Free" / "No active subscription") is a genuine, known state — not "data unavailable."                                             |
+| Activity over time  | Daily count of `campaign_generated` events, one bar per calendar day in the selected range | Zero-event days are real zeros, included explicitly (never silently dropped).                                                                       |
 
 **Metrics deliberately NOT shown**, because no reliable source exists for them — confirmed during
 the audit above, not assumed:
+
 - **Campaign performance / ROI** (`campaignHistory.performance.whatsappClicks`/`inquiries`) —
   confirmed in the Phase 28 audit, and re-confirmed here, to be dead schema: initialized to `[]`
   once at business creation and never written to by anything.
@@ -139,7 +142,7 @@ No metric on this dashboard displays a literal "Data not available yet" placehol
 metric the phase brief names (`campaigns generated`, `assets downloaded`, `WhatsApp clicks`,
 `subscription status`, `campaign activity over time`) turned out to have a real, working data
 source once audited — the placeholder text exists in the design but was never needed in practice.
-What *does* distinguish "no data" from "zero, but real": the empty-state screen (`discovering`
+What _does_ distinguish "no data" from "zero, but real": the empty-state screen (`discovering`
 mascot, "No activity yet in this period") only appears when **zero events of any kind** were found
 for the business in the range; if even one event exists, the real per-metric zeros are shown as
 actual "0" tiles, because those are genuinely known values, not missing ones.
@@ -150,12 +153,13 @@ actual "0" tiles, because those are genuinely known values, not missing ones.
 
 Six new tests in `getAnalyticsDashboard.emulator.test.ts` (Firestore-emulator-gated, same pattern
 as `createBusiness.test.ts`) prove, against the real authorization logic (not a mock of it):
+
 1. A business owner can read their own business's analytics, and the returned counts exactly match
    the events actually seeded (not merely "some non-zero number").
 2. A 7-day range genuinely excludes an event seeded 30 days ago — the timestamp filter is real.
 3. **Business A's owner cannot read Business B's analytics** — rejected with "access denied."
 4. **An agency member correctly assigned to a client business (matching `agencyId`) CAN read it.**
-5. **An agency member from a *different* agency cannot** — proving the check is a real match, not a
+5. **An agency member from a _different_ agency cannot** — proving the check is a real match, not a
    blanket "any agency member" bypass.
 6. A business with zero events returns real zero totals, not an error — and a nonexistent business
    is rejected with "not found."
@@ -195,17 +199,17 @@ report instead.
 
 ## Verification Run
 
-| Command | Location | Result |
-|---|---|---|
-| `npm run typecheck` | frontend | **PASS** |
-| `npm run typecheck` | `functions/` | **PASS** |
-| `npm run build` (`next build`) | frontend | **PASS** — 19 routes, including the new `/analytics` |
-| `npm run build` (`tsc`) | `functions/` | **PASS** |
-| `npm run lint` | frontend | **PASS** — zero errors |
-| `npm run lint` | `functions/` (scoped: every file touched/added this phase) | **PASS** — `functions/analytics/getAnalyticsDashboard.ts` and `index.ts` both clean. The two new `*.test.ts` files hit the same pre-existing, already-documented "not in tsconfig project" parse gap from Phase 28/29/30/31 (not a regression — consistent with every prior phase's test files). |
-| `npm run lint` | `functions/` (repo-wide, unscoped) | **FAIL** — same pre-existing baseline documented since Phase 28, unchanged in kind by this phase. |
-| `npm test` | frontend (jest) | **PASS** — 15 suites (was 14), 170 passed (was 164) / 7 skipped — the +1 suite / +6 tests are exactly the new `analytics/page.test.tsx`. |
-| `npm test` | `functions/` (jest) | **PASS** — 16 of 30 suites ran (was 15 of 28), 169 passed (was 161) / 65 skipped (was 58) — the delta is exactly this phase's 8 runnable unit tests + 7 emulator-gated tests. |
+| Command                        | Location                                                   | Result                                                                                                                                                                                                                                                                                           |
+| ------------------------------ | ---------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `npm run typecheck`            | frontend                                                   | **PASS**                                                                                                                                                                                                                                                                                         |
+| `npm run typecheck`            | `functions/`                                               | **PASS**                                                                                                                                                                                                                                                                                         |
+| `npm run build` (`next build`) | frontend                                                   | **PASS** — 19 routes, including the new `/analytics`                                                                                                                                                                                                                                             |
+| `npm run build` (`tsc`)        | `functions/`                                               | **PASS**                                                                                                                                                                                                                                                                                         |
+| `npm run lint`                 | frontend                                                   | **PASS** — zero errors                                                                                                                                                                                                                                                                           |
+| `npm run lint`                 | `functions/` (scoped: every file touched/added this phase) | **PASS** — `functions/analytics/getAnalyticsDashboard.ts` and `index.ts` both clean. The two new `*.test.ts` files hit the same pre-existing, already-documented "not in tsconfig project" parse gap from Phase 28/29/30/31 (not a regression — consistent with every prior phase's test files). |
+| `npm run lint`                 | `functions/` (repo-wide, unscoped)                         | **FAIL** — same pre-existing baseline documented since Phase 28, unchanged in kind by this phase.                                                                                                                                                                                                |
+| `npm test`                     | frontend (jest)                                            | **PASS** — 15 suites (was 14), 170 passed (was 164) / 7 skipped — the +1 suite / +6 tests are exactly the new `analytics/page.test.tsx`.                                                                                                                                                         |
+| `npm test`                     | `functions/` (jest)                                        | **PASS** — 16 of 30 suites ran (was 15 of 28), 169 passed (was 161) / 65 skipped (was 58) — the delta is exactly this phase's 8 runnable unit tests + 7 emulator-gated tests.                                                                                                                    |
 
 **Not verified in this environment:** a live browser/device check of the responsive layout. The
 mobile-safety of the layout (stat-card grid `grid-cols-1 sm:grid-cols-2 lg:grid-cols-4`, header
@@ -223,10 +227,10 @@ exercise CSS breakpoints).
 1. **`whatsapp_clicked`/`asset_downloaded` write-time ownership is unverified** (pre-existing,
    confirmed still present in `trackAnalyticsEvent.ts`, not fixed in this phase — it's a write-path
    integrity issue, and this phase only builds a read path). Practical effect: a business owner
-   could theoretically inflate their *own* business's WhatsApp-click or download counts by calling
+   could theoretically inflate their _own_ business's WhatsApp-click or download counts by calling
    the callable directly with fabricated values. They still cannot see or affect any other
    business's numbers — `getAnalyticsDashboard`'s authorization is independent of this gap and
-   fully closes it for the *read* side, which is this phase's actual scope.
+   fully closes it for the _read_ side, which is this phase's actual scope.
 2. **`signup` and `subscription_started` are structurally unattributable to a business** and are
    excluded from this dashboard entirely, not approximated.
 3. **No precomputed rollups** — acceptable now per the Performance analysis above, with a concrete,

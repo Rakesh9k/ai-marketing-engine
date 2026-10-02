@@ -123,9 +123,10 @@ UI components → feature services (some call Functions, some call Firestore dir
 ```
 
 with the **actual security boundary living in `firestore.rules`/`storage.rules`
-+ Cloud Function authorization**, not in "the frontend only talks to Functions."
-Direct client Firestore reads are pervasive and intentional; direct client
-Firestore **writes** are almost entirely eliminated except one (see §29).
+
+- Cloud Function authorization**, not in "the frontend only talks to Functions."
+  Direct client Firestore reads are pervasive and intentional; direct client
+  Firestore **writes** are almost entirely eliminated except one (see §29).
 
 ## 5. Frontend Architecture
 
@@ -136,21 +137,21 @@ unauthenticated, wraps children in each route's `layout.tsx`) and
 `PublicOnlyRoute` (redirect to `/dashboard` if authenticated, used inline in
 login/signup/forgot-password, which have no `layout.tsx`).
 
-| Route | Auth gate | Backend interaction |
-|---|---|---|
-| `/` | public | none |
-| `/login`, `/signup`, `/forgot-password` | `PublicOnlyRoute` | Firebase Auth SDK only |
-| `/onboarding` | **no `ProtectedRoute`/`layout.tsx`** — relies on inline `useAuth()` check only | `createBusiness` callable |
-| `/dashboard` | `ProtectedRoute` | direct Firestore reads only |
-| `/business-profile` | `ProtectedRoute` | `updateBusiness`, `updateBusinessBrain` callables (6 wizard-step submits) |
-| `/brand` | `ProtectedRoute` | direct Firestore read **and write** (`brandKitService.upsert`, client `setDoc`) |
-| `/campaigns`, `/campaigns/[id]` | `ProtectedRoute` | direct reads + `getCampaign`/`getCampaignPerformance` callables (staleness/perf checks) |
-| `/campaigns/new` | `ProtectedRoute` | `generateCampaignStrategy` callable |
-| `/products`, `/products/new` | `ProtectedRoute` | direct reads + `createProduct` callable; upload via signed-URL flow |
-| `/reels`, `/reels/new` | **no `layout.tsx`/`ProtectedRoute` found** | `reelService` callables + direct Firestore realtime listener for progress |
-| `/analytics` | `ProtectedRoute` | `getAnalyticsDashboard` callable (deliberately not a direct read — it's a server-side aggregation) |
-| `/billing` | `ProtectedRoute` | `createSubscription`/`verifyPayment` callables + client-side Razorpay Checkout.js |
-| `/usage` | `ProtectedRoute` | direct Firestore reads only |
+| Route                                   | Auth gate                                                                      | Backend interaction                                                                                |
+| --------------------------------------- | ------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------- |
+| `/`                                     | public                                                                         | none                                                                                               |
+| `/login`, `/signup`, `/forgot-password` | `PublicOnlyRoute`                                                              | Firebase Auth SDK only                                                                             |
+| `/onboarding`                           | **no `ProtectedRoute`/`layout.tsx`** — relies on inline `useAuth()` check only | `createBusiness` callable                                                                          |
+| `/dashboard`                            | `ProtectedRoute`                                                               | direct Firestore reads only                                                                        |
+| `/business-profile`                     | `ProtectedRoute`                                                               | `updateBusiness`, `updateBusinessBrain` callables (6 wizard-step submits)                          |
+| `/brand`                                | `ProtectedRoute`                                                               | direct Firestore read **and write** (`brandKitService.upsert`, client `setDoc`)                    |
+| `/campaigns`, `/campaigns/[id]`         | `ProtectedRoute`                                                               | direct reads + `getCampaign`/`getCampaignPerformance` callables (staleness/perf checks)            |
+| `/campaigns/new`                        | `ProtectedRoute`                                                               | `generateCampaignStrategy` callable                                                                |
+| `/products`, `/products/new`            | `ProtectedRoute`                                                               | direct reads + `createProduct` callable; upload via signed-URL flow                                |
+| `/reels`, `/reels/new`                  | **no `layout.tsx`/`ProtectedRoute` found**                                     | `reelService` callables + direct Firestore realtime listener for progress                          |
+| `/analytics`                            | `ProtectedRoute`                                                               | `getAnalyticsDashboard` callable (deliberately not a direct read — it's a server-side aggregation) |
+| `/billing`                              | `ProtectedRoute`                                                               | `createSubscription`/`verifyPayment` callables + client-side Razorpay Checkout.js                  |
+| `/usage`                                | `ProtectedRoute`                                                               | direct Firestore reads only                                                                        |
 
 **Gap to verify further**: `/onboarding` and `/reels*` have no route-level auth
 guard — an unauthenticated visitor is not redirected before the in-page
@@ -202,6 +203,7 @@ concerns live in `functions/src/middleware/`, not duplicated per-function:
 ## 7. Firebase Architecture
 
 Client init (`src/lib/firebase/client.ts:98-143`), exact order:
+
 1. SSR guard (`typeof window === 'undefined'` → all exports `undefined`) — every consumer function checks-and-throws rather than crashing silently.
 2. `initializeApp()` (or reuse existing app via `getApps()`).
 3. **App Check initializes immediately after `initializeApp`, before Auth/Firestore/Storage/Functions** (explicit, documented design choice — comment at lines 44-49).
@@ -296,23 +298,23 @@ patterns:
 
 Full data-model map (owner/parent, real vs. schema-only):
 
-| Collection | Owner | Status |
-|---|---|---|
-| `users` | self | Real |
-| `businesses` (incl. embedded `businessBrain`) | `userId` | Real |
-| `brand_kits` | 1:1 `businessId` | Real |
-| `products` | `businessId` | Real |
-| `campaigns` | `businessId`+`userId` | Real |
-| `campaign_assets` | `campaignId` | Real |
-| `assets` | `userId`+`businessId` | Real |
-| `usage`, `transactions`, `subscriptions` | `userId` | Real, server-locked |
-| `analytics_events`, `generation_logs` | `userId`/`businessId`/`campaignId` | Real |
-| `campaign_performance` | `campaignId` (1:1) | Real, but `inquiries` is permanently `null` (no source exists) |
-| `reels` | `businessId`+`userId` | Real, fully server-owned |
-| `idempotency_keys`, `rate_limits`, `processed_webhook_events` | internal | Real, Admin-SDK-only, intentionally absent from rules (default-deny) |
-| `agencies`, `clients` | schema/rules only | **Not real** — zero code references anywhere |
-| `partners`, `partner_referrals` | schema/rules/indexes only | **Not real** — explicitly labeled "Post-MVP" in rules comments |
-| `whatsapp_leads` | schema/rules/indexes only | **Not real** — zero code references |
+| Collection                                                    | Owner                              | Status                                                               |
+| ------------------------------------------------------------- | ---------------------------------- | -------------------------------------------------------------------- |
+| `users`                                                       | self                               | Real                                                                 |
+| `businesses` (incl. embedded `businessBrain`)                 | `userId`                           | Real                                                                 |
+| `brand_kits`                                                  | 1:1 `businessId`                   | Real                                                                 |
+| `products`                                                    | `businessId`                       | Real                                                                 |
+| `campaigns`                                                   | `businessId`+`userId`              | Real                                                                 |
+| `campaign_assets`                                             | `campaignId`                       | Real                                                                 |
+| `assets`                                                      | `userId`+`businessId`              | Real                                                                 |
+| `usage`, `transactions`, `subscriptions`                      | `userId`                           | Real, server-locked                                                  |
+| `analytics_events`, `generation_logs`                         | `userId`/`businessId`/`campaignId` | Real                                                                 |
+| `campaign_performance`                                        | `campaignId` (1:1)                 | Real, but `inquiries` is permanently `null` (no source exists)       |
+| `reels`                                                       | `businessId`+`userId`              | Real, fully server-owned                                             |
+| `idempotency_keys`, `rate_limits`, `processed_webhook_events` | internal                           | Real, Admin-SDK-only, intentionally absent from rules (default-deny) |
+| `agencies`, `clients`                                         | schema/rules only                  | **Not real** — zero code references anywhere                         |
+| `partners`, `partner_referrals`                               | schema/rules/indexes only          | **Not real** — explicitly labeled "Post-MVP" in rules comments       |
+| `whatsapp_leads`                                              | schema/rules/indexes only          | **Not real** — zero code references                                  |
 
 Business Brain, Business Profile, Brand Profile, and Localization Profile are
 **embedded fields/shapes, not standalone top-level collections** — see §13.
@@ -400,6 +402,7 @@ verified from code (not assumed):
 6. On any thrown error: campaign status set to `'failed'` with a client-safe error message (so frontend polling terminates), reservation refunded.
 
 **Internal 13-stage pipeline** (`functions/src/services/ai/pipeline.ts:435-539`):
+
 1. Business Understanding (Gemini structured text)
 2. Product/Image Understanding (Gemini Vision if images present, then structured text)
 3. Campaign Strategy (Gemini structured text, vertical-specific persona)
@@ -423,7 +426,7 @@ independent confirmation before treating as dead weight vs. a wiring gap
 
 There is also a **`createCampaign`** callable (`functions/src/functions/campaigns/createCampaign.ts`)
 that is a **separate, seemingly-vestigial path**: it reserves credits via a
-*different* reservation function (`services/firestore.ts:reserveCredits`, not
+_different_ reservation function (`services/firestore.ts:reserveCredits`, not
 `usageControl.ts`), writes a draft campaign doc, and **never finalizes or
 refunds** the reservation — a live inconsistency (§20, §31). It does not run
 the AI pipeline. In-code comments confirm the frontend actually calls
@@ -432,7 +435,13 @@ deployed and publicly callable.
 
 ## 16. AI Architecture
 
+> **Superseded for provider mapping/status**: see `docs/AI_ARCHITECTURE.md`
+> (Phase 0). This section predates the OpenAI→Gemini image migration and the
+> `aiProviderFactory.ts` indirection layer; the rest of this document is
+> still accurate.
+
 Provider abstraction under `functions/src/services/ai/`:
+
 - `text.ts`: `GeminiTextProvider` (`gemini-flash-latest`, JSON response mode).
 - `vision.ts`: `GeminiVisionProvider`, output Zod-validated before returning.
 - `image.ts`: `OpenAIImageProvider` (DALL-E 3). **Lazily constructs the OpenAI client on first call, not at module import** — deliberate fix for a real deploy-breaking bug (the OpenAI SDK throws synchronously on missing key at construction).
@@ -481,6 +490,7 @@ Statuses: `PASS`, `FAIL`, `REVIEW_REQUIRED`. Rollup: any `FAIL` → overall
 
 **Authority — confirmed server-authoritative, and confirmed enforced before
 "active" status**:
+
 - New campaigns: only `PASS` → `'verified'` (both `FAIL` and `REVIEW_REQUIRED` produce a non-verified status, though credits are still charged either way).
 - Regeneration: `shouldActivateRegeneration` (the sole named gate) requires **exactly `PASS`** — `REVIEW_REQUIRED` is deliberately treated identically to `FAIL` ("fail closed" — there is no human-review UI in this codebase to unblock a `REVIEW_REQUIRED` asset).
 - Reels have **no equivalent deterministic Truth Check at all** — correctness relies only on the AI edit-plan's own Zod schema validation and a 0.15 clip-quality-score filter. This is a real, confirmed asymmetry between the two generation pipelines.
@@ -502,7 +512,7 @@ down to the requested asset type.
 
 **Confirmed invariant, unit-tested**: a `FAIL`/`REVIEW_REQUIRED` regeneration
 is persisted as a new, separate `campaign_assets` doc with `status:'failed'`,
-but the *original* active asset is **never overwritten or superseded** unless
+but the _original_ active asset is **never overwritten or superseded** unless
 the new one is `PASS`. This directly answers the audit question "can an
 invalid regenerated version accidentally replace a valid active one?" —
 **no**, by design and by an explicit regression test cited in code comments
@@ -520,6 +530,7 @@ regeneration = 10, reel generation = 80.
 
 **Primary, correct system**: `functions/src/services/usageControl.ts`, used
 by `generateCampaignStrategy`, `regenerateAsset`, `generateReel`:
+
 - `reserveCreditsForOperation`: idempotency+eligibility decision made **inside
   a single Firestore transaction** (reads both `usage` and
   `transactions/{operationId}` via `tx.get()`), returning a discriminated
@@ -637,9 +648,10 @@ totals: frontend 28 suites/280 tests, functions 32 suites/254 tests, root
 rules suite 10 suites/116 passed.
 
 **Confirmed weak/absent**:
+
 - **App Check**: no dedicated automated test file exists at all — every App Check verification in the historical record was a manual, ad-hoc script run once by a phase-report author, never committed as a repeatable test.
 - **Real Razorpay checkout**: never exercised end-to-end in any phase report — only the external `window.Razorpay` boundary is mocked in frontend tests; backend logic is proven only against a mocked Razorpay client.
-- **Playwright E2E** (`tests/e2e/mvp-golden-path.spec.ts`): the spec's own header states it has never actually been executed via `npm run test:e2e` — Phase 28 explicitly rules this "zero verified coverage, not partial," despite the file existing and looking complete. Real-browser verification that *did* happen (Phases 20, 20B, 20C) was via ad-hoc, uncommitted Playwright scripts run directly by phase-report authors in their own sessions — not part of the repeatable, automated suite.
+- **Playwright E2E** (`tests/e2e/mvp-golden-path.spec.ts`): the spec's own header states it has never actually been executed via `npm run test:e2e` — Phase 28 explicitly rules this "zero verified coverage, not partial," despite the file existing and looking complete. Real-browser verification that _did_ happen (Phases 20, 20B, 20C) was via ad-hoc, uncommitted Playwright scripts run directly by phase-report authors in their own sessions — not part of the repeatable, automated suite.
 - **`golden-path-manual.mjs`** (root): a standalone, hand-invoked Playwright script, not referenced by `package.json` or CI — leftover tooling from a prior phase-report session (its hardcoded screenshot path literally contains a different session's temp directory ID), not reusable infrastructure.
 
 **Do not equate "test suite passes" with "production system is verified."**
@@ -651,7 +663,7 @@ third-party or real-production verification.
 ## 27. Golden User Journey
 
 ```
-Signup (Firebase Auth, direct) 
+Signup (Firebase Auth, direct)
   → onUserCreated trigger (server): creates users/{uid}, subscriptions (free plan, 100 credits), usage doc, welcome transaction, sets custom claims
   → Onboarding UI → createBusiness callable (App Check + Auth + Zod + verifyBusinessAccess N/A for creation) → businesses/{id} + businessBrain written, users.businessIds updated, claims refreshed
   → /business-profile → updateBusinessBrain callable (schema-restricted fields only)
@@ -677,20 +689,20 @@ Firestore from the client, gated by `firestore.rules`.
 
 ## 28. Source of Truth
 
-| Information | Authoritative source |
-|---|---|
-| User identity | Firebase Auth |
-| Business ownership | `businesses.userId` + custom claims, checked server-side (`verifyBusinessAccess`) |
-| Business profile / Business Brain | Firestore (`businesses.businessBrain`), written only by `createBusiness`/`updateBusinessBrain` |
-| Product | Firestore (`products`), server-generated ID |
-| Asset binary | Firebase Storage |
-| Asset metadata | Firestore (`assets`), server-created on `confirmUpload`; best-effort client patch for width/height only |
-| Campaign | Firestore (`campaigns`), server-generated ID, field-locked on `status`/credits/Truth-Check |
-| Truth Check status | Server-authoritative, deterministic, computed in `truthCheck.ts`, frozen once set by rules |
-| Credits | Server-authoritative via `usageControl.ts` (primary path) — **but a second, non-finalizing path exists via `services/firestore.ts:reserveCredits`, used by the vestigial `createCampaign`** |
-| Payment completion | `razorpayWebhook`'s HMAC-verified, transactional handler — **not** `verifyPayment` (which is UX-only) |
-| AI secrets | `functions/src/config/env.ts` reading Cloud Functions runtime env — never client-exposed |
-| App Check | Firebase App Check (ReCaptchaEnterprise), enforced per-function, never cryptographically verified locally (only in a real deployed project) |
+| Information                       | Authoritative source                                                                                                                                                                        |
+| --------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| User identity                     | Firebase Auth                                                                                                                                                                               |
+| Business ownership                | `businesses.userId` + custom claims, checked server-side (`verifyBusinessAccess`)                                                                                                           |
+| Business profile / Business Brain | Firestore (`businesses.businessBrain`), written only by `createBusiness`/`updateBusinessBrain`                                                                                              |
+| Product                           | Firestore (`products`), server-generated ID                                                                                                                                                 |
+| Asset binary                      | Firebase Storage                                                                                                                                                                            |
+| Asset metadata                    | Firestore (`assets`), server-created on `confirmUpload`; best-effort client patch for width/height only                                                                                     |
+| Campaign                          | Firestore (`campaigns`), server-generated ID, field-locked on `status`/credits/Truth-Check                                                                                                  |
+| Truth Check status                | Server-authoritative, deterministic, computed in `truthCheck.ts`, frozen once set by rules                                                                                                  |
+| Credits                           | Server-authoritative via `usageControl.ts` (primary path) — **but a second, non-finalizing path exists via `services/firestore.ts:reserveCredits`, used by the vestigial `createCampaign`** |
+| Payment completion                | `razorpayWebhook`'s HMAC-verified, transactional handler — **not** `verifyPayment` (which is UX-only)                                                                                       |
+| AI secrets                        | `functions/src/config/env.ts` reading Cloud Functions runtime env — never client-exposed                                                                                                    |
+| App Check                         | Firebase App Check (ReCaptchaEnterprise), enforced per-function, never cryptographically verified locally (only in a real deployed project)                                                 |
 
 ## 29. Security Boundaries
 
@@ -768,6 +780,7 @@ analytics data, no financial or Truth-Check impact).
 
 The following are referenced only as roadmap intent (README "Next Steps",
 rules-file comments) and are **not implemented in any form**:
+
 - Agency workspace UI (authorization primitives for it already exist and are tested — `verifyBusinessAccess`'s agency-member branch, `tests/phase27-authz.test.ts` — but no dedicated UI or `agencies`/`clients` collection usage exists).
 - WhatsApp Business API lead capture (`whatsapp_leads` schema/rules/indexes are pre-provisioned).
 - Content calendar.

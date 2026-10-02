@@ -33,7 +33,7 @@ Zero accounts existed in the Auth emulator afterward (confirmed via the emulator
 2. **Disabling the eager background token refresh does not fix it.** `isTokenAutoRefreshEnabled: true → false`, tested with a fresh signup attempt: identical failure. This rules out the proactive background refresh as the cause and isolates it to the Auth SDK's own **on-demand, per-request** token attachment.
 3. **Conclusive controlled experiment**: with `initializeFirebaseAppCheck(app)`'s call site temporarily commented out (App Check never initialized on the app at all — everything else unchanged), the identical signup flow **succeeded completely**: landed on `/dashboard`, rendered `"Welcome back, <email>!"`, zero failed HTTP requests. This is the single most decisive piece of evidence: it isolates Firebase App Check's presence on the app instance as the **sole causal variable**. (This change was diagnostic only, reverted immediately after the observation — see §8.)
 
-**Mechanism**: Firebase's JS SDK (installed here: `firebase@10.14.1`) attaches App Check tokens to requests from *other* Firebase services — not just Cloud Functions callables — automatically once `initializeAppCheck()` has run on the same `FirebaseApp` instance. This is documented, intentional, cross-service Firebase behavior (defense-in-depth), not a bug introduced by this codebase's own application code (confirmed: `src/features/auth/services/authService.ts`'s `signupWithEmailPassword`/`loginWithEmailPassword` are plain, unmodified Firebase Auth SDK calls — no custom App Check coupling was written into this application).
+**Mechanism**: Firebase's JS SDK (installed here: `firebase@10.14.1`) attaches App Check tokens to requests from _other_ Firebase services — not just Cloud Functions callables — automatically once `initializeAppCheck()` has run on the same `FirebaseApp` instance. This is documented, intentional, cross-service Firebase behavior (defense-in-depth), not a bug introduced by this codebase's own application code (confirmed: `src/features/auth/services/authService.ts`'s `signupWithEmailPassword`/`loginWithEmailPassword` are plain, unmodified Firebase Auth SDK calls — no custom App Check coupling was written into this application).
 
 The specific **exchange failure** underneath that mechanism is because App Check's debug-token flow (the only officially documented mechanism for local/offline App Check development) always requires a live round-trip to Google's real App Check backend to exchange the debug token for a usable App Check token — **there is no local/offline App Check emulator**, confirmed authoritatively this phase by inspecting `firebase emulators:start --help`'s own `--only` option list: `["apphosting","auth","functions","firestore","database","hosting","pubsub","storage","eventarc","dataconnect","tasks"]` — no `appcheck` entry exists. Every other Firebase service used by this app (Auth, Firestore, Storage, Functions) has a real local emulator; App Check does not.
 
@@ -70,6 +70,7 @@ Unchanged from Phase 20A, re-confirmed this phase byte-for-byte via `git diff` a
 ## 9. Security Impact
 
 **None — nothing shipped changed.** Re-confirmed this phase:
+
 - 24/24 expected callables still `enforceAppCheck: true` (fresh grep).
 - `healthCheck` remains the sole, unmodified, documented exception.
 - Negative test: an unauthenticated request to `createBusiness` (no `Authorization` header at all) → `{"error":{"message":"Unauthenticated","status":"UNAUTHENTICATED"}}`.
@@ -86,17 +87,17 @@ Unchanged from Phase 20A, re-confirmed this phase byte-for-byte via `git diff` a
 
 ## 12. Gate C — createBusiness
 
-**BLOCKED — untestable through a real, authenticated browser session**, because Gates A/B never produce one. What *can* be and was stated honestly: `createBusiness`'s own `enforceAppCheck: true` gate correctly rejects unauthenticated/App-Check-less requests (§9's negative tests, this phase); Phase 20A separately proved (via Node + jsdom, not a browser — not conflated with browser proof here) that a request carrying both a valid Auth token and a debug-token-derived App Check header succeeds against the emulator. Neither of those substitutes for the real-browser Gate C this phase required; both are reported for what they actually are.
+**BLOCKED — untestable through a real, authenticated browser session**, because Gates A/B never produce one. What _can_ be and was stated honestly: `createBusiness`'s own `enforceAppCheck: true` gate correctly rejects unauthenticated/App-Check-less requests (§9's negative tests, this phase); Phase 20A separately proved (via Node + jsdom, not a browser — not conflated with browser proof here) that a request carrying both a valid Auth token and a debug-token-derived App Check header succeeds against the emulator. Neither of those substitutes for the real-browser Gate C this phase required; both are reported for what they actually are.
 
 ## 13. Negative Security Tests
 
-| Test | Expected | Result |
-|---|---|---|
-| No `Authorization` header at all → `createBusiness` | `UNAUTHENTICATED` | **PASS** — confirmed this phase, fresh |
-| Fake `Authorization` header, no App Check header → `createBusiness` | `UNAUTHENTICATED` | **PASS** — confirmed this phase, fresh |
+| Test                                                                        | Expected          | Result                                                          |
+| --------------------------------------------------------------------------- | ----------------- | --------------------------------------------------------------- |
+| No `Authorization` header at all → `createBusiness`                         | `UNAUTHENTICATED` | **PASS** — confirmed this phase, fresh                          |
+| Fake `Authorization` header, no App Check header → `createBusiness`         | `UNAUTHENTICATED` | **PASS** — confirmed this phase, fresh                          |
 | Real Auth token, no App Check header → any `enforceAppCheck: true` callable | `UNAUTHENTICATED` | **PASS** — established in Phase 20A, unchanged, not re-weakened |
 
-Documented limitation (unchanged from Phase 20A, re-stated here per §20's instruction): the local Functions **emulator** validates only that an App Check header is *present*, not that it is cryptographically genuine — this is expected, documented emulator behavior (no local App Check emulator exists to do real verification), and is explicitly not treated as proof of production-grade App Check enforcement, which requires a real deployment to verify.
+Documented limitation (unchanged from Phase 20A, re-stated here per §20's instruction): the local Functions **emulator** validates only that an App Check header is _present_, not that it is cryptographically genuine — this is expected, documented emulator behavior (no local App Check emulator exists to do real verification), and is explicitly not treated as proof of production-grade App Check enforcement, which requires a real deployment to verify.
 
 ## 14. Automated Tests
 
@@ -113,6 +114,7 @@ Emulator-backed suites (run during this phase's investigation window, live): Fir
 ## 15. Production Safety
 
 Verified this phase, not assumed:
+
 - Production code path (`NEXT_PUBLIC_USE_EMULATORS` unset/`false`) never sets `FIREBASE_APPCHECK_DEBUG_TOKEN` — confirmed by re-reading the surrounding `if (useEmulators)` guard in `client.ts`, unchanged.
 - Production still requires a real `NEXT_PUBLIC_RECAPTCHA_SITE_KEY`; its absence still produces a loud `console.error` naming the exact resulting symptom, not a silent bypass — unchanged.
 - All 24 intended callables remain `enforceAppCheck: true` — fresh inventory this phase, identical to Phase 20A/20's.
@@ -129,4 +131,4 @@ Verified this phase, not assumed:
 
 **PHASE 20B BLOCKED**
 
-The root cause is now proven with the strongest evidence standard available in this environment — a controlled experiment isolating App Check's presence as the sole causal variable, plus independent confirmation that the failure is the Auth SDK's own request rejection, not an unrelated handler. No safe code-level fix exists that would resolve this without either disabling/weakening App Check (explicitly forbidden) or obtaining external credentials this environment cannot provide (a real Firebase project + interactive Firebase Console access to register a debug token). App Check remains fully enforced, unchanged, and unweakened throughout this investigation — confirmed via fresh inventory, fresh negative tests, and a byte-for-byte diff showing zero net change to the shipped client code. Per the phase's own verdict rule (*"the necessary environment configuration cannot be established and no safe implementation path can be verified"*), this is correctly **BLOCKED**, not partially verified.
+The root cause is now proven with the strongest evidence standard available in this environment — a controlled experiment isolating App Check's presence as the sole causal variable, plus independent confirmation that the failure is the Auth SDK's own request rejection, not an unrelated handler. No safe code-level fix exists that would resolve this without either disabling/weakening App Check (explicitly forbidden) or obtaining external credentials this environment cannot provide (a real Firebase project + interactive Firebase Console access to register a debug token). App Check remains fully enforced, unchanged, and unweakened throughout this investigation — confirmed via fresh inventory, fresh negative tests, and a byte-for-byte diff showing zero net change to the shipped client code. Per the phase's own verdict rule (_"the necessary environment configuration cannot be established and no safe implementation path can be verified"_), this is correctly **BLOCKED**, not partially verified.

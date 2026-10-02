@@ -9,6 +9,7 @@ This is an audit-first document: every row in §12/§13 distinguishes what was v
 **Before this phase:** structured server-side logging existed and was already well-adopted (`functions/src/utils/logging.ts`, Phase 14) across the credit system, payment webhook, AI pipeline, and Storage upload paths, with secret redaction. Nothing else did: no Sentry (frontend or server), no frontend error boundary, no correlation/request ID (the field was declared in a type and never populated), no logging on rate-limit rejection, no HTTP-reachable health endpoint (only an `onCall` function unsuited to uptime polling), no dashboards, no alerts, no uptime check, and no deployment/release identification.
 
 **This phase fixed the genuine, low-risk, infrastructure-independent gaps:**
+
 1. Installed and wired `@sentry/nextjs` for the frontend (client + server + edge, via Next.js 15's `instrumentation.ts`/`instrumentation-client.ts` convention), with a PII/secret-scrubbing `beforeSend` hook and a root `global-error.tsx` boundary that previously did not exist at all.
 2. Added a public, unauthenticated `/api/health` route on the Next.js frontend — the App Hosting service had no HTTP-reachable liveness endpoint before this (the existing `healthCheck` Cloud Function is `onCall`, which requires the Firebase callable protocol, not a plain GET, so it cannot be used by a conventional uptime checker).
 3. Added a per-invocation `requestId` (UUID) generated at the shared callable entry point (`validatedCallable`/`validatedCallableWithBusiness`), plus a `deploymentRevision` field (Cloud Run's `K_REVISION`, which Cloud Functions Gen2 always sets) on every log line — closing part of the correlation-ID and release-identification gaps.
@@ -19,12 +20,14 @@ This is an audit-first document: every row in §12/§13 distinguishes what was v
 ## 2. Current Architecture (Post-Phase)
 
 ### Backend (Cloud Functions)
+
 - `functions/src/utils/logging.ts` — `createLogger`/`logFunctionStart`/`logFunctionStage`/`logFunctionComplete`/`logFunctionError`, backed by `functions.logger` → Cloud Logging. Now also attaches `deploymentRevision` (`process.env.K_REVISION`) to every log line, and exports `generateRequestId()`.
 - `functions/src/middleware/validation.ts` — `validatedCallable`/`validatedCallableWithBusiness` gate every callable; now generate a `requestId` per invocation, include it in the rejection-warn logs, and pass it into the handler's context (handlers may opt into using it — not force-threaded into all ~30 handlers' own `logFunctionStart` calls in this pass; see §11 Known Limitations).
 - `functions/src/middleware/rateLimit.ts` — `checkRateLimit` now emits `rate_limit_rejected` (warn) with `userId`/`action`/`retryAfterSeconds` on rejection, never the internal Firestore counter/resetTime.
 - Credit system (`usageControl.ts`), payment webhook (`razorpayWebhook.ts`), AI pipeline (`pipeline.ts`), Storage uploads (`getUploadUrl.ts`/`confirmUpload.ts`), auth/validation gates — unchanged this phase; already instrumented per Phase 14, re-confirmed still correct by this audit's re-read and by the full test suite passing.
 
 ### Frontend (Next.js, App Hosting)
+
 - `src/instrumentation.ts` / `src/instrumentation-client.ts` — Sentry init for server/edge and browser respectively. `dsn` reads from `SENTRY_DSN` (server) / `NEXT_PUBLIC_SENTRY_DSN` (client), both **unset** in every environment this session has access to — Sentry's documented behavior with no DSN is a safe no-op (SDK loads, nothing is sent), verified by a clean production build (§13).
 - `src/lib/sentryScrub.ts` — `beforeSend` hook shared by both configs: strips request cookies/headers, redacts URL-embedded keys/tokens/Bearer headers/provider key prefixes from exception messages, breadcrumbs, and extra data (mirrors the redaction approach already used server-side in `logging.ts`).
 - `src/app/global-error.tsx` — root error boundary (did not exist before). Captures to Sentry, shows a generic user-facing message, no stack trace/internals.
@@ -39,24 +42,25 @@ Rationale: the frontend previously had **zero** error capture of any kind (no bo
 
 ## 4. Sentry — Verification
 
-| Check | Result |
-|---|---|
-| Package installed | `@sentry/nextjs@10.75.1` — YES (installed this phase) |
-| Client init | YES — `src/instrumentation-client.ts`, code-verified |
-| Server/edge init | YES — `src/instrumentation.ts`, code-verified |
-| DSN configured | **NO** — no Sentry account/project exists; `SENTRY_DSN`/`NEXT_PUBLIC_SENTRY_DSN` unset everywhere |
-| Production build succeeds with SDK wired, no DSN | YES — verified (`npm run build`, clean, `/api/health` and all 23 routes generated) |
-| Error boundary present | YES — `src/app/global-error.tsx` (new; none existed before) |
-| Secret/PII scrubbing | Code-verified (`sentryScrub.ts`); **not** verified against a real captured event (no DSN to send to) |
-| A real event reaches Sentry | **BLOCKED** — no account/DSN. Not fabricated. |
-| Environment/release tagging | Code present (`environment`, `release` fields wired), **not runtime-verified** (nothing to inspect without a live project) |
-| Source maps upload | Code present, explicitly skipped at build time (no `SENTRY_AUTH_TOKEN`) |
+| Check                                            | Result                                                                                                                     |
+| ------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------- |
+| Package installed                                | `@sentry/nextjs@10.75.1` — YES (installed this phase)                                                                      |
+| Client init                                      | YES — `src/instrumentation-client.ts`, code-verified                                                                       |
+| Server/edge init                                 | YES — `src/instrumentation.ts`, code-verified                                                                              |
+| DSN configured                                   | **NO** — no Sentry account/project exists; `SENTRY_DSN`/`NEXT_PUBLIC_SENTRY_DSN` unset everywhere                          |
+| Production build succeeds with SDK wired, no DSN | YES — verified (`npm run build`, clean, `/api/health` and all 23 routes generated)                                         |
+| Error boundary present                           | YES — `src/app/global-error.tsx` (new; none existed before)                                                                |
+| Secret/PII scrubbing                             | Code-verified (`sentryScrub.ts`); **not** verified against a real captured event (no DSN to send to)                       |
+| A real event reaches Sentry                      | **BLOCKED** — no account/DSN. Not fabricated.                                                                              |
+| Environment/release tagging                      | Code present (`environment`, `release` fields wired), **not runtime-verified** (nothing to inspect without a live project) |
+| Source maps upload                               | Code present, explicitly skipped at build time (no `SENTRY_AUTH_TOKEN`)                                                    |
 
 **Verdict: Sentry = IMPLEMENTED (code), BLOCKED (runtime/infrastructure).**
 
 ## 5. Firebase / Cloud Logging — Verification
 
 Unchanged from Phase 14's already-solid state, re-confirmed by this audit's independent re-read (§2 above) and by the full test suite (§13):
+
 - Structured logging via `functions.logger`, secret redaction, adopted across credits/payments/AI pipeline/storage/auth gates.
 - This phase's additions (`requestId`, `deploymentRevision`, rate-limit rejection log) all verified by unit/emulator tests (§13), not just by reading the source.
 - **Not verified this phase or ever in this environment:** that Cloud Logging in the real GCP project actually ingests/indexes/makes these fields filterable exactly as expected — this requires live GCP console access, which is unavailable here. Marked **NOT VERIFIED (infrastructure)**, consistent with Phase 14's own §17.
@@ -69,10 +73,10 @@ What exists now: every callable generates a `requestId` at the shared entry poin
 
 ## 7. Health Checks
 
-| Endpoint | Type | Reachable via plain HTTP GET | Cost/dependencies |
-|---|---|---|---|
-| `functions/src/healthCheck.ts` (`healthCheck`) | Firebase `onCall` | **NO** — requires the Firebase callable wire protocol, not curl-able by a standard uptime checker | none |
-| `src/app/api/health/route.ts` (new, this phase) | Next.js `onRequest`-style route | **YES** | none — no Firestore/Storage/AI calls, liveness only |
+| Endpoint                                        | Type                            | Reachable via plain HTTP GET                                                                      | Cost/dependencies                                   |
+| ----------------------------------------------- | ------------------------------- | ------------------------------------------------------------------------------------------------- | --------------------------------------------------- |
+| `functions/src/healthCheck.ts` (`healthCheck`)  | Firebase `onCall`               | **NO** — requires the Firebase callable wire protocol, not curl-able by a standard uptime checker | none                                                |
+| `src/app/api/health/route.ts` (new, this phase) | Next.js `onRequest`-style route | **YES**                                                                                           | none — no Firestore/Storage/AI calls, liveness only |
 
 Liveness vs. readiness: only a liveness check exists (new `/api/health`). No readiness check (bounded dependency check e.g. "can I reach Firestore") was added — not requested by evidence of need, and every readiness check adds its own failure/cost surface (§23-24 caution against expensive/unbounded readiness checks). Recorded as **MISSING (readiness)**, deliberately not built speculatively.
 
@@ -93,6 +97,7 @@ Liveness vs. readiness: only a liveness check exists (new `/api/health`). No rea
 Grep across every file this phase touched, scoped to the actual diff, for `api_key|secret|password|token|gemini|openai|razorpay|private_key|authorization|cookie` (case-insensitive): only field names, redaction-pattern source, and comments describing the redaction — **zero literal secret values**, same pattern as Phase 14's own audit. See raw grep output referenced in §13's command log.
 
 New surfaces specific to this phase, checked individually:
+
 - `sentryScrub.ts`'s `beforeSend` strips `event.request.cookies`/`headers` unconditionally and redacts URL-embedded keys/Bearer tokens/provider-key prefixes from exception values, breadcrumbs, and `extra` — mirrors the existing server-side `redactSecrets()` pattern rather than inventing a new one.
 - `/api/health` returns only `{status, service, timestamp}` — no environment variables, no Firebase config, no internal routing info.
 - `rate_limit_rejected` log omits the Firestore counter/resetTime (internal limiter state) per §19's explicit instruction — enforced by a new unit test, not just by inspection.
@@ -100,22 +105,22 @@ New surfaces specific to this phase, checked individually:
 
 ## 12. Current-State Inventory (§3 of the phase spec)
 
-| Capability | Existing implementation | Runtime verification | Status |
-|---|---|---|---|
-| Sentry frontend | `@sentry/nextjs` installed & wired (this phase) | Build succeeds with SDK active; no DSN to verify event delivery | IMPLEMENTED / BLOCKED |
-| Sentry server | Same SDK, `instrumentation.ts` node/edge branches | Same as above | IMPLEMENTED / BLOCKED |
-| Firebase logging | `functions.logger` via `createLogger` (Phase 14) | Emulator-backed tests pass; real Cloud Logging ingestion unverified | VERIFIED (code) / NOT VERIFIED (infra) |
-| structured logging | `utils/logging.ts` primitives, widely adopted | Test suite (unit + emulator) | VERIFIED |
-| correlation IDs | `requestId` generated at the callable gate only (this phase) | Unit-testable at the gate; not threaded into handler-level logs | PARTIAL |
-| Cloud Monitoring | none | — | MISSING |
-| dashboards | none | — | MISSING |
-| alerts | none | — | MISSING |
-| health endpoint | `/api/health` (new, this phase); `healthCheck` onCall (pre-existing, not HTTP-reachable) | Unit test passes; build includes the route | IMPLEMENTED |
-| readiness check | none (deliberately not built) | — | MISSING |
-| uptime monitoring | none | — | BLOCKED |
-| AI monitoring | Pipeline stage logging + provider/failureCode marker (Phase 14) | Emulator/unit tests pass | VERIFIED |
-| credit/payment monitoring | `usageControl.ts`/`razorpayWebhook.ts` structured logging (Phase 14) | Emulator tests pass | VERIFIED |
-| security monitoring | auth/validation rejection warn logs (Phase 14) + rate-limit rejection log (this phase) | Unit + emulator tests pass | VERIFIED (partial — App Check failures are platform-opaque, see §11 of risk register) |
+| Capability                | Existing implementation                                                                  | Runtime verification                                                | Status                                                                                |
+| ------------------------- | ---------------------------------------------------------------------------------------- | ------------------------------------------------------------------- | ------------------------------------------------------------------------------------- |
+| Sentry frontend           | `@sentry/nextjs` installed & wired (this phase)                                          | Build succeeds with SDK active; no DSN to verify event delivery     | IMPLEMENTED / BLOCKED                                                                 |
+| Sentry server             | Same SDK, `instrumentation.ts` node/edge branches                                        | Same as above                                                       | IMPLEMENTED / BLOCKED                                                                 |
+| Firebase logging          | `functions.logger` via `createLogger` (Phase 14)                                         | Emulator-backed tests pass; real Cloud Logging ingestion unverified | VERIFIED (code) / NOT VERIFIED (infra)                                                |
+| structured logging        | `utils/logging.ts` primitives, widely adopted                                            | Test suite (unit + emulator)                                        | VERIFIED                                                                              |
+| correlation IDs           | `requestId` generated at the callable gate only (this phase)                             | Unit-testable at the gate; not threaded into handler-level logs     | PARTIAL                                                                               |
+| Cloud Monitoring          | none                                                                                     | —                                                                   | MISSING                                                                               |
+| dashboards                | none                                                                                     | —                                                                   | MISSING                                                                               |
+| alerts                    | none                                                                                     | —                                                                   | MISSING                                                                               |
+| health endpoint           | `/api/health` (new, this phase); `healthCheck` onCall (pre-existing, not HTTP-reachable) | Unit test passes; build includes the route                          | IMPLEMENTED                                                                           |
+| readiness check           | none (deliberately not built)                                                            | —                                                                   | MISSING                                                                               |
+| uptime monitoring         | none                                                                                     | —                                                                   | BLOCKED                                                                               |
+| AI monitoring             | Pipeline stage logging + provider/failureCode marker (Phase 14)                          | Emulator/unit tests pass                                            | VERIFIED                                                                              |
+| credit/payment monitoring | `usageControl.ts`/`razorpayWebhook.ts` structured logging (Phase 14)                     | Emulator tests pass                                                 | VERIFIED                                                                              |
+| security monitoring       | auth/validation rejection warn logs (Phase 14) + rate-limit rejection log (this phase)   | Unit + emulator tests pass                                          | VERIFIED (partial — App Check failures are platform-opaque, see §11 of risk register) |
 
 ## 13. Verification Evidence
 
@@ -146,11 +151,11 @@ git diff -- <touched files> | grep -iE "api_key|secret|password|token|gemini|ope
 
 New tests added this phase:
 
-| Test | Proves |
-|---|---|
-| `functions/src/utils/logging.test.ts` (extended) | `generateRequestId()` returns unique values; `createLogger` attaches `deploymentRevision` from `K_REVISION` when set |
+| Test                                                    | Proves                                                                                                                                       |
+| ------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
+| `functions/src/utils/logging.test.ts` (extended)        | `generateRequestId()` returns unique values; `createLogger` attaches `deploymentRevision` from `K_REVISION` when set                         |
 | `functions/src/middleware/rateLimit.test.ts` (extended) | Rejection emits `rate_limit_rejected` warn with `userId`/`action`/`retryAfterSeconds`, and explicitly asserts `count`/`resetTime` are absent |
-| `src/app/api/health/route.test.ts` (new) | Returns 200 + `{status:'ok', service:'mitra-web'}`, and the serialized body contains no key/secret/token/password/credential substring |
+| `src/app/api/health/route.test.ts` (new)                | Returns 200 + `{status:'ok', service:'mitra-web'}`, and the serialized body contains no key/secret/token/password/credential substring       |
 
 ## 14. Blocked Items — Exact Unblock Steps
 
@@ -162,54 +167,60 @@ New tests added this phase:
 
 ## 15. Risk Register
 
-| ID | Finding | Severity | Evidence | Recommendation | Status |
-|---|---|---|---|---|---|
-| R1 | No Sentry DSN provisioned — frontend errors are captured by the SDK but not delivered anywhere yet | HIGH | `instrumentation-client.ts`/`instrumentation.ts` read unset env vars | Provision a Sentry project (§14.1) | OPEN |
-| R2 | No uptime check on the production domain | HIGH | No GCP Monitoring config found anywhere in repo | Create uptime check against new `/api/health` (§14.2) | OPEN |
-| R3 | No alert policies of any kind | HIGH | No alert config found | Define after a real traffic baseline exists (§14.3) | OPEN |
-| R4 | App Check rejections are not distinguishable in application-level logs from other auth failures | MEDIUM | Firebase rejects App Check failures before the callable body (and `validatedCallable`) ever runs — this is opaque platform behavior, not something `logging.ts` can intercept without a custom App Check hook | Investigate whether Cloud Functions execution logs (platform-level, not app-level) already surface this distinctly before building a workaround | OPEN |
-| R5 | `requestId` is generated at the callable gate but not threaded into individual handlers' own stage/business logs | LOW | §6, §14.5 | Mechanical follow-up if end-to-end single-request tracing (beyond the already-adequate `campaignId`/`businessId` correlation) becomes a real need | OPEN |
-| R6 | `functions/src/config/env.ts` still has one raw `console.warn` at cold start | LOW | Pre-existing, documented in Phase 14 §18, re-confirmed unchanged | Leave as-is — boot-time-only, no request context exists yet, not part of the request-failure diagnostic path | ACCEPTED (unchanged) |
-| R7 | No readiness check (only liveness) | LOW | §7 | Build only if an operator need is demonstrated — an unbounded readiness check has its own cost/failure-mode risk (§23-24) | ACCEPTED (deferred) |
+| ID  | Finding                                                                                                          | Severity | Evidence                                                                                                                                                                                                      | Recommendation                                                                                                                                    | Status               |
+| --- | ---------------------------------------------------------------------------------------------------------------- | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------- |
+| R1  | No Sentry DSN provisioned — frontend errors are captured by the SDK but not delivered anywhere yet               | HIGH     | `instrumentation-client.ts`/`instrumentation.ts` read unset env vars                                                                                                                                          | Provision a Sentry project (§14.1)                                                                                                                | OPEN                 |
+| R2  | No uptime check on the production domain                                                                         | HIGH     | No GCP Monitoring config found anywhere in repo                                                                                                                                                               | Create uptime check against new `/api/health` (§14.2)                                                                                             | OPEN                 |
+| R3  | No alert policies of any kind                                                                                    | HIGH     | No alert config found                                                                                                                                                                                         | Define after a real traffic baseline exists (§14.3)                                                                                               | OPEN                 |
+| R4  | App Check rejections are not distinguishable in application-level logs from other auth failures                  | MEDIUM   | Firebase rejects App Check failures before the callable body (and `validatedCallable`) ever runs — this is opaque platform behavior, not something `logging.ts` can intercept without a custom App Check hook | Investigate whether Cloud Functions execution logs (platform-level, not app-level) already surface this distinctly before building a workaround   | OPEN                 |
+| R5  | `requestId` is generated at the callable gate but not threaded into individual handlers' own stage/business logs | LOW      | §6, §14.5                                                                                                                                                                                                     | Mechanical follow-up if end-to-end single-request tracing (beyond the already-adequate `campaignId`/`businessId` correlation) becomes a real need | OPEN                 |
+| R6  | `functions/src/config/env.ts` still has one raw `console.warn` at cold start                                     | LOW      | Pre-existing, documented in Phase 14 §18, re-confirmed unchanged                                                                                                                                              | Leave as-is — boot-time-only, no request context exists yet, not part of the request-failure diagnostic path                                      | ACCEPTED (unchanged) |
+| R7  | No readiness check (only liveness)                                                                               | LOW      | §7                                                                                                                                                                                                            | Build only if an operator need is demonstrated — an unbounded readiness check has its own cost/failure-mode risk (§23-24)                         | ACCEPTED (deferred)  |
 
 ## 16. Final Status Matrix
 
-| Capability | Implementation | Runtime/Infra Evidence | Status |
-|---|---|---|---|
-| Sentry | `@sentry/nextjs` installed & wired, client+server+edge, scrubbing, error boundary | Build passes; no DSN — no live event verified | IMPLEMENTED / BLOCKED |
-| Firebase logging | `functions.logger` via structured `logging.ts` (Phase 14) | Emulator tests pass; real GCP ingestion unverified | VERIFIED (code) / NOT VERIFIED (infra) |
-| Structured logging | `utils/logging.ts`, widely adopted | Unit + emulator tests | VERIFIED |
-| Correlation IDs | `requestId` at the callable gate only | Unit test | PARTIAL |
-| Error classification | `errors.ts` (`AppError` subclasses), `mapErrorToHttpsError` | Pre-existing, unchanged, tests pass | VERIFIED |
-| Monitoring dashboard | none | — | MISSING |
-| Health endpoint | `/api/health` (new) + pre-existing `onCall healthCheck` | Unit test + build | IMPLEMENTED |
-| Uptime check | none | — | BLOCKED |
-| Alerts | none | — | MISSING |
-| Alert delivery | none | — | NOT VERIFIED |
-| AI monitoring | Stage logging + provider/failureCode (Phase 14) | Tests pass | VERIFIED |
-| Campaign monitoring | Pipeline stage logging (Phase 14) | Tests pass | VERIFIED |
-| Storage monitoring | Upload logging (Phase 14) | Tests pass | VERIFIED |
-| Payment monitoring | Webhook structured logging (Phase 14) | Tests pass | VERIFIED |
-| Security monitoring | Auth/validation rejection + rate-limit rejection (this phase) logging | Tests pass; App Check gap noted (R4) | PARTIAL |
-| Secret/PII protection | Redaction in `logging.ts` (Phase 14) + `sentryScrub.ts` (this phase) | Grep audit + unit tests | VERIFIED |
-| Cost controls | No new paid infra added; Sentry has no traffic yet; health endpoint is free/cheap | Code review | VERIFIED (nothing to control yet) |
+| Capability            | Implementation                                                                    | Runtime/Infra Evidence                             | Status                                 |
+| --------------------- | --------------------------------------------------------------------------------- | -------------------------------------------------- | -------------------------------------- |
+| Sentry                | `@sentry/nextjs` installed & wired, client+server+edge, scrubbing, error boundary | Build passes; no DSN — no live event verified      | IMPLEMENTED / BLOCKED                  |
+| Firebase logging      | `functions.logger` via structured `logging.ts` (Phase 14)                         | Emulator tests pass; real GCP ingestion unverified | VERIFIED (code) / NOT VERIFIED (infra) |
+| Structured logging    | `utils/logging.ts`, widely adopted                                                | Unit + emulator tests                              | VERIFIED                               |
+| Correlation IDs       | `requestId` at the callable gate only                                             | Unit test                                          | PARTIAL                                |
+| Error classification  | `errors.ts` (`AppError` subclasses), `mapErrorToHttpsError`                       | Pre-existing, unchanged, tests pass                | VERIFIED                               |
+| Monitoring dashboard  | none                                                                              | —                                                  | MISSING                                |
+| Health endpoint       | `/api/health` (new) + pre-existing `onCall healthCheck`                           | Unit test + build                                  | IMPLEMENTED                            |
+| Uptime check          | none                                                                              | —                                                  | BLOCKED                                |
+| Alerts                | none                                                                              | —                                                  | MISSING                                |
+| Alert delivery        | none                                                                              | —                                                  | NOT VERIFIED                           |
+| AI monitoring         | Stage logging + provider/failureCode (Phase 14)                                   | Tests pass                                         | VERIFIED                               |
+| Campaign monitoring   | Pipeline stage logging (Phase 14)                                                 | Tests pass                                         | VERIFIED                               |
+| Storage monitoring    | Upload logging (Phase 14)                                                         | Tests pass                                         | VERIFIED                               |
+| Payment monitoring    | Webhook structured logging (Phase 14)                                             | Tests pass                                         | VERIFIED                               |
+| Security monitoring   | Auth/validation rejection + rate-limit rejection (this phase) logging             | Tests pass; App Check gap noted (R4)               | PARTIAL                                |
+| Secret/PII protection | Redaction in `logging.ts` (Phase 14) + `sentryScrub.ts` (this phase)              | Grep audit + unit tests                            | VERIFIED                               |
+| Cost controls         | No new paid infra added; Sentry has no traffic yet; health endpoint is free/cheap | Code review                                        | VERIFIED (nothing to control yet)      |
 
 ## 17. Final Verdict
 
 ### Sentry
+
 IMPLEMENTED (code) / BLOCKED (runtime — no account/DSN provisioned)
 
 ### Firebase / Cloud Logging
+
 VERIFIED (code, via tests) / NOT VERIFIED (real GCP infrastructure inaccessible from this environment)
 
 ### Monitoring dashboards
+
 MISSING
 
 ### Health checks
+
 IMPLEMENTED (new `/api/health`, liveness only) / MISSING (readiness, deliberately deferred)
 
 ### Alerts
+
 MISSING (no policies exist; deferred pending a real traffic baseline, per §27)
 
 ### Overall Monitoring & Observability
+
 **PARTIAL.** Genuine, testable code-level gaps identified by this audit were fixed (frontend error capture, HTTP health endpoint, rate-limit observability, partial correlation IDs, deployment revision tagging). Dashboards, alerts, uptime checks, and real Sentry event delivery all remain infrastructure-dependent and are honestly reported as BLOCKED/MISSING rather than claimed complete — none of this phase's rules ("do not fabricate," "do not claim VERIFIED from config existence alone") were bent to produce a green report.

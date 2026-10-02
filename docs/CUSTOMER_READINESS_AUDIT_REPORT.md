@@ -84,18 +84,18 @@ fact outside the codebase, and this report does not claim otherwise.
 
 ### Support for critical failures — verified per failure type
 
-| Failure | Does the user understand what happened? | Does the user know what to do? | Can they reach support? |
-|---|---|---|---|
-| Authentication failure | PARTIAL — Firebase error codes are mapped in `authErrors.ts`, but only for `auth/user-not-found` (verified by direct read — a single mapped code, not a full table) | Partial | Yes, now (via account menu once logged in isn't possible pre-auth — footer link works) |
-| Upload failure | Handled — `confirmUpload.ts`'s validation errors surface as toasts | Yes | Yes (footer/sidebar) |
-| Campaign generation failure | Well-handled — `CampaignWizard.tsx` shows "We couldn't start this campaign. Any reserved credits have been returned," with credit-specific wording when detected | Yes | Yes |
-| Insufficient credits | Well-handled — explicit "You don't have enough credits" messaging before and after submission (`CampaignWizard.tsx`) | Yes | Yes |
-| Payment failure | Not independently verified this phase — see `docs/SECURITY.md` §15 for what's known | Not verified | Yes |
-| Permission denied | Server returns a mapped `permission-denied` error (`docs/API.md`'s error table); UI-level copy for this specific case was not traced end-to-end this phase | Not verified | Yes |
-| Truth Check failure | Handled — `regenerateAsset.ts` guarantees a failed regeneration never replaces a valid asset; `DetailedChecks.tsx` renders PASS/FAIL status per check | Yes | Yes |
-| Asset generation failure | Same path as campaign generation failure | Yes | Yes |
-| Download failure | Not specifically traced this phase | Not verified | Yes |
-| Server error (uncaught) | `global-error.tsx` — generic, appropriately non-technical message | Yes (refresh, or contact support) | **Yes, now** (previously no) |
+| Failure                     | Does the user understand what happened?                                                                                                                             | Does the user know what to do?    | Can they reach support?                                                                |
+| --------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------- | -------------------------------------------------------------------------------------- |
+| Authentication failure      | PARTIAL — Firebase error codes are mapped in `authErrors.ts`, but only for `auth/user-not-found` (verified by direct read — a single mapped code, not a full table) | Partial                           | Yes, now (via account menu once logged in isn't possible pre-auth — footer link works) |
+| Upload failure              | Handled — `confirmUpload.ts`'s validation errors surface as toasts                                                                                                  | Yes                               | Yes (footer/sidebar)                                                                   |
+| Campaign generation failure | Well-handled — `CampaignWizard.tsx` shows "We couldn't start this campaign. Any reserved credits have been returned," with credit-specific wording when detected    | Yes                               | Yes                                                                                    |
+| Insufficient credits        | Well-handled — explicit "You don't have enough credits" messaging before and after submission (`CampaignWizard.tsx`)                                                | Yes                               | Yes                                                                                    |
+| Payment failure             | Not independently verified this phase — see `docs/SECURITY.md` §15 for what's known                                                                                 | Not verified                      | Yes                                                                                    |
+| Permission denied           | Server returns a mapped `permission-denied` error (`docs/API.md`'s error table); UI-level copy for this specific case was not traced end-to-end this phase          | Not verified                      | Yes                                                                                    |
+| Truth Check failure         | Handled — `regenerateAsset.ts` guarantees a failed regeneration never replaces a valid asset; `DetailedChecks.tsx` renders PASS/FAIL status per check               | Yes                               | Yes                                                                                    |
+| Asset generation failure    | Same path as campaign generation failure                                                                                                                            | Yes                               | Yes                                                                                    |
+| Download failure            | Not specifically traced this phase                                                                                                                                  | Not verified                      | Yes                                                                                    |
+| Server error (uncaught)     | `global-error.tsx` — generic, appropriately non-technical message                                                                                                   | Yes (refresh, or contact support) | **Yes, now** (previously no)                                                           |
 
 ### Remaining gaps
 
@@ -103,7 +103,7 @@ fact outside the codebase, and this report does not claim otherwise.
 - No verification that `support@brain-wise.com` is an actively monitored inbox (outside this
   codebase's control).
 - Download-failure and permission-denied UI copy not individually traced.
-- No structured way for the *app* to know a support email was ever sent (no logging/analytics event
+- No structured way for the _app_ to know a support email was ever sent (no logging/analytics event
   on the mailto click) — acceptable for an MVP, noted as a future improvement, not built.
 
 ## 3. Onboarding Email Sequence
@@ -124,13 +124,13 @@ feedback-request, or beta-conversion email.
 
 ### Required audit — each of the five specified emails
 
-| Email | Status |
-|---|---|
-| 1 — Welcome | NOT IMPLEMENTED |
+| Email                    | Status          |
+| ------------------------ | --------------- |
+| 1 — Welcome              | NOT IMPLEMENTED |
 | 2 — First Campaign nudge | NOT IMPLEMENTED |
-| 3 — Value Reminder | NOT IMPLEMENTED |
-| 4 — Feedback | NOT IMPLEMENTED |
-| 5 — Beta/Conversion | NOT IMPLEMENTED |
+| 3 — Value Reminder       | NOT IMPLEMENTED |
+| 4 — Feedback             | NOT IMPLEMENTED |
+| 5 — Beta/Conversion      | NOT IMPLEMENTED |
 
 ### Decision: not built this phase
 
@@ -160,21 +160,21 @@ executed here.
 
 ### Journey matrix
 
-| Journey | Guidance exists? | Correct? | Action |
-|---|---|---|---|
-| Signup | VERIFIED | Yes — form validation, clear errors | None needed |
-| Onboarding | VERIFIED | Yes — 5–6 step wizard with per-step validation, category-aware fields (`onboarding/page.tsx`) | None needed |
-| Business Brain | PARTIAL | Data model exists and is editable; no dedicated in-app explainer of *why* it matters beyond the form fields themselves | Documented in `docs/USER_GUIDE.md`; no in-app copy added this phase |
-| Product setup | VERIFIED | Category-aware fields, validated | None needed |
-| Photo upload | VERIFIED | Format/size constraints enforced server-side (`confirmUpload.ts`); toast on failure | None needed |
-| Campaign creation | VERIFIED | `CampaignWizard.tsx` shows live credit balance, blocks submission with a specific message when credits are insufficient **before** calling the server | None needed |
-| Review | VERIFIED | Explicit review step before generation | None needed |
-| Truth Check | VERIFIED | `DetailedChecks.tsx` renders PASS/FAIL/REVIEW_REQUIRED per check, human-readable | None needed |
-| Generation | VERIFIED | `GenerationProgress.tsx` shows real backend stage names, not a fake percentage, with explicit "this can take up to a minute" expectation-setting | None needed |
-| Download | VERIFIED | Dedicated download/WhatsApp-share actions in `CampaignDetailContent.tsx` | None needed |
-| Credits | VERIFIED | Visible balance pill in the header (`Sidebar.tsx`), a dedicated `/usage` page with progress bars and plan limits | None needed |
-| Billing | VERIFIED | `/billing` page shows current plan, upgrade options, top-ups | None needed |
-| Errors | **Was MISSING a support path; now PARTIAL** | Error messages are generally specific and actionable (§2's table); the missing piece was the "if this keeps happening" escalation path, now fixed | Fixed this phase (§2) |
+| Journey           | Guidance exists?                            | Correct?                                                                                                                                              | Action                                                              |
+| ----------------- | ------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------- |
+| Signup            | VERIFIED                                    | Yes — form validation, clear errors                                                                                                                   | None needed                                                         |
+| Onboarding        | VERIFIED                                    | Yes — 5–6 step wizard with per-step validation, category-aware fields (`onboarding/page.tsx`)                                                         | None needed                                                         |
+| Business Brain    | PARTIAL                                     | Data model exists and is editable; no dedicated in-app explainer of _why_ it matters beyond the form fields themselves                                | Documented in `docs/USER_GUIDE.md`; no in-app copy added this phase |
+| Product setup     | VERIFIED                                    | Category-aware fields, validated                                                                                                                      | None needed                                                         |
+| Photo upload      | VERIFIED                                    | Format/size constraints enforced server-side (`confirmUpload.ts`); toast on failure                                                                   | None needed                                                         |
+| Campaign creation | VERIFIED                                    | `CampaignWizard.tsx` shows live credit balance, blocks submission with a specific message when credits are insufficient **before** calling the server | None needed                                                         |
+| Review            | VERIFIED                                    | Explicit review step before generation                                                                                                                | None needed                                                         |
+| Truth Check       | VERIFIED                                    | `DetailedChecks.tsx` renders PASS/FAIL/REVIEW_REQUIRED per check, human-readable                                                                      | None needed                                                         |
+| Generation        | VERIFIED                                    | `GenerationProgress.tsx` shows real backend stage names, not a fake percentage, with explicit "this can take up to a minute" expectation-setting      | None needed                                                         |
+| Download          | VERIFIED                                    | Dedicated download/WhatsApp-share actions in `CampaignDetailContent.tsx`                                                                              | None needed                                                         |
+| Credits           | VERIFIED                                    | Visible balance pill in the header (`Sidebar.tsx`), a dedicated `/usage` page with progress bars and plan limits                                      | None needed                                                         |
+| Billing           | VERIFIED                                    | `/billing` page shows current plan, upgrade options, top-ups                                                                                          | None needed                                                         |
+| Errors            | **Was MISSING a support path; now PARTIAL** | Error messages are generally specific and actionable (§2's table); the missing piece was the "if this keeps happening" escalation path, now fixed     | Fixed this phase (§2)                                               |
 
 ### First-session test
 
@@ -183,7 +183,7 @@ founder?" — **largely yes**, for the core paid workflow: onboarding is a guide
 the campaign wizard shows your credit balance and blocks you clearly if you're short, generation
 shows real progress, and Truth Check/download are self-explanatory with visible status. The genuine
 gap was specifically the "I'm stuck and need a human" path, which is what §2 fixes. Business Brain's
-*purpose* (why it matters, not just its form fields) is the one soft spot found — not fixed this
+_purpose_ (why it matters, not just its form fields) is the one soft spot found — not fixed this
 phase, since adding explainer copy risks scope creep beyond "targeted fixes" and the phase brief asks
 for restraint here.
 
@@ -211,7 +211,7 @@ anywhere in this report, per the explicit instruction not to invent them.
 
 **NOT IMPLEMENTED.** There is no operational process — no invite mechanism, no baseline-data
 collection, no week-by-week measurement cadence, and (§3) no email sequence to drive weekly
-engagement. The underlying product data needed to *measure* a beta if one ran does partially exist:
+engagement. The underlying product data needed to _measure_ a beta if one ran does partially exist:
 campaign counts, credit usage, and WhatsApp click tracking are real, server-recorded metrics
 (`getAnalyticsDashboard`, `docs/PERFORMANCE_ENGINE.md`) — but nothing aggregates them into a
 beta-cohort view, and nothing distinguishes a "beta customer" from any other user in the data model.
@@ -257,11 +257,11 @@ emails as a proxy for blocker frequency) — not as a scored result.
 Because only three frontend files were changed (`LandingFooter.tsx`, `Sidebar.tsx`,
 `global-error.tsx` — no backend, no Firestore/Storage rules, no CI/CD), the following were run:
 
-| Check | Result |
-|---|---|
-| `npx tsc --noEmit` (root) | 0 errors |
-| `npx jest` (root) | **248 passed, 0 failed, 67 skipped** (35 tests fewer counted than "315 total" shown — this matches the pre-existing skip set from every prior phase in this session; no new skip was introduced) |
-| `npm run build` | Succeeded — bundle sizes byte-identical to the last recorded baseline (163 kB shared JS floor, 312 kB heaviest route, in `docs/PERFORMANCE_OPTIMIZATION_AUDIT_REPORT.md`) |
+| Check                     | Result                                                                                                                                                                                           |
+| ------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `npx tsc --noEmit` (root) | 0 errors                                                                                                                                                                                         |
+| `npx jest` (root)         | **248 passed, 0 failed, 67 skipped** (35 tests fewer counted than "315 total" shown — this matches the pre-existing skip set from every prior phase in this session; no new skip was introduced) |
+| `npm run build`           | Succeeded — bundle sizes byte-identical to the last recorded baseline (163 kB shared JS floor, 312 kB heaviest route, in `docs/PERFORMANCE_OPTIMIZATION_AUDIT_REPORT.md`)                        |
 
 Functions were not touched, so `functions`'s typecheck/test/build were not re-run this phase (no
 functions source changed).
@@ -294,23 +294,23 @@ changed.
 - No confirmation that `support@brain-wise.com` is an actively monitored inbox — outside this
   codebase's visibility.
 - Download-failure and permission-denied UI copy: not individually traced end-to-end.
-- Business Brain's *purpose* explainer: a soft in-app-guidance gap, not fixed (would risk scope
+- Business Brain's _purpose_ explainer: a soft in-app-guidance gap, not fixed (would risk scope
   creep beyond a targeted fix).
 
 ## 10. Final Status Matrix
 
-| Area | Status | Evidence |
-|---|---|---|
-| Support system | **PARTIAL** | Real, reachable mailto link now on 3 surfaces (landing footer, account menu, crash screen); no ticketing, no context capture, inbox monitoring unverified |
-| Support error handling | **PARTIAL** | Most failure types have specific, actionable messaging (§2 table); a couple not individually traced |
-| Onboarding email infrastructure | **NOT IMPLEMENTED / BLOCKED** | No provider, no templates, no sending backend found anywhere; requires a founder decision on provider/domain not made this phase |
-| Email sequence | **NOT IMPLEMENTED** | None of the 5 specified emails exist |
-| In-app guidance | **VERIFIED (core workflow), PARTIAL (Business Brain explainer)** | Journey matrix, §4 |
-| Beta process | **NOT IMPLEMENTED** | No source-of-truth docs exist; no code artifacts found |
-| Feedback collection | **NOT IMPLEMENTED** | No structured system; the new support link is the only channel, informal |
-| Customer evidence | **NONE (no beta has run)** | N/A — not fabricated |
-| Security regression | **VERIFIED — none introduced** | §6 |
-| Overall Customer Readiness | **PARTIAL** | The core self-serve workflow has been substantially verified in production, including authentication, Business Brain creation, asset upload, product creation, campaign wizard progression, credit enforcement, and security boundaries. Full campaign generation, Truth Check, AI generation, and download remain dependent on completing the available-credit/payment test path; a customer can now reach a real human when stuck; email nurture and a structured beta process are absent |
+| Area                            | Status                                                           | Evidence                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
+| ------------------------------- | ---------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Support system                  | **PARTIAL**                                                      | Real, reachable mailto link now on 3 surfaces (landing footer, account menu, crash screen); no ticketing, no context capture, inbox monitoring unverified                                                                                                                                                                                                                                                                                                                                   |
+| Support error handling          | **PARTIAL**                                                      | Most failure types have specific, actionable messaging (§2 table); a couple not individually traced                                                                                                                                                                                                                                                                                                                                                                                         |
+| Onboarding email infrastructure | **NOT IMPLEMENTED / BLOCKED**                                    | No provider, no templates, no sending backend found anywhere; requires a founder decision on provider/domain not made this phase                                                                                                                                                                                                                                                                                                                                                            |
+| Email sequence                  | **NOT IMPLEMENTED**                                              | None of the 5 specified emails exist                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
+| In-app guidance                 | **VERIFIED (core workflow), PARTIAL (Business Brain explainer)** | Journey matrix, §4                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
+| Beta process                    | **NOT IMPLEMENTED**                                              | No source-of-truth docs exist; no code artifacts found                                                                                                                                                                                                                                                                                                                                                                                                                                      |
+| Feedback collection             | **NOT IMPLEMENTED**                                              | No structured system; the new support link is the only channel, informal                                                                                                                                                                                                                                                                                                                                                                                                                    |
+| Customer evidence               | **NONE (no beta has run)**                                       | N/A — not fabricated                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
+| Security regression             | **VERIFIED — none introduced**                                   | §6                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
+| Overall Customer Readiness      | **PARTIAL**                                                      | The core self-serve workflow has been substantially verified in production, including authentication, Business Brain creation, asset upload, product creation, campaign wizard progression, credit enforcement, and security boundaries. Full campaign generation, Truth Check, AI generation, and download remain dependent on completing the available-credit/payment test path; a customer can now reach a real human when stuck; email nurture and a structured beta process are absent |
 
 ## Final Recommendation
 

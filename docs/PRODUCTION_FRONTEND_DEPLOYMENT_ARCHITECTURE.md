@@ -8,16 +8,16 @@ Evidence labels: **VERIFIED** = observed this session (command output / file rea
 
 ## 1. Current Deployment State
 
-| Component | State | Evidence |
-|---|---|---|
-| Cloud Functions (asia-south1) | 37 live, all "unchanged" on latest deploy | VERIFIED `firebase deploy --only functions,firestore` |
-| Auth triggers (us-central1) | `onUserCreatedHandler`, `onUserDeletedHandler` live | VERIFIED |
-| Firestore rules + indexes | Deployed | VERIFIED |
-| Storage rules | Compile OK, **deployed status UNVERIFIED** (see §16) | VERIFIED dry-run |
-| Firebase Hosting | **Not configured** — `firebase.json` has no `hosting` key | VERIFIED |
-| Next.js frontend | **Not deployed anywhere verifiable** | Docs Phase 19/19A; Vercel link UNVERIFIED |
-| Custom domain `brain-wise.com` | Listed under Firebase Hosting default site as "Custom" (user-supplied) | Console screenshot text from user |
-| Firebase project | `brainwise-ai-marketing-engine` (691254604957), single Web app `1:691254604957:web:caf76181c86efb6a7b5074` | VERIFIED `firebase use`, `apps:list` |
+| Component                      | State                                                                                                      | Evidence                                              |
+| ------------------------------ | ---------------------------------------------------------------------------------------------------------- | ----------------------------------------------------- |
+| Cloud Functions (asia-south1)  | 37 live, all "unchanged" on latest deploy                                                                  | VERIFIED `firebase deploy --only functions,firestore` |
+| Auth triggers (us-central1)    | `onUserCreatedHandler`, `onUserDeletedHandler` live                                                        | VERIFIED                                              |
+| Firestore rules + indexes      | Deployed                                                                                                   | VERIFIED                                              |
+| Storage rules                  | Compile OK, **deployed status UNVERIFIED** (see §16)                                                       | VERIFIED dry-run                                      |
+| Firebase Hosting               | **Not configured** — `firebase.json` has no `hosting` key                                                  | VERIFIED                                              |
+| Next.js frontend               | **Not deployed anywhere verifiable**                                                                       | Docs Phase 19/19A; Vercel link UNVERIFIED             |
+| Custom domain `brain-wise.com` | Listed under Firebase Hosting default site as "Custom" (user-supplied)                                     | Console screenshot text from user                     |
+| Firebase project               | `brainwise-ai-marketing-engine` (691254604957), single Web app `1:691254604957:web:caf76181c86efb6a7b5074` | VERIFIED `firebase use`, `apps:list`                  |
 
 ## 2. Current Next.js Architecture
 
@@ -30,13 +30,13 @@ Evidence labels: **VERIFIED** = observed this session (command output / file rea
 
 Route map (all under `src/app/`):
 
-| Route | Render (build) | Runtime data | Auth | Notes |
-|---|---|---|---|---|
-| `/` | Static | none | public | landing |
-| `/login`, `/signup`, `/forgot-password` | Static | Firebase Auth (browser) | public | client components |
-| `/onboarding` | Static | Functions/Firestore (browser) | client guard | |
-| `/dashboard`, `/analytics`, `/billing`, `/brand`, `/business-profile`, `/campaigns`, `/campaigns/new`, `/products`, `/products/new`, `/reels`, `/reels/new`, `/usage` | Static shell | Firestore + callables from browser | `ProtectedRoute` (client) | |
-| `/campaigns/[campaignId]` | **ƒ Dynamic** | campaign ID from URL, read in browser via `useParams()` | client guard | only dynamic route; no `generateStaticParams` |
+| Route                                                                                                                                                                 | Render (build) | Runtime data                                            | Auth                      | Notes                                         |
+| --------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------- | ------------------------------------------------------- | ------------------------- | --------------------------------------------- |
+| `/`                                                                                                                                                                   | Static         | none                                                    | public                    | landing                                       |
+| `/login`, `/signup`, `/forgot-password`                                                                                                                               | Static         | Firebase Auth (browser)                                 | public                    | client components                             |
+| `/onboarding`                                                                                                                                                         | Static         | Functions/Firestore (browser)                           | client guard              |                                               |
+| `/dashboard`, `/analytics`, `/billing`, `/brand`, `/business-profile`, `/campaigns`, `/campaigns/new`, `/products`, `/products/new`, `/reels`, `/reels/new`, `/usage` | Static shell   | Firestore + callables from browser                      | `ProtectedRoute` (client) |                                               |
+| `/campaigns/[campaignId]`                                                                                                                                             | **ƒ Dynamic**  | campaign ID from URL, read in browser via `useParams()` | client guard              | only dynamic route; no `generateStaticParams` |
 
 "Static shell" = HTML prerendered with the loading/unauthenticated state; all data arrives client-side after Firebase Auth resolves.
 
@@ -87,18 +87,18 @@ Browser (Next.js client code)
 
 All variables the Next app reads are `NEXT_PUBLIC_*`, therefore **PUBLIC and BUILD-TIME** (inlined into the JS bundle at `next build`). There is **no SERVER-ONLY / RUNTIME variable in the Next app.** (Values not printed; presence only.)
 
-| Variable | Class | When needed | Notes |
-|---|---|---|---|
-| `NEXT_PUBLIC_FIREBASE_API_KEY`, `_AUTH_DOMAIN`, `_PROJECT_ID`, `_STORAGE_BUCKET`, `_MESSAGING_SENDER_ID`, `_APP_ID`, `_MEASUREMENT_ID` | PUBLIC | build | Web config; not secrets |
-| `NEXT_PUBLIC_RECAPTCHA_SITE_KEY` | PUBLIC | build | Must be the Enterprise key registered for the prod domain. **Absent from CI's build env** (CI only builds; harmless there) |
-| `NEXT_PUBLIC_RAZORPAY_KEY_ID` | PUBLIC | build | Publishable key id only. Must be `rzp_live_…` for prod |
-| `NEXT_PUBLIC_APP_URL` | PUBLIC | build | `.env.local` = `http://localhost:3000`; set to `https://brain-wise.com` in prod |
-| `NEXT_PUBLIC_APP_NAME`, `NEXT_PUBLIC_ENABLE_*` flags | PUBLIC | build | in `.env.example` |
-| `NEXT_PUBLIC_USE_EMULATORS` | PUBLIC | build | **MUST be unset/`false` in production.** `.env.local` sets it `true` |
-| `NEXT_PUBLIC_APPCHECK_DEBUG_TOKEN` | PUBLIC (but sensitive-ish) | dev only | Must NOT be set in production |
-| `GEMINI_API_KEY`, `OPENAI_API_KEY`, `NVIDIA_API_KEY`, `RAZORPAY_KEY_SECRET`, `RAZORPAY_WEBHOOK_SECRET`, Admin creds | SERVER-ONLY | Functions runtime | Live in Firebase Functions secrets; **never** needed by the frontend host |
+| Variable                                                                                                                               | Class                      | When needed       | Notes                                                                                                                      |
+| -------------------------------------------------------------------------------------------------------------------------------------- | -------------------------- | ----------------- | -------------------------------------------------------------------------------------------------------------------------- |
+| `NEXT_PUBLIC_FIREBASE_API_KEY`, `_AUTH_DOMAIN`, `_PROJECT_ID`, `_STORAGE_BUCKET`, `_MESSAGING_SENDER_ID`, `_APP_ID`, `_MEASUREMENT_ID` | PUBLIC                     | build             | Web config; not secrets                                                                                                    |
+| `NEXT_PUBLIC_RECAPTCHA_SITE_KEY`                                                                                                       | PUBLIC                     | build             | Must be the Enterprise key registered for the prod domain. **Absent from CI's build env** (CI only builds; harmless there) |
+| `NEXT_PUBLIC_RAZORPAY_KEY_ID`                                                                                                          | PUBLIC                     | build             | Publishable key id only. Must be `rzp_live_…` for prod                                                                     |
+| `NEXT_PUBLIC_APP_URL`                                                                                                                  | PUBLIC                     | build             | `.env.local` = `http://localhost:3000`; set to `https://brain-wise.com` in prod                                            |
+| `NEXT_PUBLIC_APP_NAME`, `NEXT_PUBLIC_ENABLE_*` flags                                                                                   | PUBLIC                     | build             | in `.env.example`                                                                                                          |
+| `NEXT_PUBLIC_USE_EMULATORS`                                                                                                            | PUBLIC                     | build             | **MUST be unset/`false` in production.** `.env.local` sets it `true`                                                       |
+| `NEXT_PUBLIC_APPCHECK_DEBUG_TOKEN`                                                                                                     | PUBLIC (but sensitive-ish) | dev only          | Must NOT be set in production                                                                                              |
+| `GEMINI_API_KEY`, `OPENAI_API_KEY`, `NVIDIA_API_KEY`, `RAZORPAY_KEY_SECRET`, `RAZORPAY_WEBHOOK_SECRET`, Admin creds                    | SERVER-ONLY                | Functions runtime | Live in Firebase Functions secrets; **never** needed by the frontend host                                                  |
 
-Hazard (VERIFIED): `.env.local` contains `NEXT_PUBLIC_USE_EMULATORS=true`. Any *local* `next build` / `vercel build` inlines emulator wiring (`localhost:9099` etc.) into the bundle. Production builds must come from the host's Git build with dashboard env vars only, never from this working directory.
+Hazard (VERIFIED): `.env.local` contains `NEXT_PUBLIC_USE_EMULATORS=true`. Any _local_ `next build` / `vercel build` inlines emulator wiring (`localhost:9099` etc.) into the bundle. Production builds must come from the host's Git build with dashboard env vars only, never from this working directory.
 
 ## 8. AI Architecture
 
@@ -115,22 +115,22 @@ Hazard (VERIFIED): `.env.local` contains `NEXT_PUBLIC_USE_EMULATORS=true`. Any *
 
 Verdict: **NOT COMPATIBLE as the code stands** (would need code changes; do not do them merely for hosting convenience).
 
-| Feature | Static compatible? | Evidence |
-|---|---|---|
-| Public pages (`/`, legal) | Yes | Prerendered `○` |
-| Login / Signup / Forgot | Yes | Client Firebase Auth only |
-| Dashboard / Onboarding / Business Brain / Brand | Yes | `'use client'`, browser data |
-| Asset upload | Yes | Signed URL from callable, browser PUT |
-| Campaign creation (`/campaigns/new`) | Yes | client + callables |
-| Campaign review (`/campaigns/[campaignId]`) | **No** | `ƒ Dynamic`; ID unknown at build; no `generateStaticParams`. `output:'export'` requires every dynamic segment be enumerated at build → build error (**INFERRED**, not executed) |
-| Billing | Yes | client Razorpay + callables |
-| Dynamic routes | **No** (1 route) | as above |
-| Authenticated pages | Yes | client-side guard |
-| Firebase client / App Check | Yes | browser-only |
-| Server actions / API routes / middleware | N/A — none exist | grep |
-| Image optimization | **No** | `next/image` with remote Storage URLs needs the optimizer; export needs `images.unoptimized: true` (behavior change) |
-| `next.config` `headers()` | **No** | Not applied by static export/Firebase Hosting; would need re-expression in `firebase.json` |
-| Server env vars | Yes | none exist |
+| Feature                                         | Static compatible? | Evidence                                                                                                                                                                        |
+| ----------------------------------------------- | ------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Public pages (`/`, legal)                       | Yes                | Prerendered `○`                                                                                                                                                                 |
+| Login / Signup / Forgot                         | Yes                | Client Firebase Auth only                                                                                                                                                       |
+| Dashboard / Onboarding / Business Brain / Brand | Yes                | `'use client'`, browser data                                                                                                                                                    |
+| Asset upload                                    | Yes                | Signed URL from callable, browser PUT                                                                                                                                           |
+| Campaign creation (`/campaigns/new`)            | Yes                | client + callables                                                                                                                                                              |
+| Campaign review (`/campaigns/[campaignId]`)     | **No**             | `ƒ Dynamic`; ID unknown at build; no `generateStaticParams`. `output:'export'` requires every dynamic segment be enumerated at build → build error (**INFERRED**, not executed) |
+| Billing                                         | Yes                | client Razorpay + callables                                                                                                                                                     |
+| Dynamic routes                                  | **No** (1 route)   | as above                                                                                                                                                                        |
+| Authenticated pages                             | Yes                | client-side guard                                                                                                                                                               |
+| Firebase client / App Check                     | Yes                | browser-only                                                                                                                                                                    |
+| Server actions / API routes / middleware        | N/A — none exist   | grep                                                                                                                                                                            |
+| Image optimization                              | **No**             | `next/image` with remote Storage URLs needs the optimizer; export needs `images.unoptimized: true` (behavior change)                                                            |
+| `next.config` `headers()`                       | **No**             | Not applied by static export/Firebase Hosting; would need re-expression in `firebase.json`                                                                                      |
+| Server env vars                                 | Yes                | none exist                                                                                                                                                                      |
 
 To make static export work you would need to (1) move campaign detail to a non-dynamic route (e.g. `/campaigns/view?id=…`) or add a hosting rewrite of `/campaigns/**` to a single shell page, (2) set `images.unoptimized`, (3) port headers, (4) set `output: 'export'`, output dir `out/`. Every one is an application change. Not recommended.
 
@@ -171,16 +171,16 @@ Recommended (after platform verified): `brain-wise.com` → frontend platform (c
 
 ## 17. Deployment Drift
 
-| Item | Repo | Live | Drift |
-|---|---|---|---|
-| Hosting | none in `firebase.json`; `.firebaserc` has vestigial `targets.hosting` → site `ai-marketing-engine` | Default site + `brain-wise.com` attached | Yes — domain attached to a site that serves nothing from this repo |
-| Functions | 37 + 2 | 37 + 2 | None |
-| Firestore rules/indexes | current | released | None |
-| Storage rules | current (staged) | unknown | Unknown |
-| App Check | client + all callables enforcing | console state unverified | Unknown |
-| Project aliases | `default` and `dev` → same project | — | No prod/staging split |
-| CI | `.github/workflows/ci-cd.yml` triggers on `main`/`develop`, uses `./ai-marketing-engine` working dir; git branch is `master`, repo root is the app dir | — | Likely never runs (INFERRED); unrelated to frontend hosting |
-| Docs | `PRODUCT.md`, `ARCHITECTURE.md`, `DATABASE.md`, `AI_ARCHITECTURE.md`, `SECURITY.md`, `MVP_SCOPE.md`, `TEST_PLAN.md` **do not exist** in `docs/` | — | Read `ARCHITECTURE_AI_CONTEXT.md`, `ARCHITECTURE_DISCOVERY_REPORT.md` and Phase 19/19A/20/20A/20B/20C reports instead |
+| Item                    | Repo                                                                                                                                                   | Live                                     | Drift                                                                                                                 |
+| ----------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ | ---------------------------------------- | --------------------------------------------------------------------------------------------------------------------- |
+| Hosting                 | none in `firebase.json`; `.firebaserc` has vestigial `targets.hosting` → site `ai-marketing-engine`                                                    | Default site + `brain-wise.com` attached | Yes — domain attached to a site that serves nothing from this repo                                                    |
+| Functions               | 37 + 2                                                                                                                                                 | 37 + 2                                   | None                                                                                                                  |
+| Firestore rules/indexes | current                                                                                                                                                | released                                 | None                                                                                                                  |
+| Storage rules           | current (staged)                                                                                                                                       | unknown                                  | Unknown                                                                                                               |
+| App Check               | client + all callables enforcing                                                                                                                       | console state unverified                 | Unknown                                                                                                               |
+| Project aliases         | `default` and `dev` → same project                                                                                                                     | —                                        | No prod/staging split                                                                                                 |
+| CI                      | `.github/workflows/ci-cd.yml` triggers on `main`/`develop`, uses `./ai-marketing-engine` working dir; git branch is `master`, repo root is the app dir | —                                        | Likely never runs (INFERRED); unrelated to frontend hosting                                                           |
+| Docs                    | `PRODUCT.md`, `ARCHITECTURE.md`, `DATABASE.md`, `AI_ARCHITECTURE.md`, `SECURITY.md`, `MVP_SCOPE.md`, `TEST_PLAN.md` **do not exist** in `docs/`        | —                                        | Read `ARCHITECTURE_AI_CONTEXT.md`, `ARCHITECTURE_DISCOVERY_REPORT.md` and Phase 19/19A/20/20A/20B/20C reports instead |
 
 ## 18. Recommended Production Architecture
 
@@ -188,11 +188,12 @@ Recommended (after platform verified): `brain-wise.com` → frontend platform (c
 
 Because, specifically: (1) `next build` yields a standard server build with a `ƒ` route (`/campaigns/[campaignId]`) that needs a Next runtime; (2) `next/image` with `remotePatterns` for Firebase Storage needs the image optimizer; (3) `headers()` in `next.config.ts` carries security headers that only a Next-aware host applies; (4) `vercel.json` already exists and Phases 19/19A documented Vercel as the intended host; (5) there are no server-only secrets or Firebase Admin usage in the Next app, so the frontend host does not need to sit inside Google Cloud IAM.
 
-Honest note: Firebase App Hosting is *also* technically compatible with this exact code. The code does not force Vercel over App Hosting; the tie-breakers are documented intent, existing `vercel.json`, and App Hosting needing new config/IAM/Cloud Build setup for no functional gain. If you prefer single-vendor Google, App Hosting is a valid switch with no app changes.
+Honest note: Firebase App Hosting is _also_ technically compatible with this exact code. The code does not force Vercel over App Hosting; the tie-breakers are documented intent, existing `vercel.json`, and App Hosting needing new config/IAM/Cloud Build setup for no functional gain. If you prefer single-vendor Google, App Hosting is a valid switch with no app changes.
 
 ## 19. Required Changes Before Deployment
 
 Blocking (none require app-logic changes):
+
 1. A Vercel project connected to the Git repo (**human action**).
 2. Vercel env vars per §7 (prod values; `USE_EMULATORS` unset).
 3. `brain-wise.com` (+`www`) added to Firebase Auth authorized domains.

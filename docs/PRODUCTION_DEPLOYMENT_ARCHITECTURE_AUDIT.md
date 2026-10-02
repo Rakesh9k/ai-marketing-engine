@@ -89,24 +89,24 @@ No application code changes required. Operational: connect Vercel project; set e
 
 Legend: **A** = automated test, **E** = emulator test, **B** = real browser test, **P** = production test.
 
-| # | Check | Type |
-|---|---|---|
-| 1–3 | Open `brain-wise.com`, HTTPS valid, app renders | P |
-| 4 | No console errors (incl. App Check) | P |
-| 5–8 | Signup → login → logout → login again | P (logic covered by A/E tests) |
-| 9 | Firebase Auth user appears in console | P |
-| 10 | App Check token attached / callables succeed | P (only real proof; emulator doesn't verify tokens) |
-| 11–12 | Create business → Firestore doc + `businessIds` claim | P |
-| 13–14 | Upload asset → object in Storage | P |
-| 15–16 | Start campaign → Cloud Function logs | P |
-| 17–18 | AI generation + Truth Check result | P |
-| 19–20 | Review campaign (`/campaigns/<id>` deep link + refresh) → download asset | P |
-| 21 | WhatsApp CTA opens correctly | B/P |
-| 22–23 | Billing page; Razorpay flow in test mode if keys allow | P |
-| 24 | Credits change after purchase/generation | P |
-| 25 | Logout/login persistence | P |
-| — | Unit/component suites (`npm test`), Functions tests | A |
-| — | Firestore/Storage rules, callable flow with debug token | E |
+| #     | Check                                                                    | Type                                                |
+| ----- | ------------------------------------------------------------------------ | --------------------------------------------------- |
+| 1–3   | Open `brain-wise.com`, HTTPS valid, app renders                          | P                                                   |
+| 4     | No console errors (incl. App Check)                                      | P                                                   |
+| 5–8   | Signup → login → logout → login again                                    | P (logic covered by A/E tests)                      |
+| 9     | Firebase Auth user appears in console                                    | P                                                   |
+| 10    | App Check token attached / callables succeed                             | P (only real proof; emulator doesn't verify tokens) |
+| 11–12 | Create business → Firestore doc + `businessIds` claim                    | P                                                   |
+| 13–14 | Upload asset → object in Storage                                         | P                                                   |
+| 15–16 | Start campaign → Cloud Function logs                                     | P                                                   |
+| 17–18 | AI generation + Truth Check result                                       | P                                                   |
+| 19–20 | Review campaign (`/campaigns/<id>` deep link + refresh) → download asset | P                                                   |
+| 21    | WhatsApp CTA opens correctly                                             | B/P                                                 |
+| 22–23 | Billing page; Razorpay flow in test mode if keys allow                   | P                                                   |
+| 24    | Credits change after purchase/generation                                 | P                                                   |
+| 25    | Logout/login persistence                                                 | P                                                   |
+| —     | Unit/component suites (`npm test`), Functions tests                      | A                                                   |
+| —     | Firestore/Storage rules, callable flow with debug token                  | E                                                   |
 
 ## Rollback Strategy
 

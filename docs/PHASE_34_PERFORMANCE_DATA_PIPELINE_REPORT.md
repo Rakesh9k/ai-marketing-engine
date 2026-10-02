@@ -13,8 +13,8 @@ later event than clicking a link.
   (`CampaignDetailContent.tsx`'s `handleWhatsAppShare`) fires at the exact moment the button is
   pressed, before `window.open()`. This event already existed (Phase 9/21) and was already being
   recorded to `analytics_events` — but, confirmed by audit, with **no ownership verification**
-  (the generic `trackAnalyticsEvent.ts` explicitly stubbed it out: *"For now, we'll skip the full
-  verification to avoid type issues"*) and **no per-campaign aggregation anywhere** (Phase 32's
+  (the generic `trackAnalyticsEvent.ts` explicitly stubbed it out: _"For now, we'll skip the full
+  verification to avoid type issues"_) and **no per-campaign aggregation anywhere** (Phase 32's
   dashboard only counts it as a business-wide daily total).
 - `inquiries`: **Not observable by this system today.** Confirmed by audit: no WhatsApp Business
   API reply/read-receipt integration, no inbound webhook, no connected lead-capture form exists
@@ -47,6 +47,7 @@ the same data — it simply has no data in it, before or after this phase. `docs
 documents this explicitly so a future phase doesn't assume it's populated.
 
 `CampaignPerformance` (`functions/src/types/index.ts`):
+
 ```ts
 { campaignId, businessId, whatsappClicks: number, inquiries: number | null, updatedAt, lastEventAt? }
 ```
@@ -79,6 +80,7 @@ documents this explicitly so a future phase doesn't assume it's populated.
 The client (`CampaignDetailContent.tsx`'s `handleWhatsAppShare`) generates a fresh `clickId`
 (`crypto.randomUUID()`) **once per real click**, at the moment the handler fires — not regenerated
 on retry. `withIdempotency` guarantees:
+
 - The same `clickId` sent twice (network retry, duplicated request, refresh replaying a pending
   call) → the second call is a no-op, returns the cached result, never increments again.
 - A concurrent duplicate (two requests with the same key in flight at once) → the second is
@@ -125,21 +127,22 @@ on retry. `withIdempotency` guarantees:
 ## Verification
 
 ### Tests (`functions/src/functions/analytics/recordWhatsAppClick.test.ts`, run against the
+
 Firestore + Auth emulators, all passing)
 
-| Required case | Test | Result |
-|---|---|---|
-| one click | "one click: a single real click is recorded and readable" | ✅ `whatsappClicks: 1` |
-| duplicate click | "duplicate click: retrying the SAME clickId does not double-count" | ✅ stays `1` |
-| multiple clicks | "multiple clicks: distinct genuine clicks each count" | ✅ `3` distinct clicks → `3` |
-| wrong business | "wrong business: a campaign that does not belong to the given businessId is rejected" | ✅ rejected, count stays `0` |
-| wrong campaign | (same test — a campaign is checked against the given businessId, not just existence) | ✅ covered |
-| unauthorized event | "unauthorized event: a user who does not own the business cannot record a click for it" | ✅ rejected |
-| missing campaign | "missing campaign: a campaignId that does not exist is rejected, not silently recorded" | ✅ rejected |
-| missing data | "missing data: a request without a clickId is rejected by schema validation" | ✅ rejected |
-| unknown inquiry | "unknown inquiry: inquiries is always null/unavailable — never 0, never derived from clicks" | ✅ 5 real clicks, `inquiries` still `null` |
-| real inquiry source if one exists | **No real inquiry source exists anywhere in this codebase** (confirmed by audit) — this case is satisfied by proving the negative: the "unknown inquiry" test above proves the system never fabricates one even under real click volume. There is nothing to wire a positive test to. | ✅ (by audit + negative test) |
-| cross-tenant read (added, not explicitly listed but the same class of risk) | "cross-tenant read: a user cannot read another business's campaign performance" | ✅ rejected |
+| Required case                                                               | Test                                                                                                                                                                                                                                                                                  | Result                                     |
+| --------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------ |
+| one click                                                                   | "one click: a single real click is recorded and readable"                                                                                                                                                                                                                             | ✅ `whatsappClicks: 1`                     |
+| duplicate click                                                             | "duplicate click: retrying the SAME clickId does not double-count"                                                                                                                                                                                                                    | ✅ stays `1`                               |
+| multiple clicks                                                             | "multiple clicks: distinct genuine clicks each count"                                                                                                                                                                                                                                 | ✅ `3` distinct clicks → `3`               |
+| wrong business                                                              | "wrong business: a campaign that does not belong to the given businessId is rejected"                                                                                                                                                                                                 | ✅ rejected, count stays `0`               |
+| wrong campaign                                                              | (same test — a campaign is checked against the given businessId, not just existence)                                                                                                                                                                                                  | ✅ covered                                 |
+| unauthorized event                                                          | "unauthorized event: a user who does not own the business cannot record a click for it"                                                                                                                                                                                               | ✅ rejected                                |
+| missing campaign                                                            | "missing campaign: a campaignId that does not exist is rejected, not silently recorded"                                                                                                                                                                                               | ✅ rejected                                |
+| missing data                                                                | "missing data: a request without a clickId is rejected by schema validation"                                                                                                                                                                                                          | ✅ rejected                                |
+| unknown inquiry                                                             | "unknown inquiry: inquiries is always null/unavailable — never 0, never derived from clicks"                                                                                                                                                                                          | ✅ 5 real clicks, `inquiries` still `null` |
+| real inquiry source if one exists                                           | **No real inquiry source exists anywhere in this codebase** (confirmed by audit) — this case is satisfied by proving the negative: the "unknown inquiry" test above proves the system never fabricates one even under real click volume. There is nothing to wire a positive test to. | ✅ (by audit + negative test)              |
+| cross-tenant read (added, not explicitly listed but the same class of risk) | "cross-tenant read: a user cannot read another business's campaign performance"                                                                                                                                                                                                       | ✅ rejected                                |
 
 10/10 tests passing.
 

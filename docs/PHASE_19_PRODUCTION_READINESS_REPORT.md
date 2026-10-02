@@ -5,12 +5,12 @@
 
 ## 1. Executive Summary
 
-This audit inspected the actual repository configuration, actual code, and actual (non-executable-here) deployment surface to answer one question honestly: *if a real paying customer used this application in production today, what would actually work?*
+This audit inspected the actual repository configuration, actual code, and actual (non-executable-here) deployment surface to answer one question honestly: _if a real paying customer used this application in production today, what would actually work?_
 
 Two independent, genuine **P0 blockers** were found that mean the answer is currently **no**, neither of which was known or documented by any prior phase in this session:
 
 1. **The credit-purchase flow does not exist on the frontend.** `src/app/billing/page.tsx`'s "Upgrade to this Plan" button calls `console.log(...)` and `alert('...Razorpay integration coming soon!')` — it does not call the backend's `createSubscription` function, does not open Razorpay Checkout, and the "Credit Top-Up Packs" cards have no button or click handler at all. The backend payment functions (`createSubscription`, `verifyPayment`, `razorpayWebhook`) are fully implemented and tested (Phase 10/15) and sit completely unused by the UI. **A real customer cannot purchase credits today.** This directly fails the core promise being audited: "purchase credits, generate again."
-2. **The CI/CD pipeline's production frontend deployment is misconfigured and would not work as configured.** `.github/workflows/ci-cd.yml` deploys the frontend via `FirebaseExtended/action-hosting-deploy@v0` (Firebase Hosting) for both staging and production, but `firebase.json` contains **no `hosting` configuration block at all** — no `public` directory, no Next.js framework/rewrite config. This Next.js app also has no `output: 'export'` or `output: 'standalone'` set (confirmed by reading `next.config.ts` directly), meaning it is a standard server-rendered Next.js build that cannot be served by a plain static Firebase Hosting deploy. Separately, `vercel.json` exists and is correctly configured for Next.js — suggesting Vercel is the actually-intended frontend host (matching this phase's own stated "IMPORTANT PRODUCT CONTEXT": *"Vercel for the frontend where appropriate"*) — but there is no deployment step for Vercel anywhere in this repository's CI/CD, so it's unverifiable from repo evidence alone whether Vercel's own native Git integration is actually connected and doing the real deploys, or whether the frontend has no working production deployment path at all.
+2. **The CI/CD pipeline's production frontend deployment is misconfigured and would not work as configured.** `.github/workflows/ci-cd.yml` deploys the frontend via `FirebaseExtended/action-hosting-deploy@v0` (Firebase Hosting) for both staging and production, but `firebase.json` contains **no `hosting` configuration block at all** — no `public` directory, no Next.js framework/rewrite config. This Next.js app also has no `output: 'export'` or `output: 'standalone'` set (confirmed by reading `next.config.ts` directly), meaning it is a standard server-rendered Next.js build that cannot be served by a plain static Firebase Hosting deploy. Separately, `vercel.json` exists and is correctly configured for Next.js — suggesting Vercel is the actually-intended frontend host (matching this phase's own stated "IMPORTANT PRODUCT CONTEXT": _"Vercel for the frontend where appropriate"_) — but there is no deployment step for Vercel anywhere in this repository's CI/CD, so it's unverifiable from repo evidence alone whether Vercel's own native Git integration is actually connected and doing the real deploys, or whether the frontend has no working production deployment path at all.
 
 Beyond these two, the audit found the application's **backend architecture to be substantially sound**: Firestore/Storage security rules, cross-tenant isolation, credit-ledger idempotency, Truth Check server-authority, and observability were all extensively verified in Phases 10–15 and 18 and were **re-verified passing in this phase** (26 backend test suites + 13 frontend/rules test suites, all green, re-run live against Firebase emulators during this audit — not merely cited from memory). No new backend security defect was found. The blockers here are specifically in **deployment configuration** and **frontend payment integration**, not in the core campaign/credit/security architecture.
 
@@ -22,16 +22,16 @@ All of the following are missing from this repository, consistent with every pri
 
 ## 3. Current Deployment Architecture
 
-| Component | Intended (per this phase's brief / `vercel.json`) | Actual (per repo evidence) | Status |
-|---|---|---|---|
-| Frontend | Vercel | `vercel.json` present and Next.js-correct; CI/CD instead deploys via Firebase Hosting action with no hosting config | **CONFLICT — see §4** |
-| Firebase Auth | Firebase Auth | Fully implemented, client + Admin SDK, custom claims (Phase 10/11) | OK |
-| Firestore | Firestore | Fully implemented, rules extensively tested (Phase 11/15/18, re-verified this phase) | OK |
-| Storage | Firebase Storage | Fully implemented, rules tested (Phase 11/15, re-verified this phase) | OK |
-| Functions | Firebase Cloud Functions Gen 2 | 25 functions exported from `functions/src/index.ts`, `asia-south1` region, `enforceAppCheck` on sensitive ones | OK |
-| AI | Backend-only providers (Gemini/OpenAI/NVIDIA per config) | Provider abstraction exists and is backend-only (confirmed no frontend AI SDK usage); **no real API keys present in this environment** | **NOT VERIFIED — see §8** |
-| Razorpay | Razorpay | Backend order/webhook/verification fully implemented and tested; **frontend never calls it** | **P0 — see §1, §12** |
-| Domain | Not specified | No custom domain found in any config; `NEXT_PUBLIC_APP_URL` defaults to `http://localhost:3000` in `.env.example` | CUSTOM DOMAIN NOT CONFIGURED |
+| Component     | Intended (per this phase's brief / `vercel.json`)        | Actual (per repo evidence)                                                                                                             | Status                       |
+| ------------- | -------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------- |
+| Frontend      | Vercel                                                   | `vercel.json` present and Next.js-correct; CI/CD instead deploys via Firebase Hosting action with no hosting config                    | **CONFLICT — see §4**        |
+| Firebase Auth | Firebase Auth                                            | Fully implemented, client + Admin SDK, custom claims (Phase 10/11)                                                                     | OK                           |
+| Firestore     | Firestore                                                | Fully implemented, rules extensively tested (Phase 11/15/18, re-verified this phase)                                                   | OK                           |
+| Storage       | Firebase Storage                                         | Fully implemented, rules tested (Phase 11/15, re-verified this phase)                                                                  | OK                           |
+| Functions     | Firebase Cloud Functions Gen 2                           | 25 functions exported from `functions/src/index.ts`, `asia-south1` region, `enforceAppCheck` on sensitive ones                         | OK                           |
+| AI            | Backend-only providers (Gemini/OpenAI/NVIDIA per config) | Provider abstraction exists and is backend-only (confirmed no frontend AI SDK usage); **no real API keys present in this environment** | **NOT VERIFIED — see §8**    |
+| Razorpay      | Razorpay                                                 | Backend order/webhook/verification fully implemented and tested; **frontend never calls it**                                           | **P0 — see §1, §12**         |
+| Domain        | Not specified                                            | No custom domain found in any config; `NEXT_PUBLIC_APP_URL` defaults to `http://localhost:3000` in `.env.example`                      | CUSTOM DOMAIN NOT CONFIGURED |
 
 ## 4. Deployment Configuration Audit
 
@@ -47,27 +47,27 @@ All of the following are missing from this repository, consistent with every pri
 
 No secret values are included below.
 
-| Variable | Required | Public/Secret | Configured (this environment) | Used by |
-|---|---|---|---|---|
-| `NEXT_PUBLIC_FIREBASE_API_KEY` | Yes | Public (Firebase Web API keys are not secret by design) | MISSING (no `.env.local`) | `src/lib/firebase/client.ts` |
-| `NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN` | Yes | Public | MISSING | same |
-| `NEXT_PUBLIC_FIREBASE_PROJECT_ID` | Yes | Public | MISSING | same |
-| `NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET` | Yes | Public | MISSING | same |
-| `NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID` | Yes | Public | MISSING | same |
-| `NEXT_PUBLIC_FIREBASE_APP_ID` | Yes | Public | MISSING | same |
-| `NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID` | No | Public | MISSING | same |
-| `NEXT_PUBLIC_USE_EMULATORS` | No (dev only) | Public | MISSING (defaults falsy — safe) | `src/lib/firebase/client.ts` |
-| `NEXT_PUBLIC_RAZORPAY_KEY_ID` | Would be, if frontend integration existed | Public (Razorpay's own key-id is meant to be client-visible) | MISSING; **also not referenced anywhere in frontend source** — confirms §1's finding independently | n/a — unused |
-| `FIREBASE_PROJECT_ID` (functions) | Yes | Backend | MISSING in this environment | `functions/src/config/env.ts` |
-| `GEMINI_API_KEY` | For AI generation | **Secret** | MISSING | `functions/src/services/ai/*` |
-| `OPENAI_API_KEY` | For AI generation | **Secret** | MISSING | same |
-| `NVIDIA_API_KEY` | Optional | **Secret** | MISSING | same |
-| `RAZORPAY_KEY_ID` | For payments | Backend (Razorpay's key-id itself isn't secret, but is only read server-side here) | MISSING | `functions/src/services/razorpay.ts` |
-| `RAZORPAY_KEY_SECRET` | For payments | **Secret** | MISSING | same |
-| `RAZORPAY_WEBHOOK_SECRET` | For webhook verification | **Secret** | MISSING | `functions/src/functions/webhooks/razorpayWebhook.ts` |
-| `RAZORPAY_STARTER_PLAN_ID` / `_BUSINESS_PLAN_ID` / `_AGENCY_PLAN_ID` | For subscriptions | Backend | MISSING | `createSubscription.ts` |
-| `APP_URL` | Optional | Backend | MISSING | declared, not actually consumed elsewhere (confirmed via grep) |
-| `ADMIN_EMAILS` | Optional | Backend | MISSING | **declared in schema, never read anywhere in the codebase** — dead config, INFO only |
+| Variable                                                             | Required                                  | Public/Secret                                                                      | Configured (this environment)                                                                      | Used by                                                                              |
+| -------------------------------------------------------------------- | ----------------------------------------- | ---------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------ |
+| `NEXT_PUBLIC_FIREBASE_API_KEY`                                       | Yes                                       | Public (Firebase Web API keys are not secret by design)                            | MISSING (no `.env.local`)                                                                          | `src/lib/firebase/client.ts`                                                         |
+| `NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN`                                   | Yes                                       | Public                                                                             | MISSING                                                                                            | same                                                                                 |
+| `NEXT_PUBLIC_FIREBASE_PROJECT_ID`                                    | Yes                                       | Public                                                                             | MISSING                                                                                            | same                                                                                 |
+| `NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET`                                | Yes                                       | Public                                                                             | MISSING                                                                                            | same                                                                                 |
+| `NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID`                           | Yes                                       | Public                                                                             | MISSING                                                                                            | same                                                                                 |
+| `NEXT_PUBLIC_FIREBASE_APP_ID`                                        | Yes                                       | Public                                                                             | MISSING                                                                                            | same                                                                                 |
+| `NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID`                                | No                                        | Public                                                                             | MISSING                                                                                            | same                                                                                 |
+| `NEXT_PUBLIC_USE_EMULATORS`                                          | No (dev only)                             | Public                                                                             | MISSING (defaults falsy — safe)                                                                    | `src/lib/firebase/client.ts`                                                         |
+| `NEXT_PUBLIC_RAZORPAY_KEY_ID`                                        | Would be, if frontend integration existed | Public (Razorpay's own key-id is meant to be client-visible)                       | MISSING; **also not referenced anywhere in frontend source** — confirms §1's finding independently | n/a — unused                                                                         |
+| `FIREBASE_PROJECT_ID` (functions)                                    | Yes                                       | Backend                                                                            | MISSING in this environment                                                                        | `functions/src/config/env.ts`                                                        |
+| `GEMINI_API_KEY`                                                     | For AI generation                         | **Secret**                                                                         | MISSING                                                                                            | `functions/src/services/ai/*`                                                        |
+| `OPENAI_API_KEY`                                                     | For AI generation                         | **Secret**                                                                         | MISSING                                                                                            | same                                                                                 |
+| `NVIDIA_API_KEY`                                                     | Optional                                  | **Secret**                                                                         | MISSING                                                                                            | same                                                                                 |
+| `RAZORPAY_KEY_ID`                                                    | For payments                              | Backend (Razorpay's key-id itself isn't secret, but is only read server-side here) | MISSING                                                                                            | `functions/src/services/razorpay.ts`                                                 |
+| `RAZORPAY_KEY_SECRET`                                                | For payments                              | **Secret**                                                                         | MISSING                                                                                            | same                                                                                 |
+| `RAZORPAY_WEBHOOK_SECRET`                                            | For webhook verification                  | **Secret**                                                                         | MISSING                                                                                            | `functions/src/functions/webhooks/razorpayWebhook.ts`                                |
+| `RAZORPAY_STARTER_PLAN_ID` / `_BUSINESS_PLAN_ID` / `_AGENCY_PLAN_ID` | For subscriptions                         | Backend                                                                            | MISSING                                                                                            | `createSubscription.ts`                                                              |
+| `APP_URL`                                                            | Optional                                  | Backend                                                                            | MISSING                                                                                            | declared, not actually consumed elsewhere (confirmed via grep)                       |
+| `ADMIN_EMAILS`                                                       | Optional                                  | Backend                                                                            | MISSING                                                                                            | **declared in schema, never read anywhere in the codebase** — dead config, INFO only |
 
 No variable inspected stores a secret under a `NEXT_PUBLIC_` (browser-visible) name. `.gitignore` correctly excludes `.env`, `.env.local`, `.env.*.local`; no `.env` file with real values is present or tracked in this repository — only `.env.example` with placeholder text.
 
@@ -80,21 +80,27 @@ Searched the full repository (excluding `node_modules`) for the patterns `AIza[�
 ## 7. Firebase Audit
 
 ### Auth
+
 Email/password implemented (`src/features/auth/components/{Login,Signup,ForgotPassword}Form.tsx`); no Google/OAuth or phone OTP implemented (not a gap — not part of the documented MVP scope from any prior phase). Custom claims (`role`, `businessIds`, `agencyId`) are set server-side only via `admin.auth().setCustomUserClaims` (`middleware/auth.ts`'s `setCustomClaims`) and re-derived from the caller's own verified token, never from client-supplied values or trusted Firestore reads at mint-time (Phase 11's hardening, re-confirmed by reading `createBusiness.ts` again this phase). The browser cannot forge `role`/`businessIds`/`agencyId` into its own token.
 
 ### Firestore
+
 `firestore.rules` and its extensive test coverage (`tests/security.test.ts`, `tests/phase27-*.test.ts`) were **re-run live against the Firestore emulator this phase** (not merely cited): 13 suites, 160 tests passed, covering cross-user, cross-business, cross-agency isolation; client-side forgery of `status`/`truthCheckStatus`/credit fields; and IDOR across campaign/asset/usage/transaction/subscription/brand-kit document IDs. All passed.
 
 ### Storage
+
 `storage.rules`, tested by `tests/storage.test.ts` (10 tests) — re-run live this phase, all passed. Verifies business/agency ownership scoping and that a client cannot access another business's assets or another user's temp uploads by guessing a path.
 
 ### Functions
+
 25 functions exported (`functions/src/index.ts`) — see §11 for the full table. `enforceAppCheck: true` is set on every sensitive `onCall` function (confirmed by grep across `functions/src/functions/**`).
 
 ### Rules
+
 No weakening was made or found relative to the Phase 11/15/18 baselines. Rules files were read, not modified, this phase.
 
 ### Indexes
+
 `firestore.indexes.json` defines composite indexes for `businesses` (by `userId`+`status`+`createdAt`, `agencyId`+`status`+`createdAt`, `category`+`city`+`status`) and `campaigns` (by `businessId`+`status`+`createdAt`), matching the actual query patterns in `services/firestore.ts` (`getBusinessesByUser`, `getCampaignsByBusiness`). No missing-index production query failure was found in this pass — a live production Firestore instance would be needed to catch an index gap that only manifests under Firestore's exact index-selection behavior at scale, which this environment cannot provide (**NOT VERIFIED at production scale**).
 
 ## 8. AI Production Audit
@@ -110,6 +116,7 @@ The architecture is sound and every non-provider-specific behavior (retry, timeo
 ## 9. Campaign Pipeline Audit
 
 Traced `generateCampaignStrategy.ts` → `usageControl.ts` (credit reservation) → `pipeline.ts` (12-stage execution, Phase 14's stage-aware logging) → Truth Check → `updateCampaignStatus`. Confirmed (via Phase 12/15's still-passing emulator tests, re-run this phase):
+
 - A pipeline exception reaches a terminal `failed` status with credits refunded — never stuck `generating`.
 - A duplicate/retried request does not double-reserve or double-consume credits (Phase 15's regression coverage, re-verified).
 - Truth Check FAIL reaches `failed` with credits finalized (intentional, documented — the generation attempt genuinely ran).
@@ -118,7 +125,7 @@ No new orphaned-campaign or stuck-generation defect was found this phase beyond 
 
 ## 10. Truth Check Audit
 
-Re-confirmed by reading `firestore.rules` and `services/ai/truthCheck.ts` directly this phase (not merely cited): Truth Check is computed exclusively server-side inside the Cloud Functions pipeline; `campaign_assets` and campaign verification fields (`status`, `metadata.truthCheckStatus`, `creditsReserved`/`creditsUsed`) are rejected by Firestore rules on any direct client write (re-verified passing test: *"Owner cannot forge metadata.truthCheckStatus from FAIL to PASS via Firestore write"*). No client-forgeable path to a false PASS exists.
+Re-confirmed by reading `firestore.rules` and `services/ai/truthCheck.ts` directly this phase (not merely cited): Truth Check is computed exclusively server-side inside the Cloud Functions pipeline; `campaign_assets` and campaign verification fields (`status`, `metadata.truthCheckStatus`, `creditsReserved`/`creditsUsed`) are rejected by Firestore rules on any direct client write (re-verified passing test: _"Owner cannot forge metadata.truthCheckStatus from FAIL to PASS via Firestore write"_). No client-forgeable path to a false PASS exists.
 
 ## 11. Credit System Audit
 
@@ -197,16 +204,16 @@ This phase does not implement enterprise backup infrastructure (correctly out of
 
 ## 26. Production Blockers
 
-| ID | Severity | Finding | Evidence | Status |
-|---|---|---|---|---|
-| P0-1 | P0 — BLOCKS CUSTOMER LAUNCH | Frontend has no working credit-purchase flow — "Upgrade" button is `console.log` + `alert('coming soon')`; top-up packs have no interactive element at all | `src/app/billing/page.tsx` lines ~116–133 (top-up cards, no button), ~209–213 (upgrade handler) | **BLOCKED — not fixed this phase** (real frontend payment integration is feature work, not a safe narrow audit-phase fix) |
-| P0-2 | P0 — BLOCKS CUSTOMER LAUNCH | CI/CD's Firebase Hosting frontend deploy steps reference a `hosting` configuration that does not exist in `firebase.json`; deployment architecture (Vercel vs Firebase Hosting) is internally inconsistent and unconfirmable from repo evidence | `.github/workflows/ci-cd.yml` (`deploy-staging`/`deploy-production` jobs), `firebase.json` (no `hosting` key), `vercel.json` (present, correct, but disconnected from CI/CD), `next.config.ts` (no static/standalone output) | **BLOCKED — not fixed this phase** (requires a human decision about which platform is authoritative; this environment cannot check Vercel's actual connection state) |
-| P0-3 | P0-adjacent (escalates P0-2) | No confirmed, distinct production Firebase project — `.firebaserc` only declares one project for both `default`/`dev`; CI/CD implies separate staging/production projects via secrets that can't be cross-checked here | `.firebaserc`, `.github/workflows/ci-cd.yml` | **NOT VERIFIED — reported, not fixed** (requires access to the actual GitHub repo secrets / Firebase console, unavailable here) |
-| — | P1 | Production AI provider credentials not present in this environment; production AI generation has never been observed by this audit | `functions/src/config/env.ts` (all AI keys optional/unset here) | **NOT VERIFIED** (see §8) |
-| — | P1 | Live Razorpay verification not performed (no live credentials in this environment) | `functions/src/config/env.ts` | **NOT VERIFIED** (see §12) |
-| — | P1 | No Firestore/Storage backup or lifecycle configuration found in-repo | §25 | Documented, not fixed (correctly out of this phase's scope) |
-| — | INFO | `ADMIN_EMAILS` env var declared in schema, never read anywhere in the codebase — dead config, not a security issue | `functions/src/config/env.ts` | No action required |
-| — | INFO | No custom production domain configured anywhere in-repo | §3 | No action required unless intentional for launch |
+| ID   | Severity                     | Finding                                                                                                                                                                                                                                         | Evidence                                                                                                                                                                                                                     | Status                                                                                                                                                               |
+| ---- | ---------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| P0-1 | P0 — BLOCKS CUSTOMER LAUNCH  | Frontend has no working credit-purchase flow — "Upgrade" button is `console.log` + `alert('coming soon')`; top-up packs have no interactive element at all                                                                                      | `src/app/billing/page.tsx` lines ~116–133 (top-up cards, no button), ~209–213 (upgrade handler)                                                                                                                              | **BLOCKED — not fixed this phase** (real frontend payment integration is feature work, not a safe narrow audit-phase fix)                                            |
+| P0-2 | P0 — BLOCKS CUSTOMER LAUNCH  | CI/CD's Firebase Hosting frontend deploy steps reference a `hosting` configuration that does not exist in `firebase.json`; deployment architecture (Vercel vs Firebase Hosting) is internally inconsistent and unconfirmable from repo evidence | `.github/workflows/ci-cd.yml` (`deploy-staging`/`deploy-production` jobs), `firebase.json` (no `hosting` key), `vercel.json` (present, correct, but disconnected from CI/CD), `next.config.ts` (no static/standalone output) | **BLOCKED — not fixed this phase** (requires a human decision about which platform is authoritative; this environment cannot check Vercel's actual connection state) |
+| P0-3 | P0-adjacent (escalates P0-2) | No confirmed, distinct production Firebase project — `.firebaserc` only declares one project for both `default`/`dev`; CI/CD implies separate staging/production projects via secrets that can't be cross-checked here                          | `.firebaserc`, `.github/workflows/ci-cd.yml`                                                                                                                                                                                 | **NOT VERIFIED — reported, not fixed** (requires access to the actual GitHub repo secrets / Firebase console, unavailable here)                                      |
+| —    | P1                           | Production AI provider credentials not present in this environment; production AI generation has never been observed by this audit                                                                                                              | `functions/src/config/env.ts` (all AI keys optional/unset here)                                                                                                                                                              | **NOT VERIFIED** (see §8)                                                                                                                                            |
+| —    | P1                           | Live Razorpay verification not performed (no live credentials in this environment)                                                                                                                                                              | `functions/src/config/env.ts`                                                                                                                                                                                                | **NOT VERIFIED** (see §12)                                                                                                                                           |
+| —    | P1                           | No Firestore/Storage backup or lifecycle configuration found in-repo                                                                                                                                                                            | §25                                                                                                                                                                                                                          | Documented, not fixed (correctly out of this phase's scope)                                                                                                          |
+| —    | INFO                         | `ADMIN_EMAILS` env var declared in schema, never read anywhere in the codebase — dead config, not a security issue                                                                                                                              | `functions/src/config/env.ts`                                                                                                                                                                                                | No action required                                                                                                                                                   |
+| —    | INFO                         | No custom production domain configured anywhere in-repo                                                                                                                                                                                         | §3                                                                                                                                                                                                                           | No action required unless intentional for launch                                                                                                                     |
 
 ## 27. Fixes Made
 
@@ -214,7 +221,7 @@ This phase does not implement enterprise backup infrastructure (correctly out of
 No fixes made this phase.
 ```
 
-Every P0 finding this phase surfaced requires either real feature development (frontend Razorpay integration — explicitly out of an audit phase's scope) or an external, human infrastructure decision (which platform actually serves production, whether separate Firebase projects exist) that this environment cannot verify or safely act on unilaterally. Per this phase's own rule — *"If a P0 cannot safely be fixed now: record BLOCKED with the reason"* — both are recorded as blocked rather than guessed at. No code was modified this phase; this was a pure audit.
+Every P0 finding this phase surfaced requires either real feature development (frontend Razorpay integration — explicitly out of an audit phase's scope) or an external, human infrastructure decision (which platform actually serves production, whether separate Firebase projects exist) that this environment cannot verify or safely act on unilaterally. Per this phase's own rule — _"If a P0 cannot safely be fixed now: record BLOCKED with the reason"_ — both are recorded as blocked rather than guessed at. No code was modified this phase; this was a pure audit.
 
 ## 28. Remaining P1 Issues
 
@@ -232,30 +239,43 @@ Every P0 finding this phase surfaced requires either real feature development (f
 ## 30. Tests
 
 ### Lint
+
 ```
 npm run lint            PASS (root, 0 errors)
 ```
+
 ### Typecheck
+
 ```
 npm run typecheck        PASS
 ```
+
 ### Build
+
 ```
 npm run build              PASS — 17/17 pages, /campaigns/[campaignId] correctly dynamic (ƒ), all else static (○)
 ```
+
 ### Functions Build
+
 ```
 npm run functions:build     PASS
 ```
+
 ### Unit Tests
+
 ```
 npx jest --silent (no emulator)    PASS — 13 suites, 160 tests, 7 legitimately skipped
 ```
+
 ### Integration Tests
+
 ```
 FIRESTORE_EMULATOR_HOST + FIREBASE_AUTH_EMULATOR_HOST, functions/: PASS — 26 suites, 160 tests
 ```
+
 ### Firebase Rules Tests
+
 ```
 FIRESTORE_EMULATOR_HOST + STORAGE_EMULATOR_HOST + FIREBASE_AUTH_EMULATOR_HOST, root: PASS — 13 suites, 160 tests, 7 legitimately skipped (security.test.ts, storage.test.ts, phase27-*.test.ts all executed live against real emulators this phase, not merely cited)
 ```
@@ -268,26 +288,26 @@ All of the above were executed live during this phase, not carried forward from 
 
 ## 32. Phase 20 Preconditions
 
-| Precondition | Status |
-|---|---|
-| Can user sign up? | READY (Auth + `onUserCreated` verified extensively, Phase 10/15) |
-| Can user log in? | READY (LoginForm + Auth SDK; actual login-flow test coverage is thin per Phase 15's own noted gap, but the mechanism is standard Firebase Auth) |
-| Can onboarding persist? | READY (`createBusiness`, tested) |
-| Can business persist? | READY |
-| Can product persist? | READY |
-| Can image upload? | READY (mechanism verified; signed-URL generation itself untestable in any environment audited so far — Phase 15) |
-| Can campaign creation reach backend? | READY |
-| Can AI generation execute? | **BLOCKED — no production AI credentials available in any environment audited this session** |
-| Can Truth Check execute? | READY *given* AI generation runs (deterministic, backend-only, already proven independent of provider identity) |
-| Can campaign persist? | READY |
-| Can creative download? | READY (mechanism verified in Phase 8/9) |
-| Can WhatsApp open? | READY (mechanism verified in Phase 8/9) |
-| Can credits be purchased? | **BLOCKED — frontend integration does not exist (P0-1)** |
-| Can credits be granted? | READY on the backend *given* a real payment reaches it — but nothing in the frontend can currently trigger that path |
-| Can another campaign consume credits? | READY, contingent on AI generation being unblocked |
-| Can logout/login restore state? | READY (Phase 16/18 groundwork) |
+| Precondition                          | Status                                                                                                                                          |
+| ------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
+| Can user sign up?                     | READY (Auth + `onUserCreated` verified extensively, Phase 10/15)                                                                                |
+| Can user log in?                      | READY (LoginForm + Auth SDK; actual login-flow test coverage is thin per Phase 15's own noted gap, but the mechanism is standard Firebase Auth) |
+| Can onboarding persist?               | READY (`createBusiness`, tested)                                                                                                                |
+| Can business persist?                 | READY                                                                                                                                           |
+| Can product persist?                  | READY                                                                                                                                           |
+| Can image upload?                     | READY (mechanism verified; signed-URL generation itself untestable in any environment audited so far — Phase 15)                                |
+| Can campaign creation reach backend?  | READY                                                                                                                                           |
+| Can AI generation execute?            | **BLOCKED — no production AI credentials available in any environment audited this session**                                                    |
+| Can Truth Check execute?              | READY _given_ AI generation runs (deterministic, backend-only, already proven independent of provider identity)                                 |
+| Can campaign persist?                 | READY                                                                                                                                           |
+| Can creative download?                | READY (mechanism verified in Phase 8/9)                                                                                                         |
+| Can WhatsApp open?                    | READY (mechanism verified in Phase 8/9)                                                                                                         |
+| Can credits be purchased?             | **BLOCKED — frontend integration does not exist (P0-1)**                                                                                        |
+| Can credits be granted?               | READY on the backend _given_ a real payment reaches it — but nothing in the frontend can currently trigger that path                            |
+| Can another campaign consume credits? | READY, contingent on AI generation being unblocked                                                                                              |
+| Can logout/login restore state?       | READY (Phase 16/18 groundwork)                                                                                                                  |
 
-**Phase 20 cannot exercise the full "purchase credits → generate again" golden path as written until P0-1 (frontend payment integration) is resolved, and cannot exercise real AI generation without production AI credentials.** Phase 20 *can* meaningfully exercise everything up to and including the free-credit campaign generation and Truth Check, if run from an environment that (a) can launch a real browser and (b) has real (test-mode-acceptable) AI provider credentials — neither of which this environment had for Phase 16, 18, or this phase.
+**Phase 20 cannot exercise the full "purchase credits → generate again" golden path as written until P0-1 (frontend payment integration) is resolved, and cannot exercise real AI generation without production AI credentials.** Phase 20 _can_ meaningfully exercise everything up to and including the free-credit campaign generation and Truth Check, if run from an environment that (a) can launch a real browser and (b) has real (test-mode-acceptable) AI provider credentials — neither of which this environment had for Phase 16, 18, or this phase.
 
 ## 33. Final Verdict
 
@@ -299,24 +319,24 @@ Two independent P0 blockers prevent a real paying customer from completing the a
 
 ## Production Readiness Matrix
 
-| Area | Implementation | Runtime Verified | Production Verified | Status |
-|---|---|---|---|---|
-| Frontend | Complete (Phases 8/17) | PASS (dev server, this session) | NOT VERIFIED (no deployment access) | PARTIAL |
-| Auth | Complete | PASS (emulator) | NOT VERIFIED | PARTIAL |
-| Onboarding | Complete | PASS (emulator) | NOT VERIFIED | PARTIAL |
-| Business | Complete | PASS (emulator) | NOT VERIFIED | PARTIAL |
-| Products | Complete | PASS (emulator) | NOT VERIFIED | PARTIAL |
-| Upload | Complete (mechanism) | PARTIAL (signed-URL generation untestable) | NOT VERIFIED | PARTIAL |
-| Campaigns | Complete | PASS (emulator) | NOT VERIFIED | PARTIAL |
-| AI | Complete (architecture) | PASS (mocked provider boundary only) | NOT VERIFIED (no real credentials) | PARTIAL |
-| Truth Check | Complete | PASS (emulator) | NOT VERIFIED | PARTIAL |
-| Credits | Complete | PASS (emulator, concurrency-tested) | NOT VERIFIED | PARTIAL |
-| Razorpay | Backend complete; **frontend missing** | PASS (backend, emulator) | NOT VERIFIED / **FAIL (frontend)** | **FAIL** |
-| Webhooks | Complete | PASS (emulator) | NOT VERIFIED | PARTIAL |
-| Firestore | Complete | PASS (emulator, live this phase) | NOT VERIFIED | PARTIAL |
-| Storage | Complete | PASS (emulator, live this phase) | NOT VERIFIED | PARTIAL |
-| Security | Complete | PASS (emulator, live this phase) | NOT VERIFIED | PARTIAL |
-| Analytics | Complete | Not independently re-tested this phase (cited from Phase 17) | NOT VERIFIED | PARTIAL |
-| Observability | Complete | PASS (cited from Phase 14, still passing) | NOT VERIFIED | PARTIAL |
-| Routing | Complete (Phase 18 fixes) | PASS (dev server, this session) | NOT VERIFIED | PARTIAL |
-| **Deployment** | **Inconsistent/conflicting** | N/A | **FAIL** | **FAIL** |
+| Area           | Implementation                         | Runtime Verified                                             | Production Verified                 | Status   |
+| -------------- | -------------------------------------- | ------------------------------------------------------------ | ----------------------------------- | -------- |
+| Frontend       | Complete (Phases 8/17)                 | PASS (dev server, this session)                              | NOT VERIFIED (no deployment access) | PARTIAL  |
+| Auth           | Complete                               | PASS (emulator)                                              | NOT VERIFIED                        | PARTIAL  |
+| Onboarding     | Complete                               | PASS (emulator)                                              | NOT VERIFIED                        | PARTIAL  |
+| Business       | Complete                               | PASS (emulator)                                              | NOT VERIFIED                        | PARTIAL  |
+| Products       | Complete                               | PASS (emulator)                                              | NOT VERIFIED                        | PARTIAL  |
+| Upload         | Complete (mechanism)                   | PARTIAL (signed-URL generation untestable)                   | NOT VERIFIED                        | PARTIAL  |
+| Campaigns      | Complete                               | PASS (emulator)                                              | NOT VERIFIED                        | PARTIAL  |
+| AI             | Complete (architecture)                | PASS (mocked provider boundary only)                         | NOT VERIFIED (no real credentials)  | PARTIAL  |
+| Truth Check    | Complete                               | PASS (emulator)                                              | NOT VERIFIED                        | PARTIAL  |
+| Credits        | Complete                               | PASS (emulator, concurrency-tested)                          | NOT VERIFIED                        | PARTIAL  |
+| Razorpay       | Backend complete; **frontend missing** | PASS (backend, emulator)                                     | NOT VERIFIED / **FAIL (frontend)**  | **FAIL** |
+| Webhooks       | Complete                               | PASS (emulator)                                              | NOT VERIFIED                        | PARTIAL  |
+| Firestore      | Complete                               | PASS (emulator, live this phase)                             | NOT VERIFIED                        | PARTIAL  |
+| Storage        | Complete                               | PASS (emulator, live this phase)                             | NOT VERIFIED                        | PARTIAL  |
+| Security       | Complete                               | PASS (emulator, live this phase)                             | NOT VERIFIED                        | PARTIAL  |
+| Analytics      | Complete                               | Not independently re-tested this phase (cited from Phase 17) | NOT VERIFIED                        | PARTIAL  |
+| Observability  | Complete                               | PASS (cited from Phase 14, still passing)                    | NOT VERIFIED                        | PARTIAL  |
+| Routing        | Complete (Phase 18 fixes)              | PASS (dev server, this session)                              | NOT VERIFIED                        | PARTIAL  |
+| **Deployment** | **Inconsistent/conflicting**           | N/A                                                          | **FAIL**                            | **FAIL** |

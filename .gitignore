@@ -16,11 +16,21 @@ coverage/
 playwright-report/
 test-results/
 
-# Environment files
+# Environment files. Phase 12 Secret Handling audit: the previous rules
+# (.env, .env.local, .env.*.local, .env.production.local) never covered
+# Firebase's own documented convention for per-project Functions secrets
+# deployed via `firebase deploy` — files named functions/.env.<project-id>
+# (e.g. functions/.env.brainwise-ai-marketing-engine) or a bare
+# functions/.env.staging/.env.production with no ".local" suffix. None of
+# those names matched any existing rule, so if one were ever created for a
+# real deploy, `git add -A` would happily stage real plaintext secrets. A
+# broad `.env.*` closes that for every current and future dotenv naming
+# variant; `.env.example` is explicitly un-ignored since it's the tracked,
+# secret-free template every other .env file is copied from.
 .env
 .env.local
-.env.*.local
-.env.production.local
+.env.*
+!.env.example
 
 # Firebase
 .firebase/
@@ -58,3 +68,6 @@ yarn-error.log*
 # Test artifacts
 .nyc_output/
 .vercel
+
+# One-off scratch/patch scripts (P4-2 in docs/COMPLETE_CAMPAIGN_FLOW_FIX_PLAN.md)
+/scripts/archive/

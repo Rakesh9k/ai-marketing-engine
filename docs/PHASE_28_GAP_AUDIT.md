@@ -41,26 +41,26 @@ defines versioned, vertical-aware prompt templates with explicit `salon`/`restau
 grep of `promptRegistry` outside its own file returns **zero results** — nothing imports or calls
 it. The function that actually runs generation, `GenerationPipeline` in `pipeline.ts`, builds every
 prompt through its own private `buildXPrompt` methods using **hard-coded restaurant/Hyderabad
-strings** (e.g. `pipeline.ts:1277` — *"You are a Hyderabadi marketing copywriter. Generate a
-complete campaign pack for a Hyderabad restaurant."*, unconditional; `pipeline.ts:1326` — *"You are
-a creative director for Instagram food marketing"*, unconditional). **`promptRegistry.ts` is dead
+strings** (e.g. `pipeline.ts:1277` — _"You are a Hyderabadi marketing copywriter. Generate a
+complete campaign pack for a Hyderabad restaurant."_, unconditional; `pipeline.ts:1326` — _"You are
+a creative director for Instagram food marketing"_, unconditional). **`promptRegistry.ts` is dead
 code.** Any assessment of salon readiness must discount it entirely.
 
-| Feature | Restaurant | Salon | Real Estate |
-|---|---|---|---|
-| Category validation (Zod, create/update) | IMPLEMENTED | IMPLEMENTED | IMPLEMENTED — `createBusiness.ts:17` accepts all three identically; `createBusiness.test.ts:98` proves salon persists at the schema level |
-| Business onboarding UI | IMPLEMENTED | MISSING | MISSING — `onboarding/page.tsx:20,34,140` hard-code the form's type to the literal `'restaurant'`; line 288 renders static text, not a selector |
-| Campaign wizard objectives/CTA/offer types | IMPLEMENTED | MISSING | MISSING — `campaign/constants.ts:23–86` only exposes restaurant vocabulary (`new_dish`, `book_table`, `view_menu`); no `book_appointment` or `schedule_visit` equivalents exist |
-| Prompt templates (`promptRegistry.ts`) | IMPLEMENTED but DEAD CODE | PARTIAL but DEAD CODE | MISSING, DEAD CODE | Not consumed by the live pipeline — see architectural note above |
-| Copy generation (live path, `pipeline.ts`) | IMPLEMENTED | MISSING | MISSING — `pipeline.ts:1277` unconditional restaurant framing |
-| Image/creative-direction generation | IMPLEMENTED | MISSING | MISSING — `pipeline.ts:1326`; `imagePromptBuilder.ts:212,275,314,358` restaurant/food-only strings |
-| Image analysis persona (`vision.ts`) | IMPLEMENTED | IMPLEMENTED | MISSING — `vision.ts:138` binary ternary; real_estate silently falls through to the food/product-analyst branch |
-| Truth Check verification rules | IMPLEMENTED | PLACEHOLDER | MISSING — `truthCheck.ts:949–972` restaurant-only claim dictionary (delivery/dine-in/parking/wifi); `validationStages.ts:89` explicitly concedes salon medical-claim checking is a future TODO inside a prompt comment |
-| Campaign strategy generation | IMPLEMENTED | PARTIAL | MISSING — strategy-stage template has salon guidance in the dead registry only; the live hard-coded prompts override it |
-| Localization (language/regional style) | IMPLEMENTED | NOT APPLICABLE | NOT APPLICABLE — tied to city/region, not vertical; scope is Hyderabad-only by product decision |
-| Pricing/credits | IMPLEMENTED | IMPLEMENTED | IMPLEMENTED — `pricing.ts` has zero vertical branching; genuinely vertical-agnostic, not a gap |
-| Dashboard/analytics vertical awareness | NOT APPLICABLE | NOT APPLICABLE | NOT APPLICABLE — no analytics UI exists at all (§2) |
-| Test coverage | PARTIAL | PLACEHOLDER | MISSING — one CRUD-level test for salon (`createBusiness.test.ts:98`), nothing exercising generation/Truth Check for salon; **zero** test coverage of any kind for real_estate |
+| Feature                                    | Restaurant                | Salon                 | Real Estate                                                                                                                                                                                                            |
+| ------------------------------------------ | ------------------------- | --------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Category validation (Zod, create/update)   | IMPLEMENTED               | IMPLEMENTED           | IMPLEMENTED — `createBusiness.ts:17` accepts all three identically; `createBusiness.test.ts:98` proves salon persists at the schema level                                                                              |
+| Business onboarding UI                     | IMPLEMENTED               | MISSING               | MISSING — `onboarding/page.tsx:20,34,140` hard-code the form's type to the literal `'restaurant'`; line 288 renders static text, not a selector                                                                        |
+| Campaign wizard objectives/CTA/offer types | IMPLEMENTED               | MISSING               | MISSING — `campaign/constants.ts:23–86` only exposes restaurant vocabulary (`new_dish`, `book_table`, `view_menu`); no `book_appointment` or `schedule_visit` equivalents exist                                        |
+| Prompt templates (`promptRegistry.ts`)     | IMPLEMENTED but DEAD CODE | PARTIAL but DEAD CODE | MISSING, DEAD CODE                                                                                                                                                                                                     | Not consumed by the live pipeline — see architectural note above |
+| Copy generation (live path, `pipeline.ts`) | IMPLEMENTED               | MISSING               | MISSING — `pipeline.ts:1277` unconditional restaurant framing                                                                                                                                                          |
+| Image/creative-direction generation        | IMPLEMENTED               | MISSING               | MISSING — `pipeline.ts:1326`; `imagePromptBuilder.ts:212,275,314,358` restaurant/food-only strings                                                                                                                     |
+| Image analysis persona (`vision.ts`)       | IMPLEMENTED               | IMPLEMENTED           | MISSING — `vision.ts:138` binary ternary; real_estate silently falls through to the food/product-analyst branch                                                                                                        |
+| Truth Check verification rules             | IMPLEMENTED               | PLACEHOLDER           | MISSING — `truthCheck.ts:949–972` restaurant-only claim dictionary (delivery/dine-in/parking/wifi); `validationStages.ts:89` explicitly concedes salon medical-claim checking is a future TODO inside a prompt comment |
+| Campaign strategy generation               | IMPLEMENTED               | PARTIAL               | MISSING — strategy-stage template has salon guidance in the dead registry only; the live hard-coded prompts override it                                                                                                |
+| Localization (language/regional style)     | IMPLEMENTED               | NOT APPLICABLE        | NOT APPLICABLE — tied to city/region, not vertical; scope is Hyderabad-only by product decision                                                                                                                        |
+| Pricing/credits                            | IMPLEMENTED               | IMPLEMENTED           | IMPLEMENTED — `pricing.ts` has zero vertical branching; genuinely vertical-agnostic, not a gap                                                                                                                         |
+| Dashboard/analytics vertical awareness     | NOT APPLICABLE            | NOT APPLICABLE        | NOT APPLICABLE — no analytics UI exists at all (§2)                                                                                                                                                                    |
+| Test coverage                              | PARTIAL                   | PLACEHOLDER           | MISSING — one CRUD-level test for salon (`createBusiness.test.ts:98`), nothing exercising generation/Truth Check for salon; **zero** test coverage of any kind for real_estate                                         |
 
 **Bottom line:** restaurant is the only vertical a real user can create or generate a campaign for.
 Salon has a database row and a checkbox in test fixtures; real_estate has a string in a type union.
@@ -76,6 +76,7 @@ document in Firestore's flat `analytics_events/{eventId}` collection (no per-bus
 rollup document of any kind).
 
 **Call sites are real, not fabricated:**
+
 - `signup` — server-side, `onUserCreated.ts:131`, fires on the auth trigger.
 - `onboarding_complete` — server-side, `createBusiness.ts:155`.
 - `campaign_started` / `campaign_generated` — server-side, `generateCampaignStrategy.ts:234` and `:371–376`.
@@ -88,7 +89,7 @@ rollup document of any kind).
 
 **Security gap worth flagging (not a scope gap, a real risk):** `trackAnalyticsEvent.ts:37–46` and
 `:48–54` contain code comments admitting the ownership-verification check for `asset_downloaded`/
-`whatsapp_clicked` payloads is a stub — *"we'll skip the full verification to avoid type issues"*.
+`whatsapp_clicked` payloads is a stub — _"we'll skip the full verification to avoid type issues"_.
 Any authenticated user can currently attribute an analytics event to any `businessId`/`campaignId`
 they choose; the callable only checks that the caller is authenticated, not that they own the
 resource named in the payload.
@@ -126,6 +127,7 @@ localization profile is write-once and functionally ignored at generation time. 
 `businessBrain.products[]` are never accessed by field name anywhere outside that JSON dump.
 
 **Editability, confirmed directly:**
+
 - **BrandKit is genuinely editable** — `src/app/brand/page.tsx:419` calls `brandKitService.upsert(...)`,
   a real client-side write path (notably: this bypasses the `createBrandKit`/`updateBrandKit`
   Cloud Functions entirely, writing straight to Firestore via the client SDK service layer instead).
@@ -158,7 +160,7 @@ second write site exists.
 **Type-safety note:** both fields are typed as plain `number`, not `number | undefined`. This is
 moot today (nothing reads a partially-populated `performance` object), but it means a future,
 naively-written aggregation (`el.performance.whatsappClicks || 0`) would compile without the type
-system forcing a null-check — worth fixing the type to `number | undefined` *when* (not before) a
+system forcing a null-check — worth fixing the type to `number | undefined` _when_ (not before) a
 real write path is built, so the compiler catches incomplete population instead of silently
 defaulting to zero.
 
@@ -179,22 +181,22 @@ exists but its own header comment states it **has never been executed in this en
 (browser launch is blocked by this machine's Application Control policy) — it counts as zero
 verified coverage, not partial coverage, until it is actually run somewhere.
 
-| Flow | Coverage |
-|---|---|
-| Authentication | **ZERO** |
-| Onboarding | **ZERO** |
-| Business Brain (UI) | **ZERO** (expected — no UI exists to test, see §3) |
-| Campaign wizard | PARTIAL — payload/validation logic only, no UI interaction test |
-| Upload | PARTIAL — file validation/compression logic only, no UI test |
-| Generation (progress/polling) | **ZERO** |
-| Truth Check (display) | YES — thorough (`CampaignDetailContent.test.tsx`) |
-| Regeneration | YES |
-| Download | YES |
-| WhatsApp share | YES |
-| Billing | YES |
-| Analytics | **ZERO** (expected — no UI exists to test) |
-| Routing (protected redirects) | **ZERO** |
-| Error states | PARTIAL — narrow (missing-config, missing-phone-number); no generic network-failure or not-found-page test |
+| Flow                          | Coverage                                                                                                   |
+| ----------------------------- | ---------------------------------------------------------------------------------------------------------- |
+| Authentication                | **ZERO**                                                                                                   |
+| Onboarding                    | **ZERO**                                                                                                   |
+| Business Brain (UI)           | **ZERO** (expected — no UI exists to test, see §3)                                                         |
+| Campaign wizard               | PARTIAL — payload/validation logic only, no UI interaction test                                            |
+| Upload                        | PARTIAL — file validation/compression logic only, no UI test                                               |
+| Generation (progress/polling) | **ZERO**                                                                                                   |
+| Truth Check (display)         | YES — thorough (`CampaignDetailContent.test.tsx`)                                                          |
+| Regeneration                  | YES                                                                                                        |
+| Download                      | YES                                                                                                        |
+| WhatsApp share                | YES                                                                                                        |
+| Billing                       | YES                                                                                                        |
+| Analytics                     | **ZERO** (expected — no UI exists to test)                                                                 |
+| Routing (protected redirects) | **ZERO**                                                                                                   |
+| Error states                  | PARTIAL — narrow (missing-config, missing-phone-number); no generic network-failure or not-found-page test |
 
 **Categories with zero coverage: Authentication, Onboarding, Business Brain UI, Generation
 polling, Analytics, Routing.** Of these, **Authentication, Onboarding, and Generation polling are
@@ -229,7 +231,8 @@ inaccurate documentation is reported, not silently corrected.
 
 ## Actual Missing Work
 
-Work that would need to be *built*, not just fixed:
+Work that would need to be _built_, not just fixed:
+
 1. A real vertical-aware prompt/generation path (the dead `promptRegistry.ts` is not a shortcut —
    it was never wired to `pipeline.ts` and its salon coverage is itself partial; real_estate has no
    template anywhere, dead or otherwise).
@@ -309,16 +312,16 @@ Work that would need to be *built*, not just fixed:
 
 All commands below were run from the actual repository, not assumed.
 
-| Command | Location | Result |
-|---|---|---|
-| `npm run lint` | frontend (`/`) | **PASS** — zero errors |
-| `npm run lint` | `functions/` | **FAIL** — 1,613 errors, 7 warnings (see Hidden Risk #3; pre-existing, not introduced by this phase) |
-| `npm run typecheck` | frontend | **PASS** |
-| `npm run typecheck` | `functions/` | **PASS** |
-| `npm run build` | frontend (`next build`) | **PASS** — compiles, generates all 18 routes |
-| `npm run build` | `functions/` (`tsc`) | **PASS** |
-| `npm test` | frontend (jest) | **PASS** — 14 suites, 164 passed / 7 skipped (emulator-gated) |
-| `npm test` | `functions/` (jest) | **PARTIAL** — 13 of 26 suites ran and passed (107 passed / 53 skipped within those); the other 13 suites are gated behind Firebase emulators, which were not started in this audit (out of scope for an audit-only phase) |
+| Command             | Location                | Result                                                                                                                                                                                                                    |
+| ------------------- | ----------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `npm run lint`      | frontend (`/`)          | **PASS** — zero errors                                                                                                                                                                                                    |
+| `npm run lint`      | `functions/`            | **FAIL** — 1,613 errors, 7 warnings (see Hidden Risk #3; pre-existing, not introduced by this phase)                                                                                                                      |
+| `npm run typecheck` | frontend                | **PASS**                                                                                                                                                                                                                  |
+| `npm run typecheck` | `functions/`            | **PASS**                                                                                                                                                                                                                  |
+| `npm run build`     | frontend (`next build`) | **PASS** — compiles, generates all 18 routes                                                                                                                                                                              |
+| `npm run build`     | `functions/` (`tsc`)    | **PASS**                                                                                                                                                                                                                  |
+| `npm test`          | frontend (jest)         | **PASS** — 14 suites, 164 passed / 7 skipped (emulator-gated)                                                                                                                                                             |
+| `npm test`          | `functions/` (jest)     | **PARTIAL** — 13 of 26 suites ran and passed (107 passed / 53 skipped within those); the other 13 suites are gated behind Firebase emulators, which were not started in this audit (out of scope for an audit-only phase) |
 
 The functions-lint failure is a real, pre-existing condition of the repository, not a regression
 caused by this audit (no files were edited in this phase). It is reported here rather than fixed,

@@ -41,6 +41,7 @@ number is reported as-is rather than adjusted, so it stays comparable to prior p
 ## Critical flows covered (by priority)
 
 ### Priority 1 — Auth (`src/features/auth/`)
+
 - **New**: `LoginForm.test.tsx`, `SignupForm.test.tsx`, `ForgotPasswordForm.test.tsx`,
   `ProtectedRoute.test.tsx`, `useAuth.test.tsx` — 28 tests total.
 - Covered: signup (validation, success → verification notice not a redirect, failure, resend),
@@ -54,6 +55,7 @@ number is reported as-is rather than adjusted, so it stays comparable to prior p
   both sign-in and sign-out).
 
 ### Priority 2 — Onboarding (`src/app/onboarding/page.test.tsx`, 10 tests)
+
 - Step progression (Business Basics → Location → Contact & Operations), validation (empty
   name/city/state blocks progression with a visible error), back navigation (preserves entered
   data), completion (full restaurant walkthrough → exact `createBusiness` payload → success
@@ -69,16 +71,18 @@ number is reported as-is rather than adjusted, so it stays comparable to prior p
   "Properties" step.
 
 ### Priority 3 — Business (`src/app/dashboard/page.test.tsx`, 8 tests)
+
 - Business loading (spinner), empty state (no business → onboarding link), error state (friendly
   message, never a raw stack trace), rendering real business/campaign data, "no campaigns yet"
   (never a silently-empty list), single-vs-multiple-business selector behavior, switching the
   selected business re-fetches that business's campaigns, and authorization (business data is
   always fetched scoped to the real signed-in `uid`).
-- Business *creation* is covered by the onboarding tests above; business *editing* was already
+- Business _creation_ is covered by the onboarding tests above; business _editing_ was already
   covered by Phase 33's `business-profile/page.test.tsx` — this file deliberately covers only
   what's unique to the dashboard (read + selection), not a third copy of create/edit tests.
 
 ### Priority 4 — Product/Asset (`src/features/asset/components/ImageUploader.test.tsx`, 6 tests)
+
 - Validation (a file that fails `validateFile`'s own check is rejected before upload), a valid
   file shows a preview without auto-uploading, upload success (calls `uploadImage`, shows the
   real returned dimensions, calls `onUploadComplete`), upload failure (real error message, Retry/
@@ -87,6 +91,7 @@ number is reported as-is rather than adjusted, so it stays comparable to prior p
   invented one).
 
 ### Priority 5 — Campaign (`src/features/campaign/`)
+
 - **`buildCampaignInput.test.ts`** (9 tests) — the wizard's actual strategy-assembly logic, unit-
   tested directly: rejects incomplete state (returns `null`, never a half-built payload), correct
   numeric coercion, secondary-language/language-mixing derivation, brand tone/audience description
@@ -111,6 +116,7 @@ number is reported as-is rather than adjusted, so it stays comparable to prior p
   audit) — nothing to test.
 
 ### Priority 6 — Download/WhatsApp
+
 - Already thoroughly covered by the pre-existing `CampaignDetailContent.test.tsx` (download via
   fetch+blob, WhatsApp URL built from the business's real phone/WhatsApp number, missing-phone
   error, analytics-never-blocks-the-primary-action ordering, the Phase 34
@@ -118,6 +124,7 @@ number is reported as-is rather than adjusted, so it stays comparable to prior p
   this phase.
 
 ### Priority 7 — Billing (`src/app/billing/page.test.tsx`, +5 new tests, 9 total)
+
 - New this phase: **cancel** (dismissing the Razorpay modal re-enables the button, calls neither
   `verifyPayment` nor grants anything), **failure** (`createSubscription` rejecting shows an error
   toast and never opens Razorpay; `verifyPayment` rejecting after a real checkout shows a
@@ -131,9 +138,10 @@ number is reported as-is rather than adjusted, so it stays comparable to prior p
   side of that boundary is exercised for real.
 
 ### Priority 8 — Analytics (`src/app/analytics/page.test.tsx`, +1 new test, 7 total)
+
 - New: clicking "Try again" after an error re-requests analytics data.
 - **This test found a real bug**: the button's original handler was `onClick={() =>
-  setDays(days)}` — calling `setState` with the *same* value, which React bails out of without
+setDays(days)}` — calling `setState` with the _same_ value, which React bails out of without
   re-running the fetch effect. The button silently did nothing. Fixed in
   `src/app/analytics/page.tsx` with a dedicated `retryTick` state that the button increments,
   added to the fetch effect's dependency array — a minimal, one-purpose fix, not a refactor.
@@ -142,33 +150,34 @@ number is reported as-is rather than adjusted, so it stays comparable to prior p
   (business-scoped error handling) were already covered by the pre-existing Phase 32 tests.
 
 ### Priority 9 — Verticals
+
 - Covered across three layers rather than one, deliberately: the wizard's actual allow-list data
   (`constants.test.ts`), the onboarding wizard's step-insertion logic (`onboarding/page.test.tsx`),
   and — new this phase — the real-estate branch of `business-profile/page.tsx`, which Phase 33's
   original tests exercised for salon/restaurant but never for real estate. Each test confirms not
-  just that the right vertical's UI appears, but that the *other* verticals' UI does not leak in
+  just that the right vertical's UI appears, but that the _other_ verticals' UI does not leak in
   (no "Book a Table" for salon, no "Services"/"Packages" heading for real estate, no salon step for
   a restaurant, etc.).
 
 ## Tests added (file-by-file)
 
-| File | New/extended | Tests |
-|---|---|---|
-| `src/features/auth/components/LoginForm.test.tsx` | new | 6 |
-| `src/features/auth/components/SignupForm.test.tsx` | new | 5 |
-| `src/features/auth/components/ForgotPasswordForm.test.tsx` | new | 4 |
-| `src/features/auth/components/ProtectedRoute.test.tsx` | new | 6 |
-| `src/features/auth/hooks/useAuth.test.tsx` | new | 7 |
-| `src/app/onboarding/page.test.tsx` | new | 10 |
-| `src/app/dashboard/page.test.tsx` | new | 8 |
-| `src/features/asset/components/ImageUploader.test.tsx` | new | 6 |
-| `src/features/campaign/buildCampaignInput.test.ts` | new | 9 |
-| `src/features/campaign/constants.test.ts` | new | 8 |
-| `src/features/campaign/components/GenerationProgress.test.tsx` | new | 5 |
-| `src/features/campaign/components/CampaignWizard.test.tsx` | new | 7 |
-| `src/app/billing/page.test.tsx` | extended | +5 (9 total) |
-| `src/app/business-profile/page.test.tsx` | extended | +1 (11 total) |
-| `src/app/analytics/page.test.tsx` | extended | +1 (7 total) |
+| File                                                           | New/extended | Tests         |
+| -------------------------------------------------------------- | ------------ | ------------- |
+| `src/features/auth/components/LoginForm.test.tsx`              | new          | 6             |
+| `src/features/auth/components/SignupForm.test.tsx`             | new          | 5             |
+| `src/features/auth/components/ForgotPasswordForm.test.tsx`     | new          | 4             |
+| `src/features/auth/components/ProtectedRoute.test.tsx`         | new          | 6             |
+| `src/features/auth/hooks/useAuth.test.tsx`                     | new          | 7             |
+| `src/app/onboarding/page.test.tsx`                             | new          | 10            |
+| `src/app/dashboard/page.test.tsx`                              | new          | 8             |
+| `src/features/asset/components/ImageUploader.test.tsx`         | new          | 6             |
+| `src/features/campaign/buildCampaignInput.test.ts`             | new          | 9             |
+| `src/features/campaign/constants.test.ts`                      | new          | 8             |
+| `src/features/campaign/components/GenerationProgress.test.tsx` | new          | 5             |
+| `src/features/campaign/components/CampaignWizard.test.tsx`     | new          | 7             |
+| `src/app/billing/page.test.tsx`                                | extended     | +5 (9 total)  |
+| `src/app/business-profile/page.test.tsx`                       | extended     | +1 (11 total) |
+| `src/app/analytics/page.test.tsx`                              | extended     | +1 (7 total)  |
 
 **~87 new tests**, across 12 new test files and 3 extended existing ones.
 
@@ -209,7 +218,7 @@ number is reported as-is rather than adjusted, so it stays comparable to prior p
   disabled after a validation error — see the next item).
 - **The onboarding wizard's "Continue" button lock after a validation error.** `handleNext`
   disables Continue via `Object.keys(errors).length > 0`, but `errors` is only cleared at the
-  start of the *next* `handleNext` call — meaning once an error is set, the button that would
+  start of the _next_ `handleNext` call — meaning once an error is set, the button that would
   clear it is itself disabled. This was investigated while writing the onboarding validation
   tests. **This was not asserted as either a bug or a feature** in this phase's tests (which only
   check that the error message appears, not what happens after) — it needs a deliberate decision
@@ -218,7 +227,7 @@ number is reported as-is rather than adjusted, so it stays comparable to prior p
 - **`assetService.ts`'s `uploadImage`/`deleteAsset`/`getAsset`/`listAssets` orchestration**
   (the `getUploadUrl` → PUT → `confirmUpload` → dimension-patch chain, and the ownership
   re-verification in delete/get/list). `ImageUploader.test.tsx` mocks this module at the
-  boundary, which covers the *component's* reaction to success/failure but not the orchestration
+  boundary, which covers the _component's_ reaction to success/failure but not the orchestration
   function's own internals. `assetService.test.ts` (pre-existing) covers only `validateFile`/
   `compressImage`. This remains a real gap — deep Firebase Functions/Storage mocking for this
   specific chain was assessed as high-effort-for-this-phase and deferred.

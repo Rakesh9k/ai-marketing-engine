@@ -30,7 +30,7 @@ This matches the recommended grouping exactly (8 steps, no required input omitte
 
 The wizard calls exactly one existing callable: **`generateCampaignStrategy`** (`functions/src/functions/campaigns/generateCampaignStrategy.ts`), via `callFunction({ functionName: 'generateCampaignStrategy', data })` (the same `src/services/api.ts` helper already used elsewhere in the app).
 
-A second existing callable, **`createCampaign`**, was investigated and deliberately **not** called. `createCampaign` creates a `draft` campaign document and reserves credits via `reserveCredits` (keyed by `idempotencyKey`), but never runs the generation pipeline. `generateCampaignStrategy` is fully self-contained: it does its own credit reservation via `executeWithUsageControl` → `reserveCreditsForOperation` (keyed by the freshly generated `campaignId`, a *different* reservation mechanism from `createCampaign`'s). Calling both from the wizard would have reserved credits twice for one campaign. Since `generateCampaignStrategy` already does everything (business fetch, campaign doc, pipeline, Truth Check, persistence, credit reserve/finalize/refund), it is the sole entry point the wizard calls. `createCampaign` is effectively an orphaned/unused parallel flow — not modified, not deleted, just not invoked by this wizard.
+A second existing callable, **`createCampaign`**, was investigated and deliberately **not** called. `createCampaign` creates a `draft` campaign document and reserves credits via `reserveCredits` (keyed by `idempotencyKey`), but never runs the generation pipeline. `generateCampaignStrategy` is fully self-contained: it does its own credit reservation via `executeWithUsageControl` → `reserveCreditsForOperation` (keyed by the freshly generated `campaignId`, a _different_ reservation mechanism from `createCampaign`'s). Calling both from the wizard would have reserved credits twice for one campaign. Since `generateCampaignStrategy` already does everything (business fetch, campaign doc, pipeline, Truth Check, persistence, credit reserve/finalize/refund), it is the sole entry point the wizard calls. `createCampaign` is effectively an orphaned/unused parallel flow — not modified, not deleted, just not invoked by this wizard.
 
 No credit reservation, campaign document write, or pipeline stage was reimplemented on the frontend. The backend remains fully authoritative for all of it.
 
@@ -38,30 +38,30 @@ No credit reservation, campaign document write, or pipeline stage was reimplemen
 
 Mapping lives in `src/features/campaign/buildCampaignInput.ts`, a pure function (no React) so it can be unit-tested directly against the real backend Zod schema (see §12).
 
-| UI field | Backend field |
-|---|---|
-| Step 1 objective card | `objective` |
-| Step 2 selected product | `productId` |
-| Step 2 uploaded photos | *(not sent to this callable — see §14; used for the campaign's own image assets only)* |
-| Step 3 offer type | `offer.type` |
-| Step 3 headline | `offer.headline` |
-| Step 3 description | `offer.description` |
-| Step 3 price / original price | `offer.price` / `offer.originalPrice` |
-| Step 3 terms | `offer.terms` |
-| Step 3 duration start/end | `offer.validityStart`/`offer.validityEnd` **and** `duration.start`/`duration.end` (same dates, sent to both per the schema) |
-| Step 4 localities | `audience.localities` |
-| Step 4 age min/max | `audience.ageRange.min`/`.max` |
-| Step 4 occasion | `audience.occasion` |
-| Step 5 CTA card | `cta` |
-| Step 6 language | `localization.primaryLanguage` (+ derived `secondaryLanguage`, `languageMixing`) |
-| Step 6 regional style | `localization.regionalStyle` |
-| Step 7 campaign style | `localization.campaignStyle` |
-| Business location (prefilled, not re-entered) | `localization.country`/`state`/`city`/`locality` |
-| Business Brain `brand.tone` (prefilled) | `localization.brandTone` |
-| Business Brain `localization.slangIntensity` (prefilled) | `localization.slangPreference` |
-| Business Brain `audience.targetCustomer` (prefilled, with fallback) | `localization.audienceDescription` |
-| Fixed default (no wizard step — see §14) | `localization.contentFormat = 'poster'` |
-| Client-generated UUID, locked for the attempt | `idempotencyKey` |
+| UI field                                                            | Backend field                                                                                                               |
+| ------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------- |
+| Step 1 objective card                                               | `objective`                                                                                                                 |
+| Step 2 selected product                                             | `productId`                                                                                                                 |
+| Step 2 uploaded photos                                              | _(not sent to this callable — see §14; used for the campaign's own image assets only)_                                      |
+| Step 3 offer type                                                   | `offer.type`                                                                                                                |
+| Step 3 headline                                                     | `offer.headline`                                                                                                            |
+| Step 3 description                                                  | `offer.description`                                                                                                         |
+| Step 3 price / original price                                       | `offer.price` / `offer.originalPrice`                                                                                       |
+| Step 3 terms                                                        | `offer.terms`                                                                                                               |
+| Step 3 duration start/end                                           | `offer.validityStart`/`offer.validityEnd` **and** `duration.start`/`duration.end` (same dates, sent to both per the schema) |
+| Step 4 localities                                                   | `audience.localities`                                                                                                       |
+| Step 4 age min/max                                                  | `audience.ageRange.min`/`.max`                                                                                              |
+| Step 4 occasion                                                     | `audience.occasion`                                                                                                         |
+| Step 5 CTA card                                                     | `cta`                                                                                                                       |
+| Step 6 language                                                     | `localization.primaryLanguage` (+ derived `secondaryLanguage`, `languageMixing`)                                            |
+| Step 6 regional style                                               | `localization.regionalStyle`                                                                                                |
+| Step 7 campaign style                                               | `localization.campaignStyle`                                                                                                |
+| Business location (prefilled, not re-entered)                       | `localization.country`/`state`/`city`/`locality`                                                                            |
+| Business Brain `brand.tone` (prefilled)                             | `localization.brandTone`                                                                                                    |
+| Business Brain `localization.slangIntensity` (prefilled)            | `localization.slangPreference`                                                                                              |
+| Business Brain `audience.targetCustomer` (prefilled, with fallback) | `localization.audienceDescription`                                                                                          |
+| Fixed default (no wizard step — see §14)                            | `localization.contentFormat = 'poster'`                                                                                     |
+| Client-generated UUID, locked for the attempt                       | `idempotencyKey`                                                                                                            |
 
 ## 6. Supported Enums
 
@@ -134,7 +134,7 @@ The backend fix in `generateCampaignStrategy.ts` (existing-product fetch, §14) 
 
 ## 13. End-to-End Test
 
-**Not performed against a live backend.** What *was* verified:
+**Not performed against a live backend.** What _was_ verified:
 
 - `npm run typecheck` — pass (both root and `functions/`).
 - `npm run lint` — pass (one unrelated pre-existing failure in `businessBrainService.ts` fixed since it blocked the `--max-warnings 0` gate).

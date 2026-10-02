@@ -23,27 +23,27 @@ Single canonical implementation: `functions/src/middleware/rateLimit.ts`, export
 
 ## 3. Endpoint Inventory
 
-| Endpoint | Auth | App Check | Rate Limited (before fix) | Rate Limited (after fix) | Key |
-|---|---|---|---|---|---|
-| `generateCampaignStrategy` | Y | Y | 100/60s (bug) | 10/hour | `generateCampaignStrategy_{userId}` |
-| `regenerateAsset` | Y | Y | 100/60s (bug) | 20/hour | `regenerateAsset_{userId}` |
-| `generateReel` | Y | Y | 100/60s (bug) | 10/hour | `generateReel_{userId}` |
-| `createCampaign` | Y | Y | 100/60s (bug) | 50/hour | `createCampaign_{userId}` |
-| `createReelProject` | Y | Y | 100/60s (bug), shared bucket with clip uploads | 30/hour, own bucket | `createReelProject_{userId}` |
-| `getUploadUrl` | Y | Y | 100/60s (bug) | 30/hour | `getUploadUrl_{userId}` |
-| `confirmUpload` | Y | Y | 100/60s (bug) | 30/hour | `confirmUpload_{userId}` |
-| `getReelClipUploadUrl` | Y | Y | 100/60s (bug), shared bucket | 60/hour, own bucket | `getReelClipUploadUrl_{userId}` |
-| `confirmReelClipUpload` | Y | Y | 100/60s (bug), shared bucket | 60/hour, own bucket | `confirmReelClipUpload_{userId}` |
-| `createSubscription` | Y | Y | 100/60s (bug), stale key name | 5/hour | `createSubscription_{userId}` |
-| `verifyPayment` | Y | Y | 100/60s (bug), no config at all | 10/hour (newly defined, §5) | `verifyPayment_{userId}` |
-| `razorpayWebhook` | N (signature) | N/A | not rate limited | unchanged — see §15 | — |
-| `getAnalyticsDashboard` | Y | Y | not rate limited | unchanged | — |
-| `recordWhatsAppClick` | Y | Y | not rate limited | unchanged | — |
-| `createBusiness` | Y | Y | not rate limited | unchanged | — |
-| `updateBusinessBrain` | Y | Y | not rate limited | unchanged | — |
-| `createProduct` | Y | Y | not rate limited | unchanged | — |
-| `getCampaign` | Y | Y | not rate limited | unchanged | — |
-| `onUserCreated`/`onUserDeleted` | N/A (auth trigger) | N/A | not applicable | not applicable | — |
+| Endpoint                        | Auth               | App Check | Rate Limited (before fix)                      | Rate Limited (after fix)    | Key                                 |
+| ------------------------------- | ------------------ | --------- | ---------------------------------------------- | --------------------------- | ----------------------------------- |
+| `generateCampaignStrategy`      | Y                  | Y         | 100/60s (bug)                                  | 10/hour                     | `generateCampaignStrategy_{userId}` |
+| `regenerateAsset`               | Y                  | Y         | 100/60s (bug)                                  | 20/hour                     | `regenerateAsset_{userId}`          |
+| `generateReel`                  | Y                  | Y         | 100/60s (bug)                                  | 10/hour                     | `generateReel_{userId}`             |
+| `createCampaign`                | Y                  | Y         | 100/60s (bug)                                  | 50/hour                     | `createCampaign_{userId}`           |
+| `createReelProject`             | Y                  | Y         | 100/60s (bug), shared bucket with clip uploads | 30/hour, own bucket         | `createReelProject_{userId}`        |
+| `getUploadUrl`                  | Y                  | Y         | 100/60s (bug)                                  | 30/hour                     | `getUploadUrl_{userId}`             |
+| `confirmUpload`                 | Y                  | Y         | 100/60s (bug)                                  | 30/hour                     | `confirmUpload_{userId}`            |
+| `getReelClipUploadUrl`          | Y                  | Y         | 100/60s (bug), shared bucket                   | 60/hour, own bucket         | `getReelClipUploadUrl_{userId}`     |
+| `confirmReelClipUpload`         | Y                  | Y         | 100/60s (bug), shared bucket                   | 60/hour, own bucket         | `confirmReelClipUpload_{userId}`    |
+| `createSubscription`            | Y                  | Y         | 100/60s (bug), stale key name                  | 5/hour                      | `createSubscription_{userId}`       |
+| `verifyPayment`                 | Y                  | Y         | 100/60s (bug), no config at all                | 10/hour (newly defined, §5) | `verifyPayment_{userId}`            |
+| `razorpayWebhook`               | N (signature)      | N/A       | not rate limited                               | unchanged — see §15         | —                                   |
+| `getAnalyticsDashboard`         | Y                  | Y         | not rate limited                               | unchanged                   | —                                   |
+| `recordWhatsAppClick`           | Y                  | Y         | not rate limited                               | unchanged                   | —                                   |
+| `createBusiness`                | Y                  | Y         | not rate limited                               | unchanged                   | —                                   |
+| `updateBusinessBrain`           | Y                  | Y         | not rate limited                               | unchanged                   | —                                   |
+| `createProduct`                 | Y                  | Y         | not rate limited                               | unchanged                   | —                                   |
+| `getCampaign`                   | Y                  | Y         | not rate limited                               | unchanged                   | —                                   |
+| `onUserCreated`/`onUserDeleted` | N/A (auth trigger) | N/A       | not applicable                                 | not applicable              | —                                   |
 
 The 6 CRUD/analytics/read endpoints with no rate limit at all are unchanged by this phase — see §6 category D/E discussion and §26 for why nothing was added there.
 
@@ -59,16 +59,16 @@ From the pre-existing (but unused) `rateLimitConfigs` map: `generateCampaign: 10
 
 ## 6. Current vs Intended Gap
 
-| Endpoint | Effective (before) | Intended | Gap | Severity | Action |
-|---|---:|---|---|---|---|
-| `generateCampaignStrategy` | 100/60s (≈6000/hour) | 10/hour | ~600x | CRITICAL | Fixed |
-| `regenerateAsset` | 100/60s | 20/hour | ~300x | HIGH | Fixed |
-| `generateReel` | 100/60s | 10/hour | ~600x | CRITICAL | Fixed |
-| `createCampaign` | 100/60s | 50/hour | ~120x | MEDIUM | Fixed |
-| `createSubscription` | 100/60s | 5/hour | ~1200x | HIGH (payment-adjacent) | Fixed |
-| `verifyPayment` | 100/60s | undefined → now 10/hour | policy never existed | MEDIUM | Fixed (new policy) |
-| `getUploadUrl`/`confirmUpload` | 100/60s | 30/hour | ~200x | MEDIUM | Fixed |
-| `getReelClipUploadUrl`/`confirmReelClipUpload`/`createReelProject` | 100/60s, 3 ops sharing 1 bucket | 60/hour (uploads), 30/hour (project create), each separate | conflated + ~120x | MEDIUM | Fixed |
+| Endpoint                                                           |              Effective (before) | Intended                                                   | Gap                  | Severity                | Action             |
+| ------------------------------------------------------------------ | ------------------------------: | ---------------------------------------------------------- | -------------------- | ----------------------- | ------------------ |
+| `generateCampaignStrategy`                                         |            100/60s (≈6000/hour) | 10/hour                                                    | ~600x                | CRITICAL                | Fixed              |
+| `regenerateAsset`                                                  |                         100/60s | 20/hour                                                    | ~300x                | HIGH                    | Fixed              |
+| `generateReel`                                                     |                         100/60s | 10/hour                                                    | ~600x                | CRITICAL                | Fixed              |
+| `createCampaign`                                                   |                         100/60s | 50/hour                                                    | ~120x                | MEDIUM                  | Fixed              |
+| `createSubscription`                                               |                         100/60s | 5/hour                                                     | ~1200x               | HIGH (payment-adjacent) | Fixed              |
+| `verifyPayment`                                                    |                         100/60s | undefined → now 10/hour                                    | policy never existed | MEDIUM                  | Fixed (new policy) |
+| `getUploadUrl`/`confirmUpload`                                     |                         100/60s | 30/hour                                                    | ~200x                | MEDIUM                  | Fixed              |
+| `getReelClipUploadUrl`/`confirmReelClipUpload`/`createReelProject` | 100/60s, 3 ops sharing 1 bucket | 60/hour (uploads), 30/hour (project create), each separate | conflated + ~120x    | MEDIUM                  | Fixed              |
 
 Severity reflects abuse/cost impact per Rule of §32, not blanket escalation: AI-generation endpoints (real provider $ per call) are CRITICAL; payment-adjacent endpoints are HIGH; cheap metadata/CRUD-adjacent writes are MEDIUM.
 
@@ -124,20 +124,20 @@ Not independently fault-injected against a live Firestore outage in this session
 
 ## 19. Abuse Scenario Results
 
-| # | Scenario | Result |
-|---|---|---|
-| 1 | Same user, repeated generation | Blocked at the action's real limit (e.g. 10/hour for `generateCampaignStrategy`) — verified in §20 |
-| 2 | Same user, multiple businesses | Shares one quota per action across all their businesses (§7) — not a bypass, more conservative |
-| 3 | Same business, multiple users | Each user has an independent quota — not evaluated as an abuse vector since each is a distinct authenticated identity |
-| 4 | Change client-provided `userId` | Not possible — `userId` is never read from the request body, only from the verified auth token (§7) |
-| 5 | Change client-provided `businessId` | Does not affect the rate-limit key at all (user-scoped only); would still be caught by `verifyBusinessAccess`, unchanged by this phase |
-| 6 | Concurrent requests | Exactly `maxRequests` succeed under 20-way concurrency — verified in §11 |
-| 7 | Retry after rejection | Rejected request does not consume a slot beyond what's stored (§11's count-equals-maxRequests assertion); retrying immediately is correctly rejected again until the window resets |
-| 8 | Rapid regeneration | Bounded by `regenerateAsset`'s real 20/hour policy, now enforced |
-| 9 | Rapid signed-upload-URL requests | Bounded by `getUploadUrl`'s real 30/hour policy, now enforced |
-| 10 | Agency bulk abuse | N/A — feature not implemented (§17) |
-| 11 | Unauthenticated requests | Rejected before rate limiting is ever reached — `validatedCallable` throws `unauthenticated` first (unchanged, pre-existing, Phase 37-verified) |
-| 12 | Invalid App Check | Rejected by Firebase's App Check enforcement (`enforceAppCheck: true`) before the callable handler runs at all — unchanged, pre-existing |
+| #   | Scenario                            | Result                                                                                                                                                                             |
+| --- | ----------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1   | Same user, repeated generation      | Blocked at the action's real limit (e.g. 10/hour for `generateCampaignStrategy`) — verified in §20                                                                                 |
+| 2   | Same user, multiple businesses      | Shares one quota per action across all their businesses (§7) — not a bypass, more conservative                                                                                     |
+| 3   | Same business, multiple users       | Each user has an independent quota — not evaluated as an abuse vector since each is a distinct authenticated identity                                                              |
+| 4   | Change client-provided `userId`     | Not possible — `userId` is never read from the request body, only from the verified auth token (§7)                                                                                |
+| 5   | Change client-provided `businessId` | Does not affect the rate-limit key at all (user-scoped only); would still be caught by `verifyBusinessAccess`, unchanged by this phase                                             |
+| 6   | Concurrent requests                 | Exactly `maxRequests` succeed under 20-way concurrency — verified in §11                                                                                                           |
+| 7   | Retry after rejection               | Rejected request does not consume a slot beyond what's stored (§11's count-equals-maxRequests assertion); retrying immediately is correctly rejected again until the window resets |
+| 8   | Rapid regeneration                  | Bounded by `regenerateAsset`'s real 20/hour policy, now enforced                                                                                                                   |
+| 9   | Rapid signed-upload-URL requests    | Bounded by `getUploadUrl`'s real 30/hour policy, now enforced                                                                                                                      |
+| 10  | Agency bulk abuse                   | N/A — feature not implemented (§17)                                                                                                                                                |
+| 11  | Unauthenticated requests            | Rejected before rate limiting is ever reached — `validatedCallable` throws `unauthenticated` first (unchanged, pre-existing, Phase 37-verified)                                    |
+| 12  | Invalid App Check                   | Rejected by Firebase's App Check enforcement (`enforceAppCheck: true`) before the callable handler runs at all — unchanged, pre-existing                                           |
 
 ## 20. Firebase Emulator Results
 
@@ -152,24 +152,24 @@ Ran `firebase emulators:start --only auth,firestore,storage --project demo-mitra
 
 Required coverage from §25, mapped to what was actually written:
 
-| # | Requirement | Covered by |
-|---|---|---|
-| 1 | Under limit succeeds | `rateLimit.test.ts` |
-| 2 | Exactly at limit behaves correctly | `rateLimit.test.ts` |
-| 3 | One over limit rejected | `rateLimit.test.ts` |
-| 4 | Reset works | `rateLimit.test.ts` |
-| 5 | Different users isolated | `rateLimit.test.ts` |
-| 6 | Different businesses isolated | N/A — key is user-scoped, not business-scoped (§7); no per-business isolation to test |
-| 7 | Different operations isolated | `rateLimit.test.ts` |
-| 8 | Unauthorized user cannot bypass | Pre-existing `validatedCallable` behavior, unchanged, covered by Phase 37's auth tests |
-| 9 | Client-supplied identity cannot bypass | Verified by code inspection (§7) — no client-supplied field is ever read into the key; not independently retestable beyond that since there's nothing to attempt to override |
-| 10 | Concurrent requests handled safely | `rateLimit.test.ts` |
-| 11 | Limiter failure handled correctly | Verified by code structure only (§18), not fault-injected |
-| 12 | Expensive AI operation uses correct policy | `rateLimit.test.ts` (`generateCampaignStrategy` case), confirms 10/hour is what's actually enforced |
-| 13 | Generic endpoint uses correct policy | `rateLimit.test.ts` (`falls back to the generic default for an action with no configured policy`) |
-| 14 | Rate-limit rejection does not consume credits | `createCampaign.rateLimit.test.ts` |
-| 15 | Rate-limit rejection does not invoke AI | Not directly tested (`createCampaign` doesn't invoke AI itself; `generateCampaignStrategy` does, but exhausting its real 10/hour limit with real AI-adjacent state to assert against would need mocked AI providers wired into an emulator test that doesn't currently exist — deferred, see §31) |
-| 16 | Rate-limit rejection does not create unwanted state | `createCampaign.rateLimit.test.ts` |
+| #   | Requirement                                         | Covered by                                                                                                                                                                                                                                                                                        |
+| --- | --------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1   | Under limit succeeds                                | `rateLimit.test.ts`                                                                                                                                                                                                                                                                               |
+| 2   | Exactly at limit behaves correctly                  | `rateLimit.test.ts`                                                                                                                                                                                                                                                                               |
+| 3   | One over limit rejected                             | `rateLimit.test.ts`                                                                                                                                                                                                                                                                               |
+| 4   | Reset works                                         | `rateLimit.test.ts`                                                                                                                                                                                                                                                                               |
+| 5   | Different users isolated                            | `rateLimit.test.ts`                                                                                                                                                                                                                                                                               |
+| 6   | Different businesses isolated                       | N/A — key is user-scoped, not business-scoped (§7); no per-business isolation to test                                                                                                                                                                                                             |
+| 7   | Different operations isolated                       | `rateLimit.test.ts`                                                                                                                                                                                                                                                                               |
+| 8   | Unauthorized user cannot bypass                     | Pre-existing `validatedCallable` behavior, unchanged, covered by Phase 37's auth tests                                                                                                                                                                                                            |
+| 9   | Client-supplied identity cannot bypass              | Verified by code inspection (§7) — no client-supplied field is ever read into the key; not independently retestable beyond that since there's nothing to attempt to override                                                                                                                      |
+| 10  | Concurrent requests handled safely                  | `rateLimit.test.ts`                                                                                                                                                                                                                                                                               |
+| 11  | Limiter failure handled correctly                   | Verified by code structure only (§18), not fault-injected                                                                                                                                                                                                                                         |
+| 12  | Expensive AI operation uses correct policy          | `rateLimit.test.ts` (`generateCampaignStrategy` case), confirms 10/hour is what's actually enforced                                                                                                                                                                                               |
+| 13  | Generic endpoint uses correct policy                | `rateLimit.test.ts` (`falls back to the generic default for an action with no configured policy`)                                                                                                                                                                                                 |
+| 14  | Rate-limit rejection does not consume credits       | `createCampaign.rateLimit.test.ts`                                                                                                                                                                                                                                                                |
+| 15  | Rate-limit rejection does not invoke AI             | Not directly tested (`createCampaign` doesn't invoke AI itself; `generateCampaignStrategy` does, but exhausting its real 10/hour limit with real AI-adjacent state to assert against would need mocked AI providers wired into an emulator test that doesn't currently exist — deferred, see §31) |
+| 16  | Rate-limit rejection does not create unwanted state | `createCampaign.rateLimit.test.ts`                                                                                                                                                                                                                                                                |
 
 ## 22. Performance Impact
 
@@ -177,7 +177,7 @@ Not separately benchmarked with dedicated instrumentation. Observed in test outp
 
 ## 23. Cost Impact
 
-Each `checkRateLimit` call is one Firestore transaction: 1 read + 1 write per gated request. No change in this dimension from the fix — the fix corrects *which policy* is applied, not the storage mechanism or its per-call cost. The unbounded growth of the `rate_limits` collection (§2, no TTL/cleanup) is a real, if slow-accumulating, storage-cost concern — flagged as finding F-5, not fixed in this phase (adding a Firestore TTL policy is a console/gcloud infrastructure configuration change, not a code change, and is a cost-optimization rather than a security gap; Rule 7 counsels against unnecessary architecture changes).
+Each `checkRateLimit` call is one Firestore transaction: 1 read + 1 write per gated request. No change in this dimension from the fix — the fix corrects _which policy_ is applied, not the storage mechanism or its per-call cost. The unbounded growth of the `rate_limits` collection (§2, no TTL/cleanup) is a real, if slow-accumulating, storage-cost concern — flagged as finding F-5, not fixed in this phase (adding a Firestore TTL policy is a console/gcloud infrastructure configuration change, not a code change, and is a cost-optimization rather than a security gap; Rule 7 counsels against unnecessary architecture changes).
 
 ## 24. Security Regression Results
 
@@ -189,24 +189,24 @@ This report is the documentation deliverable for this phase (Rule 29: document o
 
 ## 26. Findings
 
-| ID | Severity | Finding | Evidence | Fixed? |
-|---|---|---|---|---|
-| F-1 | CRITICAL | Every rate-limited endpoint enforced the generic 100/60s default instead of its documented action-specific policy — `rateLimitConfigs` had zero consumers | `functions/src/middleware/rateLimit.ts` (before fix), grep of all `checkRateLimit(` call sites showing 2-arg calls only | Fixed |
-| F-2 | HIGH | `mapErrorToHttpsError` rewrote `HttpsError('resource-exhausted', ...)` to a generic `internal` error, discarding the rate-limit signal (and `retryAfterSeconds`) at the callable boundary | `functions/src/utils/errors.ts` (before fix); reproduced by a real emulator request in this session, test failure showed `code: "internal"` instead of `"resource-exhausted"` | Fixed |
-| F-3 | MEDIUM | Three distinct reel operations (`createReelProject`, `getReelClipUploadUrl`, `confirmReelClipUpload`) shared one `'reelClipUpload'` rate-limit bucket, conflating a cheap metadata write with two upload-adjacent operations under one quota | grep of `checkRateLimit(context.userId, 'reelClipUpload')` across 3 files | Fixed — each now has its own action name and policy |
-| F-4 | MEDIUM | `verifyPayment` had no rate-limit policy defined anywhere (not even a stale/mismatched key) despite being a security-sensitive, payment-adjacent endpoint | grep of `rateLimitConfigs` keys vs. `checkRateLimit` call sites | Fixed — 10/hour, documented as a new recommendation, not an inherited requirement |
-| F-5 | LOW | `rate_limits` Firestore collection has no TTL or cleanup — grows by one permanent document per unique `(action, userId)` pair ever seen | `rateLimit.ts`, no `FieldValue`/scheduled-function reference to expiry anywhere in `functions/src` | Not fixed — infrastructure-level TTL policy configuration, out of scope for a code-only fix in this phase; documented as remaining work (§31) |
-| F-6 | LOW | Limiter fail-safe behavior (§18) is verified by code structure, not by an actual fault-injection test against a broken Firestore connection | This report, §18 | Not fixed — deferred, see §31 |
+| ID  | Severity | Finding                                                                                                                                                                                                                                      | Evidence                                                                                                                                                                      | Fixed?                                                                                                                                        |
+| --- | -------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
+| F-1 | CRITICAL | Every rate-limited endpoint enforced the generic 100/60s default instead of its documented action-specific policy — `rateLimitConfigs` had zero consumers                                                                                    | `functions/src/middleware/rateLimit.ts` (before fix), grep of all `checkRateLimit(` call sites showing 2-arg calls only                                                       | Fixed                                                                                                                                         |
+| F-2 | HIGH     | `mapErrorToHttpsError` rewrote `HttpsError('resource-exhausted', ...)` to a generic `internal` error, discarding the rate-limit signal (and `retryAfterSeconds`) at the callable boundary                                                    | `functions/src/utils/errors.ts` (before fix); reproduced by a real emulator request in this session, test failure showed `code: "internal"` instead of `"resource-exhausted"` | Fixed                                                                                                                                         |
+| F-3 | MEDIUM   | Three distinct reel operations (`createReelProject`, `getReelClipUploadUrl`, `confirmReelClipUpload`) shared one `'reelClipUpload'` rate-limit bucket, conflating a cheap metadata write with two upload-adjacent operations under one quota | grep of `checkRateLimit(context.userId, 'reelClipUpload')` across 3 files                                                                                                     | Fixed — each now has its own action name and policy                                                                                           |
+| F-4 | MEDIUM   | `verifyPayment` had no rate-limit policy defined anywhere (not even a stale/mismatched key) despite being a security-sensitive, payment-adjacent endpoint                                                                                    | grep of `rateLimitConfigs` keys vs. `checkRateLimit` call sites                                                                                                               | Fixed — 10/hour, documented as a new recommendation, not an inherited requirement                                                             |
+| F-5 | LOW      | `rate_limits` Firestore collection has no TTL or cleanup — grows by one permanent document per unique `(action, userId)` pair ever seen                                                                                                      | `rateLimit.ts`, no `FieldValue`/scheduled-function reference to expiry anywhere in `functions/src`                                                                            | Not fixed — infrastructure-level TTL policy configuration, out of scope for a code-only fix in this phase; documented as remaining work (§31) |
+| F-6 | LOW      | Limiter fail-safe behavior (§18) is verified by code structure, not by an actual fault-injection test against a broken Firestore connection                                                                                                  | This report, §18                                                                                                                                                              | Not fixed — deferred, see §31                                                                                                                 |
 
 No CRITICAL findings remain open. F-1 and F-2 (the two most severe) are both fixed and verified against a real emulator, not just patched and assumed correct.
 
 ## 27. Risk Register
 
-| Risk | Likelihood (pre-fix) | Impact | Likelihood (post-fix) |
-|---|---|---|---|
-| Scripted account generates unbounded AI campaigns/reels at real provider cost | High (limit was ~600x looser than intended) | High ($ cost, potential provider account suspension) | Low (10/hour genuinely enforced, verified) |
-| Client misreads a rate-limit rejection as a server error and doesn't back off correctly | Certain (every rejection surfaced as `internal`) | Low-Medium (bad UX, unnecessary retry storms) | Low (`resource-exhausted` now correctly surfaces with `retryAfterSeconds`) |
-| Firestore `rate_limits` collection becomes a slow, unbounded storage-cost creep | Ongoing, unchanged by this phase | Low (linear, small per-document cost) | Unchanged — tracked as F-5 |
+| Risk                                                                                    | Likelihood (pre-fix)                             | Impact                                               | Likelihood (post-fix)                                                      |
+| --------------------------------------------------------------------------------------- | ------------------------------------------------ | ---------------------------------------------------- | -------------------------------------------------------------------------- |
+| Scripted account generates unbounded AI campaigns/reels at real provider cost           | High (limit was ~600x looser than intended)      | High ($ cost, potential provider account suspension) | Low (10/hour genuinely enforced, verified)                                 |
+| Client misreads a rate-limit rejection as a server error and doesn't back off correctly | Certain (every rejection surfaced as `internal`) | Low-Medium (bad UX, unnecessary retry storms)        | Low (`resource-exhausted` now correctly surfaces with `retryAfterSeconds`) |
+| Firestore `rate_limits` collection becomes a slow, unbounded storage-cost creep         | Ongoing, unchanged by this phase                 | Low (linear, small per-document cost)                | Unchanged — tracked as F-5                                                 |
 
 ## 28. Exact Files Changed
 
@@ -241,21 +241,27 @@ cd functions && npm run lint                                    # confirmed pre-
 ## 30. Final Verdict
 
 ### Rate-Limit Architecture
+
 **VERIFIED** — single canonical implementation, extended in place, no duplicate limiter introduced, concurrency safety proven against a real emulator, fail-closed behavior verified by code structure.
 
 ### Endpoint Coverage
+
 **PARTIAL** — all 10 previously-rate-limited endpoints now enforce their real intended policy, verified. 6 CRUD/analytics/read endpoints remain unrated-limited by design decision carried over from before this phase (not newly introduced, not silently expanded — see §3/§17); the brief did not present evidence that these need one, and Rule 2 forbids inventing a limit without justification, so none was added.
 
 ### AI Abuse Protection
+
 **VERIFIED** — the three AI-provider-cost endpoints (`generateCampaignStrategy`, `regenerateAsset`, `generateReel`) now enforce their documented policies for real, proven against a live emulator, not just read from config.
 
 ### Tenant / Identity Protection
+
 **VERIFIED** — key is built exclusively from server-verified `request.auth.uid`; no client-supplied identifier is ever read into the rate-limit key; user isolation proven against a live emulator.
 
 ### Concurrency Safety
+
 **VERIFIED** — 20-way concurrent request test against a real Firestore transaction proves exactly `maxRequests` succeed, no overshoot.
 
 ### Production Readiness
+
 **PARTIAL** — the precision gap that was the entire point of this phase is closed and verified. Two items remain open and are honestly not claimed as done: fail-safe behavior under an actual Firestore outage was verified by code inspection only, not fault injection (F-6), and the `rate_limits` collection has no cleanup/TTL (F-5, a cost concern, not a security one).
 
 # Overall Phase Verdict

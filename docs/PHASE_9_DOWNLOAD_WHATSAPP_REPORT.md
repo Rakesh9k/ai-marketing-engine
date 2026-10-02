@@ -245,6 +245,7 @@ crashing, then deleted. Driven with a `puppeteer-core` script (no
 installed Chrome.
 
 **Desktop (1440×900): PASS.**
+
 - No raw JSON anywhere (`{"key":` pattern absent from `document.body.innerText`).
 - The `status: 'failed'` fixture asset's text never appeared on the page.
 - Clicking "Share on WhatsApp" called `window.open` exactly once with
@@ -274,7 +275,7 @@ and readable.
 - `src/lib/utils/whatsapp.test.ts` (new, 11 tests) — `normalizeWhatsAppNumber`
   cases (formatted/bare/trunk-prefixed/already-coded/unrecognizable/missing)
   and the §49 golden test (`+91 98765 43210` + `"Hi! Get 10% OFF on your next
-  order 🎉"` → `https://wa.me/919876543210?text=...`, with an exact
+order 🎉"` → `https://wa.me/919876543210?text=...`, with an exact
   round-trip decode check and a mixed-language/emoji/₹/line-break encoding
   test).
 - `src/components/campaign/CampaignDetailContent.test.tsx` (10 new tests,
@@ -302,12 +303,13 @@ passed, 10 skipped, 0 failed.
 
 Covered at the unit/logic level (no Firestore emulator available in this
 environment, consistent with every prior phase):
+
 1. Authorized creative download — PASS (browser, §12).
 2. Unauthorized creative download — PASS by construction (§6; Firestore
    rules deny the read before any URL/content is ever returned to the
    client; not independently re-run against a live emulator this phase).
 3. Correct campaign/asset association — PASS (§2/§6; server-filtered query
-   + per-document rule, no client-trusted association).
+   - per-document rule, no client-trusted association).
 4. Correct copy download — PASS (browser + `CampaignDetailContent.test.tsx`).
 5. Missing asset — PASS (`EmptyHint` fallbacks, unchanged from Phase 8).
 6. Failed download — PASS (§7).

@@ -48,7 +48,7 @@ storyboard. Renamed to `asset_reel_storyboard`.
 below):** `src/hooks/useRegenerateAsset.ts` threw synchronously inside a
 `useMemo` when `getFirebaseFunctions()` returned `undefined`. Since Firebase
 is only initialized client-side (`typeof window === 'undefined'` guards it
-in `src/lib/firebase/client.ts`), this is *always* true during Next.js
+in `src/lib/firebase/client.ts`), this is _always_ true during Next.js
 server-side rendering — meaning any page mounting this hook 500'd on its
 initial server-rendered response, only recovering after client-side
 hydration re-ran the hook in the browser. Fixed by moving the guard out of
@@ -59,16 +59,16 @@ minimal fix to the existing hook, not a new regeneration system.
 
 ## Data Mapping
 
-| UI Section | Source |
-|---|---|
-| Headlines | `assets` where `type === 'headline'`, `content: {text, characterCount, variant}` |
-| Caption | `assets` where `type === 'caption'`, `content: {text, hashtags[]}` |
-| Offer | `campaign.offer` directly (headline, price, originalPrice, description, terms, validityStart/End, `campaign.cta`) |
-| WhatsApp Message | `assets` where `type === 'whatsapp'`, `content: {message, waLink}` |
-| Story | `assets` where `type === 'story'` and `content.frames` present (concept); separately, `type === 'story'` assets with `imageUrl` (frame images, shown in Creative) |
-| Reel Concept | `assets` where `type === 'reel'` and `content.hook` present |
-| Creative | poster assets, story-frame image assets, and the `asset_reel_storyboard` asset — all identified by `imageUrl` presence |
-| Truth Check | `truthCheckStatus` prop, sourced by the page from `campaign.metadata.truthCheckStatus` only |
+| UI Section       | Source                                                                                                                                                            |
+| ---------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Headlines        | `assets` where `type === 'headline'`, `content: {text, characterCount, variant}`                                                                                  |
+| Caption          | `assets` where `type === 'caption'`, `content: {text, hashtags[]}`                                                                                                |
+| Offer            | `campaign.offer` directly (headline, price, originalPrice, description, terms, validityStart/End, `campaign.cta`)                                                 |
+| WhatsApp Message | `assets` where `type === 'whatsapp'`, `content: {message, waLink}`                                                                                                |
+| Story            | `assets` where `type === 'story'` and `content.frames` present (concept); separately, `type === 'story'` assets with `imageUrl` (frame images, shown in Creative) |
+| Reel Concept     | `assets` where `type === 'reel'` and `content.hook` present                                                                                                       |
+| Creative         | poster assets, story-frame image assets, and the `asset_reel_storyboard` asset — all identified by `imageUrl` presence                                            |
+| Truth Check      | `truthCheckStatus` prop, sourced by the page from `campaign.metadata.truthCheckStatus` only                                                                       |
 
 Assets with `status === 'superseded'` are filtered out everywhere so a
 prior (replaced) generation never displays alongside its replacement.
@@ -131,6 +131,7 @@ headline text, and with no console error or crash.
 ## Responsive Testing
 
 Verified via real headless-Chromium screenshots (see Browser Testing) at:
+
 - **Desktop** — 1440×900. Two-column Creative grid, all sections stacked
   single-column below, buttons and text fully legible.
 - **Mobile** — 390×844. Single-column throughout, no horizontal overflow,
@@ -140,6 +141,7 @@ Verified via real headless-Chromium screenshots (see Browser Testing) at:
 
 `src/components/campaign/CampaignDetailContent.test.tsx` — 15 tests, all
 passing:
+
 - Headline, caption + hashtags, offer, WhatsApp message + Share button,
   story-concept frames individually, reel-concept hook/scenes/cta, and
   creative images (as real `<img>` elements, not `storagePath` strings) all
@@ -157,6 +159,7 @@ passing:
 
 Fixed three pre-existing test-infrastructure gaps while adding this file
 (this was the first `.tsx` component test in the project):
+
 - `jest.config.js`'s `ts-jest` transform used the root `tsconfig.json`
   (`jsx: "preserve"`, meant for Next.js's own SWC compiler), which ts-jest
   cannot execute. Added `tsconfig.jest.json` (extends the root config,
@@ -197,6 +200,7 @@ including inline SVG data-URI images standing in for Phase 7's compositor
 output).
 
 Findings, in order:
+
 1. First load attempt hit a Next.js routing convention: a folder prefixed
    with `_` (`_dev-preview`) is a private folder excluded from routing in
    the App Router, producing a 404. Renamed to a non-prefixed path.

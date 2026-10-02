@@ -55,14 +55,14 @@ dependencies (not a full re-audit of security itself).
 
 ## Legal Route Matrix
 
-| Route | Exists | Publicly accessible | Linked (signup/login) | Linked (footer) | Linked (billing) | Content exists | Reflects actual implementation | Unresolved placeholders | Production verified |
-|---|---|---|---|---|---|---|---|---|---|
-| `/terms` | Yes | Yes (code) | Yes — `AuthLayout.tsx` | Yes | No | Yes | Yes | Yes — entity name, refund policy, governing law explicitly marked "founder decision required" | **No — HTTP 404** |
-| `/privacy` | Yes | Yes (code) | Yes — `AuthLayout.tsx` | Yes | Yes — `Danger zone` references it | Yes | Yes | Yes — retention periods, dedicated grievance contact, re-acceptance policy marked "founder decision required" | **No — HTTP 404** |
-| `/refund` | Yes | Yes (code) | No | Yes | No (linked from `/terms`, `/cancellation`, `/support`) | Yes | Yes | Yes — no refund policy decided, states this honestly | **No — HTTP 404** |
-| `/cancellation` | Yes | Yes (code) | No | Yes | No | Yes | Yes | Yes — post-cancellation credit fate marked "founder decision required" | **No — HTTP 404** |
-| `/contact` | Yes | Yes (code) | No | Yes | No | Yes | Yes | Yes — whether dedicated billing/privacy addresses should exist is "founder decision" | **No — HTTP 404** |
-| `/support` | Yes | Yes (code) | No | Yes | No | Yes | Yes | Yes — no SLA published, stated as such | **No — HTTP 404** |
+| Route           | Exists | Publicly accessible | Linked (signup/login)  | Linked (footer) | Linked (billing)                                       | Content exists | Reflects actual implementation | Unresolved placeholders                                                                                       | Production verified |
+| --------------- | ------ | ------------------- | ---------------------- | --------------- | ------------------------------------------------------ | -------------- | ------------------------------ | ------------------------------------------------------------------------------------------------------------- | ------------------- |
+| `/terms`        | Yes    | Yes (code)          | Yes — `AuthLayout.tsx` | Yes             | No                                                     | Yes            | Yes                            | Yes — entity name, refund policy, governing law explicitly marked "founder decision required"                 | **No — HTTP 404**   |
+| `/privacy`      | Yes    | Yes (code)          | Yes — `AuthLayout.tsx` | Yes             | Yes — `Danger zone` references it                      | Yes            | Yes                            | Yes — retention periods, dedicated grievance contact, re-acceptance policy marked "founder decision required" | **No — HTTP 404**   |
+| `/refund`       | Yes    | Yes (code)          | No                     | Yes             | No (linked from `/terms`, `/cancellation`, `/support`) | Yes            | Yes                            | Yes — no refund policy decided, states this honestly                                                          | **No — HTTP 404**   |
+| `/cancellation` | Yes    | Yes (code)          | No                     | Yes             | No                                                     | Yes            | Yes                            | Yes — post-cancellation credit fate marked "founder decision required"                                        | **No — HTTP 404**   |
+| `/contact`      | Yes    | Yes (code)          | No                     | Yes             | No                                                     | Yes            | Yes                            | Yes — whether dedicated billing/privacy addresses should exist is "founder decision"                          | **No — HTTP 404**   |
+| `/support`      | Yes    | Yes (code)          | No                     | Yes             | No                                                     | Yes            | Yes                            | Yes — no SLA published, stated as such                                                                        | **No — HTTP 404**   |
 
 Verified this session: `curl -o /dev/null -w "%{http_code}" https://www.brain-wise.com/<route>` for
 all six routes returned `404` for every one. `www.brain-wise.com` itself is confirmed live and
@@ -105,15 +105,15 @@ platform approval, or guaranteed copyright ownership.
 
 Data inventory (from `/privacy` §2, cross-checked against the code that actually produces each row):
 
-| Data | Purpose | Collection point | Storage | External processor | Retention | Deletion | User control |
-|---|---|---|---|---|---|---|---|
-| Email, Firebase UID | Auth/identity | Signup | Firebase Auth | Firebase/GCP | Not defined | Via self-service account deletion | Yes (delete) |
-| Business name/category/location/offers/brand | Personalize generation | Onboarding/Business Brain | Firestore | Firebase/GCP | Not defined | Archived (not purged) on account deletion | Partial |
-| Product photos/logos/generated assets | Generate campaigns | Upload/generation | Firebase Storage | Firebase/GCP, Gemini (vision), OpenAI (image gen) | Not defined | **Not deleted** by self-service deletion | No self-service purge |
-| Credit usage, campaign/download events | Enforce limits, usage history | App usage | Firestore | Firebase/GCP | Not defined | **Not deleted** | No self-service purge |
-| Subscription/payment status, transaction records | Grant credits, billing history | Billing | Firestore (metadata only — card/bank details go directly to Razorpay) | Firebase/GCP, Razorpay | Not defined; likely retained for legal/tax purposes (stated as such, not quantified) | **Not deleted** | No self-service purge |
-| Error diagnostics | Debugging | Runtime | Sentry (code integrated) | Sentry | N/A — not actively provisioned (no DSN found in this session's re-check of env config) | N/A | N/A |
-| Theme preference | Display preference | Browser | `localStorage` only | None — never sent to server | Browser-controlled | Browser-controlled | Full |
+| Data                                             | Purpose                        | Collection point          | Storage                                                               | External processor                                | Retention                                                                              | Deletion                                  | User control          |
+| ------------------------------------------------ | ------------------------------ | ------------------------- | --------------------------------------------------------------------- | ------------------------------------------------- | -------------------------------------------------------------------------------------- | ----------------------------------------- | --------------------- |
+| Email, Firebase UID                              | Auth/identity                  | Signup                    | Firebase Auth                                                         | Firebase/GCP                                      | Not defined                                                                            | Via self-service account deletion         | Yes (delete)          |
+| Business name/category/location/offers/brand     | Personalize generation         | Onboarding/Business Brain | Firestore                                                             | Firebase/GCP                                      | Not defined                                                                            | Archived (not purged) on account deletion | Partial               |
+| Product photos/logos/generated assets            | Generate campaigns             | Upload/generation         | Firebase Storage                                                      | Firebase/GCP, Gemini (vision), OpenAI (image gen) | Not defined                                                                            | **Not deleted** by self-service deletion  | No self-service purge |
+| Credit usage, campaign/download events           | Enforce limits, usage history  | App usage                 | Firestore                                                             | Firebase/GCP                                      | Not defined                                                                            | **Not deleted**                           | No self-service purge |
+| Subscription/payment status, transaction records | Grant credits, billing history | Billing                   | Firestore (metadata only — card/bank details go directly to Razorpay) | Firebase/GCP, Razorpay                            | Not defined; likely retained for legal/tax purposes (stated as such, not quantified)   | **Not deleted**                           | No self-service purge |
+| Error diagnostics                                | Debugging                      | Runtime                   | Sentry (code integrated)                                              | Sentry                                            | N/A — not actively provisioned (no DSN found in this session's re-check of env config) | N/A                                       | N/A                   |
+| Theme preference                                 | Display preference             | Browser                   | `localStorage` only                                                   | None — never sent to server                       | Browser-controlled                                                                     | Browser-controlled                        | Full                  |
 
 This table's "Retention" and "Deletion" columns are drawn from the Account Deletion and Retention
 Audits below, not invented for this table.
@@ -201,14 +201,14 @@ partial) before any refund automation could be built — correctly not invented.
 
 Five distinct meanings, checked separately per this protocol's own framing:
 
-| Meaning | Status | Evidence |
-|---|---|---|
-| Subscription cancellation (stop future renewal) | **IMPLEMENTED** | `functions/src/functions/subscriptions/cancelSubscription.ts` calls Razorpay `subscriptions.cancel(id, cancel_at_cycle_end=true)`; Billing page has a "Cancel subscription" button |
-| Subscription renewal cancellation | Same as above — this is what "cancel at cycle end" means technically | Same |
-| Payment cancellation (mid-transaction) | NOT APPLICABLE — Razorpay Checkout's own modal handles payment abandonment; no Mitra-side code needed or found | `src/app/billing/page.tsx`'s `modal: { ondismiss: ... }` resets local UI state only |
-| Campaign cancellation (stop an in-progress campaign) | NOT IMPLEMENTED — no "cancel this campaign generation" callable or button found | Repo-wide check found no such code |
-| AI-generation cancellation (abort a running AI call) | NOT IMPLEMENTED — generation runs to completion or failure; no abort path | Consistent with `functions/src/services/ai/pipeline.ts`'s synchronous execution model |
-| Account deletion | Separate capability — see Account Deletion Audit | — |
+| Meaning                                              | Status                                                                                                         | Evidence                                                                                                                                                                           |
+| ---------------------------------------------------- | -------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Subscription cancellation (stop future renewal)      | **IMPLEMENTED**                                                                                                | `functions/src/functions/subscriptions/cancelSubscription.ts` calls Razorpay `subscriptions.cancel(id, cancel_at_cycle_end=true)`; Billing page has a "Cancel subscription" button |
+| Subscription renewal cancellation                    | Same as above — this is what "cancel at cycle end" means technically                                           | Same                                                                                                                                                                               |
+| Payment cancellation (mid-transaction)               | NOT APPLICABLE — Razorpay Checkout's own modal handles payment abandonment; no Mitra-side code needed or found | `src/app/billing/page.tsx`'s `modal: { ondismiss: ... }` resets local UI state only                                                                                                |
+| Campaign cancellation (stop an in-progress campaign) | NOT IMPLEMENTED — no "cancel this campaign generation" callable or button found                                | Repo-wide check found no such code                                                                                                                                                 |
+| AI-generation cancellation (abort a running AI call) | NOT IMPLEMENTED — generation runs to completion or failure; no abort path                                      | Consistent with `functions/src/services/ai/pipeline.ts`'s synchronous execution model                                                                                              |
+| Account deletion                                     | Separate capability — see Account Deletion Audit                                                               | —                                                                                                                                                                                  |
 
 **Status: IMPLEMENTED (subscription cancellation only)**. The other meanings are either not
 applicable to this architecture or genuinely absent — neither was fabricated as "implemented" in any
@@ -237,7 +237,7 @@ Re-verified this session via direct file read:
 - Plan-tier feature enforcement: re-confirmed absent. `checkGenerationEligibility` in
   `usageControl.ts` checks only `creditsAvailable >= creditsRequired` — no plan-tier/feature gate
   exists, so a Free-plan user with sufficient credits can invoke Business/Agency-scoped operations.
-  This is a billing-*adjacent* legal-consistency question: `/terms` §7 does not claim tier-based
+  This is a billing-_adjacent_ legal-consistency question: `/terms` §7 does not claim tier-based
   feature restriction exists, so there is no legal misstatement, but the pricing page's advertised
   per-plan feature list (business count limits, watermarking, Brand Kit access) is not technically
   enforced — a product-accuracy gap flagged in this session's earlier production audit, restated
@@ -248,11 +248,11 @@ Re-verified this session via direct file read:
 
 ## AI Data Audit
 
-| Provider | Purpose | Inputs | Outputs | Server-side? | Data sent | Evidence |
-|---|---|---|---|---|---|---|
-| Google Gemini | Text generation (10 pipeline stages), vision/clip analysis | Business/product info, images | Marketing copy, structured analysis | Yes — `functions/src/services/ai/text.ts`, `vision.ts` | Business name, location, offers, product images, campaign history context | Confirmed server-side only; no client-side Gemini key found this session's re-check of `src/services`, `src/lib` |
-| OpenAI (DALL-E 3) | Image generation, sole provider | Prompts derived from business/campaign data | Hero campaign image | Yes — `functions/src/services/ai/image.ts`, lazily constructed client | Prompt text only (no raw uploaded images sent, per the pipeline's prompt-construction code) | Same client-exposure check, same result: server-side only |
-| NVIDIA/Nemotron | Declared, unused | N/A | N/A | N/A | None | `functions/src/config/env.ts` declares `NVIDIA_API_KEY` as an optional env var; zero code consumes it |
+| Provider          | Purpose                                                    | Inputs                                      | Outputs                             | Server-side?                                                          | Data sent                                                                                   | Evidence                                                                                                         |
+| ----------------- | ---------------------------------------------------------- | ------------------------------------------- | ----------------------------------- | --------------------------------------------------------------------- | ------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------- |
+| Google Gemini     | Text generation (10 pipeline stages), vision/clip analysis | Business/product info, images               | Marketing copy, structured analysis | Yes — `functions/src/services/ai/text.ts`, `vision.ts`                | Business name, location, offers, product images, campaign history context                   | Confirmed server-side only; no client-side Gemini key found this session's re-check of `src/services`, `src/lib` |
+| OpenAI (DALL-E 3) | Image generation, sole provider                            | Prompts derived from business/campaign data | Hero campaign image                 | Yes — `functions/src/services/ai/image.ts`, lazily constructed client | Prompt text only (no raw uploaded images sent, per the pipeline's prompt-construction code) | Same client-exposure check, same result: server-side only                                                        |
+| NVIDIA/Nemotron   | Declared, unused                                           | N/A                                         | N/A                                 | N/A                                                                   | None                                                                                        | `functions/src/config/env.ts` declares `NVIDIA_API_KEY` as an optional env var; zero code consumes it            |
 
 No API key exposure to the client was found in this session's re-check. `functions/src/config/
 modelRouting.ts` declares an `imageFallback: 'gemini-imagen'` value that is never read by any
@@ -286,7 +286,7 @@ used in generation).**
 ## Content Ownership Audit
 
 `/terms` §5 states the user retains ownership of uploaded content and grants Mitra a limited
-processing license; no representation is made about who owns AI-generated *output*, which is
+processing license; no representation is made about who owns AI-generated _output_, which is
 correctly listed as an unsettled legal question in `docs/LEGAL_FOUNDER_DECISIONS_REQUIRED.md` rather
 than answered.
 
@@ -306,17 +306,17 @@ unaddressed. Music/font asset licensing is UNVERIFIED — flagged, not concluded
 Re-confirmed this session against this session's earlier, dedicated content-capability audit (facts
 unchanged, no code touched since):
 
-| Capability | Generation | Rendering | Final file | Download | Meta API | OAuth | Publishing | Status |
-|---|---|---|---|---|---|---|---|---|
-| Post | Yes — AI hero image + SVG overlay | Yes (deterministic compositor) | SVG (not rasterized PNG/JPEG) | Yes | No | No | No | REAL (generation/export) — NOT IMPLEMENTED (publishing) |
-| Story | Yes — per-frame SVG | Yes | SVG frames | Yes | No | No | No | Same pattern as Post |
-| Reel (campaign-pipeline asset) | Text storyboard only, reuses hero image | No | Not a video | N/A | No | No | No | PLACEHOLDER — not a video |
-| Reel (dedicated "Create a Reel" feature) | Yes — real FFmpeg from user clips | Yes | Real MP4, 1080×1920, 15/30/45s | Yes | No | No | No | REAL, **conditional on `REEL_RENDERER_URL` being correctly configured in production** — unverified from this repo; silent placeholder fallback exists if unset |
-| Carousel | No | No | No | No | No | No | No | NOT IMPLEMENTED — does not exist in any form |
+| Capability                               | Generation                              | Rendering                      | Final file                     | Download | Meta API | OAuth | Publishing | Status                                                                                                                                                         |
+| ---------------------------------------- | --------------------------------------- | ------------------------------ | ------------------------------ | -------- | -------- | ----- | ---------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Post                                     | Yes — AI hero image + SVG overlay       | Yes (deterministic compositor) | SVG (not rasterized PNG/JPEG)  | Yes      | No       | No    | No         | REAL (generation/export) — NOT IMPLEMENTED (publishing)                                                                                                        |
+| Story                                    | Yes — per-frame SVG                     | Yes                            | SVG frames                     | Yes      | No       | No    | No         | Same pattern as Post                                                                                                                                           |
+| Reel (campaign-pipeline asset)           | Text storyboard only, reuses hero image | No                             | Not a video                    | N/A      | No       | No    | No         | PLACEHOLDER — not a video                                                                                                                                      |
+| Reel (dedicated "Create a Reel" feature) | Yes — real FFmpeg from user clips       | Yes                            | Real MP4, 1080×1920, 15/30/45s | Yes      | No       | No    | No         | REAL, **conditional on `REEL_RENDERER_URL` being correctly configured in production** — unverified from this repo; silent placeholder fallback exists if unset |
+| Carousel                                 | No                                      | No                             | No                             | No       | No       | No    | No         | NOT IMPLEMENTED — does not exist in any form                                                                                                                   |
 
 Repo-wide search this session for `instagram_business_account|media_publish|graph\.facebook|Graph
 API|access_token|OAuth|ig-user-id` (case-insensitive) across `src/` and `functions/src/`: same 9
-hits as this session's earlier audit, all Firebase/Google/Facebook *login* auth or Sentry
+hits as this session's earlier audit, all Firebase/Google/Facebook _login_ auth or Sentry
 PII-scrubbing regexes — **zero Meta content-publishing code exists**.
 
 **No downloadable file is represented anywhere in the public legal pages as Instagram publishing.**
@@ -379,18 +379,18 @@ Status: EXTERNAL EVIDENCE REQUIRED
 
 ## DPDP Audit
 
-| Requirement | Status |
-|---|---|
-| Notice (what/why/who/how) | PARTIALLY IMPLEMENTED — `/privacy` §2-3 data table and processor list |
-| Consent mechanism/recording | IMPLEMENTED (initial) / NOT IMPLEMENTED (re-acceptance after change) |
-| Data minimization | NOT ASSESSED — no formal field-by-field necessity review performed in any pass |
-| Purpose limitation | PARTIALLY IMPLEMENTED — documented per-field in `/privacy` §2 |
+| Requirement                          | Status                                                                                                                                     |
+| ------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------ |
+| Notice (what/why/who/how)            | PARTIALLY IMPLEMENTED — `/privacy` §2-3 data table and processor list                                                                      |
+| Consent mechanism/recording          | IMPLEMENTED (initial) / NOT IMPLEMENTED (re-acceptance after change)                                                                       |
+| Data minimization                    | NOT ASSESSED — no formal field-by-field necessity review performed in any pass                                                             |
+| Purpose limitation                   | PARTIALLY IMPLEMENTED — documented per-field in `/privacy` §2                                                                              |
 | Access/correction/deletion mechanism | PARTIALLY IMPLEMENTED — self-service deletion covers Auth login + business archival only; access/correction remain manual/support-mediated |
-| Retention limits | NOT IMPLEMENTED — FOUNDER DECISION REQUIRED |
-| Security safeguards | Cross-referenced, not re-audited in full here (see Security Cross-Check) |
-| Breach notification process | NOT IMPLEMENTED — no documented detection/escalation/notification process found in any pass |
-| Grievance officer / timeline | NOT IMPLEMENTED — no designated grievance officer or response-time commitment found |
-| Children's data | NOT APPLICABLE — B2B marketing tool, no age-gating evidence needed |
+| Retention limits                     | NOT IMPLEMENTED — FOUNDER DECISION REQUIRED                                                                                                |
+| Security safeguards                  | Cross-referenced, not re-audited in full here (see Security Cross-Check)                                                                   |
+| Breach notification process          | NOT IMPLEMENTED — no documented detection/escalation/notification process found in any pass                                                |
+| Grievance officer / timeline         | NOT IMPLEMENTED — no designated grievance officer or response-time commitment found                                                        |
+| Children's data                      | NOT APPLICABLE — B2B marketing tool, no age-gating evidence needed                                                                         |
 
 No "DPDP compliant" claim is made anywhere in the codebase or public pages (re-confirmed by
 re-searching customer-facing copy this session for "DPDP," "compliant" — zero matches outside this
@@ -413,16 +413,16 @@ sensitive-data logging issue found in the code reviewed this pass.**
 
 ## Third-Party Processor Audit
 
-| Provider | Purpose | Data processed | Technical integration | Privacy doc | DPA/contract evidence |
-|---|---|---|---|---|---|
-| Firebase / Google Cloud | Hosting, auth, database, storage, App Check, App Hosting | Identity, business data, uploaded/generated assets | Confirmed live (`www.brain-wise.com` serving via App Hosting) | `/privacy` §3 | Not verified in this repo |
-| Google Gemini | Text generation, vision | Business/product info, images | Server-side, confirmed | `/privacy` §3 | Not verified |
-| OpenAI | Image generation (DALL-E 3) | Prompts derived from business/campaign data | Server-side, confirmed | `/privacy` §3 | Not verified |
-| Razorpay | Payments | Payment/card/bank details (direct to Razorpay); Mitra receives status + metadata only | Confirmed (webhook, checkout) | `/privacy` §3 | Not verified |
-| Sentry | Error monitoring | Would receive error diagnostics if active | Integrated, not provisioned (no DSN found) | `/privacy` §2 | N/A — not active |
-| Cloud Run (reel-renderer) | FFmpeg video rendering | Uploaded video clips, business branding assets | Confirmed in code; production activation unverified | Not separately named in `/privacy` — implicitly covered by "Firebase Storage / Google Cloud" | Not verified |
-| GitHub | CI/CD | Source code, no customer data | Confirmed (`.github/workflows/`) | Not customer-data-relevant | N/A |
-| Meta/Instagram | — | — | **Not integrated — confirmed absent** | N/A | N/A |
+| Provider                  | Purpose                                                  | Data processed                                                                        | Technical integration                                         | Privacy doc                                                                                  | DPA/contract evidence     |
+| ------------------------- | -------------------------------------------------------- | ------------------------------------------------------------------------------------- | ------------------------------------------------------------- | -------------------------------------------------------------------------------------------- | ------------------------- |
+| Firebase / Google Cloud   | Hosting, auth, database, storage, App Check, App Hosting | Identity, business data, uploaded/generated assets                                    | Confirmed live (`www.brain-wise.com` serving via App Hosting) | `/privacy` §3                                                                                | Not verified in this repo |
+| Google Gemini             | Text generation, vision                                  | Business/product info, images                                                         | Server-side, confirmed                                        | `/privacy` §3                                                                                | Not verified              |
+| OpenAI                    | Image generation (DALL-E 3)                              | Prompts derived from business/campaign data                                           | Server-side, confirmed                                        | `/privacy` §3                                                                                | Not verified              |
+| Razorpay                  | Payments                                                 | Payment/card/bank details (direct to Razorpay); Mitra receives status + metadata only | Confirmed (webhook, checkout)                                 | `/privacy` §3                                                                                | Not verified              |
+| Sentry                    | Error monitoring                                         | Would receive error diagnostics if active                                             | Integrated, not provisioned (no DSN found)                    | `/privacy` §2                                                                                | N/A — not active          |
+| Cloud Run (reel-renderer) | FFmpeg video rendering                                   | Uploaded video clips, business branding assets                                        | Confirmed in code; production activation unverified           | Not separately named in `/privacy` — implicitly covered by "Firebase Storage / Google Cloud" | Not verified              |
+| GitHub                    | CI/CD                                                    | Source code, no customer data                                                         | Confirmed (`.github/workflows/`)                              | Not customer-data-relevant                                                                   | N/A                       |
+| Meta/Instagram            | —                                                        | —                                                                                     | **Not integrated — confirmed absent**                         | N/A                                                                                          | N/A                       |
 
 `services/reel-renderer/`'s Cloud Run service is not separately named as a processor in `/privacy` —
 it processes the same Storage-resident video assets already covered under "Firebase Storage," so this
@@ -441,7 +441,7 @@ performed separately in this session's earlier, broader production audit):
   collection in this ruleset is written.
 - **Consent write path**: `recordConsentAcceptance` uses the Admin SDK (bypasses Firestore rules by
   design, as all Cloud Functions do) but is scoped to exactly four fields via `.set(..., {merge:
-  true})` — confirmed by reading the function body, not just its comment.
+true})` — confirmed by reading the function body, not just its comment.
 - **Deletion auth check**: `requestAccountDeletion`'s `auth_time`-based recency check is a real
   claim on the Firebase ID token (`context.token.auth_time`), not a client-assertable value — the
   token itself is verified server-side by the Callable Functions runtime before this code ever runs
@@ -473,7 +473,7 @@ PRODUCTION VERIFICATION: BLOCKED
 ```
 
 **Note on this audit's own command usage:** this pass ran only read-only commands (`grep`, `git
-status`, `git log`, `curl` against the *live* production domain, and `cat`/file reads) — no
+status`, `git log`, `curl` against the _live_ production domain, and `cat`/file reads) — no
 `tsc`, `lint`, `test`, or `build` command was executed, consistent with the instruction that audit
 phase may run read-only/non-mutating commands but should not be conflated with the verification
 phase's mandate to run the full build/test suite (that already happened, with passing results, in
@@ -482,61 +482,61 @@ results; not re-run here to keep this phase strictly read-only).
 
 ## Findings
 
-| # | Finding | Area |
-|---|---|---|
-| F1 | None of the legal/compliance work (3 sessions' worth) is deployed to production — all routes 404 live | Deployment |
-| F2 | `createCampaign` Cloud Function still reserves credits via the legacy path and never finalizes/refunds them — live, unfixed billing defect | Billing |
-| F3 | No re-acceptance gate exists for existing users after a future Terms/Privacy version change | Consent |
-| F4 | Account deletion does not cascade to campaigns, assets, Storage objects, or usage history | Account Deletion |
-| F5 | No data-retention TTL/scheduler/lifecycle rule exists anywhere | Retention |
-| F6 | No Razorpay refund API integration exists; no refund/chargeback webhook handling | Refunds |
-| F7 | Plan-tier feature enforcement does not exist (credits-only gating) — pricing-page feature claims (business limits, watermark, Brand Kit) are not technically enforced | Billing/Product accuracy |
-| F8 | `REEL_RENDERER_URL` production configuration is unverifiable from this repo; unset value silently produces a fake placeholder "video" file | Reel/Content integrity |
-| F9 | Music/font licensing for the Reel renderer's bundled assets is unverified | Content Ownership |
-| F10 | Cloud Run reel-renderer is not separately named as a processor in `/privacy` (minor completeness gap) | Privacy |
-| F11 | No dedicated privacy/grievance contact confirmed distinct from general support | Support/Grievance |
-| F12 | No business registration or trademark evidence exists anywhere in the repository | Business Registration / Trademark |
-| F13 | No data-retention limit, breach-notification process, or grievance-officer designation exists (DPDP gaps) | DPDP |
-| F14 | Webhook HMAC comparison is not constant-time (restated, previously known, low severity) | Security |
+| #   | Finding                                                                                                                                                               | Area                              |
+| --- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------- |
+| F1  | None of the legal/compliance work (3 sessions' worth) is deployed to production — all routes 404 live                                                                 | Deployment                        |
+| F2  | `createCampaign` Cloud Function still reserves credits via the legacy path and never finalizes/refunds them — live, unfixed billing defect                            | Billing                           |
+| F3  | No re-acceptance gate exists for existing users after a future Terms/Privacy version change                                                                           | Consent                           |
+| F4  | Account deletion does not cascade to campaigns, assets, Storage objects, or usage history                                                                             | Account Deletion                  |
+| F5  | No data-retention TTL/scheduler/lifecycle rule exists anywhere                                                                                                        | Retention                         |
+| F6  | No Razorpay refund API integration exists; no refund/chargeback webhook handling                                                                                      | Refunds                           |
+| F7  | Plan-tier feature enforcement does not exist (credits-only gating) — pricing-page feature claims (business limits, watermark, Brand Kit) are not technically enforced | Billing/Product accuracy          |
+| F8  | `REEL_RENDERER_URL` production configuration is unverifiable from this repo; unset value silently produces a fake placeholder "video" file                            | Reel/Content integrity            |
+| F9  | Music/font licensing for the Reel renderer's bundled assets is unverified                                                                                             | Content Ownership                 |
+| F10 | Cloud Run reel-renderer is not separately named as a processor in `/privacy` (minor completeness gap)                                                                 | Privacy                           |
+| F11 | No dedicated privacy/grievance contact confirmed distinct from general support                                                                                        | Support/Grievance                 |
+| F12 | No business registration or trademark evidence exists anywhere in the repository                                                                                      | Business Registration / Trademark |
+| F13 | No data-retention limit, breach-notification process, or grievance-officer designation exists (DPDP gaps)                                                             | DPDP                              |
+| F14 | Webhook HMAC comparison is not constant-time (restated, previously known, low severity)                                                                               | Security                          |
 
 ## Risk Classification
 
-| Finding | Severity |
-|---|---|
-| F1 (not deployed) | High — nothing in this report is live for a real customer |
-| F2 (createCampaign credit loss) | High — real, reproducible, currently-exploitable-by-any-authenticated-client credit loss |
-| F6 (no refund handling) | Medium — financial/consumer-protection exposure once real payments flow |
-| F4, F5, F13 (deletion cascade / retention / DPDP gaps) | Medium — regulatory exposure, not urgent at current scale but compounds with real user data |
-| F7 (plan-tier enforcement) | Medium — product/pricing-page accuracy and potential unintended free access to paid-tier features |
-| F3 (no re-acceptance gate) | Low-Medium — only matters once a policy actually changes materially |
-| F8 (Reel renderer silent fallback) | Medium — customer-facing content-integrity risk if misconfigured |
-| F9, F10, F11 (licensing/processor-naming/grievance-contact gaps) | Low |
-| F12 (registration/trademark evidence) | High from a legal-standing perspective, but not engineering-actionable |
-| F14 (HMAC timing) | Low |
+| Finding                                                          | Severity                                                                                          |
+| ---------------------------------------------------------------- | ------------------------------------------------------------------------------------------------- |
+| F1 (not deployed)                                                | High — nothing in this report is live for a real customer                                         |
+| F2 (createCampaign credit loss)                                  | High — real, reproducible, currently-exploitable-by-any-authenticated-client credit loss          |
+| F6 (no refund handling)                                          | Medium — financial/consumer-protection exposure once real payments flow                           |
+| F4, F5, F13 (deletion cascade / retention / DPDP gaps)           | Medium — regulatory exposure, not urgent at current scale but compounds with real user data       |
+| F7 (plan-tier enforcement)                                       | Medium — product/pricing-page accuracy and potential unintended free access to paid-tier features |
+| F3 (no re-acceptance gate)                                       | Low-Medium — only matters once a policy actually changes materially                               |
+| F8 (Reel renderer silent fallback)                               | Medium — customer-facing content-integrity risk if misconfigured                                  |
+| F9, F10, F11 (licensing/processor-naming/grievance-contact gaps) | Low                                                                                               |
+| F12 (registration/trademark evidence)                            | High from a legal-standing perspective, but not engineering-actionable                            |
+| F14 (HMAC timing)                                                | Low                                                                                               |
 
 ## Implementation Candidates
 
-| ID | Finding | Severity | Proposed Fix | Files | Risk | Requires Founder Decision | Requires Legal Counsel | External Evidence | Status |
-|---|---|---|---|---|---|---|---|---|---|
-| C1 | F1 — nothing deployed | High | Deploy current `master` working tree to production (App Hosting) | N/A — deployment operation, not a code change | Low technical risk, but is a real production push | No | No | No | **NOT DONE — deferred pending separate deploy authorization** |
-| C2 | F2 — `createCampaign` credit loss | High | Remove the dead `createCampaign` export from `functions/src/index.ts` (chosen over repairing it — no frontend caller exists, and the callable's own tests import the handler directly, so removing the export changes zero user-facing behavior and breaks no test) | `functions/src/index.ts` | Low — verified via full test suite (15/15 targeted tests + 296/306 full suite, pre-existing unrelated environmental failures only), `tsc`, and `functions build`, all clean | No | No | No | **DONE** |
-| C3 | F14 — HMAC timing | Low | Replace `===` with `crypto.timingSafeEqual` in `verifyWebhookSignature`, with an explicit length check first (required by `timingSafeEqual`, leaks only the fixed public length of a hex-SHA256 digest, not content) | `functions/src/services/razorpay.ts` | Low — `razorpayWebhook.test.ts`'s real-HMAC-signing test suite still passes unchanged | No | No | No | **DONE** |
-| C4 | F10 — Cloud Run renderer not named in `/privacy` | Low | Add one sentence naming the Cloud Run reel-renderer processor | `src/app/privacy/page.tsx` | Low — factual correction, no policy decision | No | No | No | **DONE** |
-| C5 | F3 — no re-acceptance gate | Medium | Build a session-start check comparing `users/{uid}.termsVersion` to `CURRENT_TERMS_VERSION`, prompting re-acceptance on mismatch | New middleware/UI gate | Medium — touches auth-adjacent UX for every session | No (mechanism is safe to build once) | Possibly — whether re-acceptance is *legally required* vs. merely prudent may want counsel input | No | Not done |
-| C6 | F8 — silent Reel mock fallback | Medium | Make `getVideoRenderer()` throw instead of silently substituting a mock outside explicit dev/test environments | `functions/src/services/videoRenderer.ts` | Low-Medium — changes failure behavior for a production path; needs a real renderer URL confirmed first or this would break Reel generation entirely | No (the fix itself), but confirming `REEL_RENDERER_URL` is actually set in prod first is an operational prerequisite | No | No | Not done — deferred, needs prod `REEL_RENDERER_URL` confirmed first |
-| C7 | F4 — deletion cascade | Medium | Build a scheduled/triggered purge of campaigns/assets/Storage/usage history N days after `deletedAt` | New scheduled function | Medium — genuinely destructive, needs the retention period decided first | **Yes — retention period** | Possibly | No | Not done — Gate B |
-| C8 | F5 — retention enforcement | Medium | Build Firestore TTL policies / Storage lifecycle rules once periods are set | Firestore/Storage config | Medium | **Yes — retention periods per data category** | Possibly | No | Not done — Gate B |
-| C9 | F6 — refund automation | Medium | Build a refund-request/approval flow calling Razorpay's refund API | New callable + admin UI | Medium-High — real money movement | **Yes — refund policy** | Yes | No | Not done — Gate B/C |
-| C10 | F7 — plan-tier enforcement | Medium | Add explicit `planId` checks to Business/Agency-scoped callables (Brand Kit, multi-business limits) | `functions/src/functions/brandKit/*.ts`, `functions/src/functions/business/*.ts` | Medium — changes who can call what today | **Yes — is credits-only gating the intended model, or should tiers be enforced?** | No | No | Not done — Gate B |
-| C11 | F12 — business registration/trademark | High (legal standing) | N/A — cannot be implemented by engineering | `/terms`, `/privacy` (once entity is known) | N/A | **Yes** | Yes | **Yes — actual registration/trademark documents** | Not done — Gate D |
-| C12 | F13 — DPDP gaps (breach notification, grievance officer) | Medium | Build a documented incident-response process and designate a grievance officer | Process/doc, possibly a new `/privacy` section | Low technical risk, high process weight | **Yes** | Yes | No | Not done — Gate B/C |
-| C13 | F9 — music/font licensing | Low-Medium | Audit `services/reel-renderer/`'s bundled assets for license terms | N/A — investigation, not a code fix | N/A | No | Possibly | Possibly — depends what's found | Not done |
-| C14 | F11 — dedicated grievance contact | Low | Create `privacy@`/`grievance@` address, or formally designate `support@` | `/contact`, `/privacy` §8 | Low | **Yes** | No | No | Not done — Gate B |
+| ID  | Finding                                                  | Severity              | Proposed Fix                                                                                                                                                                                                                                                        | Files                                                                            | Risk                                                                                                                                                                        | Requires Founder Decision                                                                                            | Requires Legal Counsel                                                                           | External Evidence                                 | Status                                                              |
+| --- | -------------------------------------------------------- | --------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------ | ------------------------------------------------- | ------------------------------------------------------------------- |
+| C1  | F1 — nothing deployed                                    | High                  | Deploy current `master` working tree to production (App Hosting)                                                                                                                                                                                                    | N/A — deployment operation, not a code change                                    | Low technical risk, but is a real production push                                                                                                                           | No                                                                                                                   | No                                                                                               | No                                                | **NOT DONE — deferred pending separate deploy authorization**       |
+| C2  | F2 — `createCampaign` credit loss                        | High                  | Remove the dead `createCampaign` export from `functions/src/index.ts` (chosen over repairing it — no frontend caller exists, and the callable's own tests import the handler directly, so removing the export changes zero user-facing behavior and breaks no test) | `functions/src/index.ts`                                                         | Low — verified via full test suite (15/15 targeted tests + 296/306 full suite, pre-existing unrelated environmental failures only), `tsc`, and `functions build`, all clean | No                                                                                                                   | No                                                                                               | No                                                | **DONE**                                                            |
+| C3  | F14 — HMAC timing                                        | Low                   | Replace `===` with `crypto.timingSafeEqual` in `verifyWebhookSignature`, with an explicit length check first (required by `timingSafeEqual`, leaks only the fixed public length of a hex-SHA256 digest, not content)                                                | `functions/src/services/razorpay.ts`                                             | Low — `razorpayWebhook.test.ts`'s real-HMAC-signing test suite still passes unchanged                                                                                       | No                                                                                                                   | No                                                                                               | No                                                | **DONE**                                                            |
+| C4  | F10 — Cloud Run renderer not named in `/privacy`         | Low                   | Add one sentence naming the Cloud Run reel-renderer processor                                                                                                                                                                                                       | `src/app/privacy/page.tsx`                                                       | Low — factual correction, no policy decision                                                                                                                                | No                                                                                                                   | No                                                                                               | No                                                | **DONE**                                                            |
+| C5  | F3 — no re-acceptance gate                               | Medium                | Build a session-start check comparing `users/{uid}.termsVersion` to `CURRENT_TERMS_VERSION`, prompting re-acceptance on mismatch                                                                                                                                    | New middleware/UI gate                                                           | Medium — touches auth-adjacent UX for every session                                                                                                                         | No (mechanism is safe to build once)                                                                                 | Possibly — whether re-acceptance is _legally required_ vs. merely prudent may want counsel input | No                                                | Not done                                                            |
+| C6  | F8 — silent Reel mock fallback                           | Medium                | Make `getVideoRenderer()` throw instead of silently substituting a mock outside explicit dev/test environments                                                                                                                                                      | `functions/src/services/videoRenderer.ts`                                        | Low-Medium — changes failure behavior for a production path; needs a real renderer URL confirmed first or this would break Reel generation entirely                         | No (the fix itself), but confirming `REEL_RENDERER_URL` is actually set in prod first is an operational prerequisite | No                                                                                               | No                                                | Not done — deferred, needs prod `REEL_RENDERER_URL` confirmed first |
+| C7  | F4 — deletion cascade                                    | Medium                | Build a scheduled/triggered purge of campaigns/assets/Storage/usage history N days after `deletedAt`                                                                                                                                                                | New scheduled function                                                           | Medium — genuinely destructive, needs the retention period decided first                                                                                                    | **Yes — retention period**                                                                                           | Possibly                                                                                         | No                                                | Not done — Gate B                                                   |
+| C8  | F5 — retention enforcement                               | Medium                | Build Firestore TTL policies / Storage lifecycle rules once periods are set                                                                                                                                                                                         | Firestore/Storage config                                                         | Medium                                                                                                                                                                      | **Yes — retention periods per data category**                                                                        | Possibly                                                                                         | No                                                | Not done — Gate B                                                   |
+| C9  | F6 — refund automation                                   | Medium                | Build a refund-request/approval flow calling Razorpay's refund API                                                                                                                                                                                                  | New callable + admin UI                                                          | Medium-High — real money movement                                                                                                                                           | **Yes — refund policy**                                                                                              | Yes                                                                                              | No                                                | Not done — Gate B/C                                                 |
+| C10 | F7 — plan-tier enforcement                               | Medium                | Add explicit `planId` checks to Business/Agency-scoped callables (Brand Kit, multi-business limits)                                                                                                                                                                 | `functions/src/functions/brandKit/*.ts`, `functions/src/functions/business/*.ts` | Medium — changes who can call what today                                                                                                                                    | **Yes — is credits-only gating the intended model, or should tiers be enforced?**                                    | No                                                                                               | No                                                | Not done — Gate B                                                   |
+| C11 | F12 — business registration/trademark                    | High (legal standing) | N/A — cannot be implemented by engineering                                                                                                                                                                                                                          | `/terms`, `/privacy` (once entity is known)                                      | N/A                                                                                                                                                                         | **Yes**                                                                                                              | Yes                                                                                              | **Yes — actual registration/trademark documents** | Not done — Gate D                                                   |
+| C12 | F13 — DPDP gaps (breach notification, grievance officer) | Medium                | Build a documented incident-response process and designate a grievance officer                                                                                                                                                                                      | Process/doc, possibly a new `/privacy` section                                   | Low technical risk, high process weight                                                                                                                                     | **Yes**                                                                                                              | Yes                                                                                              | No                                                | Not done — Gate B/C                                                 |
+| C13 | F9 — music/font licensing                                | Low-Medium            | Audit `services/reel-renderer/`'s bundled assets for license terms                                                                                                                                                                                                  | N/A — investigation, not a code fix                                              | N/A                                                                                                                                                                         | No                                                                                                                   | Possibly                                                                                         | Possibly — depends what's found                   | Not done                                                            |
+| C14 | F11 — dedicated grievance contact                        | Low                   | Create `privacy@`/`grievance@` address, or formally designate `support@`                                                                                                                                                                                            | `/contact`, `/privacy` §8                                                        | Low                                                                                                                                                                         | **Yes**                                                                                                              | No                                                                                               | No                                                | Not done — Gate B                                                   |
 
 ### Gate classification
 
 **GATE A — safe engineering fix (no legal/business decision required):** C1, C2, C3, C4, C6*
-(*C6's *fix* is Gate A; confirming `REEL_RENDERER_URL` is actually set in production first is an
+(*C6's _fix_ is Gate A; confirming `REEL_RENDERER_URL` is actually set in production first is an
 operational prerequisite, not a legal decision).
 
 **GATE B — founder decision required:** C5 (partially — mechanism is Gate A, but whether to require
@@ -583,7 +583,7 @@ bundled music/font assets in the Reel renderer (C13).
 - Image generation single-provider risk (OpenAI, no working fallback) — product-reliability finding,
   not legal/compliance.
 - CI/CD frontend auto-deploy gap — deployment-process finding, related to F1 only insofar as it
-  explains *why* nothing is live, not a compliance content issue itself.
+  explains _why_ nothing is live, not a compliance content issue itself.
 
 ## Final Audit Verdict
 
@@ -819,11 +819,11 @@ Failed: 9
 Skipped: 2
 ```
 
-| Test suite | Failing test(s) | Category | Pre-existing? | Caused by legal pass? | Action |
-|---|---|---|---|---|---|
-| `createBusiness.test.ts` | 7 tests (`seedAuthUser` helper) | AUTH EMULATOR ENVIRONMENT | Yes — identical failure signature (`invalid_grant: Invalid grant: account not found` from `admin.auth().createUser`) observed in every prior run this session, before and after any legal changes | No | None — requires starting the Auth emulator alongside Firestore, out of scope for this pass |
-| `confirmReelClipUpload.test.ts` | 1 test ("accepts a valid storagePath... records the clip") | STORAGE/AUTH EMULATOR ENVIRONMENT | Yes — same `invalid_grant` root cause, Storage signed-URL path requires the same fake-credential OAuth flow that fails without a matching emulator | No | None — same as above |
-| `razorpayWebhook.test.ts` | 1 test ("the exact same webhook event delivered concurrently... grants credits exactly once") | FLAKY (timing-sensitive concurrency test) | Yes — the **other** tests in this same suite (including direct signature-verification assertions) passed both in this run and in the prior C2-C4 verification run; only this specific concurrency/timeout-sensitive test flaked, consistent with an earlier session's `rateLimit.test.ts` concurrency test flaking under this environment's load for the same reason | No — confirmed by isolating exactly which test failed; the HMAC `timingSafeEqual` change (C3) did not touch this test's logic and every signature-specific assertion in the suite passed | None — pre-existing flakiness class, not a regression |
+| Test suite                      | Failing test(s)                                                                               | Category                                  | Pre-existing?                                                                                                                                                                                                                                                                                                                                                        | Caused by legal pass?                                                                                                                                                                    | Action                                                                                     |
+| ------------------------------- | --------------------------------------------------------------------------------------------- | ----------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------ |
+| `createBusiness.test.ts`        | 7 tests (`seedAuthUser` helper)                                                               | AUTH EMULATOR ENVIRONMENT                 | Yes — identical failure signature (`invalid_grant: Invalid grant: account not found` from `admin.auth().createUser`) observed in every prior run this session, before and after any legal changes                                                                                                                                                                    | No                                                                                                                                                                                       | None — requires starting the Auth emulator alongside Firestore, out of scope for this pass |
+| `confirmReelClipUpload.test.ts` | 1 test ("accepts a valid storagePath... records the clip")                                    | STORAGE/AUTH EMULATOR ENVIRONMENT         | Yes — same `invalid_grant` root cause, Storage signed-URL path requires the same fake-credential OAuth flow that fails without a matching emulator                                                                                                                                                                                                                   | No                                                                                                                                                                                       | None — same as above                                                                       |
+| `razorpayWebhook.test.ts`       | 1 test ("the exact same webhook event delivered concurrently... grants credits exactly once") | FLAKY (timing-sensitive concurrency test) | Yes — the **other** tests in this same suite (including direct signature-verification assertions) passed both in this run and in the prior C2-C4 verification run; only this specific concurrency/timeout-sensitive test flaked, consistent with an earlier session's `rateLimit.test.ts` concurrency test flaking under this environment's load for the same reason | No — confirmed by isolating exactly which test failed; the HMAC `timingSafeEqual` change (C3) did not touch this test's logic and every signature-specific assertion in the suite passed | None — pre-existing flakiness class, not a regression                                      |
 
 **No test failure is a legal-implementation regression.** All 9 failures fall into the two
 previously-documented categories (missing Auth/Storage emulator, one flaky concurrency test).
@@ -847,8 +847,8 @@ Unchanged from `docs/LEGAL_FOUNDER_DECISIONS_REQUIRED.md` — restated, none res
 legal entity/address, business registration, trademark, governing law/jurisdiction, refund policy,
 credit-expiry policy, data-retention schedule, full deletion-cascade scope, dedicated
 privacy/grievance contact, existing-user re-acceptance requirement, AI-output ownership language.
-**New item surfaced this pass**: whether account deletion should *require* an active subscription to
-be canceled first (blocking deletion until then) or should *automatically* cancel it as part of
+**New item surfaced this pass**: whether account deletion should _require_ an active subscription to
+be canceled first (blocking deletion until then) or should _automatically_ cancel it as part of
 deletion — both are valid, policy-free-at-the-mechanism-level technical designs, but which one ships
 is a product decision, not one this audit makes.
 
@@ -905,7 +905,7 @@ technical mechanism, not a policy choice — it reuses the already-built, alread
 than bundling a billing side-effect into the destructive Auth-deletion path (an alternative,
 "auto-cancel on delete," was considered and rejected for this reason — see the function's own
 comment for the full rationale, and `docs/LEGAL_FOUNDER_DECISIONS_REQUIRED.md` for the note that
-*which* mechanism to ship was itself a small design choice, now made and documented rather than
+_which_ mechanism to ship was itself a small design choice, now made and documented rather than
 left open).
 
 Four new tests added to `requestAccountDeletion.test.ts` (active+renewing → blocked;

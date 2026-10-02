@@ -39,9 +39,9 @@ generate marketing, without exposing the internal Business Brain data model. The
 
 ### Campaign Impact — Truth Check staleness extended
 
-The brief required: *"If existing campaign versions depend on old facts: do not silently treat
+The brief required: _"If existing campaign versions depend on old facts: do not silently treat
 them as newly verified. Existing Truth Check rules must remain authoritative. If the architecture
-requires re-verification: implement it."*
+requires re-verification: implement it."_
 
 Before this phase, staleness detection (`isVerificationStale`, from Phase 6/13) only covered
 `businessRules`/`verticalProfile`. Because this phase makes those two fields editable for the

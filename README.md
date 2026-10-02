@@ -181,11 +181,11 @@ API integration and a dedicated agency workspace UI remain genuinely not impleme
 simply doesn't exist yet. Kept here only as a historical record; setting these has no effect.
 
 | Variable                                  | Default | Description (Phase 1 plan — not wired to any code)    |
-| ------------------------------------------ | ------- | ------------------------------------------------------- |
-| `NEXT_PUBLIC_ENABLE_SALON_VERTICAL`       | `false` | Superseded — salon is implemented and always-on          |
-| `NEXT_PUBLIC_ENABLE_REAL_ESTATE_VERTICAL` | `false` | Superseded — real estate is implemented and always-on    |
-| `NEXT_PUBLIC_ENABLE_WHATSAPP_API`         | `false` | Still accurate — not implemented                         |
-| `NEXT_PUBLIC_ENABLE_AGENCY_WORKSPACE`     | `false` | Still accurate — no dedicated agency UI exists            |
+| ----------------------------------------- | ------- | ----------------------------------------------------- |
+| `NEXT_PUBLIC_ENABLE_SALON_VERTICAL`       | `false` | Superseded — salon is implemented and always-on       |
+| `NEXT_PUBLIC_ENABLE_REAL_ESTATE_VERTICAL` | `false` | Superseded — real estate is implemented and always-on |
+| `NEXT_PUBLIC_ENABLE_WHATSAPP_API`         | `false` | Still accurate — not implemented                      |
+| `NEXT_PUBLIC_ENABLE_AGENCY_WORKSPACE`     | `false` | Still accurate — no dedicated agency UI exists        |
 
 ---
 

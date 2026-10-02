@@ -27,7 +27,7 @@ Existing Mitra Account (user/business/Business Brain/onboarding/credits)
 - `functions/src/functions/auth/onUserCreated.ts`'s `onUserCreatedHandler` is a Firebase Auth
   `user().onCreate()` v1 trigger — it fires on **any** new Firebase Auth user, regardless of
   provider, and already creates the `users/{uid}` doc, `subscriptions/{id}` (Free plan), `usage/
-  {usageId}`, welcome-credit transaction, and custom claims exactly once per Firebase user (it's an
+{usageId}`, welcome-credit transaction, and custom claims exactly once per Firebase user (it's an
   Auth-level event, not a client-triggered write, so there is no duplicate-initialization risk on
   retry/refresh). It already reads `userRecord.displayName`/`userRecord.photoURL`, which Firebase
   populates automatically from the Google profile — so Google's name/photo already reach the user
@@ -47,7 +47,7 @@ Existing Mitra Account (user/business/Business Brain/onboarding/credits)
 1. **`src/features/auth/components/GoogleSignInButton.tsx`** (new, shared by both login and
    signup) — the single authoritative Google sign-in handler:
    - Calls `signInWithGoogle()`, then uses Firebase's own `getAdditionalUserInfo(credential).
-     isNewUser` signal (not a heuristic) to distinguish existing vs. brand-new Google users.
+isNewUser` signal (not a heuristic) to distinguish existing vs. brand-new Google users.
    - **Existing user** → calls `onSuccess()` immediately, identical to email/password login.
    - **New user** → does **not** silently proceed. Shows an inline "please accept our policies"
      panel with a checkbox; only on explicit confirmation does it call the existing
@@ -66,7 +66,7 @@ Existing Mitra Account (user/business/Business Brain/onboarding/credits)
 3. **`SignupForm.tsx`** — added the same divider + button, with `disabled={!termsAccepted}` wired
    to the **existing** Terms/Privacy checkbox already required for email signup — a new user can't
    reach Google auth from the signup page without first checking that box either.
-4. **`src/app/privacy/page.tsx`** — added one factual row to the data table (name/email/photo *if*
+4. **`src/app/privacy/page.tsx`** — added one factual row to the data table (name/email/photo _if_
    you choose Google sign-in) and one clause to the existing Firebase/GCP processor bullet
    disclosing Google as an available sign-in method. No legal conclusion, retention period, or
    policy claim was added — only a technical disclosure of what the implementation actually sends
@@ -94,17 +94,17 @@ Existing Mitra Account (user/business/Business Brain/onboarding/credits)
 
 ## Testing
 
-| Check | Result |
-|---|---|
-| `npx tsc --noEmit` (frontend) | Clean |
-| `npm run lint` (frontend) | Clean |
-| Frontend unit tests | 260 passed, 67 skipped (pre-existing emulator-gated skips), 0 failed, 30/34 suites run |
-| New/updated auth test files | `GoogleSignInButton.test.tsx` (6 tests, new), `LoginForm.test.tsx` (+2 Google tests), `SignupForm.test.tsx` (+2 Google tests) — all passing |
-| `npm run build` (frontend) | Clean — `/login` and `/signup` bundle sizes grew as expected (2.86 kB / 3.37 kB, up from smaller pre-Google sizes), all 29 routes generated |
-| Functions build | Not affected — zero backend files changed for this feature (confirmed: `onUserCreatedHandler` and `recordConsentAcceptance` needed no code changes) |
-| Existing email/password regression | `LoginForm`, `SignupForm`, `ForgotPasswordForm`, `ProtectedRoute`, `useAuth`, billing-page tests all still pass unchanged |
+| Check                              | Result                                                                                                                                              |
+| ---------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `npx tsc --noEmit` (frontend)      | Clean                                                                                                                                               |
+| `npm run lint` (frontend)          | Clean                                                                                                                                               |
+| Frontend unit tests                | 260 passed, 67 skipped (pre-existing emulator-gated skips), 0 failed, 30/34 suites run                                                              |
+| New/updated auth test files        | `GoogleSignInButton.test.tsx` (6 tests, new), `LoginForm.test.tsx` (+2 Google tests), `SignupForm.test.tsx` (+2 Google tests) — all passing         |
+| `npm run build` (frontend)         | Clean — `/login` and `/signup` bundle sizes grew as expected (2.86 kB / 3.37 kB, up from smaller pre-Google sizes), all 29 routes generated         |
+| Functions build                    | Not affected — zero backend files changed for this feature (confirmed: `onUserCreatedHandler` and `recordConsentAcceptance` needed no code changes) |
+| Existing email/password regression | `LoginForm`, `SignupForm`, `ForgotPasswordForm`, `ProtectedRoute`, `useAuth`, billing-page tests all still pass unchanged                           |
 
-**Emulator/production distinction (per the task's own rule):** the Firebase Auth *emulator* can
+**Emulator/production distinction (per the task's own rule):** the Firebase Auth _emulator_ can
 exercise `onCreate`/`onDelete` triggers and Firestore writes, but **cannot exercise the real Google
 OAuth consent screen** — no automated test in this repository, including any that could be added
 here, proves the actual Google popup flow against Google's servers. That can only be proven by a
@@ -113,12 +113,12 @@ run this pass, since nothing is deployed yet.
 
 ## External Firebase Configuration Gate
 
-| Item | Status |
-|---|---|
-| Google provider enabled in Firebase Authentication | **UNVERIFIED.** Attempted a read-only check via the Identity Toolkit REST API this session; the project's App Check enforcement (confirmed real and active — the request was rejected with "Firebase App Check token is invalid" rather than succeeding) blocks this kind of unauthenticated config probe, and no `gcloud` CLI is available in this environment to check via the Identity Platform Admin API instead. **This must be confirmed directly in Firebase Console → Authentication → Sign-in method before Google sign-in can work at all in production.** |
-| Production authorized domain (`www.brain-wise.com`) | **UNVERIFIED** for the same reason — Firebase Authentication's authorized-domains list could not be read via available tooling this session. Must be confirmed in Firebase Console → Authentication → Settings → Authorized domains. `localhost` and the App Hosting default domain are typically pre-authorized by Firebase and were not modified. |
-| App Check | Unaffected by this feature — no App Check configuration was touched. The callables this feature relies on (`recordConsentAcceptance`) already enforce App Check, unchanged. |
-| Production Firebase project | Confirmed correct — `brainwise-ai-marketing-engine` (`.firebaserc` default), the same project already serving `www.brain-wise.com`. |
+| Item                                                | Status                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
+| --------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Google provider enabled in Firebase Authentication  | **UNVERIFIED.** Attempted a read-only check via the Identity Toolkit REST API this session; the project's App Check enforcement (confirmed real and active — the request was rejected with "Firebase App Check token is invalid" rather than succeeding) blocks this kind of unauthenticated config probe, and no `gcloud` CLI is available in this environment to check via the Identity Platform Admin API instead. **This must be confirmed directly in Firebase Console → Authentication → Sign-in method before Google sign-in can work at all in production.** |
+| Production authorized domain (`www.brain-wise.com`) | **UNVERIFIED** for the same reason — Firebase Authentication's authorized-domains list could not be read via available tooling this session. Must be confirmed in Firebase Console → Authentication → Settings → Authorized domains. `localhost` and the App Hosting default domain are typically pre-authorized by Firebase and were not modified.                                                                                                                                                                                                                  |
+| App Check                                           | Unaffected by this feature — no App Check configuration was touched. The callables this feature relies on (`recordConsentAcceptance`) already enforce App Check, unchanged.                                                                                                                                                                                                                                                                                                                                                                                          |
+| Production Firebase project                         | Confirmed correct — `brainwise-ai-marketing-engine` (`.firebaserc` default), the same project already serving `www.brain-wise.com`.                                                                                                                                                                                                                                                                                                                                                                                                                                  |
 
 ```
 EXTERNAL FIREBASE CONSOLE ACTION REQUIRED
@@ -152,19 +152,19 @@ place yet this pass.
 
 ## Production Evidence Table
 
-| Test | Environment | Result | Evidence |
-|---|---|---|---|
-| Google provider enabled | Firebase Console | **NOT VERIFIED** | Could not be checked programmatically this session (see above) |
-| Production authorized domain | Firebase Console | **NOT VERIFIED** | Same |
-| New Google registration | Production | **NOT RUN** | Blocked — not deployed |
-| Consent | Production | **NOT RUN** | Blocked — not deployed |
-| Onboarding | Production | **NOT RUN** | Blocked — not deployed |
-| Free credits | Production | **NOT RUN** | Blocked — not deployed |
-| Returning Google login | Production | **NOT RUN** | Blocked — not deployed |
-| Email/password login | Production | **NOT RUN (for this feature's regression check)** | Not re-verified against production this pass; local regression suite passed |
-| Email collision | Production/test | **NOT RUN** | Blocked — not deployed |
-| Account deletion (Google-created account) | Production/test | **NOT RUN** | Blocked — not deployed |
-| Tenant isolation | Emulator/production | **NOT RE-TESTED** | No change to authorization/Firestore-rules code in this pass — existing tenant-isolation tests (unaffected files) continue to pass, but no new Google-specific isolation test was run |
+| Test                                      | Environment         | Result                                            | Evidence                                                                                                                                                                              |
+| ----------------------------------------- | ------------------- | ------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Google provider enabled                   | Firebase Console    | **NOT VERIFIED**                                  | Could not be checked programmatically this session (see above)                                                                                                                        |
+| Production authorized domain              | Firebase Console    | **NOT VERIFIED**                                  | Same                                                                                                                                                                                  |
+| New Google registration                   | Production          | **NOT RUN**                                       | Blocked — not deployed                                                                                                                                                                |
+| Consent                                   | Production          | **NOT RUN**                                       | Blocked — not deployed                                                                                                                                                                |
+| Onboarding                                | Production          | **NOT RUN**                                       | Blocked — not deployed                                                                                                                                                                |
+| Free credits                              | Production          | **NOT RUN**                                       | Blocked — not deployed                                                                                                                                                                |
+| Returning Google login                    | Production          | **NOT RUN**                                       | Blocked — not deployed                                                                                                                                                                |
+| Email/password login                      | Production          | **NOT RUN (for this feature's regression check)** | Not re-verified against production this pass; local regression suite passed                                                                                                           |
+| Email collision                           | Production/test     | **NOT RUN**                                       | Blocked — not deployed                                                                                                                                                                |
+| Account deletion (Google-created account) | Production/test     | **NOT RUN**                                       | Blocked — not deployed                                                                                                                                                                |
+| Tenant isolation                          | Emulator/production | **NOT RE-TESTED**                                 | No change to authorization/Firestore-rules code in this pass — existing tenant-isolation tests (unaffected files) continue to pass, but no new Google-specific isolation test was run |
 
 ## Final Acceptance Criteria
 

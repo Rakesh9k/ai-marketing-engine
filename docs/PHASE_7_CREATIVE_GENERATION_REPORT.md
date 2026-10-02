@@ -11,7 +11,7 @@ Actual image API calls (before this phase): **32**, confirmed by reading the act
 
 Previous suspected number: 32. **Was the 32-call issue confirmed? YES.**
 
-But the forensic audit found something more fundamental than the call count: **the text overlay data (price, offer, CTA) that would make these images usable marketing creatives was computed (`buildTextOverlay()` in `imagePromptBuilder.ts`) and then discarded — never actually applied to any image.** The image model's own prompt explicitly instructed it *not* to render text/prices (`imagePromptBuilder.ts`'s negative prompt: `'text, numbers, prices (except specified overlays)'`), and no deterministic compositing step ever existed to add that text afterward. Every one of the 32 images, even when successfully generated, shipped with **no price, no offer, no CTA, no phone, no business name reliably on it at all.**
+But the forensic audit found something more fundamental than the call count: **the text overlay data (price, offer, CTA) that would make these images usable marketing creatives was computed (`buildTextOverlay()` in `imagePromptBuilder.ts`) and then discarded — never actually applied to any image.** The image model's own prompt explicitly instructed it _not_ to render text/prices (`imagePromptBuilder.ts`'s negative prompt: `'text, numbers, prices (except specified overlays)'`), and no deterministic compositing step ever existed to add that text afterward. Every one of the 32 images, even when successfully generated, shipped with **no price, no offer, no CTA, no phone, no business name reliably on it at all.**
 
 A third issue, also confirmed by reading the code: `generateImage()`'s returned `imageUrl` — a temporary OpenAI CDN URL (documented to expire, typically within about an hour) — was persisted directly into `campaign_assets`/campaign documents with no Storage upload step. Every generated creative became a dead link shortly after generation.
 
@@ -27,7 +27,7 @@ Per call: DALL-E 3 HD is a paid-per-image API call (OpenAI's own published prici
 Previous campaign total: 32 raw provider calls, **now: exactly 1** (`MAX_IMAGE_GENERATION_CALLS_PER_CAMPAIGN`).
 Worst case with retries: Phase 5 deliberately did **not** add automatic retry to `generateImage` (cost-control decision, documented in the Phase 5 report) — so worst case remains exactly 1 call attempt, timing out or failing outright rather than multiplying. This phase's fix (§14 below) makes that 1 call the sole determinant of the entire campaign's success or failure, which is the correct trade-off once only one call is being made.
 
-Credit pricing: `getGenerationCost('campaign_generation')` charges `PRICING.campaignBaseCredits + 2 × PRICING.imageGenerationCredits` = 140 credits — a price that was already calibrated for "up to 2 images," **not** 32. That mismatch (32 real provider calls billed against a 2-image credit price) was a standing unit-economics loss on every single campaign before this phase; it's now a price that comfortably covers the actual 1-call reality with margin. The credit *price* itself was deliberately left unchanged in this phase (a pricing-model decision, not a reliability bug) — only the real call count was fixed. See `functions/src/config/pricing.ts`'s `MAX_IMAGE_GENERATION_CALLS_PER_CAMPAIGN` constant and its comment for the full reasoning.
+Credit pricing: `getGenerationCost('campaign_generation')` charges `PRICING.campaignBaseCredits + 2 × PRICING.imageGenerationCredits` = 140 credits — a price that was already calibrated for "up to 2 images," **not** 32. That mismatch (32 real provider calls billed against a 2-image credit price) was a standing unit-economics loss on every single campaign before this phase; it's now a price that comfortably covers the actual 1-call reality with margin. The credit _price_ itself was deliberately left unchanged in this phase (a pricing-model decision, not a reliability bug) — only the real call count was fixed. See `functions/src/config/pricing.ts`'s `MAX_IMAGE_GENERATION_CALLS_PER_CAMPAIGN` constant and its comment for the full reasoning.
 
 ## 4. Timeout
 
@@ -43,13 +43,13 @@ Non-retryable failures: any image-generation failure — timeout, provider error
 
 ## 6. MVP Comparison
 
-No `/docs/MVP_SCOPE.md` (or any other source-of-truth doc) exists anywhere in this repository — confirmed by directory listing before starting this phase, consistent with every prior phase in this project. There is therefore no documented MVP requirement mandating AI-generated story/reel frames, or any specific poster/story/reel count. In the absence of such a document, the two strongest pieces of evidence for what the *intended* scope actually was are: (1) the existing credit pricing model, calibrated for "up to 2 images" per campaign — not 32 — strongly suggesting the 32-call implementation was scope creep beyond the original design, not a deliberate MVP decision; and (2) the task's own explicit instructions (non-negotiable principle: "PREDICTABLE COST > MAXIMUM AI GENERATION," and section 52's explicit direction not to build 15 AI video/image reel frames without a source-of-truth requirement to do so).
+No `/docs/MVP_SCOPE.md` (or any other source-of-truth doc) exists anywhere in this repository — confirmed by directory listing before starting this phase, consistent with every prior phase in this project. There is therefore no documented MVP requirement mandating AI-generated story/reel frames, or any specific poster/story/reel count. In the absence of such a document, the two strongest pieces of evidence for what the _intended_ scope actually was are: (1) the existing credit pricing model, calibrated for "up to 2 images" per campaign — not 32 — strongly suggesting the 32-call implementation was scope creep beyond the original design, not a deliberate MVP decision; and (2) the task's own explicit instructions (non-negotiable principle: "PREDICTABLE COST > MAXIMUM AI GENERATION," and section 52's explicit direction not to build 15 AI video/image reel frames without a source-of-truth requirement to do so).
 
 ## 7. Architecture Decision
 
 **HYBRID** (Option C).
 
-This follows directly from the audit, not from preference: section 10 of the task ("AI image generation must NEVER be trusted to render factual business information correctly... the final creative should have factual text composed/rendered deterministically") is a *requirement regardless of which option is chosen* — even a pure Option B (controlled AI generation) would still need deterministic text overlay to be trustworthy, since DALL-E cannot be relied on to render ₹299 or a phone number correctly. Given that, and given no MVP document mandates AI-only generation, a hybrid was the only architecture that satisfies both "use real AI-generated visuals" (there is real value in a genuine product-aware hero image, which the existing vision-analysis pipeline already produces) and "factual text must be deterministic" simultaneously.
+This follows directly from the audit, not from preference: section 10 of the task ("AI image generation must NEVER be trusted to render factual business information correctly... the final creative should have factual text composed/rendered deterministically") is a _requirement regardless of which option is chosen_ — even a pure Option B (controlled AI generation) would still need deterministic text overlay to be trustworthy, since DALL-E cannot be relied on to render ₹299 or a phone number correctly. Given that, and given no MVP document mandates AI-only generation, a hybrid was the only architecture that satisfies both "use real AI-generated visuals" (there is real value in a genuine product-aware hero image, which the existing vision-analysis pipeline already produces) and "factual text must be deterministic" simultaneously.
 
 ## 8. Implementation
 
@@ -62,7 +62,7 @@ This follows directly from the audit, not from preference: section 10 of the tas
 
 ## 9. Truth Check Integration
 
-The compositor's text overlay is built exclusively from `GenerationPipelineInput` fields — the exact same authoritative data `runDeterministicTruthCheck` (Phase 6) independently checks the AI-generated *copy* against. Since the image's factual text never comes from AI output at all (it's template-composed from verified fields), there is no possibility of the image disagreeing with a Truth-Check-passed campaign's facts — correctness here is structural, not something that needs a second verification pass on the image itself. Truth Check's existing scope (verifying the AI-generated copy text) is unchanged and still authoritative for that content; this phase does not weaken, bypass, or duplicate it.
+The compositor's text overlay is built exclusively from `GenerationPipelineInput` fields — the exact same authoritative data `runDeterministicTruthCheck` (Phase 6) independently checks the AI-generated _copy_ against. Since the image's factual text never comes from AI output at all (it's template-composed from verified fields), there is no possibility of the image disagreeing with a Truth-Check-passed campaign's facts — correctness here is structural, not something that needs a second verification pass on the image itself. Truth Check's existing scope (verifying the AI-generated copy text) is unchanged and still authoritative for that content; this phase does not weaken, bypass, or duplicate it.
 
 ## 10. Credit Safety
 
@@ -76,7 +76,7 @@ The compositor's text overlay is built exclusively from `GenerationPipelineInput
 ## 11. Security
 
 - **Backend-only AI**: unchanged — OpenAI/Gemini clients only ever instantiated in `functions/src/services/ai/*.ts`; confirmed (again, as in Phase 5) via repository-wide search that no `NEXT_PUBLIC_*` or frontend reference to any provider key exists.
-- **Storage security**: the new `businesses/{businessId}/campaigns/{campaignId}/generated/...` path falls under the *already-existing* `storage.rules` wildcard match `businesses/{businessId}/{allPaths=**}` (ownership gated on the caller's `businessIds` custom claim) — verified by reading `storage.rules` directly; no rule changes were needed or made.
+- **Storage security**: the new `businesses/{businessId}/campaigns/{campaignId}/generated/...` path falls under the _already-existing_ `storage.rules` wildcard match `businesses/{businessId}/{allPaths=**}` (ownership gated on the caller's `businessIds` custom claim) — verified by reading `storage.rules` directly; no rule changes were needed or made.
 - **Firestore security**: unaffected by this phase; Phase 6's `campaign_assets` write-lock (`allow write: if false`, server-only) and campaign verification-field protections remain in effect and untouched.
 - **Secret handling**: no provider credentials appear in any Storage path, Firestore document, or the new compositor's output (SVG contains only the business's own already-public marketing facts — price, offer, CTA, phone — the same information a paper flyer would carry).
 
@@ -93,7 +93,7 @@ Emulator: **SKIPPED** — not re-run in this phase (Phase 6 already established 
 
 **REAL CREATIVE GENERATION BLOCKED** — no `GEMINI_API_KEY`/`OPENAI_API_KEY` available in this environment (same limitation as Phases 5 and 6; confirmed absent from `process.env`, no `.env` file exists anywhere in the repository or this environment).
 
-What was verified in lieu of a live call: the entire pipeline logic — prompt building, the single bounded `generateImage` call, Storage re-hosting, deterministic text compositing, Firestore asset assembly, and the fail-closed credit path — was exercised end-to-end through the real `GenerationPipeline.execute()` method with only the two literal AI-provider-boundary functions (`generateImage`, `generateStructuredText`) mocked (§12). This proves the *code path* is correct; it does not prove OpenAI's actual DALL-E 3 API accepts the constructed prompt or that the resulting hero photo is visually satisfactory — that requires the live call this environment cannot make.
+What was verified in lieu of a live call: the entire pipeline logic — prompt building, the single bounded `generateImage` call, Storage re-hosting, deterministic text compositing, Firestore asset assembly, and the fail-closed credit path — was exercised end-to-end through the real `GenerationPipeline.execute()` method with only the two literal AI-provider-boundary functions (`generateImage`, `generateStructuredText`) mocked (§12). This proves the _code path_ is correct; it does not prove OpenAI's actual DALL-E 3 API accepts the constructed prompt or that the resulting hero photo is visually satisfactory — that requires the live call this environment cannot make.
 
 Actual output: **NOT INSPECTED** (blocked, as above)
 Storage: verified structurally (mocked) — **PASS** at the code/test level, not against a real Storage bucket
@@ -103,7 +103,7 @@ Campaign association: **PASS** — every generated asset's Storage path is built
 ## 14. Cost Verification
 
 Actual provider calls per campaign: **1** (down from 32), enforced by `MAX_IMAGE_GENERATION_CALLS_PER_CAMPAIGN` and verified by a real end-to-end pipeline test.
-Actual/estimated cost: **NOT DETERMINABLE FROM CURRENT CONFIGURATION** in absolute currency terms (no live API access in this environment to query actual OpenAI billing), but the *call count* — the dominant cost driver — is now known precisely and is 32x lower than before.
+Actual/estimated cost: **NOT DETERMINABLE FROM CURRENT CONFIGURATION** in absolute currency terms (no live API access in this environment to query actual OpenAI billing), but the _call count_ — the dominant cost driver — is now known precisely and is 32x lower than before.
 
 ## 15. Remaining Issues
 
@@ -112,16 +112,18 @@ Actual/estimated cost: **NOT DETERMINABLE FROM CURRENT CONFIGURATION** in absolu
 3. **Two severe, unrelated-to-cost pre-existing crash bugs were found and fixed as a direct result of writing a real end-to-end test for this phase**: (a) `creativeBrief.ts`'s `buildRequiredElements` accessed `brandProfile.colors.primary` without the optional chaining used everywhere else in the same file — crashing generation entirely for any business without a Brand Kit configured; (b) `imagePromptBuilder.ts`'s `buildSubjectSection` accessed `product.visualAttributes.colorPalette`/`.keyVisualElements` without guards — crashing generation for any product whose `attributes` isn't the AI-vision-derived shape, i.e. essentially every product created through the standard product form (Phase 3) rather than vision-analyzed. Both were **completely blocking** bugs (100% failure rate for the affected, very common cases) that had nothing to do with the 32-call/cost problem this phase was primarily scoped to fix, but were directly encountered and fixed while building the required real-pipeline test.
 4. **Credit price (140 credits, calibrated for "up to 2 images") was deliberately left unchanged** even though actual usage is now 1 image — see §3/§10. This is a business/pricing decision outside this phase's mandate ("fix creative generation," not "reprice the product"), documented rather than silently changed.
 5. **The 7-day signed Storage URL** (matching the existing `confirmUpload.ts` convention) is not truly permanent — after 7 days a generated creative's URL would need to be re-signed to remain accessible. This is a pre-existing convention this phase reused rather than a new gap; flagged for visibility since it directly relates to "images belong in Storage, not temporary links" (§7's spirit), even though it is a large improvement over the prior ~1-hour provider-URL expiry.
-6. **No dedicated real-image visual inspection was possible** (blocked per §13) — the readability/dimension/factual-accuracy tests in `compositor.test.ts` verify the *generated SVG markup* contains the correct text, dimensions, and no overflow coordinates, which is a strong correctness signal for a deterministic template, but is not the same as a human (or automated visual-diff) inspection of a rendered pixel image.
+6. **No dedicated real-image visual inspection was possible** (blocked per §13) — the readability/dimension/factual-accuracy tests in `compositor.test.ts` verify the _generated SVG markup_ contains the correct text, dimensions, and no overflow coordinates, which is a strong correctness signal for a deterministic template, but is not the same as a human (or automated visual-diff) inspection of a rendered pixel image.
 
 ## 16. Files Changed
 
 **New files**
+
 - `functions/src/services/ai/compositor.ts` — deterministic SVG text-overlay compositor
 - `functions/src/services/ai/generatedAssetStorage.ts` — downloads provider images, re-hosts them and composited creatives in Firebase Storage
 - `functions/src/services/ai/compositor.test.ts`, `generatedAssetStorage.test.ts`, `pipeline.imageCallCount.test.ts` — new tests (30 total)
 
 **Modified**
+
 - `functions/src/services/ai/pipeline.ts` — `runStage7` rewritten (32 sequential AI calls → 1 AI call + deterministic composition); new helper methods `buildCreativeTextOverlay`/`buildBrandStyle`/`buildStoryFrameOverlays`/`buildReelStoryboard`; `assembleCampaignPack`'s asset-type bug fixed (`'story_frame'`/`'reel_frame'` → real `AssetType` values `'story'`/`'reel'`); local `GenerationPipelineInput` interface extended with `businessPhone`/`businessWebsite`/`businessInstagram` (previously silently dropped, structurally present but statically invisible)
 - `functions/src/services/ai/creativeBrief.ts` — fixed unguarded `brandProfile.colors.primary` crash
 - `functions/src/services/ai/imagePromptBuilder.ts` — fixed unguarded `visualAttributes` field-access crashes

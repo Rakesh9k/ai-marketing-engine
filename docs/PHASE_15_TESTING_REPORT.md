@@ -11,7 +11,7 @@ Three real, previously-undetected problems were found and fixed:
 
 1. **A genuine test-infrastructure race**: all four Firestore/Storage rules-test files shared the same emulator `projectId: 'demo-project'`. Jest runs test files in parallel worker processes, so one file's `clearFirestore()`/`cleanup()` could wipe another file's in-flight fixtures — confirmed by re-running the full suite repeatedly and observing a different, unrelated test fail each time. Fixed by giving each file its own project namespace; the full suite then passed deterministically across 5 consecutive runs.
 2. **A P0 financial-integrity bug**: `services/firestore.ts`'s `reserveCredits()` — the credit-reservation function used by the deployed `createCampaign` Cloud Function — had **no idempotency check**. The same `idempotencyKey` submitted twice reserved credits twice, violating the "one reservation → one terminal outcome" invariant this phase exists to protect.
-3. **A function-breaking bug in the same code**, found while writing the regression test for #2: `reserveCredits` read/wrote the usage document keyed by *today's exact date*, while its own "create if missing" branch wrote to a *different* document keyed by the month's start date — so on any day other than the 1st of the month, the transaction's read found nothing and the function threw `"Usage document not found"` on effectively every real call. `createCampaign` (this function's only caller) is currently not invoked by the shipped frontend, which limited the blast radius, but the endpoint is deployed and callable by anyone with a valid auth token.
+3. **A function-breaking bug in the same code**, found while writing the regression test for #2: `reserveCredits` read/wrote the usage document keyed by _today's exact date_, while its own "create if missing" branch wrote to a _different_ document keyed by the month's start date — so on any day other than the 1st of the month, the transaction's read found nothing and the function threw `"Usage document not found"` on effectively every real call. `createCampaign` (this function's only caller) is currently not invoked by the shipped frontend, which limited the blast radius, but the endpoint is deployed and callable by anyone with a valid auth token.
 
 Both bugs are in `services/firestore.ts`, a **separate, parallel credit-reservation implementation from `services/usageControl.ts`** (which Phase 10 already hardened and this session's tests already covered extensively) — this is the same class of "sibling implementation left behind" bug found repeatedly in prior phases, just discovered here for the first time in the credits domain specifically.
 
@@ -60,13 +60,13 @@ Discovered while writing the regression test for §5: every call to `reserveCred
 
 ## 7. Tests Added
 
-| File | Scenarios |
-|---|---|
-| `functions/src/services/firestore.reserveCredits.test.ts` (new) | Duplicate idempotencyKey reserves once, not twice (sequential and concurrent); two different idempotencyKeys reserve independently; insufficient credits rejected with balance unchanged; concurrent reservations that together exceed the balance — exactly one succeeds, never negative. 5 tests. |
-| `functions/src/functions/auth/onUserCreated.test.ts` (new) | Signup persists `users/{uid}` with `role: 'user'`, empty `businessIds`, `agencyId: null`; a free-tier `subscriptions` doc; a `usage` doc for the current period; a welcome `transactions` grant record matching the subscription's included credits; handles empty optional Auth profile fields without crashing. 2 tests. |
-| `functions/src/functions/business/createBusiness.test.ts` (new) | Onboarding persists name/category/location/contact/settings and derived Business Brain defaults (identity/localization/audience), links the business onto the user's `businessIds`, and a fresh independent read still agrees; two different users' businesses never collide. 2 tests. |
-| `functions/src/functions/products/createProduct.test.ts` (new) | Authorized owner creates a product that persists with the correct `businessId`; a user cannot create a product under a business they do not own (backend-enforced via `verifyBusinessAccess`, not just Firestore rules) with no side-effect product created; creating under a nonexistent `businessId` is rejected. 3 tests. |
-| `functions/src/functions/campaigns/createCampaign.test.ts` (new) | Draft campaign creation reserves credits and persists correct `businessId`/`userId`/`status`; cross-business creation denied; the duplicate-idempotencyKey regression for §5 (credits reserved exactly once across two calls); insufficient credits blocks creation with zero campaign documents created. 4 tests. |
+| File                                                             | Scenarios                                                                                                                                                                                                                                                                                                                    |
+| ---------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `functions/src/services/firestore.reserveCredits.test.ts` (new)  | Duplicate idempotencyKey reserves once, not twice (sequential and concurrent); two different idempotencyKeys reserve independently; insufficient credits rejected with balance unchanged; concurrent reservations that together exceed the balance — exactly one succeeds, never negative. 5 tests.                          |
+| `functions/src/functions/auth/onUserCreated.test.ts` (new)       | Signup persists `users/{uid}` with `role: 'user'`, empty `businessIds`, `agencyId: null`; a free-tier `subscriptions` doc; a `usage` doc for the current period; a welcome `transactions` grant record matching the subscription's included credits; handles empty optional Auth profile fields without crashing. 2 tests.   |
+| `functions/src/functions/business/createBusiness.test.ts` (new)  | Onboarding persists name/category/location/contact/settings and derived Business Brain defaults (identity/localization/audience), links the business onto the user's `businessIds`, and a fresh independent read still agrees; two different users' businesses never collide. 2 tests.                                       |
+| `functions/src/functions/products/createProduct.test.ts` (new)   | Authorized owner creates a product that persists with the correct `businessId`; a user cannot create a product under a business they do not own (backend-enforced via `verifyBusinessAccess`, not just Firestore rules) with no side-effect product created; creating under a nonexistent `businessId` is rejected. 3 tests. |
+| `functions/src/functions/campaigns/createCampaign.test.ts` (new) | Draft campaign creation reserves credits and persists correct `businessId`/`userId`/`status`; cross-business creation denied; the duplicate-idempotencyKey regression for §5 (credits reserved exactly once across two calls); insufficient credits blocks creation with zero campaign documents created. 4 tests.           |
 
 16 new tests total, across 5 new files. All run against real Firestore/Auth emulators — no mocking of the behavior under test (credit balances, ownership checks, and persisted documents are read back from Firestore after the call, not asserted from a mock's call log).
 
@@ -91,12 +91,12 @@ See §3 — all 7 skips are legitimately documented (2 browser-only compression 
 
 ## 10. Tests Blocked / Not Tested
 
-| Scenario | Status | Why |
-|---|---|---|
-| Login (actual `signInWithEmailAndPassword` flow via `src/features/auth/services/authService.ts`) | **NOT TESTED** | No existing or new test exercises the real client-SDK sign-in call against the Auth emulator; only "already-authenticated" contexts (`authenticatedContext(uid, claims)`) are used throughout the rules tests, which proves authorization correctly but not the login call itself. Genuine gap, not fabricated as covered. |
-| `getUploadUrl`'s signed-URL generation (actual GCS V4 signing) | **NOT TESTED** | Requires real GCP service-account signing credentials; the Storage emulator's signed-URL support could not be verified as sufficient in this environment. The authorization gate in front of it (`verifyBusinessAccess`) is covered indirectly via `middleware/auth.test.ts` and this phase's own cross-business tests, and the resulting object's access control is proven directly by `tests/storage.test.ts` (10 passing tests) — the boundary that actually matters for security is tested; the signing mechanism itself is not. |
-| Frontend E2E (`signup → onboarding → product upload → campaign creation → generation → review`) | **NOT TESTED** | No Playwright/Cypress/equivalent E2E framework exists in this repository (confirmed via `package.json` — no such dependency). Per the phase's own instruction ("if [a framework] already exists, implement/extend... do not create a second application just for testing"), building a new E2E harness from scratch was treated as out of scope for this phase rather than silently skipped without explanation. |
-| Real production Gemini/OpenAI/Razorpay calls | **NOT TESTED (by design)** | Explicitly excluded per the phase's own "tests must be deterministic, no real billing" rule. |
+| Scenario                                                                                         | Status                     | Why                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
+| ------------------------------------------------------------------------------------------------ | -------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Login (actual `signInWithEmailAndPassword` flow via `src/features/auth/services/authService.ts`) | **NOT TESTED**             | No existing or new test exercises the real client-SDK sign-in call against the Auth emulator; only "already-authenticated" contexts (`authenticatedContext(uid, claims)`) are used throughout the rules tests, which proves authorization correctly but not the login call itself. Genuine gap, not fabricated as covered.                                                                                                                                                                                                           |
+| `getUploadUrl`'s signed-URL generation (actual GCS V4 signing)                                   | **NOT TESTED**             | Requires real GCP service-account signing credentials; the Storage emulator's signed-URL support could not be verified as sufficient in this environment. The authorization gate in front of it (`verifyBusinessAccess`) is covered indirectly via `middleware/auth.test.ts` and this phase's own cross-business tests, and the resulting object's access control is proven directly by `tests/storage.test.ts` (10 passing tests) — the boundary that actually matters for security is tested; the signing mechanism itself is not. |
+| Frontend E2E (`signup → onboarding → product upload → campaign creation → generation → review`)  | **NOT TESTED**             | No Playwright/Cypress/equivalent E2E framework exists in this repository (confirmed via `package.json` — no such dependency). Per the phase's own instruction ("if [a framework] already exists, implement/extend... do not create a second application just for testing"), building a new E2E harness from scratch was treated as out of scope for this phase rather than silently skipped without explanation.                                                                                                                     |
+| Real production Gemini/OpenAI/Razorpay calls                                                     | **NOT TESTED (by design)** | Explicitly excluded per the phase's own "tests must be deterministic, no real billing" rule.                                                                                                                                                                                                                                                                                                                                                                                                                                         |
 
 ## 11. Security Results
 
@@ -110,7 +110,7 @@ All executed and passing (see §7/§8 for exact test counts): cross-user (User A
 
 Payments: success (Razorpay-captured-only entitlement), failure/pending (no premature entitlement), duplicate callback and duplicate webhook (sequential and concurrent) all converge to exactly one credit grant — all pre-existing, re-verified passing.
 
-**Known residual gap** (documented, not fixed — see `createCampaign.test.ts`'s inline comment): `createCampaign` mints a fresh `campaignId` on every call regardless of `idempotencyKey`, so a retried request with the same key no longer double-charges credits (fixed this phase) but does still create a second draft campaign *document*. This is a duplicate-draft gap, not a duplicate-charge gap, and only affects the `createCampaign` endpoint — which is not currently called by the shipped frontend (`generateCampaignStrategy` is the live campaign-creation path and does not have this gap, per its own idempotency-key-scoped credit reservation in `usageControl.ts`).
+**Known residual gap** (documented, not fixed — see `createCampaign.test.ts`'s inline comment): `createCampaign` mints a fresh `campaignId` on every call regardless of `idempotencyKey`, so a retried request with the same key no longer double-charges credits (fixed this phase) but does still create a second draft campaign _document_. This is a duplicate-draft gap, not a duplicate-charge gap, and only affects the `createCampaign` endpoint — which is not currently called by the shipped frontend (`generateCampaignStrategy` is the live campaign-creation path and does not have this gap, per its own idempotency-key-scoped credit reservation in `usageControl.ts`).
 
 ## 13. AI Failure Results
 
@@ -165,58 +165,58 @@ Both suites were re-run 2–3 times consecutively against the same live emulator
 
 Using the phase's own required scenario list (§45 of the spec), not generic line coverage:
 
-| Area | Scenario | Result |
-|---|---|---|
-| Auth | Signup | PASS |
-| Auth | Login | NOT TESTED |
-| Auth | Unauthorized access | PASS |
-| Business | Onboarding | PASS |
-| Business | Persistence | PASS |
-| Business | Isolation | PASS |
-| Product | Create | PASS |
-| Product | Upload | PARTIAL (authorization gate tested; signed-URL generation itself not testable in this environment) |
-| Product | Ownership | PASS |
-| Campaign | Create | PASS |
-| Campaign | Credit reservation | PASS |
-| Campaign | Pipeline | PASS |
-| Campaign | Truth Check | PASS |
-| Campaign | Persistence | PASS |
-| AI | Valid response | PASS |
-| AI | Malformed response | PASS |
-| AI | Timeout | PASS |
-| AI | Provider failure | PASS |
-| Credits | Reservation | PASS |
-| Credits | Success | PASS |
-| Credits | Refund | PASS |
-| Credits | Insufficient credits | PASS |
-| Credits | Duplicate request | PASS |
-| Credits | Concurrent reservation | PASS |
-| Payment | Success | PASS |
-| Payment | Failure | PASS |
-| Payment | Duplicate callback | PASS |
-| Payment | Duplicate webhook | PASS |
-| Security | Cross-user | PASS |
-| Security | Cross-business | PASS |
-| Security | Unauthorized asset | PASS |
-| Security | Unauthorized campaign | PASS |
-| Security | IDOR (campaign/asset/usage/transaction/subscription) | PASS |
-| Data consistency | Mismatched Business/Product/Campaign | PASS |
-| Error recovery | Pipeline failure → terminal state + refund | PASS |
-| Error recovery | Retry after failure succeeds | PASS |
-| Observability | Failure diagnosability (who/what/where/why) | PASS |
-| Observability | No secret leakage | PASS |
-| E2E | Full frontend critical path | NOT TESTED (no E2E framework exists) |
-| Duplicate click | Regenerate button double-click | PASS (frontend) |
+| Area             | Scenario                                             | Result                                                                                             |
+| ---------------- | ---------------------------------------------------- | -------------------------------------------------------------------------------------------------- |
+| Auth             | Signup                                               | PASS                                                                                               |
+| Auth             | Login                                                | NOT TESTED                                                                                         |
+| Auth             | Unauthorized access                                  | PASS                                                                                               |
+| Business         | Onboarding                                           | PASS                                                                                               |
+| Business         | Persistence                                          | PASS                                                                                               |
+| Business         | Isolation                                            | PASS                                                                                               |
+| Product          | Create                                               | PASS                                                                                               |
+| Product          | Upload                                               | PARTIAL (authorization gate tested; signed-URL generation itself not testable in this environment) |
+| Product          | Ownership                                            | PASS                                                                                               |
+| Campaign         | Create                                               | PASS                                                                                               |
+| Campaign         | Credit reservation                                   | PASS                                                                                               |
+| Campaign         | Pipeline                                             | PASS                                                                                               |
+| Campaign         | Truth Check                                          | PASS                                                                                               |
+| Campaign         | Persistence                                          | PASS                                                                                               |
+| AI               | Valid response                                       | PASS                                                                                               |
+| AI               | Malformed response                                   | PASS                                                                                               |
+| AI               | Timeout                                              | PASS                                                                                               |
+| AI               | Provider failure                                     | PASS                                                                                               |
+| Credits          | Reservation                                          | PASS                                                                                               |
+| Credits          | Success                                              | PASS                                                                                               |
+| Credits          | Refund                                               | PASS                                                                                               |
+| Credits          | Insufficient credits                                 | PASS                                                                                               |
+| Credits          | Duplicate request                                    | PASS                                                                                               |
+| Credits          | Concurrent reservation                               | PASS                                                                                               |
+| Payment          | Success                                              | PASS                                                                                               |
+| Payment          | Failure                                              | PASS                                                                                               |
+| Payment          | Duplicate callback                                   | PASS                                                                                               |
+| Payment          | Duplicate webhook                                    | PASS                                                                                               |
+| Security         | Cross-user                                           | PASS                                                                                               |
+| Security         | Cross-business                                       | PASS                                                                                               |
+| Security         | Unauthorized asset                                   | PASS                                                                                               |
+| Security         | Unauthorized campaign                                | PASS                                                                                               |
+| Security         | IDOR (campaign/asset/usage/transaction/subscription) | PASS                                                                                               |
+| Data consistency | Mismatched Business/Product/Campaign                 | PASS                                                                                               |
+| Error recovery   | Pipeline failure → terminal state + refund           | PASS                                                                                               |
+| Error recovery   | Retry after failure succeeds                         | PASS                                                                                               |
+| Observability    | Failure diagnosability (who/what/where/why)          | PASS                                                                                               |
+| Observability    | No secret leakage                                    | PASS                                                                                               |
+| E2E              | Full frontend critical path                          | NOT TESTED (no E2E framework exists)                                                               |
+| Duplicate click  | Regenerate button double-click                       | PASS (frontend)                                                                                    |
 
 **Critical scenarios: 38. Passed: 35. Partial: 1. Not Tested: 2.**
 
 ## 20. Remaining Risks
 
-- **Login flow is genuinely untested.** The authorization *outcome* of being logged in (an authenticated context can/cannot access X) is extensively tested, but the actual `signInWithEmailAndPassword` call path in `authService.ts` has zero test coverage. A regression there (wrong error handling, wrong redirect, token not attached to subsequent calls) would not be caught by this suite.
+- **Login flow is genuinely untested.** The authorization _outcome_ of being logged in (an authenticated context can/cannot access X) is extensively tested, but the actual `signInWithEmailAndPassword` call path in `authService.ts` has zero test coverage. A regression there (wrong error handling, wrong redirect, token not attached to subsequent calls) would not be caught by this suite.
 - **No E2E coverage exists**, so a regression that only manifests in real browser/React-rendering behavior across the full signup→campaign→review flow (as opposed to each step's backend contract, which is well covered) would not be caught automatically.
 - **`createCampaign`'s duplicate-draft-document gap** (§12) remains: a retried request with the same idempotency key no longer double-charges credits but does create a second draft campaign document. Low real-world risk since this endpoint is not currently reachable from the shipped frontend, but it is a deployed, callable endpoint.
 - **The `functions:lint` baseline (~1,486 pre-existing problems)** was not remediated — consistent with every prior phase's treatment of this same debt, but it does mean lint cannot currently serve as a CI gate for the functions codebase without first addressing that baseline separately.
-- Given the size of this phase, some scenarios explicitly listed in the spec (e.g. individually testing *every* combination in §39's data-consistency list — Campaign+Asset mismatch, Payment+User mismatch, Analytics+Business mismatch) were covered by the existing, representative Business+Product mismatch test rather than exhaustively enumerated; the underlying enforcement mechanism (server-side ownership verification before any write) is the same code path in each case, so this is a reasonable, not exhaustive, proof.
+- Given the size of this phase, some scenarios explicitly listed in the spec (e.g. individually testing _every_ combination in §39's data-consistency list — Campaign+Asset mismatch, Payment+User mismatch, Analytics+Business mismatch) were covered by the existing, representative Business+Product mismatch test rather than exhaustively enumerated; the underlying enforcement mechanism (server-side ownership verification before any write) is the same code path in each case, so this is a reasonable, not exhaustive, proof.
 
 ## 21. Final Verdict
 

@@ -30,8 +30,8 @@ go through server-issued signed URLs rather than direct client writes to arbitra
   fires, specifically to avoid treating an unrestored session as "signed out" (a real bug this fixed —
   see the inline comment and `docs/PHASE_19C_FIREBASE_APP_HOSTING_PRODUCTION_REPORT.md`'s commit
   `7cad2f2`).
-- Route protection is a client-side component (`ProtectedRoute`) — this affects *navigation*, not
-  *authorization*; real authorization is enforced in Cloud Functions and Firestore/Storage rules
+- Route protection is a client-side component (`ProtectedRoute`) — this affects _navigation_, not
+  _authorization_; real authorization is enforced in Cloud Functions and Firestore/Storage rules
   (§4, §6, §7).
 - Server-side verification: every callable authenticates the caller via Firebase's own callable
   context (`context.auth`), not a custom token scheme.
@@ -100,7 +100,7 @@ verbatim beyond what's needed); the relevant architectural fact, verified direct
 alone are insufficient for at least one real read path**: `analytics_events` only has a rule allowing
 a read where `resource.data.userId == request.auth.uid`, which cannot express "an agency member
 reading a client business's events." `getAnalyticsDashboard` is a Cloud Function specifically
-*because* of this — it uses the Admin SDK (which bypasses Firestore rules entirely) and substitutes
+_because_ of this — it uses the Admin SDK (which bypasses Firestore rules entirely) and substitutes
 `verifyBusinessAccess` as the real authorization gate. **Do not assume "Firestore rules protect X" is
 sufficient reasoning anywhere a Cloud Function using the Admin SDK is involved — the function's own
 authorization check is what matters in those paths.**
@@ -126,7 +126,7 @@ match /shared/reel-music/{fileName} {
 }
 ```
 
-**Important, verified nuance**: these rules govern *client* reads/writes. Client uploads in this app
+**Important, verified nuance**: these rules govern _client_ reads/writes. Client uploads in this app
 never write directly to `businesses/{businessId}/**` via the client SDK — they PUT to a
 server-minted signed URL instead (see §8). The functions that then process those uploads
 (`confirmUpload.ts`, `confirmReelClipUpload.ts`) use `admin.storage()` — **the Admin SDK, which
@@ -198,7 +198,7 @@ causes `checkRateLimit` to hang indefinitely (never resolve or reject) rather th
 clean error, relying entirely on the Cloud Functions platform's own execution timeout to eventually
 terminate the request. The practical security property still holds — nothing expensive (AI
 generation, credit reservation) ever executes during that hang, verified with mock call-count
-assertions at 0 — but the *client-visible* behavior in that specific failure scenario is a slow
+assertions at 0 — but the _client-visible_ behavior in that specific failure scenario is a slow
 timeout, not a fast "try again" error. This is carried forward here as an accurate, current, open
 finding, not glossed over.
 
@@ -206,7 +206,7 @@ finding, not glossed over.
 
 Server-authoritative, in `functions/src/services/usageControl.ts`:
 
-- `reserveCreditsForOperation` — reserves credits *before* a billable operation (e.g. AI generation)
+- `reserveCreditsForOperation` — reserves credits _before_ a billable operation (e.g. AI generation)
   starts, so a failure mid-operation doesn't silently overspend.
 - `finalizeReservation` — converts a reservation into an actual spend once the operation completes
   successfully.
@@ -267,7 +267,7 @@ record); Razorpay's code and §15/§16 above remain accurate for the still-deplo
 - **Payment request hash**: `sha512(key|txnid|amount|productinfo|firstname|email|udf1..udf5||||||SALT)`
   — server-generated in `createPayUPayment.ts`, sourced from PayU's current public documentation
   (cited in `services/payu.ts`'s module header), not invented.
-- **Response/webhook hash**: a *different* formula (`sha512(SALT|status||||||udf5..udf1|email|firstname|productinfo|amount|txnid|key)`)
+- **Response/webhook hash**: a _different_ formula (`sha512(SALT|status||||||udf5..udf1|email|firstname|productinfo|amount|txnid|key)`)
   — `payuWebhook.ts`/`payuCallback.ts` never reuse the payment-request formula to verify a response,
   a mistake this migration was explicitly built to avoid.
 - **Constant-time comparison**: `verifyHashConstantTime()` uses `crypto.timingSafeEqual` after a
@@ -323,13 +323,13 @@ never talks to an AI provider directly.
 Verified classification (cross-checked against `README.md`'s own table, `.env.example`, and
 `apphosting.yaml`'s intent as described in `docs/PHASE_19C_FIREBASE_APP_HOSTING_PRODUCTION_REPORT.md`):
 
-| Category | Examples | Where it lives |
-|---|---|---|
-| Public, build-time (`NEXT_PUBLIC_*`) | Firebase web config, reCAPTCHA site key, Razorpay **key id** (not secret), app URL/name | Inlined into the client JS bundle — these are not secrets by Firebase/Razorpay design, and are already public once deployed |
-| Server-only secrets | `GEMINI_API_KEY`, `OPENAI_API_KEY`, `NVIDIA_API_KEY`, `RAZORPAY_KEY_SECRET`, `RAZORPAY_WEBHOOK_SECRET`, Firebase Admin credentials | Firebase Functions Secrets (`firebase functions:secrets:set`), never in `.env.local`, never in git |
+| Category                             | Examples                                                                                                                           | Where it lives                                                                                                              |
+| ------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------- |
+| Public, build-time (`NEXT_PUBLIC_*`) | Firebase web config, reCAPTCHA site key, Razorpay **key id** (not secret), app URL/name                                            | Inlined into the client JS bundle — these are not secrets by Firebase/Razorpay design, and are already public once deployed |
+| Server-only secrets                  | `GEMINI_API_KEY`, `OPENAI_API_KEY`, `NVIDIA_API_KEY`, `RAZORPAY_KEY_SECRET`, `RAZORPAY_WEBHOOK_SECRET`, Firebase Admin credentials | Firebase Functions Secrets (`firebase functions:secrets:set`), never in `.env.local`, never in git                          |
 
 **Production secret presence not independently verified in this session** — this document confirms
-the *classification/intended location* from source and prior reports, not that a live secret is
+the _classification/intended location_ from source and prior reports, not that a live secret is
 currently correctly configured in the production project. No actual secret value appears anywhere in
 this repository's tracked files (verified by pattern scan as part of this documentation pass — see
 `docs/DOCUMENTATION_AUDIT_REPORT.md`'s validation section).
@@ -387,14 +387,14 @@ server-side, not merely suggested client-side.
 
 Current, verified test evidence (file + test count, not estimated):
 
-| Area | Evidence file | Test count |
-|---|---|---|
-| Business/agency authorization | `tests/phase27-authz.test.ts` | 11 |
-| Bulk approval authorization/roles | `tests/phase27-bulk-approval-auth-roles.test.ts` | 9 |
-| General security | `tests/security.test.ts` | 30 |
-| Storage | `tests/storage.test.ts` | 10 |
-| Cross-tenant/cross-agency analytics authorization | `functions/src/functions/analytics/getAnalyticsDashboard.emulator.test.ts` | 7 (re-run against a real Firestore emulator during the Performance Optimization closure pass — all passed) |
-| Rate-limit fail-safe / fault injection | `functions/src/middleware/rateLimit.failSafe.test.ts`, `functions/src/functions/campaigns/generateCampaignStrategy.failSafe.test.ts` | 2 (per Phase 38B) |
+| Area                                              | Evidence file                                                                                                                        | Test count                                                                                                 |
+| ------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------- |
+| Business/agency authorization                     | `tests/phase27-authz.test.ts`                                                                                                        | 11                                                                                                         |
+| Bulk approval authorization/roles                 | `tests/phase27-bulk-approval-auth-roles.test.ts`                                                                                     | 9                                                                                                          |
+| General security                                  | `tests/security.test.ts`                                                                                                             | 30                                                                                                         |
+| Storage                                           | `tests/storage.test.ts`                                                                                                              | 10                                                                                                         |
+| Cross-tenant/cross-agency analytics authorization | `functions/src/functions/analytics/getAnalyticsDashboard.emulator.test.ts`                                                           | 7 (re-run against a real Firestore emulator during the Performance Optimization closure pass — all passed) |
+| Rate-limit fail-safe / fault injection            | `functions/src/middleware/rateLimit.failSafe.test.ts`, `functions/src/functions/campaigns/generateCampaignStrategy.failSafe.test.ts` | 2 (per Phase 38B)                                                                                          |
 
 Counts are from direct file inspection (`grep -c "it(\|test("`), not estimated. **VERIFIED** =
 observed passing this session or explicitly recorded as passing in a cited report with methodology
@@ -407,7 +407,7 @@ shown. Anything not in this table was not independently re-verified in this docu
 - Triggers on push/PR to `master` and `develop`.
 - Gates: frontend lint/typecheck/test/build, functions lint/typecheck/test/build, and a dedicated
   **security-rules-test** job that runs `firebase emulators:exec --only firestore,auth,storage
-  --project demo-mitra` against tests matching `security` — a real emulator, not a mock.
+--project demo-mitra` against tests matching `security` — a real emulator, not a mock.
 - Backend deploy jobs (`deploy-backend-staging`, `deploy-backend-production`) require
   `[frontend-lint, functions-lint, test, security-rules-test]` to all succeed first (`needs:`) — this
   is a genuine fail-closed gate, not a fire-and-forget deploy.
@@ -436,30 +436,30 @@ shown. Anything not in this table was not independently re-verified in this docu
 
 ## 28. Known Security Gaps
 
-| Finding | Severity | Status |
-|---|---|---|
-| Razorpay webhook signature comparison uses `===` instead of a constant-time comparison | Low (theoretical timing side-channel on an HMAC comparison) | Open, not fixed this pass (code change out of scope for a documentation-only phase) |
-| `checkRateLimit` has no bounded timeout; a Firestore outage causes it to hang rather than fail fast (F-7, Phase 38B) | Medium | Open, explicitly not fixed per Phase 38B's own record |
-| No MFA / password policy / account lockout found in the authentication code | Not rated (may be an accepted MVP tradeoff, not necessarily a defect) | Not verified as present; not assessed further |
-| Stale "Vercel deploys the frontend" comments in CI/CD (§26) | Informational, not a security control | Flagged, not fixed |
+| Finding                                                                                                              | Severity                                                              | Status                                                                              |
+| -------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------- | ----------------------------------------------------------------------------------- |
+| Razorpay webhook signature comparison uses `===` instead of a constant-time comparison                               | Low (theoretical timing side-channel on an HMAC comparison)           | Open, not fixed this pass (code change out of scope for a documentation-only phase) |
+| `checkRateLimit` has no bounded timeout; a Firestore outage causes it to hang rather than fail fast (F-7, Phase 38B) | Medium                                                                | Open, explicitly not fixed per Phase 38B's own record                               |
+| No MFA / password policy / account lockout found in the authentication code                                          | Not rated (may be an accepted MVP tradeoff, not necessarily a defect) | Not verified as present; not assessed further                                       |
+| Stale "Vercel deploys the frontend" comments in CI/CD (§26)                                                          | Informational, not a security control                                 | Flagged, not fixed                                                                  |
 
 ## 29. Security Verification Matrix
 
-| Area | Status | Evidence |
-|---|---|---|
-| Authentication | VERIFIED (email/password only) | `authService.ts`, `LoginForm.tsx`/`SignupForm.tsx` |
-| App Check enforcement (code) | VERIFIED | grep across `functions/src/functions/**`, 0 exceptions |
-| App Check (specific production hostname) | NOT RE-VERIFIED this session | Last known status: blocked, per Phase 19C report |
-| Authorization / tenant isolation | VERIFIED | Real Firestore-emulator test, 15/15 passing; `tests/phase27-authz.test.ts` |
-| Agency isolation | VERIFIED | Same emulator test (cross-agency denial case) |
-| Storage path ownership | VERIFIED | `confirmUpload.ts`/`confirmReelClipUpload.ts` source, quoted directly |
-| Credits server-authority | VERIFIED (architecturally) | `usageControl.ts`; not re-run in this pass |
-| Truth Check server-authority | VERIFIED | `truthCheck.ts`, `regenerateAsset.ts` |
-| Payment verification (test mode) | VERIFIED (code path) | `verifyPayment.ts`, `razorpayWebhook.ts` |
-| Payment verification (production) | NOT VERIFIED | Configured key recorded as test-mode |
-| Webhook signature verification | VERIFIED present, minor gap noted | `razorpay.ts`, §28 |
-| Rate limiting (precision) | VERIFIED | Phase 38 report |
-| Rate limiting (fail-safe under outage) | PARTIAL — fails safe, not fast | Phase 38B, F-7 |
-| Secrets classification | VERIFIED | `.env.example`, `apphosting.yaml`, README cross-check |
-| Secrets production presence | NOT VERIFIED | No console access this session |
-| CI/CD security gates | VERIFIED | `.github/workflows/ci-cd.yml`, read in full |
+| Area                                     | Status                            | Evidence                                                                   |
+| ---------------------------------------- | --------------------------------- | -------------------------------------------------------------------------- |
+| Authentication                           | VERIFIED (email/password only)    | `authService.ts`, `LoginForm.tsx`/`SignupForm.tsx`                         |
+| App Check enforcement (code)             | VERIFIED                          | grep across `functions/src/functions/**`, 0 exceptions                     |
+| App Check (specific production hostname) | NOT RE-VERIFIED this session      | Last known status: blocked, per Phase 19C report                           |
+| Authorization / tenant isolation         | VERIFIED                          | Real Firestore-emulator test, 15/15 passing; `tests/phase27-authz.test.ts` |
+| Agency isolation                         | VERIFIED                          | Same emulator test (cross-agency denial case)                              |
+| Storage path ownership                   | VERIFIED                          | `confirmUpload.ts`/`confirmReelClipUpload.ts` source, quoted directly      |
+| Credits server-authority                 | VERIFIED (architecturally)        | `usageControl.ts`; not re-run in this pass                                 |
+| Truth Check server-authority             | VERIFIED                          | `truthCheck.ts`, `regenerateAsset.ts`                                      |
+| Payment verification (test mode)         | VERIFIED (code path)              | `verifyPayment.ts`, `razorpayWebhook.ts`                                   |
+| Payment verification (production)        | NOT VERIFIED                      | Configured key recorded as test-mode                                       |
+| Webhook signature verification           | VERIFIED present, minor gap noted | `razorpay.ts`, §28                                                         |
+| Rate limiting (precision)                | VERIFIED                          | Phase 38 report                                                            |
+| Rate limiting (fail-safe under outage)   | PARTIAL — fails safe, not fast    | Phase 38B, F-7                                                             |
+| Secrets classification                   | VERIFIED                          | `.env.example`, `apphosting.yaml`, README cross-check                      |
+| Secrets production presence              | NOT VERIFIED                      | No console access this session                                             |
+| CI/CD security gates                     | VERIFIED                          | `.github/workflows/ci-cd.yml`, read in full                                |

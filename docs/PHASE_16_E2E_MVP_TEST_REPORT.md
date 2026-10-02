@@ -7,7 +7,7 @@
 
 The MVP golden-path E2E test — a fresh customer walking through signup → onboarding → business → product → upload → campaign generation → Truth Check → download → WhatsApp → credits → payment → second campaign → logout/login → persistence, driven through a real browser against the real frontend — **could not be executed in this environment**, for a fundamental, environment-level reason discovered during setup, not a bug in the application: this machine's Application Control policy (Windows Defender Application Control / AppLocker) blocks execution of any downloaded browser binary. Every attempt to launch Chromium — via Playwright's API and by running the executable directly — was refused by the OS with `"An Application Control policy has blocked this file"`. No MCP browser-automation tool is available in this session as an alternative.
 
-This is the exact condition Phase 16's own instructions (§69) define as **BLOCKED**: *"the complete golden path cannot meaningfully execute because of a fundamental blocker... E2E environment fundamentally broken."* Zero of the 30 golden-path steps were executed through a real browser. Per the phase's explicit "no cheating" rule (§65) and "a test that did not run is not a pass" rule, none of those 30 steps can be marked PASS.
+This is the exact condition Phase 16's own instructions (§69) define as **BLOCKED**: _"the complete golden path cannot meaningfully execute because of a fundamental blocker... E2E environment fundamentally broken."_ Zero of the 30 golden-path steps were executed through a real browser. Per the phase's explicit "no cheating" rule (§65) and "a test that did not run is not a pass" rule, none of those 30 steps can be marked PASS.
 
 Two further, independent blockers were also confirmed and would have prevented the golden path from completing even if a browser could be launched: **no real AI provider credentials** (`GEMINI_API_KEY`/`OPENAI_API_KEY`) are configured anywhere in this environment, and **no real Razorpay test-mode credentials** are configured. Per §49/§50, fabricating a stub AI provider or a fake payment success was explicitly out of bounds — those steps would have been reported BLOCKED even independent of the browser issue.
 
@@ -19,14 +19,14 @@ Checked per the required list. Missing (consistent with every prior phase): `doc
 
 ## 3. Environment
 
-| Item | Value |
-|---|---|
-| Frontend URL (local dev) | `http://localhost:3000` (Next.js `next dev`) — confirmed serving real HTML (39KB+) for `/` and `/signup`, not a blank shell; no compile errors in the dev server log |
-| Test framework | Playwright (`@playwright/test` ^1.63.0) — newly added this phase; none existed before (confirmed in Phase 15's audit) |
-| Browser | Chromium (downloaded via `npx playwright install chromium`) — **cannot be launched, see §4** |
-| Firebase emulators | Not started for this phase's E2E attempt (blocked before reaching that step — no point starting the Functions/Storage emulator stack with no browser to drive against it). Firestore/Auth/Storage emulators were exercised extensively and independently in Phase 15. |
-| AI provider | None configured — `GEMINI_API_KEY`/`OPENAI_API_KEY` unset (confirmed via `.env.example` vs. absence of any `.env.local`) |
-| Payment test mode | None configured — no Razorpay key/secret present anywhere in this environment |
+| Item                     | Value                                                                                                                                                                                                                                                                 |
+| ------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Frontend URL (local dev) | `http://localhost:3000` (Next.js `next dev`) — confirmed serving real HTML (39KB+) for `/` and `/signup`, not a blank shell; no compile errors in the dev server log                                                                                                  |
+| Test framework           | Playwright (`@playwright/test` ^1.63.0) — newly added this phase; none existed before (confirmed in Phase 15's audit)                                                                                                                                                 |
+| Browser                  | Chromium (downloaded via `npx playwright install chromium`) — **cannot be launched, see §4**                                                                                                                                                                          |
+| Firebase emulators       | Not started for this phase's E2E attempt (blocked before reaching that step — no point starting the Functions/Storage emulator stack with no browser to drive against it). Firestore/Auth/Storage emulators were exercised extensively and independently in Phase 15. |
+| AI provider              | None configured — `GEMINI_API_KEY`/`OPENAI_API_KEY` unset (confirmed via `.env.example` vs. absence of any `.env.local`)                                                                                                                                              |
+| Payment test mode        | None configured — no Razorpay key/secret present anywhere in this environment                                                                                                                                                                                         |
 
 No credentials of any kind are exposed in this report.
 
@@ -42,38 +42,38 @@ This is a hard stop for real browser-driven E2E in this specific environment. It
 
 ## 5. Golden Path Matrix
 
-| # | Step | Result | Evidence |
-|---|---|---|---|
-| 1 | Open Mitra | **NOT EXECUTED** | Dev server confirmed serving real HTML via `curl` (not via browser) — see §3; not a substitute for actual browser rendering |
-| 2 | Signup | NOT EXECUTED | — |
-| 3 | Onboarding | NOT EXECUTED | — |
-| 4 | Create business | NOT EXECUTED | — |
-| 5 | Add product | NOT EXECUTED | — |
-| 6 | Upload photo | NOT EXECUTED | — |
-| 7 | Create Campaign | NOT EXECUTED | — |
-| 8 | Select product | NOT EXECUTED | — |
-| 9 | Objective | NOT EXECUTED | — |
-| 10 | Offer | NOT EXECUTED | — |
-| 11 | Audience | NOT EXECUTED | — |
-| 12 | Language | NOT EXECUTED | — |
-| 13 | Style | NOT EXECUTED | — |
-| 14 | Review | NOT EXECUTED | — |
-| 15 | Generate | NOT EXECUTED | Would additionally be BLOCKED on missing AI credentials even with a working browser |
-| 16 | Pipeline | NOT EXECUTED | Same |
-| 17 | Truth Check | NOT EXECUTED | Same |
-| 18 | Open campaign | NOT EXECUTED | — |
-| 19 | Inspect copy | NOT EXECUTED | — |
-| 20 | Inspect creative | NOT EXECUTED | — |
-| 21 | Download | NOT EXECUTED | — |
-| 22 | WhatsApp | NOT EXECUTED | — |
-| 23 | Consume free credits | NOT EXECUTED | — |
-| 24 | Purchase credits | NOT EXECUTED | Would additionally be BLOCKED on missing Razorpay test credentials |
-| 25 | Verify credits | NOT EXECUTED | — |
-| 26 | Generate again | NOT EXECUTED | — |
-| 27 | Logout | NOT EXECUTED | — |
-| 28 | Login | NOT EXECUTED | — |
-| 29 | Campaign persistence | NOT EXECUTED | — |
-| 30 | Credit persistence | NOT EXECUTED | — |
+| #   | Step                 | Result           | Evidence                                                                                                                    |
+| --- | -------------------- | ---------------- | --------------------------------------------------------------------------------------------------------------------------- |
+| 1   | Open Mitra           | **NOT EXECUTED** | Dev server confirmed serving real HTML via `curl` (not via browser) — see §3; not a substitute for actual browser rendering |
+| 2   | Signup               | NOT EXECUTED     | —                                                                                                                           |
+| 3   | Onboarding           | NOT EXECUTED     | —                                                                                                                           |
+| 4   | Create business      | NOT EXECUTED     | —                                                                                                                           |
+| 5   | Add product          | NOT EXECUTED     | —                                                                                                                           |
+| 6   | Upload photo         | NOT EXECUTED     | —                                                                                                                           |
+| 7   | Create Campaign      | NOT EXECUTED     | —                                                                                                                           |
+| 8   | Select product       | NOT EXECUTED     | —                                                                                                                           |
+| 9   | Objective            | NOT EXECUTED     | —                                                                                                                           |
+| 10  | Offer                | NOT EXECUTED     | —                                                                                                                           |
+| 11  | Audience             | NOT EXECUTED     | —                                                                                                                           |
+| 12  | Language             | NOT EXECUTED     | —                                                                                                                           |
+| 13  | Style                | NOT EXECUTED     | —                                                                                                                           |
+| 14  | Review               | NOT EXECUTED     | —                                                                                                                           |
+| 15  | Generate             | NOT EXECUTED     | Would additionally be BLOCKED on missing AI credentials even with a working browser                                         |
+| 16  | Pipeline             | NOT EXECUTED     | Same                                                                                                                        |
+| 17  | Truth Check          | NOT EXECUTED     | Same                                                                                                                        |
+| 18  | Open campaign        | NOT EXECUTED     | —                                                                                                                           |
+| 19  | Inspect copy         | NOT EXECUTED     | —                                                                                                                           |
+| 20  | Inspect creative     | NOT EXECUTED     | —                                                                                                                           |
+| 21  | Download             | NOT EXECUTED     | —                                                                                                                           |
+| 22  | WhatsApp             | NOT EXECUTED     | —                                                                                                                           |
+| 23  | Consume free credits | NOT EXECUTED     | —                                                                                                                           |
+| 24  | Purchase credits     | NOT EXECUTED     | Would additionally be BLOCKED on missing Razorpay test credentials                                                          |
+| 25  | Verify credits       | NOT EXECUTED     | —                                                                                                                           |
+| 26  | Generate again       | NOT EXECUTED     | —                                                                                                                           |
+| 27  | Logout               | NOT EXECUTED     | —                                                                                                                           |
+| 28  | Login                | NOT EXECUTED     | —                                                                                                                           |
+| 29  | Campaign persistence | NOT EXECUTED     | —                                                                                                                           |
+| 30  | Credit persistence   | NOT EXECUTED     | —                                                                                                                           |
 
 **0 / 30 steps executed.**
 
@@ -115,11 +115,11 @@ npx jest --silent          PASS (13 suites, 160 passed, 7 legitimately skipped �
 
 ## 11. AI Provider Strategy (Why No Stub Was Substituted)
 
-No test/stub AI provider exists in the codebase (confirmed via grep across `functions/src/services/ai/`), and per §49's explicit instruction — *"Do not replace the entire pipeline with mock generateCampaign() → success. That would invalidate the test"* — none was fabricated for this phase either. The correct fix (introducing a genuine deterministic test-provider mode behind the existing provider abstraction) is itself a real architectural change with its own review surface, not something to improvise unreviewed inside an E2E test file. It is called out here as a concrete recommendation for whoever unblocks this phase next (see §14).
+No test/stub AI provider exists in the codebase (confirmed via grep across `functions/src/services/ai/`), and per §49's explicit instruction — _"Do not replace the entire pipeline with mock generateCampaign() → success. That would invalidate the test"_ — none was fabricated for this phase either. The correct fix (introducing a genuine deterministic test-provider mode behind the existing provider abstraction) is itself a real architectural change with its own review surface, not something to improvise unreviewed inside an E2E test file. It is called out here as a concrete recommendation for whoever unblocks this phase next (see §14).
 
 ## 12. Payment Strategy (Why No Fake Success Was Substituted)
 
-No Razorpay test-mode credentials exist in this environment. Per §50 — *"If the payment provider cannot be automated in the current environment: do not fake payment success. Instead: PARTIALLY VERIFIED/BLOCKED for the affected payment portion"* — the purchase-credits step is written in the spec to attempt the real UI action and report blocked rather than being scripted to a fabricated success.
+No Razorpay test-mode credentials exist in this environment. Per §50 — _"If the payment provider cannot be automated in the current environment: do not fake payment success. Instead: PARTIALLY VERIFIED/BLOCKED for the affected payment portion"_ — the purchase-credits step is written in the spec to attempt the real UI action and report blocked rather than being scripted to a fabricated success.
 
 ## 13. Remaining Blockers
 

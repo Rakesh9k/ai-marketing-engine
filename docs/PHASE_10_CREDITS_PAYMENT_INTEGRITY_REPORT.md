@@ -118,14 +118,14 @@ client-generated one). Webhook-event dedup uses
 - **Reservation:** `reserveCreditsForOperation` — now fully atomic,
   including its idempotency check (fixed, see §4).
 - **Finalization:** `finalizeReservation` — flips `status: 'pending' ->
-  'completed'`; idempotent (repeat calls on an already-`completed`
+'completed'`; idempotent (repeat calls on an already-`completed`
   reservation are a no-op returning success); rejects finalizing a
   `refunded` reservation.
 - **Refund:** `refundReservation` — atomically decrements
   `usage.creditsUsed` and flips the reservation to `'refunded'`; idempotent
   (repeat calls on an already-`refunded` reservation are a no-op); rejects
   refunding a `completed` reservation; verifies `transaction.userId ===
-  userId` before refunding (cross-user protection).
+userId` before refunding (cross-user protection).
 
 ## 4. Credit Invariants
 
@@ -302,7 +302,7 @@ than silently allowed — proven in §11/§12.
   the claim itself is now atomic and exactly-once, the grant is too.
 - **Entitlement:** `subscription.activated` sets (not increments)
   `subscription.status`/`planId`/`creditsIncluded` via `set(..., {merge:
-  true})` on a deterministic doc ID (`subscription.id`, Razorpay's own ID)
+true})` on a deterministic doc ID (`subscription.id`, Razorpay's own ID)
   — repeat delivery re-sets the same values, not additive, so duplicate
   entitlement creation is structurally impossible (there's exactly one
   Firestore document per Razorpay subscription ID, always).
@@ -319,12 +319,14 @@ of live risk the client-side credit-mutation code did (§1, finding 4).
 ## 11. Critical Duplicate Test
 
 The exact sequence requested (§64):
+
 ```
 Payment callback (verifyPayment)
 Payment callback (verifyPayment, again)
 Webhook (payment.captured)
 Webhook (payment.captured, again — sequential)
 ```
+
 Tested as two separate, composable proofs (since `verifyPayment` never
 grants credits, testing it and the webhook together would not add
 information beyond testing each independently — see §7's "sole
@@ -344,8 +346,7 @@ once) — **not** 2400. `transactions/{paymentId}` exists exactly once,
 
 - `razorpayWebhook.test.ts`, **"CRITICAL (§29/§66)"**: the identical event
   delivered **concurrently** (`Promise.all`, simulating a real Razorpay
-  retry racing the original delivery) — **actual result: `1200`, not
-  2400.** This is the strongest form of this test and it passes.
+  retry racing the original delivery) — **actual result: `1200`, not 2400.** This is the strongest form of this test and it passes.
 
 Also tested the reverse order (§65, "webhook, webhook, callback, callback"
 is functionally the same sequence tested above since callback ordering
@@ -394,7 +395,7 @@ All run against a real Firestore emulator (`usageControl.concurrency.test.ts`):
   (pre-existing, unchanged, confirmed by reading the code).
 - **Cross-user payment verification (`verifyPayment.test.ts`):** User A
   cannot activate/verify User B's subscription — `subscription.userId !==
-  context.userId` is rejected with `belongs to another user`, and the
+context.userId` is rejected with `belongs to another user`, and the
   subscription's status is confirmed unchanged (`'incomplete'`) after the
   attacker's failed attempt.
 - **Cross-business authorization for credit-reserving operations
@@ -433,15 +434,15 @@ All run against a real Firestore emulator (`firebase emulators:start
 --only firestore`, confirmed working in this environment — Java 21 +
 `firebase-tools` 15.29.0 were both available):
 
-| Suite | Tests | Result |
-|---|---|---|
-| `usageControl.test.ts` (pre-existing, run for real for the first time) | 10 | **10 passed** |
-| `usageControl.concurrency.test.ts` (new) | 7 | **7 passed** |
-| `razorpayWebhook.test.ts` (new) | 5 | **5 passed** |
-| `verifyPayment.test.ts` (new) | 5 | **5 passed** |
-| `auth.test.ts` (new) | 3 | **3 passed** |
-| `analyticsService.test.ts` (Phase 9) | 4 | **4 passed** |
-| All other pre-existing functions suites | 95 | **95 passed** |
+| Suite                                                                  | Tests | Result        |
+| ---------------------------------------------------------------------- | ----- | ------------- |
+| `usageControl.test.ts` (pre-existing, run for real for the first time) | 10    | **10 passed** |
+| `usageControl.concurrency.test.ts` (new)                               | 7     | **7 passed**  |
+| `razorpayWebhook.test.ts` (new)                                        | 5     | **5 passed**  |
+| `verifyPayment.test.ts` (new)                                          | 5     | **5 passed**  |
+| `auth.test.ts` (new)                                                   | 3     | **3 passed**  |
+| `analyticsService.test.ts` (Phase 9)                                   | 4     | **4 passed**  |
+| All other pre-existing functions suites                                | 95    | **95 passed** |
 
 **Functions total: 15 suites, 129 tests, 129 passed, 0 skipped, 0
 failed** (with `FIRESTORE_EMULATOR_HOST` set — every previously
@@ -516,6 +517,7 @@ Ranked by severity:
 ## 18. Files Changed
 
 **Bug fixes:**
+
 - `functions/src/services/usageControl.ts` — atomic idempotency check
   inside the reservation transaction (fixes the same-operationId double-
   reservation race).
@@ -529,29 +531,31 @@ Ranked by severity:
   `verifyAuthAndBusinessAccess(context as any, ...)` call (redundant with
   the correct `campaign.userId` check immediately after).
 - **21 files** — removed the broken `verifyAuth(context as
-  any)`/`verifyAuthAndBusinessAccess(context as any, ...)` pattern that
+any)`/`verifyAuthAndBusinessAccess(context as any, ...)` pattern that
   made every one of these callables always throw "Authentication
   required": `functions/src/functions/{assets/confirmUpload.ts,
-  assets/getUploadUrl.ts, brandKit/createBrandKit.ts, brandKit/getBrandKit.ts,
-  brandKit/updateBrandKit.ts, business/getBusiness.ts,
-  business/listBusinesses.ts, business/updateBusiness.ts,
-  campaigns/createCampaign.ts, campaigns/generateCampaignStrategy.ts,
-  campaigns/getCampaign.ts, campaigns/listCampaigns.ts,
-  campaigns/updateCampaign.ts, campaigns/updateCampaignStatus.ts,
-  products/archiveProduct.ts, products/createProduct.ts,
-  products/getProduct.ts, products/listProducts.ts,
-  products/updateProduct.ts, subscriptions/createSubscription.ts,
-  subscriptions/verifyPayment.ts}`.
+assets/getUploadUrl.ts, brandKit/createBrandKit.ts, brandKit/getBrandKit.ts,
+brandKit/updateBrandKit.ts, business/getBusiness.ts,
+business/listBusinesses.ts, business/updateBusiness.ts,
+campaigns/createCampaign.ts, campaigns/generateCampaignStrategy.ts,
+campaigns/getCampaign.ts, campaigns/listCampaigns.ts,
+campaigns/updateCampaign.ts, campaigns/updateCampaignStatus.ts,
+products/archiveProduct.ts, products/createProduct.ts,
+products/getProduct.ts, products/listProducts.ts,
+products/updateProduct.ts, subscriptions/createSubscription.ts,
+subscriptions/verifyPayment.ts}`.
 - `functions/src/functions/analytics/trackAnalyticsEvent.ts` — (Phase 9)
   now requires `request.auth.uid`; unrelated to this phase's edits, listed
   for completeness of the diff.
 
 **Security hardening:**
+
 - `src/services/database.ts` — removed the entire dead, dangerous
   client-side `transactionService` (reservation/finalize/refund) and six
   `usageService.increment*` methods; kept read-only methods.
 
 **New tests (all run against a real Firestore emulator):**
+
 - `functions/src/services/usageControl.concurrency.test.ts`
 - `functions/src/functions/webhooks/razorpayWebhook.test.ts`
 - `functions/src/functions/subscriptions/verifyPayment.test.ts`

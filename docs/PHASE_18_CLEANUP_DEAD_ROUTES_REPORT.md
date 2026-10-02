@@ -19,65 +19,78 @@ No unrelated refactoring, no route renames beyond the one proven-broken link, no
 
 ## 3. Actual Route Inventory
 
-| Route | Exists | Auth (before) | Auth (after) | References | Browser Tested | Classification |
-|---|---|---|---|---|---|---|
-| `/` | yes | n/a (public) | n/a | Nav, footer, redirect targets | Server-rendered, verified | KEEP — REQUIRED |
-| `/login` | yes | public only | public only | Multiple | Server-rendered, verified | KEEP — REQUIRED |
-| `/signup` | yes | public only | public only | Multiple | Server-rendered, verified | KEEP — REQUIRED |
-| `/forgot-password` | yes | public only | public only | `LoginForm.tsx` | Server-rendered, verified | KEEP — REQUIRED |
-| `/onboarding` | yes | protected (own check) | unchanged | Now 4 references (was 1) | Server-rendered, verified | KEEP — REQUIRED |
-| `/dashboard` | yes | `ProtectedRoute` | unchanged | Sidebar, redirects, tests | Server-rendered, verified | KEEP — REQUIRED |
-| `/products` | yes | **none** | `ProtectedRoute` (fixed) | Sidebar, dashboard | Server-rendered, verified | FIX — BROKEN ROUTING → fixed |
-| `/products/new` | yes | **none** | `ProtectedRoute` (fixed, inherited) | `products/page.tsx`, `CampaignWizard.tsx` | Server-rendered, verified | FIX — BROKEN ROUTING → fixed |
-| `/campaigns` | yes | `ProtectedRoute` | unchanged | Sidebar, dashboard | Server-rendered, verified | KEEP — REQUIRED |
-| `/campaigns/new` | yes | `ProtectedRoute` (inherited) | unchanged | Sidebar/dashboard/campaigns CTA | Server-rendered, verified | KEEP — REQUIRED |
-| `/campaigns/[campaignId]` | yes | `ProtectedRoute` (inherited) | unchanged | Dynamic, from campaign list/dashboard | Server-rendered, verified | KEEP — REQUIRED |
-| `/brand` | yes | **none** | `ProtectedRoute` (fixed) | Sidebar, dashboard | Server-rendered, verified | FIX — BROKEN ROUTING → fixed |
-| `/usage` | yes | **none** | `ProtectedRoute` (fixed) | Sidebar | Server-rendered, verified | FIX — BROKEN ROUTING → fixed |
-| `/billing` | yes | **none** | `ProtectedRoute` (fixed) | Sidebar, `CampaignWizard.tsx` (credits CTA) | Server-rendered, verified | FIX — BROKEN ROUTING → fixed |
-| `/onboarding/business` | **no** (never had a page) | — | — | 3 dead links (now fixed) | n/a | REMOVE — PROVEN OBSOLETE (was never a real route; the 3 links to it were the actual defect) |
+| Route                     | Exists                    | Auth (before)                | Auth (after)                        | References                                  | Browser Tested            | Classification                                                                              |
+| ------------------------- | ------------------------- | ---------------------------- | ----------------------------------- | ------------------------------------------- | ------------------------- | ------------------------------------------------------------------------------------------- |
+| `/`                       | yes                       | n/a (public)                 | n/a                                 | Nav, footer, redirect targets               | Server-rendered, verified | KEEP — REQUIRED                                                                             |
+| `/login`                  | yes                       | public only                  | public only                         | Multiple                                    | Server-rendered, verified | KEEP — REQUIRED                                                                             |
+| `/signup`                 | yes                       | public only                  | public only                         | Multiple                                    | Server-rendered, verified | KEEP — REQUIRED                                                                             |
+| `/forgot-password`        | yes                       | public only                  | public only                         | `LoginForm.tsx`                             | Server-rendered, verified | KEEP — REQUIRED                                                                             |
+| `/onboarding`             | yes                       | protected (own check)        | unchanged                           | Now 4 references (was 1)                    | Server-rendered, verified | KEEP — REQUIRED                                                                             |
+| `/dashboard`              | yes                       | `ProtectedRoute`             | unchanged                           | Sidebar, redirects, tests                   | Server-rendered, verified | KEEP — REQUIRED                                                                             |
+| `/products`               | yes                       | **none**                     | `ProtectedRoute` (fixed)            | Sidebar, dashboard                          | Server-rendered, verified | FIX — BROKEN ROUTING → fixed                                                                |
+| `/products/new`           | yes                       | **none**                     | `ProtectedRoute` (fixed, inherited) | `products/page.tsx`, `CampaignWizard.tsx`   | Server-rendered, verified | FIX — BROKEN ROUTING → fixed                                                                |
+| `/campaigns`              | yes                       | `ProtectedRoute`             | unchanged                           | Sidebar, dashboard                          | Server-rendered, verified | KEEP — REQUIRED                                                                             |
+| `/campaigns/new`          | yes                       | `ProtectedRoute` (inherited) | unchanged                           | Sidebar/dashboard/campaigns CTA             | Server-rendered, verified | KEEP — REQUIRED                                                                             |
+| `/campaigns/[campaignId]` | yes                       | `ProtectedRoute` (inherited) | unchanged                           | Dynamic, from campaign list/dashboard       | Server-rendered, verified | KEEP — REQUIRED                                                                             |
+| `/brand`                  | yes                       | **none**                     | `ProtectedRoute` (fixed)            | Sidebar, dashboard                          | Server-rendered, verified | FIX — BROKEN ROUTING → fixed                                                                |
+| `/usage`                  | yes                       | **none**                     | `ProtectedRoute` (fixed)            | Sidebar                                     | Server-rendered, verified | FIX — BROKEN ROUTING → fixed                                                                |
+| `/billing`                | yes                       | **none**                     | `ProtectedRoute` (fixed)            | Sidebar, `CampaignWizard.tsx` (credits CTA) | Server-rendered, verified | FIX — BROKEN ROUTING → fixed                                                                |
+| `/onboarding/business`    | **no** (never had a page) | —                            | —                                   | 3 dead links (now fixed)                    | n/a                       | REMOVE — PROVEN OBSOLETE (was never a real route; the 3 links to it were the actual defect) |
 
 No API routes, no Pages Router, no middleware.ts, no `next.config.ts` redirects/rewrites exist in this application — confirmed by direct filesystem/config inspection, not assumption.
 
 ## 4. Required Route Audit
 
 ### `/`
+
 Public landing page (Phase 17). Renders immediately; redirects an authenticated visitor to `/dashboard` in the background via `useAuthStatus()`. Unchanged this phase.
 
 ### `/login`
+
 `PublicOnlyRoute`-gated (redirects an already-authenticated visitor to `/dashboard`). Links from `/`, footer, `SignupForm.tsx`, `ForgotPasswordForm.tsx`, `Sidebar.tsx`'s logout handler (`window.location.href = '/login'`). Unchanged.
 
 ### `/signup`
+
 `PublicOnlyRoute`-gated. Linked from `/`, footer, `LoginForm.tsx`. Unchanged.
 
 ### `/onboarding`
-Not wrapped in `ProtectedRoute`/`PublicOnlyRoute` — it manages its own access logic internally (confirmed by reading `src/app/onboarding/page.tsx`, which calls `createBusiness` directly). This phase did not touch its internal auth handling (out of scope — no proven broken destination *inside* the page), only fixed the three external links that pointed at the nonexistent `/onboarding/business` instead of here.
+
+Not wrapped in `ProtectedRoute`/`PublicOnlyRoute` — it manages its own access logic internally (confirmed by reading `src/app/onboarding/page.tsx`, which calls `createBusiness` directly). This phase did not touch its internal auth handling (out of scope — no proven broken destination _inside_ the page), only fixed the three external links that pointed at the nonexistent `/onboarding/business` instead of here.
 
 ### `/dashboard`
+
 `ProtectedRoute` + `Sidebar` via `dashboard/layout.tsx`. Central hub; links to `/campaigns`, `/campaigns/new`, `/brand`, `/products`, `/onboarding` (now correct). Unchanged.
 
 ### `/products`
+
 **Fixed this phase.** Previously had no layout at all. Now wrapped via new `src/app/products/layout.tsx` (`ProtectedRoute` + `Sidebar`, identical to `campaigns/layout.tsx`). Confirmed via a live dev server: before comparison wasn't preserved, but after the fix, direct unauthenticated access now renders the same `ProtectedRoute` loading-state markup as `/dashboard`/`/campaigns` (byte-identical `role="status" aria-label="Loading"` output), rather than the page's own separate, never-resolving spinner.
 
 ### `/products/new`
+
 Nested under `src/app/products/`, so it automatically inherits the new `products/layout.tsx` fix — no separate file needed. Linked from `/products`' empty state and `CampaignWizard.tsx`'s "add a product" CTA.
 
 ### `/campaigns`
+
 `ProtectedRoute` + `Sidebar` via `campaigns/layout.tsx` (pre-existing, unchanged). One broken link fixed (see §6).
 
 ### `/campaigns/new`
+
 Inherits `campaigns/layout.tsx`. Hosts `CampaignWizard`, which reads a `?generating=<campaignId>` query parameter to resume the generation-progress view after a refresh — confirmed this is read correctly (`useSearchParams()` inside `CampaignWizard.tsx`), so this is a working, intentional query-param-driven state, not a broken/dead parameter.
 
 ### Campaign Detail (`/campaigns/[campaignId]`)
+
 Inherits `campaigns/layout.tsx`. Already has a proper `'not-found'` load-error state (`src/app/campaigns/[campaignId]/page.tsx`) for a nonexistent/inaccessible campaign ID — confirmed by reading the component, not assumed. Two malformed, empty, untracked sibling directories were found alongside the real one and removed (see §7) — they contained no code and were never a functioning route.
 
 ### `/brand`
+
 **Fixed this phase.** Same gap and same fix as `/products` (new `src/app/brand/layout.tsx`). One broken link (its own "no business" empty state pointing at `/onboarding/business`) also fixed.
 
 ### `/usage`
+
 **Fixed this phase.** Same gap and same fix (new `src/app/usage/layout.tsx`). Standalone page, not merely a dashboard widget duplicate — retained per this phase's explicit instruction not to remove a dedicated usage page just because the dashboard also shows credit information.
 
 ### `/billing`
+
 **Fixed this phase.** Same gap and same fix (new `src/app/billing/layout.tsx`). This is the financially-sensitive route the phase explicitly asked to be handled carefully: the fix adds only the same auth gate every other protected route already has — no payment/credit logic, Razorpay integration, or pricing display was touched.
 
 ## 5. Navigation Reference Audit
@@ -92,12 +105,12 @@ Inherits `campaigns/layout.tsx`. Already has a proper `'not-found'` load-error s
 
 ## 6. Broken Destinations Found
 
-| Source | Destination | Problem | Resolution |
-|---|---|---|---|
-| `src/app/dashboard/page.tsx` (empty-state CTA) | `/onboarding/business` | Route never existed (only an empty, untracked directory backed it — no `page.tsx`) | Fixed to `/onboarding`, confirmed to be the real business-creation flow |
-| `src/app/campaigns/page.tsx` (empty-state CTA) | `/onboarding/business` | Same | Same fix |
-| `src/app/brand/page.tsx` (empty-state CTA) | `/onboarding/business` | Same | Same fix |
-| `src/features/auth/components/AuthLayout.tsx` (used by `/login`, `/signup`) | `/terms`, `/privacy` | Routes genuinely do not exist anywhere in this application — not a typo/rename, a missing feature | **NOT FIXED** — per this phase's explicit instruction not to build features or fabricate legal pages to repair a broken link. Reported here as **BROKEN / MISSING FEATURE**, same finding already flagged (undecided) in Phase 17's report. Left as-is; a product/legal decision (build the pages, or remove the disclosure text) is needed, not a routing fix this phase is authorized to make unilaterally. |
+| Source                                                                      | Destination            | Problem                                                                                           | Resolution                                                                                                                                                                                                                                                                                                                                                                                                    |
+| --------------------------------------------------------------------------- | ---------------------- | ------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `src/app/dashboard/page.tsx` (empty-state CTA)                              | `/onboarding/business` | Route never existed (only an empty, untracked directory backed it — no `page.tsx`)                | Fixed to `/onboarding`, confirmed to be the real business-creation flow                                                                                                                                                                                                                                                                                                                                       |
+| `src/app/campaigns/page.tsx` (empty-state CTA)                              | `/onboarding/business` | Same                                                                                              | Same fix                                                                                                                                                                                                                                                                                                                                                                                                      |
+| `src/app/brand/page.tsx` (empty-state CTA)                                  | `/onboarding/business` | Same                                                                                              | Same fix                                                                                                                                                                                                                                                                                                                                                                                                      |
+| `src/features/auth/components/AuthLayout.tsx` (used by `/login`, `/signup`) | `/terms`, `/privacy`   | Routes genuinely do not exist anywhere in this application — not a typo/rename, a missing feature | **NOT FIXED** — per this phase's explicit instruction not to build features or fabricate legal pages to repair a broken link. Reported here as **BROKEN / MISSING FEATURE**, same finding already flagged (undecided) in Phase 17's report. Left as-is; a product/legal decision (build the pages, or remove the disclosure text) is needed, not a routing fix this phase is authorized to make unilaterally. |
 
 ## 7. Routes Removed
 
@@ -105,13 +118,13 @@ Inherits `campaigns/layout.tsx`. Already has a proper `'not-found'` load-error s
 No routes removed.
 ```
 
-That is the correct outcome here in the strict sense — every path that ever rendered a real page continues to. What *was* removed were three **empty, git-untracked directories that never contained a route in the first place**:
+That is the correct outcome here in the strict sense — every path that ever rendered a real page continues to. What _was_ removed were three **empty, git-untracked directories that never contained a route in the first place**:
 
-| Path removed | Evidence it was never a route | Why removed |
-|---|---|---|
-| `src/app/onboarding/business/` | Empty (verified via `find -mindepth 0` and PowerShell `Get-ChildItem -Recurse`); `git status` showed no tracked or untracked content under it | It was the source of the false impression that `/onboarding/business` might be valid; its existence as a bare directory was actively misleading. No `page.tsx` ever existed there. |
-| `src/app/campaigns/[campaignId` (missing closing bracket) | Empty, confirmed via PowerShell `Get-ChildItem -Recurse` | Malformed Next.js dynamic-segment name (invalid syntax — no closing bracket), empty, untracked. Not a functioning route by construction. |
-| `src/app/campaigns/[campaignId/]` | Empty, confirmed via PowerShell `Get-ChildItem -Recurse` | Same — malformed segment name, empty, untracked. |
+| Path removed                                              | Evidence it was never a route                                                                                                                 | Why removed                                                                                                                                                                        |
+| --------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `src/app/onboarding/business/`                            | Empty (verified via `find -mindepth 0` and PowerShell `Get-ChildItem -Recurse`); `git status` showed no tracked or untracked content under it | It was the source of the false impression that `/onboarding/business` might be valid; its existence as a bare directory was actively misleading. No `page.tsx` ever existed there. |
+| `src/app/campaigns/[campaignId` (missing closing bracket) | Empty, confirmed via PowerShell `Get-ChildItem -Recurse`                                                                                      | Malformed Next.js dynamic-segment name (invalid syntax — no closing bracket), empty, untracked. Not a functioning route by construction.                                           |
+| `src/app/campaigns/[campaignId/]`                         | Empty, confirmed via PowerShell `Get-ChildItem -Recurse`                                                                                      | Same — malformed segment name, empty, untracked.                                                                                                                                   |
 
 None of these three paths appeared in `git status` even as untracked additions before removal (empty directories are invisible to git), confirming they had zero effect on the committed/working application and zero risk in removing them.
 
@@ -150,7 +163,7 @@ GET /billing -> 200
 
 All 13 real page routes return HTTP 200 with actual rendered markup (not error pages), and the dev server log shows zero server-side errors across all thirteen requests.
 
-**This is not a substitute for real browser interaction** — click-through navigation, the actual client-side auth-redirect firing, and visual confirmation were not observed directly. See §11 for what curl-based evidence *does* establish about the authorization fix specifically.
+**This is not a substitute for real browser interaction** — click-through navigation, the actual client-side auth-redirect firing, and visual confirmation were not observed directly. See §11 for what curl-based evidence _does_ establish about the authorization fix specifically.
 
 ## 11. Authentication / Authorization Verification
 
@@ -188,17 +201,20 @@ No test needed to change: no route this phase touched had an existing test asser
 The repository's overall `git status` reflects the accumulated uncommitted work of every phase in this long session (8 through 17), not just this phase — the vast majority of the modified/untracked files listed are pre-existing and untouched by Phase 18. Isolating strictly what this phase changed:
 
 **Modified (1-line change each, verified via `git diff`):**
+
 - `src/app/dashboard/page.tsx` — `/onboarding/business` → `/onboarding`
 - `src/app/campaigns/page.tsx` — `/onboarding/business` → `/onboarding`
 - `src/app/brand/page.tsx` — `/onboarding/business` → `/onboarding`
 
 **Created:**
+
 - `src/app/products/layout.tsx`
 - `src/app/brand/layout.tsx`
 - `src/app/billing/layout.tsx`
 - `src/app/usage/layout.tsx`
 
 **Removed (empty, untracked, no git record existed):**
+
 - `src/app/onboarding/business/`
 - `src/app/campaigns/[campaignId` (malformed)
 - `src/app/campaigns/[campaignId/]` (malformed)

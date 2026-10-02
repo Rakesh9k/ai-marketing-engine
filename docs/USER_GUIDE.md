@@ -62,7 +62,7 @@ step).
 
 Business Brain is Mitra's internal name for the structured business/brand/localization data
 collected during onboarding (and editable afterward — Phase 33 added a dedicated edit UI per the
-project's phase history). It is what every campaign is generated *and fact-checked* against — see
+project's phase history). It is what every campaign is generated _and fact-checked_ against — see
 §7, Truth Check.
 
 ## 4. Adding Products and Photos
@@ -136,7 +136,7 @@ A generated campaign includes:
 
 Truth Check is a server-side verification pass (`functions/src/services/ai/truthCheck.ts`) that
 checks generated campaign content against your actual Business Brain and product data — not against
-what the AI *assumed*. It exists so a campaign can't claim a price, phone number, or offer that
+what the AI _assumed_. It exists so a campaign can't claim a price, phone number, or offer that
 doesn't match what you actually told Mitra.
 
 - **PASS** — every checked fact matched.
@@ -185,11 +185,11 @@ generation per month at current pricing.
 
 ### Paid Plans
 
-| Plan | Monthly Credits | Price |
-|---|---|---|
-| Starter | 500 | ₹499 |
-| Business | 1,200 | ₹999 |
-| Agency | 3,000 | ₹2,499 |
+| Plan     | Monthly Credits | Price  |
+| -------- | --------------- | ------ |
+| Starter  | 500             | ₹499   |
+| Business | 1,200           | ₹999   |
+| Agency   | 3,000           | ₹2,499 |
 
 (Source: `PRICING.subscriptionTiers` in `functions/src/config/pricing.ts` — current as of this
 document's verification, but pricing can change; this table is not a contractual guarantee.)
@@ -231,7 +231,7 @@ once during onboarding and can be changed by editing your Business Brain afterwa
 
 **Partially implemented, no dedicated UI.** The backend has real, tested authorization for an
 "agency member" role that can be granted access to a specific client business it's assigned to (and
-is correctly denied access to a business belonging to a *different* agency — this exact scenario is
+is correctly denied access to a business belonging to a _different_ agency — this exact scenario is
 covered by an automated test using a real Firestore emulator). However, there is currently **no
 separate agency workspace screen** in the app — an agency member uses the same business-scoped pages
 as any other user, for whichever client business they've been granted access to. If you're looking
@@ -258,17 +258,17 @@ project's own phase history in `README.md`):
 
 ## 15. Troubleshooting
 
-| Problem | What happened | What to check | What you can do |
-|---|---|---|---|
-| **Can't sign in** | Wrong email/password, or your session hasn't finished restoring yet on page load | Double-check your credentials; if a page seems stuck loading right after opening it, wait a moment before assuming it failed | Try again after a few seconds; use "forgot password" if you're sure the credentials are right |
-| **Upload failed** | The file may be the wrong format/too large, or the upload didn't reach the server before confirmation | Confirm the file is JPEG/PNG/WebP and under 10 MB | Re-select the file and try again |
-| **Campaign can't be generated** | A required input is missing, or the request was rejected before reaching the AI pipeline | Check that all required campaign fields are filled in | Review the campaign form for validation messages |
-| **Insufficient credits** | Your account's server-recorded credit balance is below what this action costs | Check your current plan/credits on the Billing page | Wait for your next monthly credit refresh, or buy a top-up/upgrade your plan |
-| **Campaign generation failed partway** | An internal error occurred during generation | — | Your credits for that attempt are refunded automatically (§9) — you can retry without being charged twice |
-| **Asset unavailable / broken image** | A download link may have expired, or (see `docs/PERFORMANCE_OPTIMIZATION_AUDIT_REPORT.md`'s Closure Validation) a currently-known production defect exists in how the app serves optimized images on some deployments | — | Try reloading the page; if the problem persists, this may be a known backend issue rather than something on your end |
-| **Payment issue** | A Razorpay payment didn't complete, or your credits haven't updated yet | Check whether Razorpay showed a successful payment | Credits are granted once Razorpay's server confirms the payment, which can lag a few seconds behind the checkout screen — wait briefly before assuming it failed |
-| **Session expired / logged out unexpectedly** | Your Firebase session ended | — | Sign in again |
-| **Permission denied on a business/campaign** | You're trying to access a business or campaign your account isn't authorized for | Confirm you're signed into the correct account | This is enforced by the server and is not adjustable from the client |
+| Problem                                       | What happened                                                                                                                                                                                                         | What to check                                                                                                                | What you can do                                                                                                                                                  |
+| --------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Can't sign in**                             | Wrong email/password, or your session hasn't finished restoring yet on page load                                                                                                                                      | Double-check your credentials; if a page seems stuck loading right after opening it, wait a moment before assuming it failed | Try again after a few seconds; use "forgot password" if you're sure the credentials are right                                                                    |
+| **Upload failed**                             | The file may be the wrong format/too large, or the upload didn't reach the server before confirmation                                                                                                                 | Confirm the file is JPEG/PNG/WebP and under 10 MB                                                                            | Re-select the file and try again                                                                                                                                 |
+| **Campaign can't be generated**               | A required input is missing, or the request was rejected before reaching the AI pipeline                                                                                                                              | Check that all required campaign fields are filled in                                                                        | Review the campaign form for validation messages                                                                                                                 |
+| **Insufficient credits**                      | Your account's server-recorded credit balance is below what this action costs                                                                                                                                         | Check your current plan/credits on the Billing page                                                                          | Wait for your next monthly credit refresh, or buy a top-up/upgrade your plan                                                                                     |
+| **Campaign generation failed partway**        | An internal error occurred during generation                                                                                                                                                                          | —                                                                                                                            | Your credits for that attempt are refunded automatically (§9) — you can retry without being charged twice                                                        |
+| **Asset unavailable / broken image**          | A download link may have expired, or (see `docs/PERFORMANCE_OPTIMIZATION_AUDIT_REPORT.md`'s Closure Validation) a currently-known production defect exists in how the app serves optimized images on some deployments | —                                                                                                                            | Try reloading the page; if the problem persists, this may be a known backend issue rather than something on your end                                             |
+| **Payment issue**                             | A Razorpay payment didn't complete, or your credits haven't updated yet                                                                                                                                               | Check whether Razorpay showed a successful payment                                                                           | Credits are granted once Razorpay's server confirms the payment, which can lag a few seconds behind the checkout screen — wait briefly before assuming it failed |
+| **Session expired / logged out unexpectedly** | Your Firebase session ended                                                                                                                                                                                           | —                                                                                                                            | Sign in again                                                                                                                                                    |
+| **Permission denied on a business/campaign**  | You're trying to access a business or campaign your account isn't authorized for                                                                                                                                      | Confirm you're signed into the correct account                                                                               | This is enforced by the server and is not adjustable from the client                                                                                             |
 
 This document does not include a support contact — none is defined in this repository at the time
 of writing.
