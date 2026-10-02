@@ -54,7 +54,14 @@ describe('VerticalConfig — restaurant is unchanged', () => {
   it('carries the exact Truth Check claim-keyword table that used to be hard-coded in truthCheck.ts', () => {
     const keywords = VERTICAL_CONFIGS.restaurant.truthCheckClaimKeywords.map((k) => k.keyword);
     expect(keywords).toEqual(
-      expect.arrayContaining(['free delivery', 'dine in', 'takeaway', 'parking', 'wifi', 'catering'])
+      expect.arrayContaining([
+        'free delivery',
+        'dine in',
+        'takeaway',
+        'parking',
+        'wifi',
+        'catering',
+      ])
     );
     expect(keywords.length).toBe(24);
   });

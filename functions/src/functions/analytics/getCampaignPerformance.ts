@@ -21,11 +21,14 @@ const getCampaignPerformanceSchema = z.object({
   campaignId: z.string().min(1),
 });
 
+import type { PostPerformanceRecord } from '../../types/meta';
+
 export interface CampaignPerformanceResult {
   campaignId: string;
   whatsappClicks: number;
   inquiries: null;
   inquiriesAvailable: false;
+  postsPerformance?: PostPerformanceRecord[];
   updatedAt: string | null;
 }
 
@@ -56,13 +59,10 @@ export const getCampaignPerformance = onCall(
 
       const result: CampaignPerformanceResult = {
         campaignId: data.campaignId,
-        // No event recorded yet is a known "zero clicks," not "unknown" —
-        // the absence of a document here means the click genuinely never
-        // happened, unlike inquiries below where the absence means the
-        // system simply has no way to observe the answer.
         whatsappClicks: performance?.whatsappClicks ?? 0,
         inquiries: null,
         inquiriesAvailable: false,
+        postsPerformance: performance?.postsPerformance ?? [],
         updatedAt: performance?.updatedAt ?? null,
       };
 

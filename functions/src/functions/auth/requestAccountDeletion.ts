@@ -42,17 +42,8 @@ const RECENT_AUTH_WINDOW_SECONDS = 15 * 60;
  * periods before it can be implemented safely.
  *
  * Blocks deletion if the caller has an active, still-renewing paid
- * subscription (docs/LEGAL_DELETION_DATA_LIFECYCLE.md's "Critical Finding" —
- * without this check, deleting the Auth login left Razorpay with no idea the
- * account was gone, so it would keep charging the customer with no
- * self-service way back in to stop it). "Block, require cancel first" was
- * chosen over "auto-cancel as part of deletion" because it reuses the
- * already-built, already-reviewed cancelSubscription callable as the one
- * place a Razorpay API call happens on this account, rather than bundling a
- * billing side-effect into an already-destructive Auth-deletion path. A
- * subscription that is already set to cancelAtPeriodEnd is not blocking —
- * Razorpay will not renew it regardless of whether the Mitra account still
- * exists, so there is no orphaned-charge risk in that case.
+ * subscription (without this check, deleting the Auth login leaves the payment
+ * gateway with no idea the account was gone, so it would keep charging the customer).
  */
 export const requestAccountDeletion = onCall(
   { region: 'asia-south1', enforceAppCheck: true, maxInstances: 10 },

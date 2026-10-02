@@ -2,29 +2,18 @@ import { GoogleGenerativeAI } from '@google/generative-ai';
 import type { z } from 'zod';
 import { getEnvConfig } from '../../config/env';
 
-const config = getEnvConfig();
-
 /**
  * Text AI Provider using Google Gemini 1.5 Pro
  * Primary provider for structured text generation
  */
 export class GeminiTextProvider {
-  private client: GoogleGenerativeAI;
-  private model: any;
+  private get apiKey(): string {
+    return getEnvConfig().GEMINI_API_KEY || process.env['GEMINI_API_KEY'] || '';
+  }
 
-  constructor() {
-    const apiKey = config.GEMINI_API_KEY || '';
-    this.client = new GoogleGenerativeAI(apiKey);
-    this.model = this.client.getGenerativeModel({
-      model: 'gemini-flash-latest',
-      generationConfig: {
-        temperature: 0.4,
-        topK: 40,
-        topP: 0.95,
-        maxOutputTokens: 8192,
-        responseMimeType: 'application/json',
-      },
-    });
+  private getClient(): GoogleGenerativeAI {
+    const key = this.apiKey;
+    return new GoogleGenerativeAI(key);
   }
 
   /**
@@ -35,7 +24,7 @@ export class GeminiTextProvider {
     schema: z.ZodType<T>,
     options?: { temperature?: number; maxTokens?: number }
   ): Promise<T> {
-    const model = this.client.getGenerativeModel({
+    const model = this.getClient().getGenerativeModel({
       model: 'gemini-flash-latest',
       generationConfig: {
         temperature: options?.temperature ?? 0.4,
@@ -73,7 +62,7 @@ export class GeminiTextProvider {
     prompt: string,
     options?: { temperature?: number; maxTokens?: number }
   ): Promise<string> {
-    const model = this.client.getGenerativeModel({
+    const model = this.getClient().getGenerativeModel({
       model: 'gemini-flash-latest',
       generationConfig: {
         temperature: options?.temperature ?? 0.7,

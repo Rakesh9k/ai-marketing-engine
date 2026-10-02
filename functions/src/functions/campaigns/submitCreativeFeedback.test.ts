@@ -5,19 +5,21 @@ import { trackCreativeEvent } from '../../services/analyticsService';
 import { updateCreativePreferences } from '../../services/preferenceService';
 
 jest.mock('../../middleware/auth', () => ({
-  verifyBusinessAccess: jest.fn()
+  verifyBusinessAccess: jest.fn(),
 }));
 
 jest.mock('../../services/firestore', () => ({
-  createCreativeFeedbackDoc: jest.fn()
+  createCreativeFeedbackDoc: jest.fn(),
 }));
 
 jest.mock('../../services/analyticsService', () => ({
-  trackCreativeEvent: jest.fn()
+  trackCreativeEvent: jest.fn(),
+  trackCreativeLiked: jest.fn(),
+  trackCreativeDisliked: jest.fn(),
 }));
 
 jest.mock('../../services/preferenceService', () => ({
-  updateCreativePreferences: jest.fn()
+  updateCreativePreferences: jest.fn(),
 }));
 
 function callableRequest(data: unknown, uid = 'user-1') {
@@ -31,7 +33,9 @@ describe('submitCreativeFeedback callable', () => {
   });
 
   it('5.5 requires authentication', async () => {
-    await expect((submitCreativeFeedback as any).run({ data: {}, auth: null } as any)).rejects.toThrow('Authentication required');
+    await expect(
+      (submitCreativeFeedback as any).run({ data: {}, auth: null } as any)
+    ).rejects.toThrow('Authentication required');
   });
 
   it('5.6 tenant isolation: fails if verifyBusinessAccess throws', async () => {
@@ -42,7 +46,7 @@ describe('submitCreativeFeedback callable', () => {
           businessId: 'biz-1',
           creativeId: 'creative-1',
           creativeType: 'post',
-          sentiment: 'positive'
+          sentiment: 'positive',
         })
       )
     ).rejects.toThrow();
@@ -56,7 +60,7 @@ describe('submitCreativeFeedback callable', () => {
       styleId: 'style-1',
       creativeType: 'post',
       sentiment: 'positive',
-      reasons: ['more_premium']
+      reasons: ['more_premium'],
     };
 
     const result = await (submitCreativeFeedback as any).run(callableRequest(data));
@@ -88,7 +92,7 @@ describe('submitCreativeFeedback callable', () => {
       creativeId: 'creative-2',
       creativeType: 'reel',
       sentiment: 'negative',
-      reasons: ['less_text', 'different']
+      reasons: ['less_text', 'different'],
     };
 
     await (submitCreativeFeedback as any).run(callableRequest(data));
@@ -103,35 +107,45 @@ describe('submitCreativeFeedback callable', () => {
 
   it('5.3 / 5.4 reasons and custom reasons are bounded and validated', async () => {
     // Valid custom reason
-    await (submitCreativeFeedback as any).run(callableRequest({
-      businessId: 'biz-1',
-      creativeId: 'creative-1',
-      creativeType: 'post',
-      sentiment: 'negative',
-      customReason: 'too flashy'
-    }));
+    await (submitCreativeFeedback as any).run(
+      callableRequest({
+        businessId: 'biz-1',
+        creativeId: 'creative-1',
+        creativeType: 'post',
+        sentiment: 'negative',
+        customReason: 'too flashy',
+      })
+    );
 
     const savedFeedback = (createCreativeFeedbackDoc as jest.Mock).mock.calls[0][0];
     expect(savedFeedback.customReason).toBe('too flashy');
 
     // Reject oversized
     const largeStr = 'a'.repeat(600);
-    await expect((submitCreativeFeedback as any).run(callableRequest({
-      businessId: 'biz-1',
-      creativeId: 'creative-1',
-      creativeType: 'post',
-      sentiment: 'negative',
-      customReason: largeStr
-    }))).rejects.toThrow();
+    await expect(
+      (submitCreativeFeedback as any).run(
+        callableRequest({
+          businessId: 'biz-1',
+          creativeId: 'creative-1',
+          creativeType: 'post',
+          sentiment: 'negative',
+          customReason: largeStr,
+        })
+      )
+    ).rejects.toThrow();
 
     // Reject invalid enum
-    await expect((submitCreativeFeedback as any).run(callableRequest({
-      businessId: 'biz-1',
-      creativeId: 'creative-1',
-      creativeType: 'post',
-      sentiment: 'negative',
-      reasons: ['not_a_valid_reason']
-    }))).rejects.toThrow();
+    await expect(
+      (submitCreativeFeedback as any).run(
+        callableRequest({
+          businessId: 'biz-1',
+          creativeId: 'creative-1',
+          creativeType: 'post',
+          sentiment: 'negative',
+          reasons: ['not_a_valid_reason'],
+        })
+      )
+    ).rejects.toThrow();
   });
 
   it('5.11 Feedback does NOT mutate preferences directly, it calls updateCreativePreferences explicitly', async () => {

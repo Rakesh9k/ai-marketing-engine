@@ -134,6 +134,7 @@ export interface GenerationPipelineInput {
     category: string;
   };
   vertical?: 'restaurant' | 'salon' | 'real_estate';
+  performanceRecommendations?: import('./recommendation').GenerationRecommendationContext;
 }
 
 export interface ExtractedPrice {
@@ -193,7 +194,9 @@ export type AssetType =
 
 export type AssetStatus = 'generating' | 'completed' | 'failed' | 'superseded';
 
-export type SubscriptionPlan = 'free' | 'starter' | 'business' | 'agency';
+export type SubscriptionPlan = 'free' | 'starter' | 'business' | 'pro' | 'agency';
+
+export type BillingCycle = 'monthly' | 'yearly';
 
 export type SubscriptionStatus = 'active' | 'canceled' | 'past_due' | 'trialing' | 'incomplete';
 
@@ -206,7 +209,7 @@ export type TransactionType =
   | 'grant'
   | 'setup_fee';
 
-export type TransactionStatus = 'pending' | 'completed' | 'failed' | 'refunded';
+export type TransactionStatus = 'pending' | 'completed' | 'failed' | 'refunded' | 'expired';
 
 export interface LocalizationProfile {
   country: string;
@@ -347,6 +350,8 @@ export interface ImageGenerationRequest {
 export interface ImageGenerationResponse {
   readonly success: boolean;
   readonly imageUrl?: string;
+  /** Inline image bytes (Gemini returns bytes, not a hosted URL). */
+  readonly imageData?: { readonly base64: string; readonly mimeType: string };
   readonly provider?: string;
   readonly model?: string;
   readonly metadata?: Record<string, unknown>;
@@ -526,6 +531,7 @@ export interface CampaignPerformance {
   businessId: string;
   whatsappClicks: number;
   inquiries: number | null;
+  postsPerformance?: import('./meta').PostPerformanceRecord[];
   updatedAt: string;
   lastEventAt?: string;
 }
@@ -588,10 +594,153 @@ export interface Product {
   updatedAt: string;
 }
 
+export interface PipelineTraceStep<T = unknown> {
+  stepId: string;
+  name: string;
+  status: 'passed' | 'failed' | 'warning' | 'skipped';
+  timestamp: string;
+  data: T;
+  summary?: string;
+}
+
+export interface UserRequestStageData {
+  request: string;
+  language: string;
+  style: string;
+  objective: string;
+  targetProduct?: string;
+  rawInput?: Record<string, unknown>;
+}
+
+export interface IntentExtractionStageData {
+  extractedLanguage: string;
+  extractedStyle: string;
+  extractedProduct: string;
+  extractedObjective: string;
+  extractedOccasion?: string;
+  confidence: number;
+}
+
+export interface BusinessBrainRetrievalStageData {
+  business: string;
+  location: string;
+  product: string;
+  price: string;
+  brandTone: string;
+  languagePreference: string;
+  audience: string;
+  businessRules?: Record<string, unknown>;
+}
+
+export interface ContextSelectedStageData {
+  selectedContext: {
+    businessIdentity: boolean;
+    productInformation: boolean;
+    currentOffer: boolean;
+    location: boolean;
+    language: boolean;
+    tone: boolean;
+    relevantPreviousCampaignPreferences: boolean;
+    brandRules: boolean;
+  };
+  contextSummary: string;
+}
+
+export interface GeminiRequestStageData {
+  systemInstruction: string;
+  businessContext: string;
+  userRequest: string;
+  task: string;
+  outputSchema: Record<string, unknown> | string;
+}
+
+export interface GeminiResponseStageData {
+  headline?: string;
+  caption?: string;
+  language?: string;
+  tone?: string;
+  cta?: string;
+  rawOutput?: Record<string, unknown>;
+}
+
+export interface ValidationCheckItem {
+  name: string;
+  status: 'PASS' | 'FAIL' | 'REVIEW_REQUIRED';
+  expected?: string;
+  actual?: string;
+  details?: string;
+}
+
+export interface ValidationStageData {
+  passed: boolean;
+  checks: ValidationCheckItem[];
+  summary: string;
+}
+
+export interface MitraTransformationsStageData {
+  appliedTransformations: Array<{
+    name: string;
+    description: string;
+  }>;
+  textOverlay?: Record<string, unknown>;
+}
+
+export interface CreativeGenerationStageData {
+  generatedPostersCount: number;
+  storyFramesCount: number;
+  reelStoryboardCount: number;
+  assetsMetadata: Array<{
+    type: string;
+    url?: string;
+    prompt?: string;
+  }>;
+}
+
+export interface FinalCampaignStageData {
+  campaignId: string;
+  status: string;
+  deliveredAssetsCount: number;
+  customerSummary: string;
+  headlinePreview?: string;
+  captionPreview?: string;
+  whatsappMessagePreview?: string;
+}
+
+export interface PipelineTrace {
+  traceId: string;
+  campaignId: string;
+  businessId: string;
+  createdAt: string;
+  conflictResolution?: {
+    conflictsDetected: Array<{
+      id: string;
+      category: string;
+      description: string;
+      appliedHierarchy: string;
+      winningResolution: string;
+      geminiDirective: string;
+    }>;
+    nonNegotiables: Record<string, string>;
+    geminiConflictDirectives: string[];
+  };
+  userRequest: PipelineTraceStep<UserRequestStageData>;
+  mitraUi: PipelineTraceStep<Record<string, unknown>>;
+  intentExtraction: PipelineTraceStep<IntentExtractionStageData>;
+  businessBrainRetrieval: PipelineTraceStep<BusinessBrainRetrievalStageData>;
+  contextAssembly: PipelineTraceStep<ContextSelectedStageData>;
+  promptBuilder: PipelineTraceStep<GeminiRequestStageData>;
+  geminiResponse: PipelineTraceStep<GeminiResponseStageData>;
+  validationTruthCheck: PipelineTraceStep<ValidationStageData>;
+  mitraTransformations: PipelineTraceStep<MitraTransformationsStageData>;
+  creativeGeneration: PipelineTraceStep<CreativeGenerationStageData>;
+  finalCampaign: PipelineTraceStep<FinalCampaignStageData>;
+}
+
 export interface Campaign {
   campaignId: string;
   businessId: string;
   userId: string;
+  sourceCalendarItemId?: string;
   objective: CampaignObjective;
   templateId?: string;
   creativeObjective?: CreativeObjective;
@@ -643,6 +792,7 @@ export interface Campaign {
     truthCheckResult?: TruthCheckResult;
     savedStyleId?: string;
     savedStyleVersion?: number;
+    pipelineTrace?: PipelineTrace;
   };
   createdAt: string;
   updatedAt: string;
@@ -693,15 +843,19 @@ export interface Subscription {
   userId: string;
   planId: SubscriptionPlan;
   status: SubscriptionStatus;
-  razorpaySubscriptionId?: string;
-  razorpayCustomerId?: string;
   currentPeriodStart: string;
   currentPeriodEnd: string;
   creditsIncluded: number;
   creditsUsed: number;
   cancelAtPeriodEnd: boolean;
   provider?: string;
+  /** Legacy Razorpay (kept for historical records and the deployed legacy functions). */
+  razorpaySubscriptionId?: string;
+  razorpayCustomerId?: string;
   payuMandateTxnId?: string;
+  /** Paddle: billing interval of the subscribed price. */
+  billingCycle?: 'monthly' | 'yearly';
+  paddleCustomerId?: string;
   canceledAt?: string;
   trialEnd?: string;
   metadata?: Record<string, unknown>;
@@ -715,6 +869,14 @@ export interface Usage {
   periodStart: string;
   periodEnd: string;
   planId: SubscriptionPlan;
+  /**
+   * Display total for the period: monthly plan credits + bonusCredits.
+   * Enforcement (usageControl.ts) derives availability from planId + bonusCredits,
+   * not from this field.
+   */
+  creditsIncluded?: number;
+  /** Credits bought via top-up packs for this period (additive to the plan's monthly credits). */
+  bonusCredits?: number;
   campaignsCreated: number;
   creditsUsed: number;
   imagesGenerated: number;
@@ -734,6 +896,7 @@ export interface Transaction {
   currency: 'INR';
   balanceAfter: number;
   description: string;
+  /** Legacy Razorpay (kept for historical records and the deployed legacy functions). */
   razorpayPaymentId?: string;
   razorpayOrderId?: string;
   razorpaySubscriptionId?: string;
@@ -999,6 +1162,13 @@ export interface BrandCreativeContext {
   logo?: {
     primaryUrl?: string;
     secondaryUrl?: string;
+    // Durable Storage path for the primary logo, used to fetch real logo
+    // bytes server-side for deterministic compositing (compositor.ts) —
+    // the AI image model can't use logoUrl as a visual reference, so the
+    // actual pixels have to reach the final creative some other way.
+    primaryStoragePath?: string;
+    primaryWidth?: number;
+    primaryHeight?: number;
   };
   colors?: {
     primary?: string;
@@ -1244,3 +1414,9 @@ export interface CreativeTemplate {
   active: boolean;
   source: CreativeTemplateSource;
 }
+
+export * from './publishing';
+export * from './scheduling';
+export * from './calendar';
+export * from './recommendation';
+export * from './beta';

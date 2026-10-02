@@ -1,5 +1,10 @@
 import { getFirestore } from 'firebase-admin/firestore';
-import type { CreativeFeedback, CreativePreference, CreativePreferenceState, CreativePreferenceSource } from '../types';
+import type {
+  CreativeFeedback,
+  CreativePreference,
+  CreativePreferenceState,
+  CreativePreferenceSource,
+} from '../types';
 
 /**
  * Deterministically aggregates template preferences from feedback events.
@@ -14,11 +19,11 @@ export async function updateCreativePreferences(feedback: CreativeFeedback): Pro
   const db = getFirestore();
   const businessId = feedback.businessId;
   const templateId = feedback.templateId;
-  
+
   // Use a predictable document ID for idempotency and quick lookup
   // A business has one preference record per template.
   const preferenceDocId = `${businessId}_${templateId}`;
-  
+
   const preferenceRef = db.collection('creative_preferences').doc(preferenceDocId);
 
   await db.runTransaction(async (transaction) => {
@@ -50,7 +55,7 @@ export async function updateCreativePreferences(feedback: CreativeFeedback): Pro
 
     // Deterministic threshold logic for preference
     const netScore = pos - neg;
-    
+
     // Establishing a preference requires a net score of at least 2.
     // Losing a preference happens if the net score drops to 0 or below,
     // providing basic hysteresis.
@@ -73,7 +78,7 @@ export async function updateCreativePreferences(feedback: CreativeFeedback): Pro
     const scoreFactor = Math.min(1.0, Math.abs(netScore) / 5);
     const volumeFactor = Math.min(1.0, totalEvidence / 10);
     let confidence = scoreFactor * volumeFactor;
-    
+
     // Ensure confidence is bounded and clean
     confidence = Math.max(0, Math.min(1, confidence));
     if (isNaN(confidence)) confidence = 0;

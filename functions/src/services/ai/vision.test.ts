@@ -9,7 +9,9 @@ jest.mock('@google/generative-ai', () => ({
 }));
 
 // Vision fetches source images before analysis; avoid real network calls.
-global.fetch = jest.fn().mockRejectedValue(new Error('no network in tests')) as unknown as typeof fetch;
+global.fetch = jest
+  .fn()
+  .mockRejectedValue(new Error('no network in tests')) as unknown as typeof fetch;
 
 import { GeminiVisionProvider } from './vision';
 
@@ -41,17 +43,25 @@ describe('GeminiVisionProvider — runtime schema validation (no more unsafe cas
   });
 
   const metadata = { name: 'Paneer Biryani', price: 249, category: 'main' };
-  const business = { name: 'Test Restaurant', category: 'restaurant', location: { city: 'Hyderabad', state: 'Telangana' } };
+  const business = {
+    name: 'Test Restaurant',
+    category: 'restaurant',
+    location: { city: 'Hyderabad', state: 'Telangana' },
+  };
 
   it('valid structured response is returned as-is', async () => {
-    generateContentMock.mockResolvedValue({ response: { text: () => JSON.stringify(VALID_RESPONSE) } });
+    generateContentMock.mockResolvedValue({
+      response: { text: () => JSON.stringify(VALID_RESPONSE) },
+    });
     const result = await provider.analyzeProductImages([], metadata, business);
     expect(result).toEqual(VALID_RESPONSE);
   });
 
   it('missing required field is rejected by runtime validation, not silently passed through', async () => {
     const { confidence: _confidence, ...missingConfidence } = VALID_RESPONSE;
-    generateContentMock.mockResolvedValue({ response: { text: () => JSON.stringify(missingConfidence) } });
+    generateContentMock.mockResolvedValue({
+      response: { text: () => JSON.stringify(missingConfidence) },
+    });
     await expect(provider.analyzeProductImages([], metadata, business)).rejects.toThrow(
       /schema validation failed/i
     );
@@ -70,5 +80,20 @@ describe('GeminiVisionProvider — runtime schema validation (no more unsafe cas
     await expect(provider.analyzeProductImages([], metadata, business)).rejects.toThrow(
       /Failed to parse vision response/
     );
+  });
+
+  // F2/I1 (Pass 2): images WERE requested (unlike the tests above, which
+  // deliberately pass []) but every fetch fails (expired/deleted/network) —
+  // this must throw, not silently call Gemini text-only and return a
+  // schema-valid but fabricated "analysis" the caller can't distinguish
+  // from a real one.
+  it('throws when images were requested but none could be loaded, instead of silently analyzing zero images', async () => {
+    generateContentMock.mockResolvedValue({
+      response: { text: () => JSON.stringify(VALID_RESPONSE) },
+    });
+    await expect(
+      provider.analyzeProductImages(['https://example.com/dead-link.jpg'], metadata, business)
+    ).rejects.toThrow(/none of the 1 product image\(s\) could be loaded/);
+    expect(generateContentMock).not.toHaveBeenCalled();
   });
 });

@@ -131,7 +131,13 @@ describeIfEmulator('createBusiness — onboarding persistence (Phase 15)', () =>
       location: { city: 'Hyderabad', state: 'Telangana', locality: 'Banjara Hills' },
       contact: { phone: '9876500000', whatsapp: '9876500000' },
       services: [
-        { id: 'svc_0', name: 'Haircut & Styling', category: 'hair' as const, price: 500, active: true },
+        {
+          id: 'svc_0',
+          name: 'Haircut & Styling',
+          category: 'hair' as const,
+          price: 500,
+          active: true,
+        },
         { id: 'svc_1', name: 'Manicure', category: 'nails' as const, price: 300, active: true },
       ],
       packages: [

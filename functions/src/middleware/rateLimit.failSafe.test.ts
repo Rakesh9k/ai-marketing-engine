@@ -58,25 +58,21 @@ describeIfOutageSimulated('checkRateLimit — Firestore backing store unavailabl
   // that transaction is still retrying can itself hang. jest.config.js's
   // `forceExit: true` already handles process cleanup for this file.
 
-  it(
-    'does not silently allow the request (resolve) within 5s when Firestore is unreachable',
-    async () => {
-      const userId = `user-${uuid()}`;
-      const action = `test-action-${uuid()}`;
+  it('does not silently allow the request (resolve) within 5s when Firestore is unreachable', async () => {
+    const userId = `user-${uuid()}`;
+    const action = `test-action-${uuid()}`;
 
-      const outcome = await Promise.race([
-        checkRateLimit(userId, action, { maxRequests: 10, windowSeconds: 3600 }).then(
-          () => 'resolved' as const
-        ),
-        delay(5000, 'still-pending' as const),
-      ]);
+    const outcome = await Promise.race([
+      checkRateLimit(userId, action, { maxRequests: 10, windowSeconds: 3600 }).then(
+        () => 'resolved' as const
+      ),
+      delay(5000, 'still-pending' as const),
+    ]);
 
-      // The real question: does an infrastructure failure in the rate
-      // limiter's own persistence layer ever resolve as if the request
-      // were allowed, even eventually? If it had resolved within this
-      // window, that would be a fail-open bug. It does not.
-      expect(outcome).toBe('still-pending');
-    },
-    10_000
-  );
+    // The real question: does an infrastructure failure in the rate
+    // limiter's own persistence layer ever resolve as if the request
+    // were allowed, even eventually? If it had resolved within this
+    // window, that would be a fail-open bug. It does not.
+    expect(outcome).toBe('still-pending');
+  }, 10_000);
 });

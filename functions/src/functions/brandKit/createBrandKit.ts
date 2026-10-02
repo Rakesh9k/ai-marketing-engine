@@ -6,6 +6,7 @@ import { validatedCallable } from '../../middleware/validation';
 import { createBrandKitDoc, getBrandKitDoc } from '../../services/firestore';
 import { logFunctionStart, logFunctionComplete, logFunctionError } from '../../utils/logging';
 import { mapErrorToHttpsError } from '../../utils/errors';
+import { requireFeature } from '../../services/entitlements';
 import type { BrandKit } from '../../types';
 
 const createBrandKitSchema = z.object({
@@ -78,6 +79,10 @@ export const createBrandKit = onCall(
 
     try {
       await verifyBusinessAccess(context.userId, data.businessId);
+      // P0-4 (docs/P0_HARDENING_TRACKER.md): "Brand Kit & Logo Integration"
+      // is a Business/Agency-tier feature per the pricing page — Free/Starter
+      // never advertised it. Enforced server-side (TC-PLAN-003/004/005).
+      await requireFeature(context.userId, 'brandKit');
 
       const existingBrandKit = await getBrandKitDoc(data.businessId);
       const now = new Date().toISOString();

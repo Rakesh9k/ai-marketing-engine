@@ -47,7 +47,12 @@ function makeBusiness(
         colors: { primary: '#000', secondary: '#fff', accent: '#f00' },
         fonts: { heading: 'Poppins', body: 'Inter' },
       },
-      audience: { targetCustomer: '', ageRange: { min: 18, max: 65 }, localities: ['Kondapur'], preferences: '' },
+      audience: {
+        targetCustomer: '',
+        ageRange: { min: 18, max: 65 },
+        localities: ['Kondapur'],
+        preferences: '',
+      },
       localization: {
         primaryLanguage: 'en',
         secondaryLanguage: 'en',
@@ -105,7 +110,7 @@ describeIfEmulator('updateBusinessBrain — customer Business Brain edits (Phase
     expect(business?.businessBrain.businessRules.minimumOrder).toBe(0);
   });
 
-  it('cross-tenant: User B cannot edit User A\'s Business Brain', async () => {
+  it("cross-tenant: User B cannot edit User A's Business Brain", async () => {
     const ownerId = `user-${uuid()}`;
     const attackerId = `user-${uuid()}`;
     const businessId = `biz-${uuid()}`;

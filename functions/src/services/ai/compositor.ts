@@ -45,6 +45,12 @@ export interface CreativeBrandStyle {
   primaryColor: string;
   accentColor: string;
   textColor: string;
+  // Real logo bytes, embedded as a data: URI (never a URL — same reasoning
+  // as baseImage below: this SVG must be self-contained). Composited
+  // deterministically in a corner; this is the ONLY place the actual
+  // uploaded logo reaches a generated creative — the AI image prompt
+  // cannot use it as a visual reference (see imagePromptBuilder.ts).
+  logo?: { dataUri: string; width: number; height: number };
 }
 
 export const DEFAULT_BRAND_STYLE: CreativeBrandStyle = {
@@ -52,6 +58,19 @@ export const DEFAULT_BRAND_STYLE: CreativeBrandStyle = {
   accentColor: '#FFD700',
   textColor: '#FFFFFF',
 };
+
+/**
+ * Brand colours ultimately originate from user-editable Brand Kit fields
+ * (see A3 in the fix plan) and are interpolated directly into `fill="..."`
+ * attributes below. A hex regex is the correct validator (not XML
+ * escaping — `escapeSvgText` protects text *content*, not an unquoted
+ * attribute value that could otherwise break out of `fill="…"` with a
+ * crafted string like `red" onload="…`), with a safe fallback so a bad
+ * value degrades to the default colour instead of ever reaching markup.
+ */
+function safeColor(value: string | undefined, fallback: string): string {
+  return value && /^#[0-9A-Fa-f]{6}$/.test(value) ? value : fallback;
+}
 
 /** Escapes text for safe inclusion inside SVG markup — never trust generated/user text as raw XML. */
 export function escapeSvgText(text: string): string {
@@ -110,12 +129,16 @@ function fitFontSize(text: string, maxWidth: number, baseSize: number, minSize: 
 }
 
 /**
- * Composes the final creative as an SVG string. baseImageUrl must be a
- * stable, permanently-hosted URL (Firebase Storage) — never a temporary
- * provider URL — since the SVG references it by external href.
+ * Composes the final creative as an SVG string. `baseImage` must be a
+ * `data:` URI containing the actual image bytes, not a URL — an SVG's
+ * `<image href="https://...">` is an external subresource that browsers do
+ * not fetch when the SVG itself is shown via `<img>`/`next/image` (so the
+ * photo silently failed to render), and any signed URL would also expire
+ * days before the campaign's history page does. Embedding the bytes makes
+ * the SVG genuinely self-contained.
  */
 export function composeCreativeSVG(
-  baseImageUrl: string,
+  baseImage: string,
   overlay: CreativeTextOverlay,
   brand: CreativeBrandStyle,
   format: CreativeFormat
@@ -123,6 +146,15 @@ export function composeCreativeSVG(
   const { width, height } = CREATIVE_DIMENSIONS[format];
   const margin = Math.round(width * 0.06);
   const maxCharsPerLine = Math.round(width / 24);
+
+  // See safeColor's doc comment: these are interpolated into unquoted-risk
+  // `fill="..."` attributes below, so they're validated once, up front.
+  brand = {
+    ...brand,
+    primaryColor: safeColor(brand.primaryColor, DEFAULT_BRAND_STYLE.primaryColor),
+    accentColor: safeColor(brand.accentColor, DEFAULT_BRAND_STYLE.accentColor),
+    textColor: safeColor(brand.textColor, DEFAULT_BRAND_STYLE.textColor),
+  };
 
   const headlineLines = wrapText(overlay.headline, maxCharsPerLine, format === 'story' ? 3 : 2);
   const headlineFontSize = fitFontSize(
@@ -192,6 +224,16 @@ export function composeCreativeSVG(
     );
   }
 
+  let logoMarkup = '';
+  if (brand.logo && brand.logo.width > 0 && brand.logo.height > 0) {
+    const logoMaxWidth = Math.round(width * 0.18);
+    const logoW = Math.min(logoMaxWidth, brand.logo.width);
+    const logoH = Math.round(logoW * (brand.logo.height / brand.logo.width));
+    const logoX = width - margin - logoW;
+    const logoY = margin;
+    logoMarkup = `<image href="${brand.logo.dataUri}" x="${logoX}" y="${logoY}" width="${logoW}" height="${logoH}" preserveAspectRatio="xMidYMid meet" />`;
+  }
+
   return `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">
   <defs>
     <linearGradient id="scrim" x1="0" y1="0" x2="0" y2="1">
@@ -199,8 +241,9 @@ export function composeCreativeSVG(
       <stop offset="100%" stop-color="#000000" stop-opacity="0.82" />
     </linearGradient>
   </defs>
-  <image href="${escapeSvgText(baseImageUrl)}" x="0" y="0" width="${width}" height="${height}" preserveAspectRatio="xMidYMid slice" />
+  <image href="${baseImage}" x="0" y="0" width="${width}" height="${height}" preserveAspectRatio="xMidYMid slice" />
   <rect x="0" y="${scrimY}" width="${width}" height="${scrimHeight}" fill="url(#scrim)" />
+  ${logoMarkup}
   <g>
     ${lines.join('\n    ')}
   </g>

@@ -19,18 +19,26 @@ app.get('/healthz', (_req, res) => {
 
 app.use(apiKeyMiddleware);
 
-app.post('/analyze-clip', asyncHandler(async (req: Request, res: Response) => {
-  const result = await analyzeClip(req.body);
-  res.status(200).json(result);
-}));
+app.post(
+  '/analyze-clip',
+  asyncHandler(async (req: Request, res: Response) => {
+    const result = await analyzeClip(req.body);
+    res.status(200).json(result);
+  })
+);
 
-app.post('/render', asyncHandler(async (req: Request, res: Response) => {
-  const result = await renderReel(req.body);
-  res.status(200).json(result);
-}));
+app.post(
+  '/render',
+  asyncHandler(async (req: Request, res: Response) => {
+    const result = await renderReel(req.body);
+    res.status(200).json(result);
+  })
+);
 
 app.use((req: Request, res: Response) => {
-  res.status(404).json({ error: { code: 'not_found', message: `No route for ${req.method} ${req.path}` } });
+  res
+    .status(404)
+    .json({ error: { code: 'not_found', message: `No route for ${req.method} ${req.path}` } });
 });
 
 // Centralized error handler: ApiError -> its own status/code, everything

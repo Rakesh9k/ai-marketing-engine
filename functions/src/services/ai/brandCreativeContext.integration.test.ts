@@ -30,12 +30,12 @@ jest.mock('./index', () => ({
 const fetchAsBufferMock = jest
   .fn()
   .mockResolvedValue({ buffer: Buffer.from('fake-bytes'), contentType: 'image/png' });
-const uploadGeneratedAssetMock = jest.fn().mockImplementation(
-  async (businessId: string, campaignId: string, type: string) => ({
+const uploadGeneratedAssetMock = jest
+  .fn()
+  .mockImplementation(async (businessId: string, campaignId: string, type: string) => ({
     url: `https://storage.example.com/${businessId}/${campaignId}/${type}-${Math.random()}`,
     storagePath: `businesses/${businessId}/campaigns/${campaignId}/generated/${type}.svg`,
-  })
-);
+  }));
 
 jest.mock('./generatedAssetStorage', () => ({
   fetchAsBuffer: (...args: unknown[]) => fetchAsBufferMock(...args),

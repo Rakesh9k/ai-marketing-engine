@@ -32,7 +32,9 @@ function makeBusiness(businessId: string, userId: string, name: string): Busines
     category: 'restaurant',
     location: { country: 'India', state: 'Telangana', city: 'Hyderabad', locality: 'Kondapur' },
     contact: { phone: '9876543210', whatsapp: '9876543210' },
-    businessBrain: { audience: { targetCustomer: `${name}'s customers` } } as unknown as Business['businessBrain'],
+    businessBrain: {
+      audience: { targetCustomer: `${name}'s customers` },
+    } as unknown as Business['businessBrain'],
     settings: { timezone: 'Asia/Kolkata', currency: 'INR' },
     status: 'active',
     createdAt: new Date().toISOString(),
@@ -58,7 +60,11 @@ function makeProduct(productId: string, businessId: string): Product {
   } as unknown as Product;
 }
 
-function makeRequestData(businessId: string, productId: string | undefined, idempotencyKey: string) {
+function makeRequestData(
+  businessId: string,
+  productId: string | undefined,
+  idempotencyKey: string
+) {
   return {
     businessId,
     productId,
@@ -70,7 +76,10 @@ function makeRequestData(businessId: string, productId: string | undefined, idem
       validityStart: new Date().toISOString(),
       validityEnd: new Date(Date.now() + 86400000).toISOString(),
     },
-    duration: { start: new Date().toISOString(), end: new Date(Date.now() + 86400000).toISOString() },
+    duration: {
+      start: new Date().toISOString(),
+      end: new Date(Date.now() + 86400000).toISOString(),
+    },
     audience: { localities: ['Kondapur'] },
     cta: 'order_whatsapp',
     localization: {
@@ -92,95 +101,107 @@ function makeRequestData(businessId: string, productId: string | undefined, idem
   };
 }
 
-describeIfEmulator('generateCampaignStrategy — cross-entity consistency (Firestore emulator, Phase 13)', () => {
-  afterAll(async () => {
-    await admin.app().delete();
-  });
-
-  async function seedUsage(userId: string, businessId: string) {
-    const now = new Date();
-    const periodStart = new Date(now.getFullYear(), now.getMonth(), 1);
-    const usageId = `${userId}_${periodStart.toISOString().split('T')[0]}`;
-    await admin.firestore().collection('usage').doc(usageId).set({
-      usageId,
-      userId,
-      periodStart: periodStart.toISOString(),
-      periodEnd: new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString(),
-      planId: 'business',
-      campaignsCreated: 0,
-      creditsUsed: 0,
-      imagesGenerated: 0,
-      copyGenerations: 0,
-      regenerations: 0,
-      failedGenerations: 0,
-      updatedAt: new Date().toISOString(),
+describeIfEmulator(
+  'generateCampaignStrategy — cross-entity consistency (Firestore emulator, Phase 13)',
+  () => {
+    afterAll(async () => {
+      await admin.app().delete();
     });
-    await admin
-      .firestore()
-      .collection('users')
-      .doc(userId)
-      .set({ userId, businessIds: [businessId], role: 'user' });
+
+    async function seedUsage(userId: string, businessId: string) {
+      const now = new Date();
+      const periodStart = new Date(now.getFullYear(), now.getMonth(), 1);
+      const usageId = `${userId}_${periodStart.toISOString().split('T')[0]}`;
+      await admin
+        .firestore()
+        .collection('usage')
+        .doc(usageId)
+        .set({
+          usageId,
+          userId,
+          periodStart: periodStart.toISOString(),
+          periodEnd: new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString(),
+          planId: 'business',
+          campaignsCreated: 0,
+          creditsUsed: 0,
+          imagesGenerated: 0,
+          copyGenerations: 0,
+          regenerations: 0,
+          failedGenerations: 0,
+          updatedAt: new Date().toISOString(),
+        });
+      await admin
+        .firestore()
+        .collection('users')
+        .doc(userId)
+        .set({ userId, businessIds: [businessId], role: 'user' });
+    }
+
+    beforeEach(() => jest.clearAllMocks());
+
+    it("GOLDEN TEST 2/13: Business A cannot generate a campaign using Business B's product, even though both IDs are individually valid", async () => {
+      const userId = `user-${uuid()}`;
+      const businessAId = `biz-A-${uuid()}`;
+      const businessBId = `biz-B-${uuid()}`;
+      const productBId = `prod-B-${uuid()}`;
+
+      await createBusinessDoc(makeBusiness(businessAId, userId, 'Business A'));
+      // Business B belongs to a different user entirely.
+      await createBusinessDoc(makeBusiness(businessBId, `user-${uuid()}`, 'Business B'));
+      await createProductDoc(makeProduct(productBId, businessBId));
+      await seedUsage(userId, businessAId);
+
+      const request = callableRequest(
+        makeRequestData(businessAId, productBId, uuid()), // businessId=A, productId=B's product
+        userId
+      );
+
+      await expect((generateCampaignStrategy as any).run(request)).rejects.toThrow(
+        /does not belong to this business/i
+      );
+
+      // No campaign should have been created for this rejected request.
+      const campaignsSnap = await admin
+        .firestore()
+        .collection('campaigns')
+        .where('userId', '==', userId)
+        .get();
+      expect(campaignsSnap.size).toBe(0);
+
+      // No credits should have been reserved either.
+      const usageId = `${userId}_${new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split('T')[0]}`;
+      const usageSnap = await admin.firestore().collection('usage').doc(usageId).get();
+      expect(usageSnap.data()!['creditsUsed']).toBe(0);
+    });
+
+    it("a business using its OWN product succeeds, and the pipeline receives only that business's Business Brain context", async () => {
+      const userId = `user-${uuid()}`;
+      const businessAId = `biz-A-${uuid()}`;
+      const productAId = `prod-A-${uuid()}`;
+
+      await createBusinessDoc(makeBusiness(businessAId, userId, 'Business A'));
+      await createProductDoc(makeProduct(productAId, businessAId));
+      await seedUsage(userId, businessAId);
+
+      mockExecute.mockResolvedValue({
+        campaignPack: {
+          assets: [],
+          truthCheck: {
+            status: 'PASS',
+            summary: 'ok',
+            checkedAt: new Date().toISOString(),
+            checks: [],
+          },
+        },
+      });
+
+      const request = callableRequest(makeRequestData(businessAId, productAId, uuid()), userId);
+      await (generateCampaignStrategy as any).run(request);
+
+      expect(mockExecute).toHaveBeenCalledTimes(1);
+      const pipelineInput = mockExecute.mock.calls[0]![0];
+      expect(pipelineInput.businessId).toBe(businessAId);
+      expect(pipelineInput.businessBrain.audience.targetCustomer).toBe("Business A's customers");
+    });
   }
-
-  beforeEach(() => jest.clearAllMocks());
-
-  it('GOLDEN TEST 2/13: Business A cannot generate a campaign using Business B\'s product, even though both IDs are individually valid', async () => {
-    const userId = `user-${uuid()}`;
-    const businessAId = `biz-A-${uuid()}`;
-    const businessBId = `biz-B-${uuid()}`;
-    const productBId = `prod-B-${uuid()}`;
-
-    await createBusinessDoc(makeBusiness(businessAId, userId, 'Business A'));
-    // Business B belongs to a different user entirely.
-    await createBusinessDoc(makeBusiness(businessBId, `user-${uuid()}`, 'Business B'));
-    await createProductDoc(makeProduct(productBId, businessBId));
-    await seedUsage(userId, businessAId);
-
-    const request = callableRequest(
-      makeRequestData(businessAId, productBId, uuid()), // businessId=A, productId=B's product
-      userId
-    );
-
-    await expect((generateCampaignStrategy as any).run(request)).rejects.toThrow(
-      /does not belong to this business/i
-    );
-
-    // No campaign should have been created for this rejected request.
-    const campaignsSnap = await admin
-      .firestore()
-      .collection('campaigns')
-      .where('userId', '==', userId)
-      .get();
-    expect(campaignsSnap.size).toBe(0);
-
-    // No credits should have been reserved either.
-    const usageId = `${userId}_${new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split('T')[0]}`;
-    const usageSnap = await admin.firestore().collection('usage').doc(usageId).get();
-    expect(usageSnap.data()!['creditsUsed']).toBe(0);
-  });
-
-  it('a business using its OWN product succeeds, and the pipeline receives only that business\'s Business Brain context', async () => {
-    const userId = `user-${uuid()}`;
-    const businessAId = `biz-A-${uuid()}`;
-    const productAId = `prod-A-${uuid()}`;
-
-    await createBusinessDoc(makeBusiness(businessAId, userId, 'Business A'));
-    await createProductDoc(makeProduct(productAId, businessAId));
-    await seedUsage(userId, businessAId);
-
-    mockExecute.mockResolvedValue({
-      campaignPack: {
-        assets: [],
-        truthCheck: { status: 'PASS', summary: 'ok', checkedAt: new Date().toISOString(), checks: [] },
-      },
-    });
-
-    const request = callableRequest(makeRequestData(businessAId, productAId, uuid()), userId);
-    await (generateCampaignStrategy as any).run(request);
-
-    expect(mockExecute).toHaveBeenCalledTimes(1);
-    const pipelineInput = mockExecute.mock.calls[0]![0];
-    expect(pipelineInput.businessId).toBe(businessAId);
-    expect(pipelineInput.businessBrain.audience.targetCustomer).toBe("Business A's customers");
-  });
-});
+);

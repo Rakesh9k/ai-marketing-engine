@@ -24,11 +24,13 @@ export const PIX_FMT = 'yuv420p';
  * `COPY assets ./assets`) and in local dev run from the repo checkout —
  * no env var override needed in either case.
  */
-const FONTS_DIR = process.env.DRAWTEXT_FONTS_DIR || path.join(__dirname, '..', '..', 'assets', 'fonts');
+const FONTS_DIR =
+  process.env.DRAWTEXT_FONTS_DIR || path.join(__dirname, '..', '..', 'assets', 'fonts');
 
 export const FONT_PATHS: Record<Script, string> = {
   latin: process.env.DRAWTEXT_FONT_LATIN || path.join(FONTS_DIR, 'NotoSans-Bold.ttf'),
-  devanagari: process.env.DRAWTEXT_FONT_DEVANAGARI || path.join(FONTS_DIR, 'NotoSansDevanagari-Bold.ttf'),
+  devanagari:
+    process.env.DRAWTEXT_FONT_DEVANAGARI || path.join(FONTS_DIR, 'NotoSansDevanagari-Bold.ttf'),
   telugu: process.env.DRAWTEXT_FONT_TELUGU || path.join(FONTS_DIR, 'NotoSansTelugu-Bold.ttf'),
 };
 

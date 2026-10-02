@@ -151,30 +151,26 @@ describeIfEmulator('checkRateLimit', () => {
     }
   });
 
-  it(
-    'handles concurrent requests without a check-then-write race: exactly maxRequests succeed',
-    async () => {
-      const userId = `user-${uuid()}`;
-      const action = `test-action-${uuid()}`;
-      const config = { maxRequests: 10, windowSeconds: 3600 };
+  it('handles concurrent requests without a check-then-write race: exactly maxRequests succeed', async () => {
+    const userId = `user-${uuid()}`;
+    const action = `test-action-${uuid()}`;
+    const config = { maxRequests: 10, windowSeconds: 3600 };
 
-      const results = await Promise.allSettled(
-        Array.from({ length: 20 }, () => checkRateLimit(userId, action, config))
-      );
+    const results = await Promise.allSettled(
+      Array.from({ length: 20 }, () => checkRateLimit(userId, action, config))
+    );
 
-      const succeeded = results.filter((r) => r.status === 'fulfilled').length;
-      const rejected = results.filter((r) => r.status === 'rejected').length;
+    const succeeded = results.filter((r) => r.status === 'fulfilled').length;
+    const rejected = results.filter((r) => r.status === 'rejected').length;
 
-      expect(succeeded).toBe(config.maxRequests);
-      expect(rejected).toBe(20 - config.maxRequests);
+    expect(succeeded).toBe(config.maxRequests);
+    expect(rejected).toBe(20 - config.maxRequests);
 
-      // The stored count must reflect exactly the successful requests, not
-      // more — a check-then-write race would allow the count to overshoot
-      // maxRequests under concurrent load.
-      const key = `ratelimit_${action}_${userId}`;
-      const doc = await admin.firestore().collection('rate_limits').doc(key).get();
-      expect(doc.data()?.['count']).toBe(config.maxRequests);
-    },
-    15_000
-  );
+    // The stored count must reflect exactly the successful requests, not
+    // more — a check-then-write race would allow the count to overshoot
+    // maxRequests under concurrent load.
+    const key = `ratelimit_${action}_${userId}`;
+    const doc = await admin.firestore().collection('rate_limits').doc(key).get();
+    expect(doc.data()?.['count']).toBe(config.maxRequests);
+  }, 15_000);
 });

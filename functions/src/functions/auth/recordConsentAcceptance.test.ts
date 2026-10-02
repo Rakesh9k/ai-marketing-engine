@@ -27,7 +27,7 @@ describeIfEmulator('recordConsentAcceptance (Firestore emulator)', () => {
     await admin.app().delete();
   });
 
-  it('records the server-side current Terms/Privacy version and a server timestamp on the caller\'s own user doc', async () => {
+  it("records the server-side current Terms/Privacy version and a server timestamp on the caller's own user doc", async () => {
     const userId = `user-${crypto.randomUUID()}`;
     const user: User = {
       userId,

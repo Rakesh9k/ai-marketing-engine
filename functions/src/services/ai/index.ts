@@ -1,7 +1,5 @@
 import type { z } from 'zod';
-import { geminiVisionProvider, geminiReelVisionProvider } from './vision';
-import { geminiTextProvider } from './text';
-import { openAIImageProvider } from './image';
+import { getTextAI, getVisionAI, getReelVisionAI, getImageAI } from './factory/aiProviderFactory';
 import { runDeterministicTruthCheck, extractFacts } from './truthCheck';
 import { executeWithUsageControl, getGenerationCost, USAGE_ERROR_CODES } from '../usageControl';
 import { withTimeout, withRetry } from './retry';
@@ -27,10 +25,10 @@ const IMAGE_TIMEOUT_MS = 60_000;
  * Centralized access to all AI providers
  */
 export const aiServices = {
-  vision: geminiVisionProvider,
-  reelVision: geminiReelVisionProvider,
-  text: geminiTextProvider,
-  image: openAIImageProvider,
+  vision: getVisionAI(),
+  reelVision: getReelVisionAI(),
+  text: getTextAI(),
+  image: getImageAI(),
   truthCheck: {
     runDeterministicTruthCheck,
     extractFacts,
@@ -216,7 +214,11 @@ export async function generateImage(
   request: ImageGenerationRequest
 ): Promise<ImageGenerationResponse> {
   const start = Date.now();
-  const meta = { provider: 'openai', model: 'dall-e-3', stage: 'image.generateImage' };
+  const meta = {
+    provider: 'gemini',
+    model: process.env['GEMINI_IMAGE_MODEL'] || 'gemini-2.5-flash-image',
+    stage: 'image.generateImage',
+  };
   try {
     const result = await withTimeout(
       aiServices.image.generateImage(request),
@@ -237,8 +239,8 @@ export async function generateImage(
     aiLogger.error('ai.timeout', error, { ...meta, durationMs: Date.now() - start });
     return {
       success: false,
-      provider: 'openai',
-      model: 'dall-e-3',
+      provider: 'gemini',
+      model: process.env['GEMINI_IMAGE_MODEL'] || 'gemini-2.5-flash-image',
       error: { code: 'TIMEOUT', message: errorMessage(error) },
     };
   }

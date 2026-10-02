@@ -1,8 +1,8 @@
 import { z } from 'zod';
-import type { 
-  CreativeTemplate, 
-  CreativeObjective, 
-  BusinessCategory, 
+import type {
+  CreativeTemplate,
+  CreativeObjective,
+  BusinessCategory,
   BrandCreativeContext,
   LanguageCode,
   RegionalStyle,
@@ -109,7 +109,9 @@ export interface BuildTemplateContextInput {
   creativePreferences?: import('./creativeContextSelector').CreativePreferenceContext;
 }
 
-export function buildCreativeTemplateContext(input: BuildTemplateContextInput): CreativeTemplateContext {
+export function buildCreativeTemplateContext(
+  input: BuildTemplateContextInput
+): CreativeTemplateContext {
   const template = creativeTemplateRegistry.getCreativeTemplate(input.templateId);
   if (!template) {
     throw new TemplateContextValidationError(`Template not found: ${input.templateId}`);
@@ -119,13 +121,17 @@ export function buildCreativeTemplateContext(input: BuildTemplateContextInput): 
   }
 
   if (!template.objectives.includes(input.objective)) {
-    throw new TemplateContextValidationError(`Objective ${input.objective} is not supported by template ${template.id}`);
+    throw new TemplateContextValidationError(
+      `Objective ${input.objective} is not supported by template ${template.id}`
+    );
   }
 
   const businessCategory = input.businessBrain?.identity?.category as BusinessCategory;
   if (template.compatibleVerticals && template.compatibleVerticals.length > 0) {
     if (businessCategory && !template.compatibleVerticals.includes(businessCategory)) {
-      throw new TemplateContextValidationError(`Vertical ${businessCategory} is not supported by template ${template.id}`);
+      throw new TemplateContextValidationError(
+        `Vertical ${businessCategory} is not supported by template ${template.id}`
+      );
     }
   }
 
@@ -140,7 +146,13 @@ export function buildCreativeTemplateContext(input: BuildTemplateContextInput): 
   };
 
   let offer: OfferContext | undefined = undefined;
-  if (input.offerHeadline && input.offerPrice !== undefined && input.offerType && input.offerValidityStart && input.offerValidityEnd) {
+  if (
+    input.offerHeadline &&
+    input.offerPrice !== undefined &&
+    input.offerType &&
+    input.offerValidityStart &&
+    input.offerValidityEnd
+  ) {
     offer = {
       headline: input.offerHeadline,
       description: input.offerDescription,
@@ -152,15 +164,23 @@ export function buildCreativeTemplateContext(input: BuildTemplateContextInput): 
       terms: input.offerTerms,
     };
   } else {
-    const hasOfferRequired = template.structure.grammar.some((g: any) => g.role === 'offer' && g.required);
+    const hasOfferRequired = template.structure.grammar.some(
+      (g: any) => g.role === 'offer' && g.required
+    );
     if (hasOfferRequired) {
-      throw new TemplateContextValidationError(`Template ${template.id} requires an offer, but offer details are incomplete`);
+      throw new TemplateContextValidationError(
+        `Template ${template.id} requires an offer, but offer details are incomplete`
+      );
     }
   }
 
-  const hasProductRequired = template.structure.grammar.some((g: any) => g.role === 'product' && g.required);
+  const hasProductRequired = template.structure.grammar.some(
+    (g: any) => g.role === 'product' && g.required
+  );
   if (hasProductRequired && !product.name) {
-    throw new TemplateContextValidationError(`Template ${template.id} requires a product, but product is missing`);
+    throw new TemplateContextValidationError(
+      `Template ${template.id} requires a product, but product is missing`
+    );
   }
 
   if (!input.businessBrain?.identity) {

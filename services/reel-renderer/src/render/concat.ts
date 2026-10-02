@@ -19,7 +19,10 @@ export interface ConcatClip {
  * hard-cut transition (see AGENTS instructions: reliability over transition
  * variety for this MVP).
  */
-export async function concatWithTransitions(clips: ConcatClip[], outputPath: string): Promise<void> {
+export async function concatWithTransitions(
+  clips: ConcatClip[],
+  outputPath: string
+): Promise<void> {
   if (clips.length === 0) {
     throw new Error('concatWithTransitions requires at least one clip');
   }
@@ -29,7 +32,9 @@ export async function concatWithTransitions(clips: ConcatClip[], outputPath: str
     return;
   }
 
-  const durationsSec = await Promise.all(clips.map(async (c) => (await probeVideo(c.path)).durationMs / 1000));
+  const durationsSec = await Promise.all(
+    clips.map(async (c) => (await probeVideo(c.path)).durationMs / 1000)
+  );
 
   const inputArgs: string[] = [];
   clips.forEach((c) => {

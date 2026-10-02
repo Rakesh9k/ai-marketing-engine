@@ -231,7 +231,9 @@ export const creativeTemplateSchema: z.ZodType<CreativeTemplate> = z
     constraints: templateConstraintsSchema,
     version: z.number().int().min(1),
     active: z.boolean(),
-    source: z.enum(CREATIVE_TEMPLATE_SOURCES as [CreativeTemplateSource, ...CreativeTemplateSource[]]),
+    source: z.enum(
+      CREATIVE_TEMPLATE_SOURCES as [CreativeTemplateSource, ...CreativeTemplateSource[]]
+    ),
   })
   .superRefine((template, ctx) => {
     uniqueIdsRefinement(template.structure.grammar, ctx, ['structure', 'grammar'], 'grammar step');
@@ -254,7 +256,10 @@ export const creativeTemplateSchema: z.ZodType<CreativeTemplate> = z
     }
 
     const sectionCount = template.structure.grammar.length;
-    if (sectionCount < template.constraints.minSections || sectionCount > template.constraints.maxSections) {
+    if (
+      sectionCount < template.constraints.minSections ||
+      sectionCount > template.constraints.maxSections
+    ) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
         message: `structure.grammar has ${sectionCount} step(s), outside constraints range [${template.constraints.minSections}, ${template.constraints.maxSections}]`,

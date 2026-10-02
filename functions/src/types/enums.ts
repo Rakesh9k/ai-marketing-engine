@@ -60,7 +60,7 @@ export type AssetType =
 
 export type AssetStatus = 'generating' | 'completed' | 'failed';
 
-export type SubscriptionPlan = 'free' | 'starter' | 'business' | 'agency';
+export type SubscriptionPlan = 'free' | 'starter' | 'business' | 'pro' | 'agency';
 
 export type SubscriptionStatus = 'active' | 'canceled' | 'past_due' | 'trialing' | 'incomplete';
 
@@ -73,7 +73,7 @@ export type TransactionType =
   | 'grant'
   | 'setup_fee';
 
-export type TransactionStatus = 'pending' | 'completed' | 'failed' | 'refunded';
+export type TransactionStatus = 'pending' | 'completed' | 'failed' | 'refunded' | 'expired';
 
 export interface LocalizationProfile {
   country: string;

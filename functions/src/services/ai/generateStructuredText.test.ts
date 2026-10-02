@@ -27,7 +27,7 @@ jest.mock('./vision', () => ({
 }));
 
 jest.mock('./image', () => ({
-  openAIImageProvider: {
+  geminiImageProvider: {
     generateImage: (...args: unknown[]) => generateImageMock(...args),
   },
 }));
@@ -124,7 +124,12 @@ describe('generateStructuredText argument flow', () => {
 
   it('generateImage forwards the request unchanged and returns the provider result', async () => {
     const request = { prompt: 'a poster', generationMode: 'poster' as const };
-    const response = { success: true, imageUrl: 'https://example.com/img.png', provider: 'openai', model: 'dall-e-3' };
+    const response = {
+      success: true,
+      imageUrl: 'https://example.com/img.png',
+      provider: 'openai',
+      model: 'dall-e-3',
+    };
     generateImageMock.mockResolvedValue(response);
 
     const result = await generateImage(request as never);

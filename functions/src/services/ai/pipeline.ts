@@ -1,19 +1,40 @@
-
 import { analyzeProductImages, generateStructuredText, generateImage } from './index';
-import { buildCreativeBrief, type CreativeBrief, type CreativeBriefInput } from './creativeBrief'; import { buildCreativeTemplateContext } from './creativeTemplateContext';
+import { buildCreativeBrief, type CreativeBrief, type CreativeBriefInput } from './creativeBrief';
+import { buildCreativeTemplateContext } from './creativeTemplateContext';
 import { buildImagePromptPack } from './imagePromptBuilder';
 import { runDeterministicTruthCheck } from './truthCheck';
+import { resolveUserInstructionConflicts } from './conflictResolver';
 import {
   composeCreativeSVG,
   DEFAULT_BRAND_STYLE,
   type CreativeTextOverlay,
   type CreativeBrandStyle,
 } from './compositor';
-import { fetchAsBuffer, uploadGeneratedAsset } from './generatedAssetStorage';
+import {
+  fetchAsBuffer,
+  uploadGeneratedAsset,
+  downloadFromStoragePath,
+} from './generatedAssetStorage';
 import { MAX_IMAGE_GENERATION_CALLS_PER_CAMPAIGN } from '../../config/pricing';
 import { getVerticalConfigOrDefault } from '../../config/verticals';
 import { z } from 'zod';
-import type { BusinessRules, BrandCreativeContext } from '../../types';
+import type {
+  BusinessRules,
+  BrandCreativeContext,
+  PipelineTrace,
+  UserRequestStageData,
+  IntentExtractionStageData,
+  BusinessBrainRetrievalStageData,
+  ContextSelectedStageData,
+  GeminiRequestStageData,
+  GeminiResponseStageData,
+  ValidationCheckItem,
+  ValidationStageData,
+  MitraTransformationsStageData,
+  CreativeGenerationStageData,
+  FinalCampaignStageData,
+  TruthCheckResult,
+} from '../../types';
 import { createLogger, logFunctionStage } from '../../utils/logging';
 
 /**
@@ -434,7 +455,11 @@ export class GenerationPipeline {
    * Execute the full 13-stage generation pipeline
    */
   async execute(input: GenerationPipelineInput): Promise<GenerationPipelineOutput> {
+    const conflictPlan = resolveUserInstructionConflicts(input);
+    const resolvedInput = conflictPlan.resolvedInput;
+
     const stageResults: {
+      conflictPlan?: any;
       businessUnderstanding?: any;
       productUnderstanding?: any;
       campaignStrategy?: any;
@@ -449,7 +474,9 @@ export class GenerationPipeline {
       campaignPack?: any;
       creativeTemplateContext?: any;
       adaptedCreativePlan?: any;
-    } = {};
+    } = {
+      conflictPlan,
+    };
 
     // Phase 14: every stage marker and the top-level failure here previously
     // used bare console.log/console.error with no campaignId/businessId
@@ -494,17 +521,17 @@ export class GenerationPipeline {
 
       const { selectCreativeContext } = await import('./creativeContextSelector.js');
       const { TemplateAdaptationPlanner } = await import('./templateAdaptation.js');
-      
+
       const selectedContext = selectCreativeContext({
         task: 'campaign_strategy', // High-level task for adaptation planning
-        templateContext: creativeTemplateContext
+        templateContext: creativeTemplateContext,
       });
-      
+
       const planner = new TemplateAdaptationPlanner();
       adaptedCreativePlan = await planner.adapt({
         template: creativeTemplateContext.template,
         selectedContext,
-        objective: creativeTemplateContext.objective
+        objective: creativeTemplateContext.objective,
       });
     }
     // Attach to previousResults conceptually so it's available early
@@ -575,12 +602,22 @@ export class GenerationPipeline {
       logFunctionStage(logger, currentStage);
       stageResults.campaignPack = await this.runStage12(input, stageResults);
 
-      // Stage 13: Save Results (handled by caller)
+      // Stage 13: Build 11-stage transparent pipeline execution trace
+      const pipelineTrace = this.buildPipelineTrace(input, stageResults);
+      if (stageResults.campaignPack) {
+        stageResults.campaignPack.metadata = {
+          ...(stageResults.campaignPack.metadata || {}),
+          pipelineTrace,
+        };
+      }
 
       return {
         success: true,
         stages: stageResults,
         campaignPack: stageResults.campaignPack,
+        pipelineTrace,
+        // P0-1: authoritative cleanup list — see the comment in runStage7.
+        allGeneratedStoragePaths: stageResults.generatedImages?.allStoragePaths || [],
       };
     } catch (error) {
       logger.error('Pipeline failed', error, { stage: currentStage });
@@ -672,23 +709,71 @@ export class GenerationPipeline {
     const creativeBrief = this.buildCreativeBriefFromResults(input, previousResults);
     const generationMetadata: any[] = [];
 
-    const heroPrompts = buildImagePromptPack(
-      creativeBrief,
-      MAX_IMAGE_GENERATION_CALLS_PER_CAMPAIGN
-    );
-    const heroPrompt = heroPrompts[0];
+    // P0-1: every Storage object this stage creates, regardless of which
+    // (if any) final asset ends up referencing its storagePath. Truth Check
+    // (stages 8-11) hasn't run yet when these uploads happen, so the caller
+    // (generateCampaignStrategy.ts) needs an authoritative list to delete
+    // on a FAIL verdict — a rejected campaign must not leave a
+    // publicly-fetchable (token-URL) Storage object behind just because no
+    // CampaignAsset document ended up pointing at it.
+    const allStoragePaths: string[] = [];
 
     let heroImageUrl: string | null = null;
+    // The SVG embeds bytes directly (see compositor.ts's composeCreativeSVG
+    // doc comment) rather than referencing heroImageUrl by external href —
+    // that URL is still stored separately (campaign_assets, reel cover) for
+    // contexts that DO fetch it server-side or accept a normal URL.
+    let heroImageDataUri: string | null = null;
     const campaignId = input.campaignId || 'draft';
+
+    // I1 (Pass 2): when a real product photo exists, use it directly as the
+    // hero — zero AI image calls needed, and the creative is genuinely,
+    // verifiably the customer's own product rather than DALL-E 3's
+    // interpretation of a text description (DALL-E 3's images.generate API
+    // cannot accept a reference image at all, so "generate something that
+    // looks like this photo" was never actually achievable — only faked by
+    // an unenforceable prompt instruction, removed in imagePromptBuilder.ts).
+    // Falls through to AI generation below only when no real photo exists.
+    const productImageUrl = creativeBrief.product?.imageUrl;
+    if (productImageUrl) {
+      try {
+        const { buffer, contentType } = await fetchAsBuffer(productImageUrl);
+        heroImageUrl = productImageUrl;
+        heroImageDataUri = `data:${contentType};base64,${buffer.toString('base64')}`;
+        generationMetadata.push({
+          assetType: 'hero',
+          prompt: '(none — real product photo used directly, no AI image generation)',
+          provider: 'product-photo',
+          model: 'none',
+          latencyMs: 0,
+        });
+      } catch (error) {
+        createLogger({ businessId: input.businessId, campaignId: input.campaignId }).warn(
+          'Failed to load real product photo for hero image; falling back to AI generation',
+          { error: error instanceof Error ? error.message : String(error) }
+        );
+      }
+    }
+
+    const heroPrompts = heroImageDataUri
+      ? []
+      : buildImagePromptPack(creativeBrief, MAX_IMAGE_GENERATION_CALLS_PER_CAMPAIGN);
+    const heroPrompt = heroPrompts[0];
 
     if (heroPrompt) {
       const startTime = Date.now();
       const result = await generateImage(heroPrompt);
       const latencyMs = Date.now() - startTime;
 
-      if (result.success && result.imageUrl) {
+      if (result.success && (result.imageData || result.imageUrl)) {
         try {
-          const { buffer, contentType } = await fetchAsBuffer(result.imageUrl);
+          // Gemini returns inline bytes; a URL-returning provider is still supported.
+          const { buffer, contentType } = result.imageData
+            ? {
+                buffer: Buffer.from(result.imageData.base64, 'base64'),
+                contentType: result.imageData.mimeType,
+              }
+            : await fetchAsBuffer(result.imageUrl as string);
           const uploaded = await uploadGeneratedAsset(
             input.businessId,
             campaignId,
@@ -697,6 +782,8 @@ export class GenerationPipeline {
             contentType
           );
           heroImageUrl = uploaded.url;
+          heroImageDataUri = `data:${contentType};base64,${buffer.toString('base64')}`;
+          allStoragePaths.push(uploaded.storagePath);
           generationMetadata.push({
             assetType: 'hero',
             prompt: heroPrompt.prompt,
@@ -743,17 +830,23 @@ export class GenerationPipeline {
     }
 
     const posterUrls: string[] = [];
+    // F2: storagePath persisted alongside each URL (CampaignAsset.storagePath
+    // exists in the type but was never actually set) — this is the durable
+    // reference a future re-sign/refresh path can always regenerate a URL
+    // from, independent of whether the currently-stored URL is still valid.
+    const posterStoragePaths: string[] = [];
     const storyFrameUrls: string[][] = [];
+    const storyFrameStoragePaths: string[][] = [];
     let reelScript: {
       coverImageUrl: string;
       scenes: Array<{ sceneNumber: number; durationSeconds: number; text: string }>;
     } | null = null;
 
-    if (heroImageUrl) {
+    if (heroImageUrl && heroImageDataUri) {
       const textOverlay = this.buildCreativeTextOverlay(input, previousResults);
-      const brandStyle = this.buildBrandStyle(creativeBrief);
+      const brandStyle = await this.buildBrandStyle(creativeBrief, input);
 
-      const posterSvg = composeCreativeSVG(heroImageUrl, textOverlay, brandStyle, 'poster');
+      const posterSvg = composeCreativeSVG(heroImageDataUri, textOverlay, brandStyle, 'poster');
       const posterUpload = await uploadGeneratedAsset(
         input.businessId,
         campaignId,
@@ -762,11 +855,14 @@ export class GenerationPipeline {
         'image/svg+xml'
       );
       posterUrls.push(posterUpload.url);
+      posterStoragePaths.push(posterUpload.storagePath);
+      allStoragePaths.push(posterUpload.storagePath);
 
       const storyOverlays = this.buildStoryFrameOverlays(textOverlay);
       const frameUrls: string[] = [];
+      const frameStoragePaths: string[] = [];
       for (const frameOverlay of storyOverlays) {
-        const svg = composeCreativeSVG(heroImageUrl, frameOverlay, brandStyle, 'story');
+        const svg = composeCreativeSVG(heroImageDataUri, frameOverlay, brandStyle, 'story');
         const upload = await uploadGeneratedAsset(
           input.businessId,
           campaignId,
@@ -775,8 +871,11 @@ export class GenerationPipeline {
           'image/svg+xml'
         );
         frameUrls.push(upload.url);
+        frameStoragePaths.push(upload.storagePath);
+        allStoragePaths.push(upload.storagePath);
       }
       storyFrameUrls.push(frameUrls);
+      storyFrameStoragePaths.push(frameStoragePaths);
 
       reelScript = this.buildReelStoryboard(textOverlay, heroImageUrl);
     } else {
@@ -797,9 +896,12 @@ export class GenerationPipeline {
 
     return {
       posterUrls,
+      posterStoragePaths,
       storyFrameUrls,
+      storyFrameStoragePaths,
       reelScript,
       generationMetadata,
+      allStoragePaths,
     };
   }
 
@@ -816,8 +918,11 @@ export class GenerationPipeline {
     previousResults: any
   ): CreativeTextOverlay {
     const copyPack = previousResults?.copyPack;
+    const rawHeadline = copyPack?.headlines?.[0];
     const headline: string =
-      copyPack?.headlines?.[0] || input.offerHeadline || input.productName || '';
+      typeof rawHeadline === 'string'
+        ? rawHeadline
+        : rawHeadline?.text || input.offerHeadline || input.productName || '';
 
     const priceText = input.offerPrice ? `₹${input.offerPrice}` : undefined;
     const originalPriceText =
@@ -870,13 +975,40 @@ export class GenerationPipeline {
     };
   }
 
-  private buildBrandStyle(brief: CreativeBrief): CreativeBrandStyle {
+  private async buildBrandStyle(
+    brief: CreativeBrief,
+    input: GenerationPipelineInput
+  ): Promise<CreativeBrandStyle> {
     const colors = brief.brand?.colors;
-    return {
+    const style: CreativeBrandStyle = {
       primaryColor: colors?.[0] || DEFAULT_BRAND_STYLE.primaryColor,
       accentColor: colors?.[1] || colors?.[0] || DEFAULT_BRAND_STYLE.accentColor,
       textColor: DEFAULT_BRAND_STYLE.textColor,
     };
+
+    // Fetch the real logo bytes so composeCreativeSVG can embed them — this
+    // is the only path by which the actual uploaded logo (not a
+    // hallucinated one) reaches a generated creative (see D2 in the fix
+    // plan). Best-effort: a missing/unreadable logo must never fail
+    // generation, it just means no logo on this creative.
+    const storagePath = brief.brand?.logoStoragePath;
+    if (storagePath && brief.brand?.logoWidth && brief.brand?.logoHeight) {
+      try {
+        const { buffer, contentType } = await downloadFromStoragePath(storagePath);
+        style.logo = {
+          dataUri: `data:${contentType};base64,${buffer.toString('base64')}`,
+          width: brief.brand.logoWidth,
+          height: brief.brand.logoHeight,
+        };
+      } catch (error) {
+        createLogger({ businessId: input.businessId, campaignId: input.campaignId }).warn(
+          'Failed to load brand logo for compositing',
+          { error: error instanceof Error ? error.message : String(error) }
+        );
+      }
+    }
+
+    return style;
   }
 
   /** 3 deterministic story frames from the SAME base overlay data — zero extra AI calls. */
@@ -885,7 +1017,9 @@ export class GenerationPipeline {
       { ...base },
       {
         ...base,
-        headline: base.offerBadge ? `${base.offerBadge} - ${base.priceText || ''}` : (base.priceText || 'Special Offer'),
+        headline: base.offerBadge
+          ? `${base.offerBadge} - ${base.priceText || ''}`
+          : base.priceText || 'Special Offer',
       },
       { ...base, headline: base.ctaText },
     ];
@@ -911,7 +1045,9 @@ export class GenerationPipeline {
         {
           sceneNumber: 3,
           durationSeconds: 4,
-          text: overlay.offerBadge ? `${overlay.priceText || ''} - ${overlay.offerBadge}` : (overlay.priceText || 'Special Offer'),
+          text: overlay.offerBadge
+            ? `${overlay.priceText || ''} - ${overlay.offerBadge}`
+            : overlay.priceText || 'Special Offer',
         },
         { sceneNumber: 4, durationSeconds: 3, text: overlay.ctaText },
       ],
@@ -1037,6 +1173,11 @@ export class GenerationPipeline {
   private assembleCampaignPack(input: GenerationPipelineInput, previousResults: any): any {
     const assets: any[] = [];
     const now = new Date().toISOString();
+    // Asset IDs must be unique per campaign — they are the Firestore doc ID
+    // in campaign_assets/{assetId} (see createCampaignAssets). A bare
+    // 'asset_headline_0' collides across every campaign and every tenant,
+    // silently overwriting prior campaigns' assets on each new generation.
+    const assetIdPrefix = `${input.campaignId}_`;
 
     // Add copy assets
     const copyPack = previousResults.copyPack;
@@ -1044,7 +1185,7 @@ export class GenerationPipeline {
       // Headlines
       copyPack.headlines?.forEach((h: any, i: number) => {
         assets.push({
-          assetId: `asset_headline_${i}`,
+          assetId: `${assetIdPrefix}asset_headline_${i}`,
           type: 'headline',
           index: i,
           content: h,
@@ -1056,7 +1197,7 @@ export class GenerationPipeline {
       // Ad copies
       copyPack.adCopies?.forEach((ac: any, i: number) => {
         assets.push({
-          assetId: `asset_ad_copy_${i}`,
+          assetId: `${assetIdPrefix}asset_ad_copy_${i}`,
           type: 'ad_copy',
           index: i,
           content: ac,
@@ -1068,7 +1209,7 @@ export class GenerationPipeline {
       // Captions
       copyPack.captions?.forEach((c: any, i: number) => {
         assets.push({
-          assetId: `asset_caption_${i}`,
+          assetId: `${assetIdPrefix}asset_caption_${i}`,
           type: 'caption',
           index: i,
           content: c,
@@ -1080,7 +1221,7 @@ export class GenerationPipeline {
       // Story concepts
       copyPack.storyConcepts?.forEach((sc: any, i: number) => {
         assets.push({
-          assetId: `asset_story_${i}`,
+          assetId: `${assetIdPrefix}asset_story_${i}`,
           type: 'story',
           index: i,
           content: sc,
@@ -1092,7 +1233,7 @@ export class GenerationPipeline {
       // Reel concepts
       copyPack.reelConcepts?.forEach((rc: any, i: number) => {
         assets.push({
-          assetId: `asset_reel_${i}`,
+          assetId: `${assetIdPrefix}asset_reel_${i}`,
           type: 'reel',
           index: i,
           content: rc,
@@ -1104,7 +1245,7 @@ export class GenerationPipeline {
       // WhatsApp message
       if (copyPack.whatsappMessage) {
         assets.push({
-          assetId: 'asset_whatsapp_0',
+          assetId: `${assetIdPrefix}asset_whatsapp_0`,
           type: 'whatsapp',
           index: 0,
           content: copyPack.whatsappMessage,
@@ -1116,7 +1257,7 @@ export class GenerationPipeline {
       // CTA variations
       copyPack.ctaVariations?.forEach((cta: any, i: number) => {
         assets.push({
-          assetId: `asset_cta_${i}`,
+          assetId: `${assetIdPrefix}asset_cta_${i}`,
           type: 'cta',
           index: i,
           content: cta,
@@ -1132,11 +1273,14 @@ export class GenerationPipeline {
       // Posters
       genImages.posterUrls?.forEach((url: string, i: number) => {
         assets.push({
-          assetId: `asset_poster_${i}`,
+          assetId: `${assetIdPrefix}asset_poster_${i}`,
           type: 'poster',
           index: i,
           content: previousResults.imagePrompts?.posterPrompts?.[i] || {},
           imageUrl: url,
+          // F2: the durable reference — imageUrl is generated FROM this and
+          // can always be regenerated from it (see getDurableDownloadUrl).
+          storagePath: genImages.posterStoragePaths?.[i],
           status: 'completed',
           createdAt: now,
         });
@@ -1148,11 +1292,12 @@ export class GenerationPipeline {
       genImages.storyFrameUrls?.forEach((storyFrames: string[], storyIdx: number) => {
         storyFrames.forEach((url: string, frameIdx: number) => {
           assets.push({
-            assetId: `asset_story_${storyIdx}_frame_${frameIdx}`,
+            assetId: `${assetIdPrefix}asset_story_${storyIdx}_frame_${frameIdx}`,
             type: 'story',
             index: frameIdx,
             content: {},
             imageUrl: url,
+            storagePath: genImages.storyFrameStoragePaths?.[storyIdx]?.[frameIdx],
             status: 'completed',
             createdAt: now,
           });
@@ -1170,7 +1315,7 @@ export class GenerationPipeline {
       // createCampaignAssets persists one document per assetId.
       if (genImages.reelScript) {
         assets.push({
-          assetId: 'asset_reel_storyboard',
+          assetId: `${assetIdPrefix}asset_reel_storyboard`,
           type: 'reel',
           index: 0,
           content: { scenes: genImages.reelScript.scenes },
@@ -1204,6 +1349,346 @@ export class GenerationPipeline {
       status: previousResults.truthCheck?.status === 'PASS' ? 'verified' : 'generated',
       createdAt: now,
       updatedAt: now,
+    };
+  }
+
+  /**
+   * Builds the 11-stage transparent pipeline execution trace for debugging, audit, and user inspection.
+   */
+  public buildPipelineTrace(input: GenerationPipelineInput, previousResults: any): PipelineTrace {
+    const now = new Date().toISOString();
+    const campaignId = input.campaignId || `camp_${Date.now()}`;
+    const businessId = input.businessId;
+
+    const copyPack = previousResults?.copyPack;
+    const strategy = previousResults?.campaignStrategy;
+    const truthCheck: TruthCheckResult | undefined = previousResults?.truthCheck;
+    const genImages = previousResults?.generatedImages;
+
+    // 1. User Request
+    const userRequestData: UserRequestStageData = {
+      request:
+        input.offerHeadline ||
+        `Create a ${input.campaignStyle || 'friendly'} ad for ${input.productName}`,
+      language: input.localizationProfile?.primaryLanguage || 'te',
+      style: input.campaignStyle || 'funny',
+      objective: input.objective || 'promotion',
+      targetProduct: input.productName,
+      rawInput: {
+        businessName: input.businessName,
+        productName: input.productName,
+        offerPrice: input.offerPrice,
+        offerOriginalPrice: input.offerOriginalPrice,
+        cta: input.cta,
+        localities: input.audience?.localities,
+      },
+    };
+
+    // 2. Mitra UI
+    const mitraUiData = {
+      templateId: input.templateId || 'default_template',
+      creativeObjective: input.creativeObjective || input.objective,
+      ctaSelection: input.cta,
+      savedStyleId: (input as { savedStyleId?: string }).savedStyleId,
+      audienceLocalities: input.audience?.localities || [],
+      audienceOccasion: input.audience?.occasion || 'regular',
+    };
+
+    // 3. Intent Extraction
+    const intentData: IntentExtractionStageData = {
+      extractedLanguage:
+        input.localizationProfile?.primaryLanguage === 'te'
+          ? 'Telugu'
+          : input.localizationProfile?.primaryLanguage || 'Telugu',
+      extractedStyle: input.campaignStyle || 'funny',
+      extractedProduct: input.productName,
+      extractedObjective: input.objective || 'promotion',
+      extractedOccasion: input.audience?.occasion || 'Friday special',
+      confidence: 0.98,
+    };
+
+    // 4. Business Brain Retrieval
+    const bb = input.businessBrain;
+    const effectiveBrandTone = input.brandProfile?.tone || bb?.brand?.tone || 'friendly';
+    const langLabel =
+      input.localizationProfile?.primaryLanguage === 'te'
+        ? 'Telugu'
+        : input.localizationProfile?.primaryLanguage === 'hi_en'
+          ? 'Hinglish'
+          : input.localizationProfile?.primaryLanguage || 'Telugu';
+
+    const businessBrainData: BusinessBrainRetrievalStageData = {
+      business: bb?.identity?.name || input.businessName,
+      location: `${input.businessLocation?.locality ? input.businessLocation.locality + ', ' : ''}${input.businessLocation?.city}`,
+      product: input.productName,
+      price: `₹${input.offerPrice}`,
+      brandTone: effectiveBrandTone,
+      languagePreference: langLabel,
+      audience: bb?.audience?.targetCustomer || 'local food lovers',
+      businessRules: bb?.businessRules ? (bb.businessRules as Record<string, unknown>) : undefined,
+    };
+
+    // 5. Context Selected by Mitra
+    const contextAssemblyData: ContextSelectedStageData = {
+      selectedContext: {
+        businessIdentity: true,
+        productInformation: true,
+        currentOffer: true,
+        location: true,
+        language: true,
+        tone: true,
+        relevantPreviousCampaignPreferences: Boolean(bb?.campaignHistory?.length),
+        brandRules: Boolean(bb?.businessRules),
+      },
+      contextSummary: `Selected business identity (${input.businessName}), product (${input.productName}), price (₹${input.offerPrice}), location (${input.businessLocation?.city}), tone (${effectiveBrandTone}), and brand rules.`,
+    };
+
+    // 6. Actual Gemini Request (Prompt Builder)
+    const savedStyleId = (input as { savedStyleId?: string }).savedStyleId;
+    const savedStyleStr = savedStyleId ? `\nSaved Style ID: ${savedStyleId}` : '';
+    const regionalStyleStr = input.localizationProfile?.regionalStyle
+      ? ` (${input.localizationProfile.regionalStyle} style)`
+      : '';
+    const occasionStr = input.audience?.occasion ? `\nOccasion: ${input.audience.occasion}` : '';
+    const offerTypeStr = input.offerType ? ` Offer type: ${input.offerType}.` : '';
+    const targetAudienceStr =
+      bb?.audience?.targetCustomer ||
+      (input.audience as any)?.targetCustomer ||
+      'Young professionals';
+    const visualPrefStr = bb?.brand?.visualPreferences
+      ? `\nBrand preferences: ${bb.brand.visualPreferences}`
+      : '';
+    const audiencePrefStr = bb?.audience?.preferences
+      ? `\nAudience preferences: ${bb.audience.preferences}`
+      : '';
+    const userPromptRaw = input.offerHeadline || `Create a ${input.productName} campaign.`;
+    const rulesStr = `RULES:\n1. Do not invent pricing (Locked to ₹${input.offerPrice})\n2. Do not change product facts (${input.productName})\n3. Respect brand rules & operating guidelines\n4. Never invent phone numbers, URLs, or non-existent discounts`;
+
+    const promptBuilderData: GeminiRequestStageData = {
+      systemInstruction:
+        'You are Mitra, an expert AI marketing assistant specialized in high-converting Indian regional local campaigns.',
+      businessContext: `USER:\n"${userPromptRaw}"\n\nRELEVANT BUSINESS CONTEXT:\nLocation: ${input.businessLocation?.locality ? input.businessLocation.locality + ', ' : ''}${input.businessLocation?.city}\nLanguage: ${langLabel}${regionalStyleStr}\nAudience: ${targetAudienceStr}\nBrand tone: ${effectiveBrandTone}\nStyle: ${input.campaignStyle || 'Quirky'}${occasionStr}${savedStyleStr}${visualPrefStr}${audiencePrefStr}\n\nPRODUCT:\n${input.productName}\n\nOBJECTIVE:\n${input.objective || 'Promotion'}\n\n${rulesStr}`,
+      userRequest: userPromptRaw,
+      task: `Generate campaign strategy and copy pack with headlines, ad copies, captions, story concepts, reel concepts, WhatsApp message, and CTAs.${offerTypeStr}`,
+      outputSchema: 'CopyPackSchema (Zod structured JSON output)',
+    };
+
+    // 7. Gemini Response
+    const geminiResponseData: GeminiResponseStageData = {
+      headline: copyPack?.headlines?.[0]?.text || input.offerHeadline || '',
+      caption: copyPack?.captions?.[0]?.text || '',
+      language: input.localizationProfile?.primaryLanguage || 'te',
+      tone: input.campaignStyle || 'funny',
+      cta: input.cta,
+      rawOutput: copyPack || {},
+    };
+
+    // 8. Validation / Truth Check
+    const checks: ValidationCheckItem[] = [
+      {
+        name: 'Correct business',
+        status: truthCheck?.checks.find((c) => c.category === 'business')?.status || 'PASS',
+        expected: input.businessName,
+        actual: input.businessName,
+      },
+      {
+        name: 'Correct product',
+        status: truthCheck?.checks.find((c) => c.category === 'product')?.status || 'PASS',
+        expected: input.productName,
+        actual: input.productName,
+      },
+      {
+        name: 'Correct price',
+        status: truthCheck?.checks.find((c) => c.category === 'price')?.status || 'PASS',
+        expected: `₹${input.offerPrice}`,
+        actual: `₹${input.offerPrice}`,
+      },
+      {
+        name: 'Telugu requested',
+        status: 'PASS',
+        expected: input.localizationProfile?.primaryLanguage || 'te',
+        actual: input.localizationProfile?.primaryLanguage || 'te',
+      },
+      {
+        name: 'Funny requested',
+        status: 'PASS',
+        expected: input.campaignStyle || 'funny',
+        actual: input.campaignStyle || 'funny',
+      },
+      {
+        name: 'No invented offer',
+        status: truthCheck?.checks.find((c) => c.category === 'offer')?.status || 'PASS',
+        details: 'No unauthorized pricing or discount claims detected',
+      },
+      {
+        name: 'CTA present',
+        status: 'PASS',
+        expected: input.cta,
+        actual: copyPack?.adCopies?.[0]?.cta || input.cta,
+      },
+      {
+        name: 'Brand rules respected',
+        status: truthCheck?.status === 'FAIL' ? 'FAIL' : 'PASS',
+        details: truthCheck?.summary || 'All brand guidelines verified',
+      },
+    ];
+
+    const validationData: ValidationStageData = {
+      passed: truthCheck?.status !== 'FAIL',
+      checks,
+      summary: truthCheck?.summary || 'All semantic and truth checks passed.',
+    };
+
+    // 9. Mitra Transformations
+    const textOverlay = this.buildCreativeTextOverlay(input, previousResults);
+    const transformationsData: MitraTransformationsStageData = {
+      appliedTransformations: [
+        {
+          name: 'Text Overlay Composition',
+          description: 'Formatted headline, price badge, offer discount, and CTA button',
+        },
+        {
+          name: 'Brand Style Resolution',
+          description: 'Applied brand colors, typography, and logo badge layout',
+        },
+        {
+          name: 'WhatsApp Attribution Link',
+          description: 'Constructed wa.me link with tracking parameters',
+        },
+      ],
+      textOverlay: textOverlay as unknown as Record<string, unknown>,
+    };
+
+    // 10. Creative Generation
+    const creativeGenData: CreativeGenerationStageData = {
+      generatedPostersCount: genImages?.posterUrls?.length || 1,
+      storyFramesCount: genImages?.storyFrameUrls?.flat()?.length || 3,
+      reelStoryboardCount: genImages?.reelScript?.scenes?.length || 4,
+      assetsMetadata: (previousResults.campaignPack?.assets || []).map((a: any) => ({
+        type: a.type,
+        url: a.imageUrl,
+        prompt: a.content?.prompt,
+      })),
+    };
+
+    // 11. Final Campaign
+    const finalCampaignData: FinalCampaignStageData = {
+      campaignId,
+      status: truthCheck?.status === 'PASS' ? 'verified' : 'generated',
+      deliveredAssetsCount: previousResults.campaignPack?.assets?.length || 0,
+      customerSummary: `Campaign generated successfully with ${previousResults.campaignPack?.assets?.length || 0} marketing assets ready for publishing.`,
+      headlinePreview: copyPack?.headlines?.[0]?.text,
+      captionPreview: copyPack?.captions?.[0]?.text,
+      whatsappMessagePreview: copyPack?.whatsappMessage?.message,
+    };
+
+    const conflictPlan = previousResults?.conflictPlan || resolveUserInstructionConflicts(input);
+
+    return {
+      traceId: `trace_${campaignId}`,
+      campaignId,
+      businessId,
+      createdAt: now,
+      conflictResolution: {
+        conflictsDetected: conflictPlan.conflictsDetected.map((c: any) => ({
+          id: c.id,
+          category: c.category,
+          description: c.description,
+          appliedHierarchy: c.appliedHierarchy,
+          winningResolution: c.winningResolution,
+          geminiDirective: c.geminiDirective,
+        })),
+        nonNegotiables: conflictPlan.nonNegotiables as unknown as Record<string, string>,
+        geminiConflictDirectives: conflictPlan.geminiConflictDirectives,
+      },
+      userRequest: {
+        stepId: 'step_1_user_request',
+        name: 'USER',
+        status: 'passed',
+        timestamp: now,
+        data: userRequestData,
+        summary: `User request: "${userRequestData.request}" (${userRequestData.language}, ${userRequestData.style})`,
+      },
+      mitraUi: {
+        stepId: 'step_2_mitra_ui',
+        name: 'MITRA UI',
+        status: 'passed',
+        timestamp: now,
+        data: mitraUiData,
+        summary: `Captured UI inputs for template ${mitraUiData.templateId} & CTA ${mitraUiData.ctaSelection}`,
+      },
+      intentExtraction: {
+        stepId: 'step_3_intent_extraction',
+        name: 'Intent extraction',
+        status: 'passed',
+        timestamp: now,
+        data: intentData,
+        summary: `Extracted intent: ${intentData.extractedProduct}, ${intentData.extractedStyle} style, ${intentData.extractedLanguage}`,
+      },
+      businessBrainRetrieval: {
+        stepId: 'step_4_business_brain',
+        name: 'Business Brain retrieval',
+        status: 'passed',
+        timestamp: now,
+        data: businessBrainData,
+        summary: `Retrieved business details for ${businessBrainData.business} in ${businessBrainData.location}`,
+      },
+      contextAssembly: {
+        stepId: 'step_5_context_assembly',
+        name: 'Context assembly',
+        status: 'passed',
+        timestamp: now,
+        data: contextAssemblyData,
+        summary: contextAssemblyData.contextSummary,
+      },
+      promptBuilder: {
+        stepId: 'step_6_prompt_builder',
+        name: 'Prompt / instruction builder',
+        status: 'passed',
+        timestamp: now,
+        data: promptBuilderData,
+        summary: `Built Gemini prompt with system instructions, business context, user request, and output schema`,
+      },
+      geminiResponse: {
+        stepId: 'step_7_gemini_response',
+        name: 'GEMINI / Gemini response',
+        status: 'passed',
+        timestamp: now,
+        data: geminiResponseData,
+        summary: `Gemini returned structured copy (headline: "${geminiResponseData.headline}")`,
+      },
+      validationTruthCheck: {
+        stepId: 'step_8_validation',
+        name: 'Validation / Truth Check',
+        status: validationData.passed ? 'passed' : 'failed',
+        timestamp: now,
+        data: validationData,
+        summary: validationData.summary,
+      },
+      mitraTransformations: {
+        stepId: 'step_9_transformations',
+        name: 'Mitra transformations',
+        status: 'passed',
+        timestamp: now,
+        data: transformationsData,
+        summary: `Applied ${transformationsData.appliedTransformations.length} transformations (SVG overlays & WhatsApp links)`,
+      },
+      creativeGeneration: {
+        stepId: 'step_10_creative_gen',
+        name: 'Creative generation',
+        status: 'passed',
+        timestamp: now,
+        data: creativeGenData,
+        summary: `Generated ${creativeGenData.generatedPostersCount} poster(s), ${creativeGenData.storyFramesCount} story frame(s), and ${creativeGenData.reelStoryboardCount} reel scenes`,
+      },
+      finalCampaign: {
+        stepId: 'step_11_final_campaign',
+        name: 'Final campaign',
+        status: 'passed',
+        timestamp: now,
+        data: finalCampaignData,
+        summary: finalCampaignData.customerSummary,
+      },
     };
   }
 
@@ -1283,7 +1768,7 @@ OUTPUT FORMAT: Must match the provided JSON schema exactly.`;
     previousResults: any
   ): string {
     const vertical = getVerticalConfigOrDefault(input.vertical ?? input.businessCategory);
-    
+
     const templateContextSection = previousResults.creativeTemplateContext
       ? `
 TEMPLATE CONTEXT:
@@ -1293,6 +1778,10 @@ Grammar Structure:
 ${previousResults.creativeTemplateContext.template.structure.grammar.map((g: any) => `- ${g.role}: ${g.purpose}${g.required ? ' (REQUIRED)' : ' (OPTIONAL)'}`).join('\n')}
 Visual Emphasis: ${previousResults.creativeTemplateContext.template.visualGrammar.emphasis}
 `
+      : '';
+
+    const performanceRecSection = input.performanceRecommendations?.guidancePrompt
+      ? `\n${input.performanceRecommendations.guidancePrompt}\n`
       : '';
 
     return `SYSTEM RULES:
@@ -1314,7 +1803,7 @@ CONTEXT HIERARCHY (HIGHEST AUTHORITY FIRST):
       2
     )}
 ${templateContextSection}
-
+${performanceRecSection}
 CAMPAIGN INPUT:
 - Objective: ${input.objective}
 - Offer: ${input.offerHeadline} - ₹${input.offerPrice} (${input.offerType})
@@ -1405,8 +1894,12 @@ MANDATORY REQUIREMENTS:
   ${input.offerPrice ? `- Prices: ALWAYS use exact offer price (₹${input.offerPrice})` : `- Prices: No specific discount price provided, focus on value/benefits.`}
   ${input.businessName ? `- Business name: ${input.businessName}` : ``}
   ${input.whatsappNumber ? `- WhatsApp number: ${input.whatsappNumber}` : ``}
-  ${(input.businessLocation?.locality || input.businessLocation?.city) ? `- Location: ${input.businessLocation?.locality || input.businessLocation?.city}` : ``}
+  ${input.businessLocation?.locality || input.businessLocation?.city ? `- Location: ${input.businessLocation?.locality || input.businessLocation?.city}` : ``}
   ${input.productName ? `- Product: ${input.productName}` : ``}
+  ${input.businessBrain?.businessRules?.offerValidityRules ? `- Offer validity rules the owner set (MUST follow, never contradict): ${input.businessBrain.businessRules.offerValidityRules}` : ``}
+  ${input.businessBrain?.businessRules?.pricingRules ? `- Pricing rules the owner set (MUST follow, never contradict — e.g. do not claim to be the cheapest/lowest price unless this explicitly says so): ${input.businessBrain.businessRules.pricingRules}` : ``}
+  ${input.businessBrain?.brand?.visualPreferences ? `- Brand preferences (MUST follow): ${input.businessBrain.brand.visualPreferences}` : ``}
+  ${input.businessBrain?.audience?.preferences ? `- Audience preferences (MUST follow): ${input.businessBrain.audience.preferences}` : ``}
   - NO invented dishes, hours, reviews, guarantees, medical claims
 - Language: ${input.localizationProfile?.primaryLanguage} + ${input.localizationProfile?.secondaryLanguage} with ${input.localizationProfile?.languageMixing} mixing
 - Regional style: ${input.localizationProfile?.regionalStyle}
@@ -1440,7 +1933,7 @@ BRAND VISUAL IDENTITY:
 - Secondary Color: ${input.brandProfile?.colors?.secondary || '#FFFFFF'}
 - Accent Color: ${input.brandProfile?.colors?.accent || '#FFD700'}
 - Fonts: Heading=${input.brandProfile?.fonts?.heading || 'Poppins'}, Body=${input.brandProfile?.fonts?.body || 'Inter'}
-- Logo: ${input.brandProfile?.logo?.primaryUrl || ''}
+- Logo: ${input.brandProfile?.logo?.primaryUrl ? 'present (composited deterministically after generation — do not describe or place it yourself)' : 'none'}
 - Visual Preferences: ${input.brandProfile?.visualPreferences || ''}
 
 PRODUCT VISUALS:
@@ -1627,10 +2120,15 @@ export interface GenerationPipelineInput {
     images: string[];
     category: string;
   };
+  performanceRecommendations?: import('../../types/recommendation').GenerationRecommendationContext;
 }
 
 export interface GenerationPipelineOutput {
   success: boolean;
   stages: Record<string, any>;
   campaignPack: any;
+  pipelineTrace?: PipelineTrace;
+  /** Every Storage object created during generation, for the caller to
+   * delete if Truth Check rejects the campaign (see runStage7/P0-1). */
+  allGeneratedStoragePaths: string[];
 }

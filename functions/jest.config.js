@@ -10,6 +10,12 @@ module.exports = {
   rootDir: '.',
   testMatch: ['<rootDir>/src/**/*.test.ts'],
   moduleFileExtensions: ['ts', 'js', 'json', 'node'],
+  // Source uses explicit .js extensions on relative dynamic imports (Node16
+  // module resolution requirement), but the compiled test sources are .ts.
+  // Strip the extension so Jest resolves these back to the .ts files/mocks.
+  moduleNameMapper: {
+    '^(\\.{1,2}/.*)\\.js$': '$1',
+  },
   transform: {
     '^.+\\.ts$': ['ts-jest', { tsconfig: '<rootDir>/tsconfig.json' }],
   },

@@ -79,16 +79,14 @@ describe('PayU payment request hash (forward)', () => {
     );
   });
 
-  it('changes when udf1 (the userId) changes — one user cannot reuse another user\'s hash', () => {
+  it("changes when udf1 (the userId) changes — one user cannot reuse another user's hash", () => {
     const a = generatePaymentHash({ ...base, udf1: 'user-A' });
     const b = generatePaymentHash({ ...base, udf1: 'user-B' });
     expect(a).not.toBe(b);
   });
 
   it('handles special characters and unicode in firstname without throwing', () => {
-    expect(() =>
-      generatePaymentHash({ ...base, firstname: "O'Brien 名前 & Co." })
-    ).not.toThrow();
+    expect(() => generatePaymentHash({ ...base, firstname: "O'Brien 名前 & Co." })).not.toThrow();
   });
 
   it('handles decimal amounts with two decimal places consistently', () => {
@@ -151,9 +149,7 @@ describe('PayU response/webhook hash (reverse)', () => {
   });
 
   it('is NOT the same formula/value as the forward payment-request hash for the same fields', () => {
-    expect(generateResponseHash(base)).not.toBe(
-      generatePaymentHash({ ...base, salt: base.salt })
-    );
+    expect(generateResponseHash(base)).not.toBe(generatePaymentHash({ ...base, salt: base.salt }));
   });
 
   it('changes when status changes from success to failure', () => {

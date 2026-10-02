@@ -59,12 +59,11 @@ if (admin.apps.length === 0) {
 }
 
 // image.ts/text.ts/vision.ts construct their provider SDK clients as
-// module-level singletons (export const openAIImageProvider = new
-// OpenAIImageProvider(); etc). The OpenAI SDK throws at construction time
-// if OPENAI_API_KEY is an empty string, which crashes any test file that
+// module-level singletons (export const geminiImageProvider = new
+// GeminiImageProvider(); etc). Provider construction must not require
+// credentials at import time, which would crash any test file that
 // transitively imports functions/src/services/ai/index.ts or pipeline.ts
 // even when the test never makes a real API call. These are obviously fake
 // values — no real provider call succeeds with them — set only so module
 // import doesn't crash in a test process with no credentials configured.
-process.env['OPENAI_API_KEY'] ||= 'sk-test-fake-key-for-unit-tests-only';
 process.env['GEMINI_API_KEY'] ||= 'test-fake-gemini-key-for-unit-tests-only';

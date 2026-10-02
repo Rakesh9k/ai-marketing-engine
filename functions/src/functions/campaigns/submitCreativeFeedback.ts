@@ -65,8 +65,9 @@ export const submitCreativeFeedback = onCall(
 
       await createCreativeFeedbackDoc(feedback);
 
-      // Phase 21: Track Approval/Rejection
-      const { trackCreativeEvent } = await import('../../services/analyticsService.js');
+      // Phase 21 & Phase 16: Track Approval/Rejection & Like/Dislike
+      const { trackCreativeEvent, trackCreativeLiked, trackCreativeDisliked } =
+        await import('../../services/analyticsService.js');
       await trackCreativeEvent({
         eventType: data.sentiment === 'positive' ? 'creative_approved' : 'creative_rejected',
         userId: context.userId,
@@ -77,8 +78,34 @@ export const submitCreativeFeedback = onCall(
         templateVersion: data.templateVersion,
         styleId: data.styleId,
         styleVersion: data.styleVersion,
-        creativeType: data.creativeType
+        creativeType: data.creativeType,
       });
+
+      if (data.sentiment === 'positive') {
+        await trackCreativeLiked(
+          context.userId,
+          data.businessId,
+          data.creativeId,
+          data.campaignId,
+          {
+            templateId: data.templateId,
+            styleId: data.styleId,
+            creativeType: data.creativeType,
+          }
+        );
+      } else {
+        await trackCreativeDisliked(
+          context.userId,
+          data.businessId,
+          data.creativeId,
+          data.campaignId,
+          {
+            templateId: data.templateId,
+            styleId: data.styleId,
+            creativeType: data.creativeType,
+          }
+        );
+      }
 
       // Phase 17: Build Template Preference Memory
       const { updateCreativePreferences } = await import('../../services/preferenceService.js');
@@ -92,4 +119,3 @@ export const submitCreativeFeedback = onCall(
     }
   })
 );
-

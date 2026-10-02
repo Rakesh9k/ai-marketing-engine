@@ -473,7 +473,11 @@ export async function cancelSIMandate(mandateTxnid: string): Promise<void> {
 // Refund — UNVERIFIED, BLOCKED (see docs/PAYMENT_GATEWAY.md)
 // ---------------------------------------------------------------------------
 
-export async function refundPayment(mihpayid: string, amount: string, txnid: string): Promise<void> {
+export async function refundPayment(
+  mihpayid: string,
+  amount: string,
+  txnid: string
+): Promise<void> {
   const config = getPayUConfig();
   const hash = crypto
     .createHash('sha512')

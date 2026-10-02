@@ -35,30 +35,40 @@ const mockCreateCampaignAssets = jest.fn().mockResolvedValue(undefined);
 const mockGetCreativePreferencesByBusiness = jest.fn().mockResolvedValue([]);
 const mockGetSavedStyleDoc = jest.fn().mockResolvedValue(null);
 jest.mock('../../services/firestore', () => ({
+  // P0-4: see generateCampaignStrategy.template.test.ts's identical comment.
+  getCurrentUsage: jest.fn().mockResolvedValue({ campaignsCreated: 0, planId: 'agency' }),
+  getSubscriptionByUser: jest.fn().mockResolvedValue(null),
   createCampaignDoc: (...args: unknown[]) => mockCreateCampaignDoc(...args),
   updateCampaignDoc: (...args: unknown[]) => mockUpdateCampaignDoc(...args),
   getBusinessDoc: (...args: unknown[]) => mockGetBusinessDoc(...args),
   getBrandKitDoc: (...args: unknown[]) => mockGetBrandKitDoc(...args),
   getProductDoc: (...args: unknown[]) => mockGetProductDoc(...args),
   createCampaignAssets: (...args: unknown[]) => mockCreateCampaignAssets(...args),
-  getCreativePreferencesByBusiness: (...args: unknown[]) => mockGetCreativePreferencesByBusiness(...args),
+  getCreativePreferencesByBusiness: (...args: unknown[]) =>
+    mockGetCreativePreferencesByBusiness(...args),
   getSavedStyleDoc: (...args: unknown[]) => mockGetSavedStyleDoc(...args),
+  getCampaignByIdempotencyKey: jest.fn().mockResolvedValue(null),
 }));
 
 const mockExecuteWithUsageControl = jest.fn();
 jest.mock('../../services/usageControl', () => ({
   executeWithUsageControl: (...args: unknown[]) => mockExecuteWithUsageControl(...args),
   getGenerationCost: () => 140,
-  USAGE_ERROR_CODES: { INSUFFICIENT_CREDITS: 'INSUFFICIENT_CREDITS', SUBSCRIPTION_REQUIRED: 'SUBSCRIPTION_REQUIRED' },
+  USAGE_ERROR_CODES: {
+    INSUFFICIENT_CREDITS: 'INSUFFICIENT_CREDITS',
+    SUBSCRIPTION_REQUIRED: 'SUBSCRIPTION_REQUIRED',
+  },
 }));
 
 const mockTrackEvent = jest.fn().mockResolvedValue(undefined);
 jest.mock('../../services/analyticsService', () => ({
   trackEvent: (...args: unknown[]) => mockTrackEvent(...args),
   trackCreativeEvent: jest.fn().mockResolvedValue(undefined),
+  trackCampaignApproved: jest.fn().mockResolvedValue(undefined),
   ANALYTICS_EVENTS: {
     CAMPAIGN_STARTED: 'campaign_started',
     CAMPAIGN_GENERATED: 'campaign_generated',
+    CAMPAIGN_APPROVED: 'campaign_approved',
   },
 }));
 
@@ -108,7 +118,10 @@ function makeRequestData(
       validityStart: new Date().toISOString(),
       validityEnd: new Date(Date.now() + 86400000).toISOString(),
     },
-    duration: { start: new Date().toISOString(), end: new Date(Date.now() + 86400000).toISOString() },
+    duration: {
+      start: new Date().toISOString(),
+      end: new Date(Date.now() + 86400000).toISOString(),
+    },
     audience: { localities: ['Kondapur'] },
     cta: overrides.cta || 'order_whatsapp',
     localization: {
@@ -138,7 +151,12 @@ describe('generateCampaignStrategy — vertical support gate (Phase 29)', () => 
     mockGetBrandKitDoc.mockResolvedValue(null);
     mockGetProductDoc.mockResolvedValue(null);
     mockExecuteWithUsageControl.mockImplementation(
-      async (_userId: string, _campaignId: string, _opType: string, callback: () => Promise<any>) => {
+      async (
+        _userId: string,
+        _campaignId: string,
+        _opType: string,
+        callback: () => Promise<any>
+      ) => {
         const result = await callback();
         return { result, creditsUsed: 140 };
       }
@@ -182,10 +200,15 @@ describe('generateCampaignStrategy — vertical support gate (Phase 29)', () => 
 
   it('restaurant is unaffected: generation proceeds through credit reservation exactly as before', async () => {
     mockGetBusinessDoc.mockResolvedValue(makeBusiness('restaurant'));
-    mockExecute.mockResolvedValue({ 
+    mockExecute.mockResolvedValue({
       campaignPack: {
         assets: [],
-        truthCheck: { status: 'PASS', summary: 'ok', checkedAt: new Date().toISOString(), checks: [] },
+        truthCheck: {
+          status: 'PASS',
+          summary: 'ok',
+          checkedAt: new Date().toISOString(),
+          checks: [],
+        },
       },
     });
 
@@ -200,10 +223,15 @@ describe('generateCampaignStrategy — vertical support gate (Phase 29)', () => 
 
   it('Phase 30: salon proceeds through credit reservation and generation exactly like restaurant, using its own objective/CTA', async () => {
     mockGetBusinessDoc.mockResolvedValue(makeBusiness('salon'));
-    mockExecute.mockResolvedValue({ 
+    mockExecute.mockResolvedValue({
       campaignPack: {
         assets: [],
-        truthCheck: { status: 'PASS', summary: 'ok', checkedAt: new Date().toISOString(), checks: [] },
+        truthCheck: {
+          status: 'PASS',
+          summary: 'ok',
+          checkedAt: new Date().toISOString(),
+          checks: [],
+        },
       },
     });
 
@@ -219,7 +247,7 @@ describe('generateCampaignStrategy — vertical support gate (Phase 29)', () => 
     expect(mockExecute.mock.calls[0]![0].vertical).toBe('salon');
   });
 
-  it('rejects a salon business submitting a restaurant-only CTA (book_table) — no vertical can use another vertical\'s CTAs', async () => {
+  it("rejects a salon business submitting a restaurant-only CTA (book_table) — no vertical can use another vertical's CTAs", async () => {
     mockGetBusinessDoc.mockResolvedValue(makeBusiness('salon'));
 
     const request = callableRequest(
@@ -260,10 +288,15 @@ describe('generateCampaignStrategy — vertical support gate (Phase 29)', () => 
 
   it('Phase 31: real_estate proceeds through credit reservation and generation exactly like restaurant/salon, using its own objective/CTA', async () => {
     mockGetBusinessDoc.mockResolvedValue(makeBusiness('real_estate'));
-    mockExecute.mockResolvedValue({ 
+    mockExecute.mockResolvedValue({
       campaignPack: {
         assets: [],
-        truthCheck: { status: 'PASS', summary: 'ok', checkedAt: new Date().toISOString(), checks: [] },
+        truthCheck: {
+          status: 'PASS',
+          summary: 'ok',
+          checkedAt: new Date().toISOString(),
+          checks: [],
+        },
       },
     });
 
@@ -318,6 +351,3 @@ describe('generateCampaignStrategy — vertical support gate (Phase 29)', () => 
     expect(mockExecuteWithUsageControl).not.toHaveBeenCalled();
   });
 });
-
-
-

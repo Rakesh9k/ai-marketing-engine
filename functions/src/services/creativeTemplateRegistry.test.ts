@@ -149,7 +149,7 @@ describe('BuiltinCreativeTemplateRegistry — deterministic order', () => {
     expect(fourth).toEqual(third);
   });
 
-  it('order matches the built-in library\'s registration order (not a ranking — just stable, documented ordering)', () => {
+  it("order matches the built-in library's registration order (not a ranking — just stable, documented ordering)", () => {
     const activeIds = BUILTIN_CREATIVE_TEMPLATES.filter((t) => t.active).map((t) => t.id);
     expect(registry.listCreativeTemplates().map((t) => t.id)).toEqual(activeIds);
   });
@@ -200,7 +200,9 @@ describe('BuiltinCreativeTemplateRegistry — validation', () => {
   it('every template registered from the real built-in library independently passes schema validation (re-verified at the registry boundary)', () => {
     expect(() => makeRegistry([...BUILTIN_CREATIVE_TEMPLATES])).not.toThrow();
     const registry = makeRegistry([...BUILTIN_CREATIVE_TEMPLATES]);
-    expect(registry.listCreativeTemplates().length + registry.listCreativeTemplates({}).length).toBeGreaterThan(0);
+    expect(
+      registry.listCreativeTemplates().length + registry.listCreativeTemplates({}).length
+    ).toBeGreaterThan(0);
   });
 });
 
@@ -260,7 +262,9 @@ describe('creativeTemplateRegistry — the exported singleton', () => {
   });
 
   it('getCreativeTemplate on the singleton resolves a known real id', () => {
-    expect(creativeTemplateRegistry.getCreativeTemplate('reel-product-reveal')?.name).toBe('Product Reveal');
+    expect(creativeTemplateRegistry.getCreativeTemplate('reel-product-reveal')?.name).toBe(
+      'Product Reveal'
+    );
   });
 });
 
@@ -271,7 +275,13 @@ describe('CreativeTemplateRegistry — architectural boundaries', () => {
 
   it('the registry exposes no selection/ranking/recommendation API', () => {
     const registryKeys = Object.getOwnPropertyNames(BuiltinCreativeTemplateRegistry.prototype);
-    for (const forbidden of ['rankCreativeTemplates', 'scoreCreativeTemplate', 'recommendCreativeTemplate', 'selectTemplate', 'chooseBestTemplate']) {
+    for (const forbidden of [
+      'rankCreativeTemplates',
+      'scoreCreativeTemplate',
+      'recommendCreativeTemplate',
+      'selectTemplate',
+      'chooseBestTemplate',
+    ]) {
       expect(registryKeys).not.toContain(forbidden);
     }
   });
@@ -279,6 +289,8 @@ describe('CreativeTemplateRegistry — architectural boundaries', () => {
   it('the module exports only the documented registry surface (class, singleton, filter type) — no stray helpers leak out', () => {
     // eslint-disable-next-line @typescript-eslint/no-var-requires
     const moduleExports = Object.keys(require('./creativeTemplateRegistry'));
-    expect(moduleExports.sort()).toEqual(['BuiltinCreativeTemplateRegistry', 'creativeTemplateRegistry'].sort());
+    expect(moduleExports.sort()).toEqual(
+      ['BuiltinCreativeTemplateRegistry', 'creativeTemplateRegistry'].sort()
+    );
   });
 });

@@ -71,7 +71,11 @@ export async function renderReel(input: ReelRenderInput): Promise<RenderedReel> 
       const seg = input.plan.segments[i];
       const sourcePath = clipLocalPaths.get(seg.clipId);
       if (!sourcePath) {
-        throw new ApiError(400, 'unknown_clip', `plan references clipId "${seg.clipId}" not present in clips[]`);
+        throw new ApiError(
+          400,
+          'unknown_clip',
+          `plan references clipId "${seg.clipId}" not present in clips[]`
+        );
       }
       const outPath = path.join(segmentsDir, `segment-${i}.mp4`);
       await buildSegmentClip({
@@ -123,7 +127,11 @@ export async function renderReel(input: ReelRenderInput): Promise<RenderedReel> 
     let withLogoPath = concatenatedPath;
     if (logoLocal) {
       withLogoPath = path.join(dir, 'with-logo.mp4');
-      await overlayLogo({ videoPath: concatenatedPath, logoPath: logoLocal, outputPath: withLogoPath });
+      await overlayLogo({
+        videoPath: concatenatedPath,
+        logoPath: logoLocal,
+        outputPath: withLogoPath,
+      });
     }
 
     // 6. Mix in background music and produce the final export.
@@ -140,7 +148,9 @@ export async function renderReel(input: ReelRenderInput): Promise<RenderedReel> 
     const finalProbe = await probeVideo(finalPath);
     const thumbLocal = path.join(dir, 'thumb.jpg');
     const thumbTimestampMs = Math.min(1000, Math.max(0, finalProbe.durationMs - 200));
-    await extractThumbnail(finalPath, thumbLocal, finalProbe.durationMs, { timestampMs: thumbTimestampMs });
+    await extractThumbnail(finalPath, thumbLocal, finalProbe.durationMs, {
+      timestampMs: thumbTimestampMs,
+    });
 
     // 8. Upload outputs.
     await uploadFile(finalPath, input.outputStoragePath, 'video/mp4');
@@ -176,11 +186,19 @@ function validateInput(input: ReelRenderInput): void {
     throw new ApiError(400, 'invalid_request', 'music.storagePath is required');
   }
   if (!input.outputStoragePath || !input.thumbnailStoragePath) {
-    throw new ApiError(400, 'invalid_request', 'outputStoragePath and thumbnailStoragePath are required');
+    throw new ApiError(
+      400,
+      'invalid_request',
+      'outputStoragePath and thumbnailStoragePath are required'
+    );
   }
   for (const seg of input.plan.segments) {
     if (seg.endMs <= seg.startMs) {
-      throw new ApiError(400, 'invalid_segment', `segment for clip ${seg.clipId} has endMs <= startMs`);
+      throw new ApiError(
+        400,
+        'invalid_segment',
+        `segment for clip ${seg.clipId} has endMs <= startMs`
+      );
     }
   }
 }

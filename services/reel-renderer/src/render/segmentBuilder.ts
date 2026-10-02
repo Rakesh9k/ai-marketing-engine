@@ -34,7 +34,12 @@ export async function buildSegmentClip(params: {
 
   if (text && text.trim().length > 0) {
     filters.push(
-      await buildCaptionFilter({ text: text.trim(), workDir, position: 'lower_third', fontSize: 52 })
+      await buildCaptionFilter({
+        text: text.trim(),
+        workDir,
+        position: 'lower_third',
+        fontSize: 52,
+      })
     );
   }
 

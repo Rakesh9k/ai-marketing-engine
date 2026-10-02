@@ -8,10 +8,17 @@ import type {
   TransactionStatus,
   SubscriptionPlan,
 } from '../types';
-import { PRICING, getMonthlyCredits } from '../config/pricing';
+import { PRICING } from '../config/pricing';
+import { getPeriodCreditAllowance, resolveEntitledPlan } from './billing';
 import { logFunctionStart, logFunctionComplete, logFunctionError } from '../utils/logging';
 
-const db = admin.firestore();
+const db = new Proxy({} as admin.firestore.Firestore, {
+  get(_target, prop, receiver) {
+    const firestore = admin.firestore();
+    const value = Reflect.get(firestore, prop, receiver);
+    return typeof value === 'function' ? value.bind(firestore) : value;
+  },
+});
 
 function serverTimestamp() {
   return FieldValue.serverTimestamp();
@@ -59,6 +66,11 @@ export const USAGE_ERROR_CODES = {
   OPERATION_NOT_FOUND: 'OPERATION_NOT_FOUND',
   UNAUTHORIZED: 'UNAUTHORIZED',
   GENERATION_FAILED: 'GENERATION_FAILED',
+  // M3 (Pass 2): a second call with the SAME idempotency key arrived while
+  // the first one (for that key) is still mid-generation. Distinct from
+  // ALREADY_FINALIZED/ALREADY_REFUNDED, which mean the first call already
+  // reached a terminal state.
+  DUPLICATE_REQUEST_IN_PROGRESS: 'DUPLICATE_REQUEST_IN_PROGRESS',
 } as const;
 
 export type UsageErrorCode = (typeof USAGE_ERROR_CODES)[keyof typeof USAGE_ERROR_CODES];
@@ -77,6 +89,12 @@ export interface ReservationResult {
   creditsReserved: number;
   creditsRemaining: number;
   transactionId: string;
+  // M3 (Pass 2) — true when this call did NOT create a fresh reservation,
+  // because a transactions/{operationId} doc for this exact idempotency key
+  // was already 'pending' (a genuine retry/duplicate of an in-flight
+  // request, not a new logical operation). executeWithUsageControl uses
+  // this to avoid re-running the whole (billable) generation a second time.
+  isIdempotentReplay: boolean;
 }
 
 export interface FinalizationResult {
@@ -126,8 +144,8 @@ export async function checkGenerationEligibility(
 
     // Check subscription status
     const subscriptionPlan = usage.planId;
-    const monthlyCredits = getMonthlyCredits(subscriptionPlan);
-    const creditsIncluded = monthlyCredits;
+    // Plan allowance + any top-up (bonus) credits for this period.
+    const creditsIncluded = getPeriodCreditAllowance(subscriptionPlan, usage.bonusCredits);
     const creditsAvailable = creditsIncluded - usage.creditsUsed;
 
     // Check if user has enough credits
@@ -200,7 +218,9 @@ export async function reserveCreditsForOperation(
         userId,
         periodStart: periodStart.toISOString(),
         periodEnd: periodEnd.toISOString(),
-        planId: 'free',
+        // A new period must not demote a subscriber to Free: derive the plan
+        // from their subscription (see resolveEntitledPlan).
+        planId: await resolveEntitledPlan(userId),
         campaignsCreated: 0,
         creditsUsed: 0,
         imagesGenerated: 0,
@@ -281,8 +301,9 @@ export async function reserveCreditsForOperation(
       const usageData = usageSnap.data()!;
       const planId = usageData['planId'] as SubscriptionPlan;
       const creditsUsed = usageData['creditsUsed'] as number;
-      const monthlyCredits = getMonthlyCredits(planId);
-      const creditsAvailable = monthlyCredits - (creditsUsed || 0);
+      const creditsAvailable =
+        getPeriodCreditAllowance(planId, usageData['bonusCredits'] as number | undefined) -
+        (creditsUsed || 0);
 
       if (creditsAvailable < creditsRequired) {
         return { kind: 'insufficient' };
@@ -302,9 +323,20 @@ export async function reserveCreditsForOperation(
         createdAt: serverTimestamp(),
       });
 
-      // Increment creditsUsed
+      // Increment creditsUsed. P0-4 (docs/P0_HARDENING_TRACKER.md): for
+      // campaign_generation specifically, also increment campaignsCreated
+      // in the SAME atomic transaction — this is the counter
+      // entitlements.ts's requireCampaignAllowance checks against, and it
+      // must move in lockstep with the credit reservation it's paired with
+      // (see the matching decrement in refundReservation/
+      // cleanupExpiredReservations below, and requireCampaignAllowance's own
+      // doc comment for why the quota check itself runs before this ever
+      // executes).
       tx.update(usageRef, {
         creditsUsed: FieldValue.increment(creditsRequired),
+        ...(operationType === 'campaign_generation'
+          ? { campaignsCreated: FieldValue.increment(1) }
+          : {}),
         updatedAt: serverTimestamp(),
       });
 
@@ -345,6 +377,7 @@ export async function reserveCreditsForOperation(
       creditsReserved: creditsRequired,
       creditsRemaining,
       transactionId: operationId,
+      isIdempotentReplay: outcome.kind === 'idempotent-pending',
     };
   } catch (error) {
     if (error instanceof Error && 'code' in error) {
@@ -478,12 +511,18 @@ export async function refundReservation(
     const creditsToRefund = Math.abs(transaction.amount);
     const usageRef = db.collection('usage').doc(getUsageDocId(userId, currentPeriodStart()));
     const refundRef = db.collection('transactions').doc(`refund_${operationId}`);
+    // P0-4: release the campaign-quota slot this reservation had consumed,
+    // matching reserveCreditsForOperation's own increment — a refunded
+    // (failed) generation must not count against the plan's monthly
+    // campaign allowance.
+    const isCampaignGeneration = transaction.metadata?.['operationType'] === 'campaign_generation';
 
     // Atomic refund using transaction
     await db.runTransaction(async (tx) => {
       // Decrement creditsUsed
       tx.update(usageRef, {
         creditsUsed: FieldValue.increment(-creditsToRefund),
+        ...(isCampaignGeneration ? { campaignsCreated: FieldValue.increment(-1) } : {}),
         updatedAt: serverTimestamp(),
       });
 
@@ -528,6 +567,76 @@ export async function refundReservation(
 }
 
 /**
+ * Clean up stale credit reservations that timed out or abandoned without finalization/refund.
+ */
+export async function cleanupExpiredReservations(
+  maxAgeMinutes = 15
+): Promise<{ cleanedCount: number; creditsReleased: number }> {
+  const { logger, startTime } = logFunctionStart('cleanupExpiredReservations', { maxAgeMinutes });
+
+  try {
+    const cutoffDate = new Date(Date.now() - maxAgeMinutes * 60 * 1000);
+    const snap = await db
+      .collection('transactions')
+      .where('type', '==', 'reservation')
+      .where('status', '==', 'pending')
+      .get();
+
+    let cleanedCount = 0;
+    let totalCreditsReleased = 0;
+
+    for (const doc of snap.docs) {
+      const data = doc.data() as Transaction;
+      const createdAt = new Date(data.createdAt);
+
+      if (isNaN(createdAt.getTime()) || createdAt < cutoffDate) {
+        const creditsToRelease = Math.abs(data.amount);
+        const usageRef = db
+          .collection('usage')
+          .doc(getUsageDocId(data.userId, currentPeriodStart()));
+        const txRef = doc.ref;
+        // P0-4: same campaignsCreated release as refundReservation — an
+        // abandoned/timed-out reservation must not permanently consume a
+        // campaign-quota slot either.
+        const isCampaignGeneration = data.metadata?.['operationType'] === 'campaign_generation';
+
+        await db.runTransaction(async (tx) => {
+          const freshTxSnap = await tx.get(txRef);
+          if (!freshTxSnap.exists || freshTxSnap.data()?.['status'] !== 'pending') {
+            return;
+          }
+
+          tx.update(usageRef, {
+            creditsUsed: FieldValue.increment(-creditsToRelease),
+            ...(isCampaignGeneration ? { campaignsCreated: FieldValue.increment(-1) } : {}),
+            updatedAt: serverTimestamp(),
+          });
+
+          tx.update(txRef, {
+            status: 'expired' as TransactionStatus,
+            updatedAt: serverTimestamp(),
+          });
+        });
+
+        cleanedCount++;
+        totalCreditsReleased += creditsToRelease;
+      }
+    }
+
+    logFunctionComplete(logger, startTime, {
+      success: true,
+      cleanedCount,
+      totalCreditsReleased,
+    });
+
+    return { cleanedCount, creditsReleased: totalCreditsReleased };
+  } catch (error) {
+    logFunctionError(logger, startTime, error as Error);
+    return { cleanedCount: 0, creditsReleased: 0 };
+  }
+}
+
+/**
  * Get generation cost for an operation type
  */
 export function getGenerationCost(operationType: string): number {
@@ -541,6 +650,10 @@ export function getGenerationCost(operationType: string): number {
       return PRICING.imageGenerationCredits;
     case 'reel_generation':
       return PRICING.reelGenerationCredits;
+    case 'style_analysis':
+      return PRICING.styleAnalysisCredits;
+    case 'calendar_planning':
+      return PRICING.calendarPlanningCredits;
     default:
       throw createUsageControlError(
         USAGE_ERROR_CODES.INVALID_OPERATION,
@@ -579,6 +692,27 @@ export async function executeWithUsageControl<T>(
       metadata
     );
 
+    // M3 (Pass 2): a reservation for this EXACT idempotency key already
+    // exists and is still pending — this call is a retry/duplicate of a
+    // request already being processed (client timeout-and-retry, a network-
+    // level resend, or a genuinely concurrent double-submit), not a new
+    // logical operation. Previously this fell through to running
+    // generationFn() again regardless — reserveCreditsForOperation's own
+    // idempotency correctly prevented a SECOND credit charge, but the
+    // entire (billable-in-AI-provider-cost) pipeline still ran twice,
+    // produced two different campaign documents from one idempotency key,
+    // and whichever finalized second could race into ALREADY_FINALIZED.
+    // The caller is expected to resolve the ORIGINAL request's result
+    // itself (e.g. by looking up the campaign by idempotencyKey, as
+    // generateCampaignStrategy.ts now does before ever reaching this
+    // function) rather than have this function fabricate or re-derive one.
+    if (reservation.isIdempotentReplay) {
+      throw createUsageControlError(
+        USAGE_ERROR_CODES.DUPLICATE_REQUEST_IN_PROGRESS,
+        'A generation with this idempotency key is already in progress'
+      );
+    }
+
     // Execute generation
     const result = await generationFn();
 
@@ -589,8 +723,17 @@ export async function executeWithUsageControl<T>(
 
     return { result, creditsUsed: creditsRequired };
   } catch (error) {
-    // Refund on any failure
-    if (reservation) {
+    // Refund on any failure — EXCEPT a duplicate-in-progress: `reservation`
+    // here is a READ of someone else's still-active reservation (this call
+    // never created or owns it), not a new one this call is responsible
+    // for. Refunding it would incorrectly cancel the ORIGINAL, still-
+    // running request's legitimate credit hold out from under it.
+    const isDuplicateInProgress =
+      error instanceof Error &&
+      'code' in error &&
+      (error as UsageControlError).code === USAGE_ERROR_CODES.DUPLICATE_REQUEST_IN_PROGRESS;
+
+    if (reservation && !isDuplicateInProgress) {
       try {
         await refundReservation(operationId, userId);
       } catch (refundError) {

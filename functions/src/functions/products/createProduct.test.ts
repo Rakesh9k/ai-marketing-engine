@@ -38,7 +38,9 @@ function makeProductInput(businessId: string) {
     name: 'Paneer Biryani',
     price: 299,
     category: 'main' as const,
-    images: [{ url: 'https://storage.example.com/img.png', storagePath: 'x/y.png', isPrimary: true }],
+    images: [
+      { url: 'https://storage.example.com/img.png', storagePath: 'x/y.png', isPrimary: true },
+    ],
   };
 }
 

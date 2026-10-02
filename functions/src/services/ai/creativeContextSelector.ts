@@ -1,19 +1,15 @@
-import type { 
-  CreativeTemplate, 
-  BrandCreativeContext,
-  CreativeObjective
-} from '../../types';
-import type { 
+import type { CreativeTemplate, BrandCreativeContext, CreativeObjective } from '../../types';
+import type {
   BusinessBrainContext,
   ProductContext,
   OfferContext,
   AudienceContext,
   LocalizationContext,
-  CreativeTemplateContext
+  CreativeTemplateContext,
 } from './creativeTemplateContext';
 import type { SavedStyleContext } from '../../types';
 
-export type CreativeTask = 
+export type CreativeTask =
   | 'business_understanding'
   | 'product_understanding'
   | 'campaign_strategy'
@@ -115,55 +111,70 @@ export interface SelectCreativeContextInput {
   templateContext: CreativeTemplateContext;
 }
 
-const TASK_REQUIREMENTS: Record<CreativeTask, { required: CreativeContextKey[], optional: CreativeContextKey[] }> = {
+const TASK_REQUIREMENTS: Record<
+  CreativeTask,
+  { required: CreativeContextKey[]; optional: CreativeContextKey[] }
+> = {
   business_understanding: {
     required: ['brand'],
-    optional: ['localization', 'businessRules']
+    optional: ['localization', 'businessRules'],
   },
   product_understanding: {
     required: ['brand', 'product'],
-    optional: ['audience', 'localization', 'businessRules']
+    optional: ['audience', 'localization', 'businessRules'],
   },
   campaign_strategy: {
     required: ['brand', 'product'],
-    optional: ['offer', 'audience', 'localization', 'businessRules']
+    optional: ['offer', 'audience', 'localization', 'businessRules'],
   },
   localization_strategy: {
     required: ['brand', 'product', 'localization'],
-    optional: ['audience', 'businessRules']
+    optional: ['audience', 'businessRules'],
   },
   creative_copy: {
     required: ['brand', 'product'],
-    optional: ['cta', 'offer', 'audience', 'localization', 'businessRules', 'approvedHumor', 'savedStyle']
+    optional: [
+      'cta',
+      'offer',
+      'audience',
+      'localization',
+      'businessRules',
+      'approvedHumor',
+      'savedStyle',
+    ],
   },
   image_prompt: {
     required: ['product', 'visualPreferences'],
-    optional: ['brand', 'logo', 'colors', 'localization', 'savedStyle']
+    optional: ['brand', 'logo', 'colors', 'localization', 'savedStyle'],
   },
   image_generation: {
     required: ['product', 'visualPreferences', 'logo', 'colors'],
-    optional: ['brand', 'localization', 'savedStyle']
+    optional: ['brand', 'localization', 'savedStyle'],
   },
   reel_shot_plan: {
     required: ['brand', 'product', 'visualPreferences', 'shotConstraints'],
-    optional: ['offer', 'audience', 'localization', 'logo', 'colors', 'savedStyle']
+    optional: ['offer', 'audience', 'localization', 'logo', 'colors', 'savedStyle'],
   },
   truth_check: {
     required: ['brand', 'product'],
-    optional: ['offer', 'businessRules']
-  }
+    optional: ['offer', 'businessRules'],
+  },
 };
 
-export function getSelectionPlan(task: CreativeTask, templateContext: CreativeTemplateContext): CreativeContextSelectionPlan {
+export function getSelectionPlan(
+  task: CreativeTask,
+  templateContext: CreativeTemplateContext
+): CreativeContextSelectionPlan {
   const baseReqs = TASK_REQUIREMENTS[task];
   const required = new Set<CreativeContextKey>(baseReqs.required);
   const optional = new Set<CreativeContextKey>(baseReqs.optional);
 
-  const isRelevant = (key: CreativeContextKey) => baseReqs.required.includes(key) || baseReqs.optional.includes(key);
+  const isRelevant = (key: CreativeContextKey) =>
+    baseReqs.required.includes(key) || baseReqs.optional.includes(key);
 
   // Augment based on template structure
   const grammar = templateContext.template.structure.grammar;
-  
+
   if (isRelevant('offer')) {
     const hasOffer = grammar.some((g: any) => g.role === 'offer' || g.role === 'promotion');
     if (hasOffer) {
@@ -203,7 +214,7 @@ export function getSelectionPlan(task: CreativeTask, templateContext: CreativeTe
   return {
     task,
     required: Array.from(required),
-    optional: Array.from(optional)
+    optional: Array.from(optional),
   };
 }
 
@@ -231,35 +242,44 @@ export function selectCreativeContext(input: SelectCreativeContextInput): Select
   checkAndAssign('offer', input.templateContext.offer);
   checkAndAssign('audience', input.templateContext.audience);
   checkAndAssign('localization', input.templateContext.localization);
-  
+
   // cta is derived from campaignConstraints
-  const cta: CTAContext | undefined = input.templateContext.campaignConstraints?.requiredCta ? { text: input.templateContext.campaignConstraints.requiredCta } : undefined;
+  const cta: CTAContext | undefined = input.templateContext.campaignConstraints?.requiredCta
+    ? { text: input.templateContext.campaignConstraints.requiredCta }
+    : undefined;
   checkAndAssign('cta', cta);
 
   // visualPreferences, logo, colors are derived from brand
   const visualPreferences: string | undefined = input.templateContext.brand?.visualPreferences;
   checkAndAssign('visualPreferences', visualPreferences);
 
-  const logo: LogoContext | undefined = input.templateContext.brand?.logo ? {
-    primaryUrl: input.templateContext.brand.logo.primaryUrl,
-    secondaryUrl: input.templateContext.brand.logo.secondaryUrl
-  } : undefined;
+  const logo: LogoContext | undefined = input.templateContext.brand?.logo
+    ? {
+        primaryUrl: input.templateContext.brand.logo.primaryUrl,
+        secondaryUrl: input.templateContext.brand.logo.secondaryUrl,
+      }
+    : undefined;
   checkAndAssign('logo', logo);
 
-  const colors: BrandColorsContext | undefined = input.templateContext.brand?.colors ? {
-    primary: input.templateContext.brand.colors.primary,
-    secondary: input.templateContext.brand.colors.secondary,
-    accent: input.templateContext.brand.colors.accent
-  } : undefined;
+  const colors: BrandColorsContext | undefined = input.templateContext.brand?.colors
+    ? {
+        primary: input.templateContext.brand.colors.primary,
+        secondary: input.templateContext.brand.colors.secondary,
+        accent: input.templateContext.brand.colors.accent,
+      }
+    : undefined;
   checkAndAssign('colors', colors);
 
   // shotConstraints
-  const shotConstraints: ShotConstraintsContext | undefined = input.templateContext.template.constraints ? {
-    minDurationSeconds: (input.templateContext.template.constraints as any).minDurationSeconds,
-    maxDurationSeconds: (input.templateContext.template.constraints as any).maxDurationSeconds,
-    minSections: input.templateContext.template.constraints.minSections,
-    maxSections: input.templateContext.template.constraints.maxSections,
-  } : undefined;
+  const shotConstraints: ShotConstraintsContext | undefined = input.templateContext.template
+    .constraints
+    ? {
+        minDurationSeconds: (input.templateContext.template.constraints as any).minDurationSeconds,
+        maxDurationSeconds: (input.templateContext.template.constraints as any).maxDurationSeconds,
+        minSections: input.templateContext.template.constraints.minSections,
+        maxSections: input.templateContext.template.constraints.maxSections,
+      }
+    : undefined;
   checkAndAssign('shotConstraints', shotConstraints);
   checkAndAssign('savedStyle', input.templateContext.savedStyle);
   checkAndAssign('creativePreferences', input.templateContext.creativePreferences);
@@ -281,6 +301,6 @@ export function selectCreativeContext(input: SelectCreativeContextInput): Select
     task: input.task,
     template: selectedTemplate,
     context: selectedContext,
-    missingRequired
+    missingRequired,
   };
 }

@@ -3,7 +3,7 @@ import { getCreativePreferencesByBusiness } from './firestore';
 import type { CreativePreference } from '../types';
 
 jest.mock('./firestore', () => ({
-  getCreativePreferencesByBusiness: jest.fn()
+  getCreativePreferencesByBusiness: jest.fn(),
 }));
 
 const mockPrefs = getCreativePreferencesByBusiness as jest.Mock;
@@ -25,13 +25,13 @@ describe('recommendCreativeTemplates', () => {
     source: 'approval',
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
-    ...overrides
+    ...overrides,
   });
 
   it('7.1 Insufficient evidence: no preferred templates available', async () => {
     mockPrefs.mockResolvedValue([
       createPref({ preference: 'none' }),
-      createPref({ preference: 'avoided' })
+      createPref({ preference: 'avoided' }),
     ]);
 
     const result = await recommendCreativeTemplates({ businessId: 'biz-1' });
@@ -42,7 +42,7 @@ describe('recommendCreativeTemplates', () => {
 
   it('7.2 Preferred template: correctly surfaces a preferred template', async () => {
     mockPrefs.mockResolvedValue([
-      createPref({ templateId: 'post-problem-solution', preference: 'preferred' })
+      createPref({ templateId: 'post-problem-solution', preference: 'preferred' }),
     ]);
 
     const result = await recommendCreativeTemplates({ businessId: 'biz-1' });
@@ -54,7 +54,7 @@ describe('recommendCreativeTemplates', () => {
 
   it('7.3 Avoided template: avoided templates are not recommended', async () => {
     mockPrefs.mockResolvedValue([
-      createPref({ templateId: 'post-problem-solution', preference: 'avoided' })
+      createPref({ templateId: 'post-problem-solution', preference: 'avoided' }),
     ]);
 
     const result = await recommendCreativeTemplates({ businessId: 'biz-1' });
@@ -65,7 +65,7 @@ describe('recommendCreativeTemplates', () => {
   it('7.5 Type compatibility / 7.6 Objective compatibility', async () => {
     mockPrefs.mockResolvedValue([
       createPref({ templateId: 'post-problem-solution', preference: 'preferred' }),
-      createPref({ templateId: 'reel-product-reveal', preference: 'preferred' })
+      createPref({ templateId: 'reel-product-reveal', preference: 'preferred' }),
     ]);
 
     // Request reel type only
@@ -77,7 +77,12 @@ describe('recommendCreativeTemplates', () => {
   it('7.8 Multiple candidates: deterministic ordering based on explicit user pref and confidence', async () => {
     mockPrefs.mockResolvedValue([
       createPref({ templateId: 'post-social-proof', confidence: 0.5, evidenceCount: 5 }),
-      createPref({ templateId: 'post-problem-solution', source: 'explicit_user', confidence: 0.1, evidenceCount: 1 }), // Should win due to explicit
+      createPref({
+        templateId: 'post-problem-solution',
+        source: 'explicit_user',
+        confidence: 0.1,
+        evidenceCount: 1,
+      }), // Should win due to explicit
       createPref({ templateId: 'post-differentiator', confidence: 0.8, evidenceCount: 8 }),
     ]);
 
@@ -91,7 +96,7 @@ describe('recommendCreativeTemplates', () => {
   it('7.9 Inactive templates: filters them out', async () => {
     // Assuming 'invalid-template' is not in the registry
     mockPrefs.mockResolvedValue([
-      createPref({ templateId: 'invalid-template', preference: 'preferred' })
+      createPref({ templateId: 'invalid-template', preference: 'preferred' }),
     ]);
 
     const result = await recommendCreativeTemplates({ businessId: 'biz-1' });
@@ -107,7 +112,7 @@ describe('recommendCreativeTemplates', () => {
 
   it('7.11 No mutation / 7.12 No self-reinforcement', async () => {
     mockPrefs.mockResolvedValue([
-      createPref({ templateId: 'post-problem-solution', preference: 'preferred' })
+      createPref({ templateId: 'post-problem-solution', preference: 'preferred' }),
     ]);
     const result = await recommendCreativeTemplates({ businessId: 'biz-1' });
     // Verify it just returns data and does NOT call any other services or emit events

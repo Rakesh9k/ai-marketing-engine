@@ -40,28 +40,47 @@ export const ReferenceStyleAnalysisSchema = z.object({
   colorMode: z.enum(['brand', 'neutral', 'monochrome', 'vibrant']),
   humor: z.enum(['none', 'light', 'moderate', 'high']),
   ctaStyle: z.enum(['soft', 'direct', 'urgent', 'conversational']),
-  composition: z.enum(['centered', 'hero-focused', 'split-layout', 'editorial', 'grid', 'asymmetric', 'negative-space-heavy', 'left-aligned', 'right-aligned']).optional(),
-  visualHierarchy: z.array(z.enum(['product', 'headline', 'cta', 'brand', 'supporting-copy'])).optional(),
+  composition: z
+    .enum([
+      'centered',
+      'hero-focused',
+      'split-layout',
+      'editorial',
+      'grid',
+      'asymmetric',
+      'negative-space-heavy',
+      'left-aligned',
+      'right-aligned',
+    ])
+    .optional(),
+  visualHierarchy: z
+    .array(z.enum(['product', 'headline', 'cta', 'brand', 'supporting-copy']))
+    .optional(),
   ctaPlacement: z.enum(['bottom', 'top', 'end-card', 'integrated', 'product-adjacent']).optional(),
-  hookStructure: z.enum(['question', 'bold-statement', 'visual-surprise', 'product-first', 'problem-first', 'offer-first', 'curiosity']).optional(),
+  hookStructure: z
+    .enum([
+      'question',
+      'bold-statement',
+      'visual-surprise',
+      'product-first',
+      'problem-first',
+      'offer-first',
+      'curiosity',
+    ])
+    .optional(),
   shotPacing: z.enum(['slow', 'moderate', 'fast', 'dynamic', 'cinematic']).optional(),
 });
 export type ReferenceStyleAnalysisResult = z.infer<typeof ReferenceStyleAnalysisSchema>;
 
-const config = getEnvConfig();
-
-/**
- * Vision AI Provider using Google Gemini 1.5 Pro
- * Analyzes product images for marketing campaign generation
- */
 export class GeminiVisionProvider {
-  protected client: GoogleGenerativeAI;
-  protected model: any;
+  protected get apiKey(): string {
+    return getEnvConfig().GEMINI_API_KEY || process.env['GEMINI_API_KEY'] || '';
+  }
 
-  constructor() {
-    const apiKey = config.GEMINI_API_KEY || '';
-    this.client = new GoogleGenerativeAI(apiKey);
-    this.model = this.client.getGenerativeModel({ model: 'gemini-flash-latest' });
+  protected getModel(): any {
+    const key = this.apiKey;
+    const client = new GoogleGenerativeAI(key);
+    return client.getGenerativeModel({ model: 'gemini-flash-latest' });
   }
 
   /**
@@ -92,7 +111,7 @@ Return a JSON object strictly matching this structure:
 Omit fields if you cannot confidently determine them. Output ONLY JSON.`;
 
     try {
-      const result = await this.model.generateContent([prompt, ...imageParts]);
+      const result = await this.getModel().generateContent([prompt, ...imageParts]);
       const response = result.response.text();
       const jsonMatch = response.match(/\{[\s\S]*\}/);
       const jsonStr = jsonMatch ? jsonMatch[0] : response;
@@ -103,7 +122,9 @@ Omit fields if you cannot confidently determine them. Output ONLY JSON.`;
       }
       return validation.data;
     } catch (error) {
-      throw new Error(`Reference style analysis failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      throw new Error(
+        `Reference style analysis failed: ${error instanceof Error ? error.message : 'Unknown error'}`
+      );
     }
   }
 
@@ -126,10 +147,25 @@ Omit fields if you cannot confidently determine them. Output ONLY JSON.`;
   ): Promise<VisionAnalysisResult> {
     const imageParts = await this.prepareImages(imageUrls);
 
+    // F2/I1: previously, if EVERY image failed to load (expired URL,
+    // deleted file, network blip), this silently proceeded to call Gemini
+    // with zero images — which still returns a syntactically valid,
+    // schema-passing result that the caller had no way to distinguish from
+    // a real analysis. It was actually a text-only hallucination based on
+    // productMetadata alone. Caller-visible images were requested; caller-
+    // visible images must actually have been analyzed, or this must fail
+    // loudly (routing into the same refund path as any other pipeline
+    // failure) rather than silently degrading.
+    if (imageUrls.length > 0 && imageParts.length === 0) {
+      throw new Error(
+        `Vision analysis failed: none of the ${imageUrls.length} product image(s) could be loaded`
+      );
+    }
+
     const prompt = this.buildAnalysisPrompt(productMetadata, businessContext);
 
     try {
-      const result = await this.model.generateContent([prompt, ...imageParts]);
+      const result = await this.getModel().generateContent([prompt, ...imageParts]);
       const response = result.response.text();
 
       return this.parseVisionResponse(response);
@@ -317,7 +353,7 @@ Return JSON:
   ]
 }`;
 
-    const result = await this.model.generateContent([prompt, ...imageParts]);
+    const result = await this.getModel().generateContent([prompt, ...imageParts]);
     const responseText = result.response.text();
     const jsonMatch = responseText.match(/\{[\s\S]*\}/);
     const parsed = JSON.parse(jsonMatch ? jsonMatch[0] : responseText);

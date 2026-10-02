@@ -51,17 +51,19 @@ function makeReqRes(bodyObj: Record<string, unknown>) {
   return { req, res };
 }
 
-function signedPayload(overrides: Partial<{
-  txnid: string;
-  amount: string;
-  status: string;
-  productinfo: string;
-  firstname: string;
-  email: string;
-  udf1: string;
-  udf2: string;
-  mihpayid: string;
-}>) {
+function signedPayload(
+  overrides: Partial<{
+    txnid: string;
+    amount: string;
+    status: string;
+    productinfo: string;
+    firstname: string;
+    email: string;
+    udf1: string;
+    udf2: string;
+    mihpayid: string;
+  }>
+) {
   const fields = {
     key: TEST_KEY,
     txnid: overrides.txnid ?? 'txn-default',
@@ -95,21 +97,29 @@ describeIfEmulator('payuWebhook (Firestore emulator, network to PayU mocked)', (
     });
   });
 
-  async function seedPendingTransaction(txnid: string, userId: string, planId: string, amount: number) {
-    await db.collection('transactions').doc(txnid).set({
-      transactionId: txnid,
-      userId,
-      type: 'subscription',
-      amount,
-      currency: 'INR',
-      balanceAfter: 0,
-      description: `Subscription payment for ${planId} plan`,
-      provider: 'payu',
-      payuTxnId: txnid,
-      status: 'pending',
-      metadata: { planId },
-      createdAt: new Date().toISOString(),
-    });
+  async function seedPendingTransaction(
+    txnid: string,
+    userId: string,
+    planId: string,
+    amount: number
+  ) {
+    await db
+      .collection('transactions')
+      .doc(txnid)
+      .set({
+        transactionId: txnid,
+        userId,
+        type: 'subscription',
+        amount,
+        currency: 'INR',
+        balanceAfter: 0,
+        description: `Subscription payment for ${planId} plan`,
+        provider: 'payu',
+        payuTxnId: txnid,
+        status: 'pending',
+        metadata: { planId },
+        createdAt: new Date().toISOString(),
+      });
   }
 
   it('rejects a webhook with an invalid hash (tampered payload) without granting credits', async () => {
@@ -202,13 +212,17 @@ describeIfEmulator('payuWebhook (Firestore emulator, network to PayU mocked)', (
     const b = makeReqRes(payload);
     const c = makeReqRes(payload);
 
-    await Promise.all([payuWebhook(a.req, a.res), payuWebhook(b.req, b.res), payuWebhook(c.req, c.res)]);
+    await Promise.all([
+      payuWebhook(a.req, a.res),
+      payuWebhook(b.req, b.res),
+      payuWebhook(c.req, c.res),
+    ]);
 
     const sub = await db.collection('subscriptions').doc(txnid).get();
     expect(sub.data()!['creditsIncluded']).toBe(500);
   });
 
-  it('refuses to grant credits when the received amount does not match Mitra\'s own expected amount', async () => {
+  it("refuses to grant credits when the received amount does not match Mitra's own expected amount", async () => {
     const txnid = `txn-${crypto.randomUUID()}`;
     const userId = `user-${crypto.randomUUID()}`;
     await seedPendingTransaction(txnid, userId, 'business', 999); // expects ₹999

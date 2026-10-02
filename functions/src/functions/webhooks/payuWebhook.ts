@@ -27,12 +27,12 @@ function serverTimestamp() {
  * steps, which are UNVERIFIED (no PayU account access in this
  * environment).
  *
- * Pipeline, mirroring razorpayWebhook.ts's structure so the two gateways'
+ * Pipeline, mirroring webhook.ts's structure so the two gateways'
  * safety properties stay comparable:
  *   1. Hash verification (constant-time, see services/payu.ts)
  *   2. Idempotency claim (txnid+status, atomic Firestore transaction claim
  *      — PayU may retry delivery, same correctness pattern as the
- *      Razorpay webhook's processed_webhook_events collection)
+ *      payment gateway webhook's processed_webhook_events collection)
  *   3. Look up Mitra's own pending transaction record by txnid (created by
  *      createPayUPayment.ts) — userId/planId/expected amount come from
  *      THIS record, not from the webhook's udf fields, even though those
@@ -46,103 +46,111 @@ function serverTimestamp() {
  *      verify-call failure is logged, not silently ignored).
  *   6. Credit grant (only for status === 'success').
  */
-export const payuWebhook = onRequest({ region: 'asia-south1' }, async (req, res) => {
-  const { logger, startTime } = logFunctionStart('payuWebhook', { method: req.method });
+export const payuWebhook = onRequest(
+  {
+    region: 'asia-south1',
+    // Phase 12 Secret Handling audit — getPayUConfig()/verifyPayUResponse
+    // need the PayU salt to verify the hash.
+    secrets: ['PAYU_SALT'],
+  },
+  async (req, res) => {
+    const { logger, startTime } = logFunctionStart('payuWebhook', { method: req.method });
 
-  try {
-    if (req.method !== 'POST') {
-      res.status(405).send('Method not allowed');
-      return;
-    }
-
-    let payuConfig;
     try {
-      payuConfig = getPayUConfig();
-    } catch (configError) {
-      logger.error('PayU not configured', configError as Error);
-      res.status(500).send('PayU not configured');
-      return;
-    }
+      if (req.method !== 'POST') {
+        res.status(405).send('Method not allowed');
+        return;
+      }
 
-    const body = req.body as Record<string, unknown>;
-    const txnid = typeof body['txnid'] === 'string' ? body['txnid'] : '';
-    const status = typeof body['status'] === 'string' ? body['status'] : '';
-    const amount =
-      typeof body['amount'] === 'string' ? body['amount'] : String(body['amount'] ?? '');
-    const mihpayid = typeof body['mihpayid'] === 'string' ? body['mihpayid'] : '';
+      let payuConfig;
+      try {
+        payuConfig = getPayUConfig();
+      } catch (configError) {
+        logger.error('PayU not configured', configError as Error);
+        res.status(500).send('PayU not configured');
+        return;
+      }
 
-    if (!txnid || !status) {
-      logger.error('payuWebhook missing txnid/status', new Error('Malformed payload'));
-      res.status(400).send('Missing required fields');
-      return;
-    }
+      const body = req.body as Record<string, unknown>;
+      const txnid = typeof body['txnid'] === 'string' ? body['txnid'] : '';
+      const status = typeof body['status'] === 'string' ? body['status'] : '';
+      const amount =
+        typeof body['amount'] === 'string' ? body['amount'] : String(body['amount'] ?? '');
+      const mihpayid = typeof body['mihpayid'] === 'string' ? body['mihpayid'] : '';
 
-    const hashValid = verifyPayUResponse(
-      {
-        key: String(body['key'] ?? ''),
-        txnid,
-        amount,
-        productinfo: String(body['productinfo'] ?? ''),
-        firstname: String(body['firstname'] ?? ''),
-        email: String(body['email'] ?? ''),
-        status,
-        udf1: typeof body['udf1'] === 'string' ? body['udf1'] : undefined,
-        udf2: typeof body['udf2'] === 'string' ? body['udf2'] : undefined,
-        hash: String(body['hash'] ?? ''),
-      },
-      payuConfig.salt
-    );
+      if (!txnid || !status) {
+        logger.error('payuWebhook missing txnid/status', new Error('Malformed payload'));
+        res.status(400).send('Missing required fields');
+        return;
+      }
 
-    if (!hashValid) {
-      logger.error('payuWebhook invalid hash', new Error('Hash verification failed'), { txnid });
-      res.status(400).send('Invalid signature');
-      return;
-    }
+      const hashValid = verifyPayUResponse(
+        {
+          key: String(body['key'] ?? ''),
+          txnid,
+          amount,
+          productinfo: String(body['productinfo'] ?? ''),
+          firstname: String(body['firstname'] ?? ''),
+          email: String(body['email'] ?? ''),
+          status,
+          udf1: typeof body['udf1'] === 'string' ? body['udf1'] : undefined,
+          udf2: typeof body['udf2'] === 'string' ? body['udf2'] : undefined,
+          hash: String(body['hash'] ?? ''),
+        },
+        payuConfig.salt
+      );
 
-    // Idempotency: claim on txnid+status so a repeated identical delivery
-    // (PayU retry) is a no-op, but a legitimate status transition
-    // (pending -> success) is still processed once.
-    const eventId = `payu_${txnid}_${status}`;
-    const processedRef = db.collection('processed_webhook_events').doc(eventId);
-    const claimed = await db.runTransaction(async (tx) => {
-      const snap = await tx.get(processedRef);
-      if (snap.exists) return false;
-      tx.set(processedRef, {
+      if (!hashValid) {
+        logger.error('payuWebhook invalid hash', new Error('Hash verification failed'), { txnid });
+        res.status(400).send('Invalid signature');
+        return;
+      }
+
+      // Idempotency: claim on txnid+status so a repeated identical delivery
+      // (PayU retry) is a no-op, but a legitimate status transition
+      // (pending -> success) is still processed once.
+      const eventId = `payu_${txnid}_${status}`;
+      const processedRef = db.collection('processed_webhook_events').doc(eventId);
+      const claimed = await db.runTransaction(async (tx) => {
+        const snap = await tx.get(processedRef);
+        if (snap.exists) return false;
+        tx.set(processedRef, {
+          eventId,
+          eventType: `payu.${status}`,
+          status: 'processing',
+          claimedAt: serverTimestamp(),
+        });
+        return true;
+      });
+
+      if (!claimed) {
+        logger.info('payuWebhook event already processed', { txnid, status });
+        res.status(200).send('OK');
+        return;
+      }
+
+      try {
+        await processPayUEvent({ txnid, status, amount, mihpayid, body });
+      } catch (processingError) {
+        await processedRef.delete().catch(() => undefined);
+        throw processingError;
+      }
+
+      await processedRef.set({
         eventId,
         eventType: `payu.${status}`,
-        status: 'processing',
-        claimedAt: serverTimestamp(),
+        status: 'processed',
+        processedAt: serverTimestamp(),
       });
-      return true;
-    });
 
-    if (!claimed) {
-      logger.info('payuWebhook event already processed', { txnid, status });
+      logFunctionComplete(logger, startTime, { success: true, txnid, status });
       res.status(200).send('OK');
-      return;
+    } catch (error) {
+      logFunctionError(logger, startTime, error as Error);
+      res.status(500).send('Internal server error');
     }
-
-    try {
-      await processPayUEvent({ txnid, status, amount, mihpayid, body });
-    } catch (processingError) {
-      await processedRef.delete().catch(() => undefined);
-      throw processingError;
-    }
-
-    await processedRef.set({
-      eventId,
-      eventType: `payu.${status}`,
-      status: 'processed',
-      processedAt: serverTimestamp(),
-    });
-
-    logFunctionComplete(logger, startTime, { success: true, txnid, status });
-    res.status(200).send('OK');
-  } catch (error) {
-    logFunctionError(logger, startTime, error as Error);
-    res.status(500).send('Internal server error');
   }
-});
+);
 
 async function processPayUEvent(params: {
   txnid: string;

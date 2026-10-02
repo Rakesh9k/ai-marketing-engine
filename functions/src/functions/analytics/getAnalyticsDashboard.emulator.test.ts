@@ -44,12 +44,7 @@ describeIfEmulator('getAnalyticsDashboard — authorization & business isolation
     await admin.app().delete();
   });
 
-  async function seedEvent(
-    eventName: string,
-    userId: string,
-    businessId: string,
-    daysAgo: number
-  ) {
+  async function seedEvent(eventName: string, userId: string, businessId: string, daysAgo: number) {
     const eventId = `${userId}_${eventName}_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`;
     const timestamp = new Date(Date.now() - daysAgo * 24 * 60 * 60 * 1000).toISOString();
     await db.collection('analytics_events').doc(eventId).set({
@@ -99,7 +94,7 @@ describeIfEmulator('getAnalyticsDashboard — authorization & business isolation
     expect(response.totals.campaignsGenerated).toBe(1);
   });
 
-  it('CRITICAL: Business A\'s owner cannot read Business B\'s analytics', async () => {
+  it("CRITICAL: Business A's owner cannot read Business B's analytics", async () => {
     const ownerA = `user-${uuid()}`;
     const ownerB = `user-${uuid()}`;
     const businessAId = `biz-A-${uuid()}`;
@@ -143,10 +138,12 @@ describeIfEmulator('getAnalyticsDashboard — authorization & business isolation
     const businessId = `biz-${uuid()}`;
 
     await createBusinessDoc(makeBusiness(businessId, clientOwnerId, agencyId));
-    await db
-      .collection('users')
-      .doc(wrongAgencyMemberId)
-      .set({ userId: wrongAgencyMemberId, role: 'agency_member', agencyId: otherAgencyId, businessIds: [] });
+    await db.collection('users').doc(wrongAgencyMemberId).set({
+      userId: wrongAgencyMemberId,
+      role: 'agency_member',
+      agencyId: otherAgencyId,
+      businessIds: [],
+    });
 
     await expect(
       (getAnalyticsDashboard as any).run(

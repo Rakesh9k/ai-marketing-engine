@@ -52,10 +52,7 @@ describeIfEmulator('onUserCreatedHandler — signup persistence (Phase 15)', () 
     expect(userData['agencyId']).toBeNull();
     expect(userData['email']).toBe(`${userId}@test.example`);
 
-    const subSnap = await db
-      .collection('subscriptions')
-      .where('userId', '==', userId)
-      .get();
+    const subSnap = await db.collection('subscriptions').where('userId', '==', userId).get();
     expect(subSnap.size).toBe(1);
     const sub = subSnap.docs[0]!.data();
     expect(sub['planId']).toBe('free');
@@ -70,10 +67,7 @@ describeIfEmulator('onUserCreatedHandler — signup persistence (Phase 15)', () 
     expect(usageDoc.exists).toBe(true);
     expect(usageDoc.data()!['creditsUsed']).toBe(0);
 
-    const txnSnap = await db
-      .collection('transactions')
-      .where('userId', '==', userId)
-      .get();
+    const txnSnap = await db.collection('transactions').where('userId', '==', userId).get();
     expect(txnSnap.size).toBe(1);
     expect(txnSnap.docs[0]!.data()['type']).toBe('grant');
     expect(txnSnap.docs[0]!.data()['amount']).toBe(sub['creditsIncluded']);

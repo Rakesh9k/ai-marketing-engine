@@ -104,14 +104,16 @@ export async function buildCaptionFilter(opts: CaptionFilterOptions): Promise<st
 
   const maxLineWidth = Math.max(...measuredLines.map((l) => l.widthPx));
   const totalTextHeight =
-    measuredLines.reduce((sum, l) => sum + l.lineHeightPx, 0) + LINE_SPACING * (measuredLines.length - 1);
+    measuredLines.reduce((sum, l) => sum + l.lineHeightPx, 0) +
+    LINE_SPACING * (measuredLines.length - 1);
 
   const boxWidth = maxLineWidth + BOX_PAD * 2;
   const boxHeight = totalTextHeight + BOX_PAD * 2;
   const boxX = Math.round((containerWidth - boxWidth) / 2);
   const boxY = Math.round(
-    (opts.position === 'center' ? (containerHeight - boxHeight) / 2 : containerHeight - boxHeight - 260) +
-      extraYOffset
+    (opts.position === 'center'
+      ? (containerHeight - boxHeight) / 2
+      : containerHeight - boxHeight - 260) + extraYOffset
   );
 
   const filters: string[] = [

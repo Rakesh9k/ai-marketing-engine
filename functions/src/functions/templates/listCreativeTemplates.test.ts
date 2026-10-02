@@ -12,7 +12,9 @@ function callableRequest(data: unknown, uid = 'user-1') {
 
 describe('listCreativeTemplates callable', () => {
   it('requires authentication', async () => {
-    await expect((listCreativeTemplates as any).run({ data: {}, auth: null } as any)).rejects.toThrow();
+    await expect(
+      (listCreativeTemplates as any).run({ data: {}, auth: null } as any)
+    ).rejects.toThrow();
   });
 
   it('returns every active built-in template when no filters are supplied', async () => {
@@ -27,13 +29,17 @@ describe('listCreativeTemplates callable', () => {
   });
 
   it('filters by objective', async () => {
-    const result = await (listCreativeTemplates as any).run(callableRequest({ objective: 'conversion' }));
+    const result = await (listCreativeTemplates as any).run(
+      callableRequest({ objective: 'conversion' })
+    );
     expect(result.templates.length).toBeGreaterThan(0);
     for (const t of result.templates) expect(t.objectives).toContain('conversion');
   });
 
   it('filters by vertical', async () => {
-    const result = await (listCreativeTemplates as any).run(callableRequest({ vertical: 'restaurant' }));
+    const result = await (listCreativeTemplates as any).run(
+      callableRequest({ vertical: 'restaurant' })
+    );
     expect(result.templates.length).toBeGreaterThan(0);
     for (const t of result.templates) expect(t.compatibleVerticals).toContain('restaurant');
   });
@@ -51,12 +57,16 @@ describe('listCreativeTemplates callable', () => {
   });
 
   it('returns an empty array (not an error) for a filter combination matching nothing', async () => {
-    const result = await (listCreativeTemplates as any).run(callableRequest({ objective: 'retention' }));
+    const result = await (listCreativeTemplates as any).run(
+      callableRequest({ objective: 'retention' })
+    );
     expect(result.templates).toEqual([]);
   });
 
   it('rejects an invalid type value', async () => {
-    await expect((listCreativeTemplates as any).run(callableRequest({ type: 'carousel' }))).rejects.toThrow();
+    await expect(
+      (listCreativeTemplates as any).run(callableRequest({ type: 'carousel' }))
+    ).rejects.toThrow();
   });
 
   it('never returns internal creative grammar (structure/visualGrammar/adaptationRules/constraints) to the client', async () => {

@@ -29,7 +29,7 @@ import {
   getGenerationCost,
   USAGE_ERROR_CODES,
 } from '../../services/usageControl';
-import { trackCreativeEvent } from '../../services/analyticsService';
+import { trackCreativeEvent, trackCampaignRegenerated } from '../../services/analyticsService';
 import type { UsageErrorCode } from '../../services/usageControl';
 
 const regenerateAssetSchema = z.object({
@@ -50,7 +50,15 @@ const regenerateAssetSchema = z.object({
 });
 
 export const regenerateAsset = onCall(
-  { region: 'asia-south1', enforceAppCheck: true, maxInstances: 20, timeoutSeconds: 540, memory: '1GiB' },
+  {
+    region: 'asia-south1',
+    enforceAppCheck: true,
+    maxInstances: 20,
+    timeoutSeconds: 540,
+    memory: '1GiB',
+    // Phase 12 Secret Handling audit — see generateCampaignStrategy.ts.
+    secrets: ['GEMINI_API_KEY'],
+  },
   validatedCallable(regenerateAssetSchema, async (data, context) => {
     const { logger, startTime } = logFunctionStart('regenerateAsset', {
       userId: context.userId,
@@ -225,6 +233,8 @@ export const regenerateAsset = onCall(
             index: originalAsset.index,
             content: newAssetData.content,
             imageUrl: newAssetData.imageUrl,
+            // F2: durable reference, same as generateCampaignStrategy.ts.
+            storagePath: newAssetData.storagePath,
             status: regenerationPassed ? newAssetData.status : 'failed',
             promptUsed: newAssetData.promptUsed,
             modelUsed: 'dall-e-3',
@@ -255,7 +265,7 @@ export const regenerateAsset = onCall(
           // regeneration is stored (above) but never marked as having
           // superseded anything.
 
-          // Phase 21: Track regeneration
+          // Phase 21 & Phase 16: Track regeneration
           await trackCreativeEvent({
             eventType: 'creative_regenerated',
             userId: context.userId,
@@ -265,9 +275,18 @@ export const regenerateAsset = onCall(
             creativeType: 'post',
             metadata: {
               originalAssetId: originalAsset.assetId,
-              regenerationPassed
-            }
+              regenerationPassed,
+            },
           });
+
+          await trackCampaignRegenerated(
+            context.userId,
+            campaign.businessId,
+            data.campaignId,
+            newAsset.assetId,
+            data.assetType,
+            { originalAssetId: originalAsset.assetId, regenerationPassed }
+          );
 
           return { pipelineResult, newAsset, regenerationPassed, regenerationTruthStatus };
         },
@@ -309,4 +328,3 @@ export const regenerateAsset = onCall(
     }
   })
 );
-

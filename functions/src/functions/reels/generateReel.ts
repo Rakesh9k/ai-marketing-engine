@@ -22,6 +22,7 @@ import { analyzeReelClips, generateValidatedReelEditPlan } from '../../services/
 import { getVideoRenderer } from '../../services/videoRenderer';
 import { getMusicTrackById, MIN_REEL_CLIPS, pickDefaultMusicTrack } from '../../config/reels';
 import { toSavedStyleContext } from '../../services/savedStyle';
+import { requirePlan } from '../../services/entitlements';
 
 const generateReelSchema = z.object({
   businessId: z.string().min(1),
@@ -56,6 +57,10 @@ export const generateReel = onCall(
     // timeout since it awaits the full render round-trip synchronously.
     timeoutSeconds: 540,
     memory: '512MiB',
+    // Phase 12 Secret Handling audit — GEMINI_API_KEY (scene analysis/edit
+    // plan) and REEL_RENDERER_API_KEY (the Cloud Run renderer's own auth
+    // header, see videoRenderer.ts). See generateCampaignStrategy.ts.
+    secrets: ['GEMINI_API_KEY'],
   },
   validatedCallable(generateReelSchema, async (data, context) => {
     const { logger, startTime } = logFunctionStart('generateReel', {
@@ -70,6 +75,9 @@ export const generateReel = onCall(
     try {
       await verifyBusinessAccess(userId, data.businessId);
       await checkRateLimit(userId, 'generateReel');
+      // Reel generation is a Business-tier feature — Starter credits cannot
+      // substitute for the plan entitlement (see entitlements.ts PLAN_ENTITLEMENTS).
+      await requirePlan(userId, 'business');
 
       const reel = await getReelProjectDoc(reelId);
       if (!reel || reel.businessId !== data.businessId) {
@@ -318,4 +326,3 @@ export const generateReel = onCall(
     }
   })
 );
-

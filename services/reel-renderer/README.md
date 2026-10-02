@@ -59,11 +59,11 @@ identical across every build/host (see "Font strategy" below).
 Mitra supports English, Hindi (Devanagari), Telugu, Hinglish, and mixed
 Hindi/Telugu+English captions. Three vendored fonts cover this:
 
-| Script | Font | Path (in-container) |
-|---|---|---|
-| Latin (English/Hinglish) | Noto Sans Bold | `assets/fonts/NotoSans-Bold.ttf` |
-| Devanagari (Hindi) | Noto Sans Devanagari Bold | `assets/fonts/NotoSansDevanagari-Bold.ttf` |
-| Telugu | Noto Sans Telugu Bold | `assets/fonts/NotoSansTelugu-Bold.ttf` |
+| Script                   | Font                      | Path (in-container)                        |
+| ------------------------ | ------------------------- | ------------------------------------------ |
+| Latin (English/Hinglish) | Noto Sans Bold            | `assets/fonts/NotoSans-Bold.ttf`           |
+| Devanagari (Hindi)       | Noto Sans Devanagari Bold | `assets/fonts/NotoSansDevanagari-Bold.ttf` |
+| Telugu                   | Noto Sans Telugu Bold     | `assets/fonts/NotoSansTelugu-Bold.ttf`     |
 
 All three are **SIL Open Font License 1.1** — permissive, royalty-free, and
 explicitly permits embedding in commercial software with no attribution
@@ -93,7 +93,7 @@ baseline, behind a single `drawbox` background sized to the whole
 line/block.
 
 **Known limitation — Telugu base+matra glyph collision (confirmed, not
-merely theoretical):** the `ffmpeg-static` binary this service uses *is*
+merely theoretical):** the `ffmpeg-static` binary this service uses _is_
 built with `--enable-libharfbuzz`/`--enable-libfribidi`, and `drawtext`'s
 `text_shaping` option defaults to `true` — so shaping is attempted. Testing
 found it works correctly for every **Devanagari** case tried (conjuncts
@@ -239,9 +239,9 @@ outside the emulator; nothing else on the Functions side needs to change.
 ## Pipeline design notes / judgment calls
 
 - **Audio strategy**: every intermediate segment/title-card clip is built
-  *without* audio (`-an`). The only audio in the final output is the
+  _without_ audio (`-an`). The only audio in the final output is the
   background music bed, mixed in once at the very end (`src/render/
-  audioMix.ts`) at low volume (0.22 gain) with a 0.5s fade-in / 1s fade-out
+audioMix.ts`) at low volume (0.22 gain) with a 0.5s fade-in / 1s fade-out
   and `loudnorm` normalization. This trades "preserve each clip's original
   ambient audio at low volume" for a single, reliable audio path — the
   product brief explicitly allows this ("If a clip's original audio is very
@@ -264,7 +264,7 @@ outside the emulator; nothing else on the Functions side needs to change.
   `fade` (`DEFAULT_JOIN_TRANSITION` in `src/render/constants.ts`) — a safe,
   clean look regardless of style.
 - **Crop, never stretch**: `scale=W:H:force_original_aspect_ratio=increase,
-  crop=W:H` scales the source up to cover the 1080x1920 frame then center-
+crop=W:H` scales the source up to cover the 1080x1920 frame then center-
   crops it, so landscape or otherwise non-vertical source footage is never
   distorted.
 - **Brightness/motion heuristics**: coarse, deterministic, and explicitly
@@ -276,7 +276,7 @@ outside the emulator; nothing else on the Functions side needs to change.
   `signalstats` filter for per-frame luma stats, or sampling more/denser
   frames) if upstream clip scoring proves too coarse in practice.
 - **File size / bitrate**: final export uses `-crf 23 -maxrate 4M -bufsize
-  8M`, which in the local smoke test produced ~1.2MB for a 5.7s test video
+8M`, which in the local smoke test produced ~1.2MB for a 5.7s test video
   (synthetic noise-pattern test sources, which compress worse than real
   footage) — comfortably in the "a few MB per 15-45s" target for real
   handheld footage.

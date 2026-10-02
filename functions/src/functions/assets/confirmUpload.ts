@@ -7,6 +7,7 @@ import { verifyBusinessAccess } from '../../middleware/auth';
 import { validatedCallable } from '../../middleware/validation';
 import { checkRateLimit } from '../../middleware/rateLimit';
 import { createAssetDoc, getAssetDoc } from '../../services/firestore';
+import { getDurableDownloadUrl } from '../../services/storageUrls';
 import { logFunctionStart, logFunctionComplete, logFunctionError } from '../../utils/logging';
 import { mapErrorToHttpsError } from '../../utils/errors';
 import type { Asset, AssetType } from '../../types';
@@ -90,12 +91,42 @@ export const confirmUpload = onCall(
         throw new HttpsError('not-found', 'Uploaded file not found in storage');
       }
 
-      // Get the download URL
-      const [downloadURL] = await file.getSignedUrl({
-        version: 'v4',
-        action: 'read',
-        expires: Date.now() + 7 * 24 * 60 * 60 * 1000, // 7 days
-      });
+      // Phase 4 Storage Security Audit: getUploadUrl.ts's signed URL only
+      // constrains the Content-Type header the PUT must send — it does NOT
+      // (and, with a plain V4 "write" signed URL, cannot) cap the actual
+      // number of bytes the client sends, and `metadata.size`/`mimeType`
+      // above are the CLIENT's own claim, never checked against the real
+      // uploaded object. Without this, a caller could request a signed URL
+      // for a 1KB image, then PUT an arbitrarily large file through it —
+      // paying nothing extra client-side while the bucket absorbs the real
+      // storage cost — and this function would persist the client's forged
+      // (small) size into the asset doc regardless. Re-deriving size/
+      // contentType from the actual GCS object (not the request body) closes
+      // that gap; oversized or mistyped uploads are deleted rather than
+      // silently accepted.
+      const MAX_UPLOAD_BYTES = 10 * 1024 * 1024;
+      const [realMetadata] = await file.getMetadata();
+      const realSize = Number(realMetadata.size || 0);
+      const realContentType = realMetadata.contentType || '';
+      if (realSize > MAX_UPLOAD_BYTES || !/^image\/(jpeg|png|webp)$/.test(realContentType)) {
+        await file.delete().catch(() => undefined);
+        logger.warn('confirmUpload denied: uploaded object failed server-side validation', {
+          userId,
+          businessId,
+          realSize,
+          realContentType,
+        });
+        throw new HttpsError(
+          'invalid-argument',
+          'Uploaded file exceeds the size limit or is not a supported image type'
+        );
+      }
+
+      // F2: a durable, non-expiring download URL (token-based, same
+      // mechanism as the client SDK's getDownloadURL()) — not a 7-day
+      // signed URL, which used to make product photos silently stop
+      // reaching the vision pipeline a week after upload.
+      const downloadURL = await getDurableDownloadUrl(storagePath);
 
       // Generate asset ID
       const assetId = uuidv7();
@@ -128,8 +159,10 @@ export const confirmUpload = onCall(
         description: undefined,
         storagePath,
         fileName: storagePath.split('/').pop() || 'unknown',
-        mimeType: metadata?.mimeType || 'image/jpeg',
-        size: metadata?.size || 0,
+        // Server-verified values (realSize/realContentType), not the
+        // client's claimed metadata — see the validation block above.
+        mimeType: realContentType,
+        size: realSize,
         width: metadata?.width || 0,
         height: metadata?.height || 0,
         assetType: validAssetType,

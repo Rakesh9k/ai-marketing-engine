@@ -57,48 +57,94 @@ service cloud.firestore {
         request.resource.data.get('subscriptionId', null) == resource.data.get('subscriptionId', null);
 
       allow delete: if false;
+
+      // Social Connections subcollection (Phase 9 Meta integration)
+      match /socialConnections/{connectionId} {
+        allow read: if isOwner(userId);
+        allow write: if false;
+      }
     }
 
-    // Businesses collection
+    // Meta server-only collections (Phase 9 Meta integration)
+    // Server Admin SDK only — client access completely disallowed
+    match /metaCredentials/{connectionId} {
+      allow read, write: if false;
+    }
+
+    match /metaOAuthStates/{stateId} {
+      allow read, write: if false;
+    }
+
+    match /pendingMetaSessions/{stateId} {
+      allow read, write: if false;
+    }
+
+    // Businesses collection. Read-only for clients — create/update go
+    // through createBusiness/updateBusiness/updateBusinessBrain (Admin
+    // SDK, bypasses these rules). The old unrestricted `allow update: if
+    // resource.data.userId == request.auth.uid` let the owner overwrite
+    // userId, agencyId, status, or businessBrain directly, bypassing every
+    // one of those callables' Zod validation and vertical-consistency
+    // checks (A2 in the fix plan) — confirmed no legitimate client caller
+    // of businessService.update/create/archive exists (grep found none).
     match /businesses/{businessId} {
       allow read: if isAuthenticated() &&
         (resource.data.userId == request.auth.uid ||
          hasBusinessAccess(businessId) ||
          (request.auth.token.role == 'agency_member' && resource.data.agencyId == request.auth.token.agencyId));
-      allow create: if isAuthenticated() && request.resource.data.userId == request.auth.uid;
-      allow update: if isAuthenticated() && resource.data.userId == request.auth.uid;
-      allow delete: if false; // Soft delete only
+      allow write: if false;
     }
 
-    // Agency collection — agency administrators and members can read their own agency
+    // Agency collection — agency administrators and members can read their
+    // own agency. No agency-creation/management callable exists anywhere in
+    // this codebase yet (confirmed by grep: no `collection('agencies')`
+    // write outside this rules file), so the previous "allow read, write"
+    // granted an owner unrestricted mass-assignment over ownerUserId/
+    // members/vertical the moment any agency doc existed (e.g. seeded via
+    // the Firebase console for a pilot customer) — including reassigning
+    // ownerUserId to hijack the agency, or an agency_member deleting it
+    // outright via the blanket "write" grant. Locked to the same
+    // read-only-for-clients pattern already used for businesses/brand_kits
+    // until a real server-side agency management flow exists to own writes.
     match /agencies/{agencyId} {
-      allow read, write: if isAuthenticated() &&
+      allow read: if isAuthenticated() &&
         (request.auth.uid == resource.data.ownerUserId ||
          isAgencyMember(agencyId));
-      allow create: if false; // Agencies created onboarding flow only
+      allow write: if false;
     }
 
-    // Clients collection — managed within an agency workspace
+    // Clients collection — managed within an agency workspace. Like
+    // agencies above, no code anywhere creates/reads/updates this
+    // collection (confirmed by grep) — it is unimplemented scaffolding.
+    // The previous `create` condition checked
+    // `request.resource.data.agencyId in request.auth.token.businessIds`,
+    // which any authenticated user could satisfy trivially by setting
+    // agencyId to one of their own businessIds (a value they fully
+    // control), and `update` placed no restriction at all on which fields
+    // an owner could change once a doc existed. Locked server-only until a
+    // real client management flow is built to validate and own these
+    // writes.
     match /clients/{clientId} {
       allow read: if isAuthenticated() &&
         (resource.data.userId == request.auth.uid ||
          hasBusinessAccess(resource.data.businessIds[0]) ||
          (request.auth.token.role == 'agency_member' &&
           resource.data.agencyId == request.auth.token.agencyId));
-      allow create: if isAuthenticated() && request.resource.data.userId == request.auth.uid &&
-        request.resource.data.agencyId in request.auth.token.businessIds;
-      allow update: if isAuthenticated() && resource.data.userId == request.auth.uid;
-      allow delete: if false;
+      allow write: if false;
     }
 
-    // Brand Kits collection (1:1 with business)
+    // Brand Kits collection (1:1 with business). Read-only for clients —
+    // writes must go through createBrandKit/updateBrandKit, which validate
+    // colors as hex and enforce the tone enum (Zod schemas the client SDK
+    // has no equivalent for).
     match /brand_kits/{businessId} {
-      allow read, write: if isAuthenticated() &&
+      allow read: if isAuthenticated() &&
         exists(/databases/$(database)/documents/businesses/$(businessId)) &&
         (get(/databases/$(database)/documents/businesses/$(businessId)).data.userId == request.auth.uid ||
          hasBusinessAccess(businessId) ||
          (request.auth.token.role == 'agency_member' &&
           get(/databases/$(database)/documents/businesses/$(businessId)).data.agencyId == request.auth.token.agencyId));
+      allow write: if false;
     }
 
     // Saved Styles are business-scoped creative preferences. They contain no
@@ -122,7 +168,14 @@ service cloud.firestore {
          get(/databases/$(database)/documents/businesses/$(resource.data.businessId)).data.agencyId == request.auth.token.agencyId);
       allow create: if isAuthenticated() &&
         request.resource.data.businessId in request.auth.token.businessIds;
-      allow update, delete: if isAuthenticated() &&
+      // businessId must not change on update — otherwise an owner could
+      // re-point an existing product into another tenant's catalogue
+      // (A1 in the fix plan): the old rule only checked the EXISTING
+      // doc's business ownership, never that the write kept it there.
+      allow update: if isAuthenticated() &&
+        get(/databases/$(database)/documents/businesses/$(resource.data.businessId)).data.userId == request.auth.uid &&
+        request.resource.data.businessId == resource.data.businessId;
+      allow delete: if isAuthenticated() &&
         get(/databases/$(database)/documents/businesses/$(resource.data.businessId)).data.userId == request.auth.uid;
     }
 
@@ -144,16 +197,40 @@ service cloud.firestore {
       // rules) only — a client-supplied write can never move a campaign into
       // or out of a verified/completed state, and can never touch
       // metadata.truthCheckStatus, regardless of what value it sends.
+      // Beyond the previously-pinned status/credits/truthCheckStatus
+      // fields: businessId and userId must never change (re-pointing a
+      // campaign to another tenant), and offer/completedAt/
+      // metadata.truthCheckResult are also server-authoritative — a client
+      // could otherwise edit a verified campaign's price after the fact
+      // (A1 in the fix plan) while its truthCheckStatus label still read
+      // 'PASS' for the ORIGINAL, no-longer-displayed price.
       allow update: if isAuthenticated() && resource.data.userId == request.auth.uid &&
+        request.resource.data.userId == resource.data.userId &&
+        request.resource.data.businessId == resource.data.businessId &&
         request.resource.data.status == resource.data.status &&
         request.resource.data.creditsReserved == resource.data.creditsReserved &&
+        // Only locked once verified — a draft campaign's offer is
+        // legitimately client-editable before generation; the actual
+        // threat (A1) is editing price/terms on an ALREADY Truth-Check-
+        // verified campaign while its 'verified' status/badge stays shown.
+        (resource.data.status != 'verified' ||
+         !('offer' in request.resource.data) ||
+         !('offer' in resource.data) ||
+         request.resource.data.offer == resource.data.offer) &&
+        (!('completedAt' in request.resource.data) ||
+         !('completedAt' in resource.data) ||
+         request.resource.data.completedAt == resource.data.completedAt) &&
         (!('creditsUsed' in request.resource.data) ||
          !('creditsUsed' in resource.data) ||
          request.resource.data.creditsUsed == resource.data.creditsUsed) &&
         (!('metadata' in request.resource.data) ||
          !('metadata' in resource.data) ||
          !request.resource.data.metadata.keys().hasAny(['truthCheckStatus']) ||
-         request.resource.data.metadata.truthCheckStatus == resource.data.metadata.truthCheckStatus);
+         request.resource.data.metadata.truthCheckStatus == resource.data.metadata.truthCheckStatus) &&
+        (!('metadata' in request.resource.data) ||
+         !('metadata' in resource.data) ||
+         !request.resource.data.metadata.keys().hasAny(['truthCheckResult']) ||
+         request.resource.data.metadata.truthCheckResult == resource.data.metadata.truthCheckResult);
       allow delete: if false;
     }
 
@@ -178,7 +255,14 @@ service cloud.firestore {
       allow create: if isAuthenticated() &&
         request.resource.data.userId == request.auth.uid &&
         request.resource.data.businessId in request.auth.token.businessIds;
-      allow update: if isAuthenticated() && resource.data.userId == request.auth.uid;
+      // businessId/userId must not change on update — otherwise an owner
+      // could re-point their own asset into another tenant's business
+      // (the same class of bug already fixed for products/{productId}
+      // above: the old rule only checked the EXISTING doc's owner, never
+      // that the write kept userId/businessId unchanged).
+      allow update: if isAuthenticated() && resource.data.userId == request.auth.uid &&
+        request.resource.data.userId == resource.data.userId &&
+        request.resource.data.businessId == resource.data.businessId;
       allow delete: if false; // Soft delete only
     }
 
@@ -260,5 +344,66 @@ service cloud.firestore {
       allow update: if false;
       allow delete: if false;
     }
+
+    // The collections below are never read or written by any client — only
+    // Cloud Functions (Admin SDK, which bypasses these rules) touch them.
+    // Firestore denies access to any path with no matching rule by default,
+    // so these were already inaccessible; these blocks make that trust
+    // boundary explicit rather than implicit-by-omission, so a future
+    // change to this file can't accidentally open one of them (e.g. by
+    // adding a catch-all match) without visibly contradicting a rule
+    // already written here.
+    match /creative_feedback/{feedbackId} {
+      allow read, write: if false;
+    }
+
+    match /creative_preferences/{preferenceId} {
+      allow read, write: if false;
+    }
+
+    match /processed_webhook_events/{eventId} {
+      allow read, write: if false;
+    }
+
+    match /idempotency_keys/{keyId} {
+      allow read, write: if false;
+    }
+
+    match /rate_limits/{limitId} {
+      allow read, write: if false;
+    }
+
+    // Publish Jobs collection (Phase 10 Publishing Engine)
+    // Read: Allowed for the owning user only
+    // Write: Disallowed for client SDK — all job creation and status state transitions go through Cloud Functions (Admin SDK)
+    match /publishJobs/{jobId} {
+      allow read: if isAuthenticated() && resource.data.userId == request.auth.uid;
+      allow write: if false;
+    }
+
+    // Scheduled Posts collection (Phase 11 Scheduling Engine)
+    // Read: Allowed for the owning user only
+    // Write: Disallowed for client SDK — all scheduling state transitions go through Cloud Functions (Admin SDK)
+    match /scheduledPosts/{scheduledPostId} {
+      allow read: if isAuthenticated() && resource.data.userId == request.auth.uid;
+      allow write: if false;
+    }
+
+    // Marketing Plans collection (Phase 14 30-Day Marketing Calendar)
+    // Read: Allowed for the owning user only
+    // Write: Disallowed for client SDK — all plan creation goes through Cloud Functions (Admin SDK)
+    match /marketingPlans/{planId} {
+      allow read: if isAuthenticated() && resource.data.userId == request.auth.uid;
+      allow write: if false;
+    }
+
+    // Marketing Calendar Items collection (Phase 14 30-Day Marketing Calendar)
+    // Read: Allowed for the owning user only
+    // Write: Disallowed for client SDK — all item modifications go through Cloud Functions (Admin SDK)
+    match /marketingCalendarItems/{itemId} {
+      allow read: if isAuthenticated() && resource.data.userId == request.auth.uid;
+      allow write: if false;
+    }
   }
 }
+

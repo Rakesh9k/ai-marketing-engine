@@ -18,7 +18,9 @@ export function apiKeyMiddleware(req: Request, res: Response, next: NextFunction
   }
   const provided = req.header('x-api-key');
   if (provided !== API_KEY) {
-    res.status(401).json({ error: { code: 'unauthorized', message: 'Missing or invalid x-api-key' } });
+    res
+      .status(401)
+      .json({ error: { code: 'unauthorized', message: 'Missing or invalid x-api-key' } });
     return;
   }
   next();

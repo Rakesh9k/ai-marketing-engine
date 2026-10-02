@@ -48,7 +48,10 @@ function makeCampaign(campaignId: string, businessId: string, userId: string): C
       validityStart: new Date().toISOString(),
       validityEnd: new Date(Date.now() + 86400000).toISOString(),
     },
-    duration: { start: new Date().toISOString(), end: new Date(Date.now() + 86400000).toISOString() },
+    duration: {
+      start: new Date().toISOString(),
+      end: new Date(Date.now() + 86400000).toISOString(),
+    },
     audience: { localities: ['Kondapur'] },
     cta: 'order_whatsapp',
     localization: {} as Campaign['localization'],
@@ -223,7 +226,7 @@ describeIfEmulator('recordWhatsAppClick / getCampaignPerformance (Phase 34)', ()
     expect(result.inquiriesAvailable).toBe(false);
   });
 
-  it('cross-tenant read: a user cannot read another business\'s campaign performance', async () => {
+  it("cross-tenant read: a user cannot read another business's campaign performance", async () => {
     const ownerId = `user-${uuid()}`;
     const attackerId = `user-${uuid()}`;
     const businessId = `biz-${uuid()}`;
@@ -232,9 +235,7 @@ describeIfEmulator('recordWhatsAppClick / getCampaignPerformance (Phase 34)', ()
     await createCampaignDoc(makeCampaign(campaignId, businessId, ownerId));
 
     await expect(
-      (getCampaignPerformance as any).run(
-        callableRequest({ businessId, campaignId }, attackerId)
-      )
+      (getCampaignPerformance as any).run(callableRequest({ businessId, campaignId }, attackerId))
     ).rejects.toThrow();
   });
 });

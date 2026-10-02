@@ -19,6 +19,7 @@ export const PRICING = {
   campaignBaseCredits: 100,
   regenerationCredits: 10,
   imageGenerationCredits: 20,
+  calendarPlanningCredits: 10,
   premiumModelMultiplier: 2,
   maxCreditsPerCampaign: 300,
   // "Create a Reel": one Vision-AI scene-classification call per clip (up to
@@ -26,11 +27,19 @@ export const PRICING = {
   // Priced below a full campaign_generation (140) since there is no DALL-E
   // image generation involved — the user supplies the real footage.
   reelGenerationCredits: 80,
+  // Phase 8 Credits & Usage Enforcement Audit: analyzeReferenceStyle.ts made
+  // a real (billable) Vision-AI call with no credit cost defined anywhere —
+  // a genuine free/unlimited-AI-usage gap, not an intentional free feature.
+  // Priced below imageGenerationCredits (20) since this is a single
+  // analysis call, not a generation call — a new price point for a
+  // previously-uncosted operation, not a change to any existing one.
+  styleAnalysisCredits: 15,
   subscriptionTiers: {
-    free: { monthlyCredits: 100, priceINR: 0 },
-    starter: { monthlyCredits: 500, priceINR: 499 },
-    business: { monthlyCredits: 1200, priceINR: 999 },
-    agency: { monthlyCredits: 3000, priceINR: 2499 },
+    free: { monthlyCredits: 100, priceINR: 0, yearlyPriceINR: 0, monthlyReels: 0, monthlyCreatives: 5, monthlyStories: 0, maxBusinesses: 1 },
+    starter: { monthlyCredits: 500, priceINR: 999, yearlyPriceINR: 9990, monthlyReels: 3, monthlyCreatives: 15, monthlyStories: 9, maxBusinesses: 1 },
+    business: { monthlyCredits: 1200, priceINR: 1699, yearlyPriceINR: 16990, monthlyReels: 10, monthlyCreatives: 30, monthlyStories: 30, maxBusinesses: 1 },
+    pro: { monthlyCredits: 2500, priceINR: 2999, yearlyPriceINR: 24990, monthlyReels: 20, monthlyCreatives: 60, monthlyStories: 60, maxBusinesses: 3 },
+    agency: { monthlyCredits: 6000, priceINR: 4999, yearlyPriceINR: 49990, monthlyReels: 40, monthlyCreatives: 120, monthlyStories: 120, maxBusinesses: 10 },
   },
   topUpPacks: [
     { credits: 500, priceINR: 499 },
@@ -39,15 +48,31 @@ export const PRICING = {
   ],
 } as const;
 
+export type EntitlementType = 'reel' | 'creative' | 'story';
+
+export const ENTITLEMENT_COSTS: Record<EntitlementType, { credits: number }> = {
+  reel: {
+    credits: PRICING.reelGenerationCredits, // 80
+  },
+  creative: {
+    credits: PRICING.imageGenerationCredits, // 20
+  },
+  story: {
+    credits: 10,
+  },
+};
+
 export type SubscriptionPlan = keyof typeof PRICING.subscriptionTiers;
 export type SubscriptionTier = (typeof PRICING.subscriptionTiers)[SubscriptionPlan];
 
 export function getMonthlyCredits(plan: SubscriptionPlan): number {
-  return PRICING.subscriptionTiers[plan].monthlyCredits;
+  return PRICING.subscriptionTiers[plan]?.monthlyCredits ?? 100;
 }
 
-export function getPlanPrice(plan: SubscriptionPlan): number {
-  return PRICING.subscriptionTiers[plan].priceINR;
+export function getPlanPrice(plan: SubscriptionPlan, billingCycle: 'monthly' | 'yearly' = 'monthly'): number {
+  const tier = PRICING.subscriptionTiers[plan];
+  if (!tier) return 0;
+  return billingCycle === 'yearly' ? tier.yearlyPriceINR : tier.priceINR;
 }
 
 export function calculateCreditsRequired(

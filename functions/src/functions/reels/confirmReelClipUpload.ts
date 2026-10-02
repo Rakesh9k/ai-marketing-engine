@@ -10,6 +10,7 @@ import { checkRateLimit } from '../../middleware/rateLimit';
 import { createAssetDoc, getAssetDoc, getReelProjectDoc } from '../../services/firestore';
 import { logFunctionStart, logFunctionComplete, logFunctionError } from '../../utils/logging';
 import { mapErrorToHttpsError } from '../../utils/errors';
+import { getDurableDownloadUrl } from '../../services/storageUrls';
 import {
   MAX_CLIP_FILE_SIZE_BYTES,
   MAX_REEL_CLIPS,
@@ -85,22 +86,45 @@ export const confirmReelClipUpload = onCall(
         throw new HttpsError('not-found', 'Uploaded clip not found in storage');
       }
 
+      // Phase 4 Storage Security Audit (same fix as confirmUpload.ts): the
+      // signed URL only constrains the Content-Type header, not the actual
+      // byte count, and `data.metadata` is the client's own unverified
+      // claim. Re-derive size/contentType from the real GCS object before
+      // trusting either value for the per-clip or total-upload ceiling.
+      const [realMetadata] = await file.getMetadata();
+      const realSize = Number(realMetadata.size || 0);
+      const realContentType = realMetadata.contentType || '';
+      if (
+        realSize > MAX_CLIP_FILE_SIZE_BYTES ||
+        !/^video\/(mp4|quicktime|webm|x-matroska)$/.test(realContentType)
+      ) {
+        await file.delete().catch(() => undefined);
+        logger.warn('confirmReelClipUpload denied: uploaded object failed server-side validation', {
+          userId: context.userId,
+          businessId: data.businessId,
+          realSize,
+          realContentType,
+        });
+        throw new HttpsError(
+          'invalid-argument',
+          'Uploaded clip exceeds the size limit or is not a supported video type'
+        );
+      }
+
       // Total-upload-size ceiling is enforced here (not just per-clip) —
       // AGENTS.md section 3 "maximum total upload size must be enforced".
       const existingAssets = await Promise.all(reel.inputClipIds.map((id) => getAssetDoc(id)));
       const priorTotalSize = existingAssets.reduce((sum, a) => sum + (a?.size || 0), 0);
-      if (priorTotalSize + data.metadata.size > MAX_TOTAL_UPLOAD_SIZE_BYTES) {
+      if (priorTotalSize + realSize > MAX_TOTAL_UPLOAD_SIZE_BYTES) {
+        await file.delete().catch(() => undefined);
         throw new HttpsError(
           'failed-precondition',
           'Total size of all clips for this Reel is too large. Try uploading fewer or shorter clips.'
         );
       }
 
-      const [downloadURL] = await file.getSignedUrl({
-        version: 'v4',
-        action: 'read',
-        expires: Date.now() + 7 * 24 * 60 * 60 * 1000,
-      });
+      // F2: durable, non-expiring URL — see confirmUpload.ts for the same fix.
+      const downloadURL = await getDurableDownloadUrl(data.storagePath);
 
       const assetId = uuidv7();
       const asset: Asset = {
@@ -110,8 +134,9 @@ export const confirmReelClipUpload = onCall(
         name: data.metadata.originalName,
         storagePath: data.storagePath,
         fileName: data.storagePath.split('/').pop() || 'unknown',
-        mimeType: data.metadata.mimeType,
-        size: data.metadata.size,
+        // Server-verified values, not the client's claimed metadata.
+        mimeType: realContentType,
+        size: realSize,
         width: 0,
         height: 0,
         assetType: 'reel_clip',

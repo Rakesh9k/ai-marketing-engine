@@ -7,11 +7,15 @@ describe('withTimeout', () => {
 
   it('rejects with AITimeoutError when the promise never settles within the budget', async () => {
     const neverResolves = new Promise(() => {});
-    await expect(withTimeout(neverResolves, 20, 'slow-call')).rejects.toBeInstanceOf(AITimeoutError);
+    await expect(withTimeout(neverResolves, 20, 'slow-call')).rejects.toBeInstanceOf(
+      AITimeoutError
+    );
   });
 
   it('propagates the original rejection when the promise rejects before the timeout', async () => {
-    await expect(withTimeout(Promise.reject(new Error('boom')), 100, 'test')).rejects.toThrow('boom');
+    await expect(withTimeout(Promise.reject(new Error('boom')), 100, 'test')).rejects.toThrow(
+      'boom'
+    );
   });
 });
 

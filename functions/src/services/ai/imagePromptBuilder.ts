@@ -105,8 +105,16 @@ function buildSubjectSection(brief: CreativeBrief): string {
     }
   }
 
-  subject +=
-    '\n\nCRITICAL: Use the uploaded product image as the EXACT visual reference. The generated image must preserve the product identity, packaging, dish appearance, quantity, and color. Do NOT change the product to a different dish or style.';
+  // I1 (Pass 2): this used to instruct the model to "use the uploaded
+  // product image as the EXACT visual reference" — but DALL-E 3's
+  // images.generate API (image.ts) is text-to-image only; it has no
+  // mechanism to accept a reference image at all, so that instruction was
+  // never actually enforceable and the claim was false regardless of
+  // outcome. The real fix is architectural, not a stronger prompt: when a
+  // real product photo exists, the pipeline now uses that photo directly
+  // as the hero image and skips AI image generation entirely (see
+  // pipeline.ts runStage7) — this prompt path only runs when there is NO
+  // real product photo to be faithful to in the first place.
 
   return subject;
 }
@@ -187,9 +195,12 @@ function buildBrandSection(brief: CreativeBrief): string {
     brandSection += `\n- Visual style: ${brand.visualStyle}`;
   }
 
-  if (brand.logoUrl) {
-    brandSection += `\n- Logo: Place in top-right or bottom-right corner, subtle but visible. URL: ${brand.logoUrl}`;
-  }
+  // Deliberately no logo instruction here: DALL-E 3's text-to-image API
+  // cannot fetch a URL or use it as a visual reference, so telling it to
+  // "place the logo" only produced a hallucinated mark, never the real
+  // uploaded logo — and a base64 data: URL could run the prompt past
+  // DALL-E's 4,000-character limit outright. The real logo is composited
+  // deterministically onto the generated image afterward (compositor.ts).
 
   if (brand.fonts) {
     brandSection += `\n- Fonts: Heading="${brand.fonts.heading}", Body="${brand.fonts.body}" (for text overlay reference)`;

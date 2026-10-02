@@ -59,15 +59,20 @@ jest.mock('../../services/firestore', () => ({
   getBrandKitDoc: (...args: unknown[]) => mockGetBrandKitDoc(...args),
   getProductDoc: (...args: unknown[]) => mockGetProductDoc(...args),
   createCampaignAssets: (...args: unknown[]) => mockCreateCampaignAssets(...args),
-  getCreativePreferencesByBusiness: (...args: unknown[]) => mockGetCreativePreferencesByBusiness(...args),
+  getCreativePreferencesByBusiness: (...args: unknown[]) =>
+    mockGetCreativePreferencesByBusiness(...args),
   getSavedStyleDoc: (...args: unknown[]) => mockGetSavedStyleDoc(...args),
+  getCampaignByIdempotencyKey: jest.fn().mockResolvedValue(null),
 }));
 
 const mockExecuteWithUsageControl = jest.fn();
 jest.mock('../../services/usageControl', () => ({
   executeWithUsageControl: (...args: unknown[]) => mockExecuteWithUsageControl(...args),
   getGenerationCost: () => 140,
-  USAGE_ERROR_CODES: { INSUFFICIENT_CREDITS: 'INSUFFICIENT_CREDITS', SUBSCRIPTION_REQUIRED: 'SUBSCRIPTION_REQUIRED' },
+  USAGE_ERROR_CODES: {
+    INSUFFICIENT_CREDITS: 'INSUFFICIENT_CREDITS',
+    SUBSCRIPTION_REQUIRED: 'SUBSCRIPTION_REQUIRED',
+  },
 }));
 
 const mockTrackEvent = jest.fn().mockResolvedValue(undefined);
@@ -121,80 +126,73 @@ describeIfOutageSimulated(
       mockGetBusinessDoc.mockResolvedValue(makeBusiness());
     });
 
-    it(
-      'aborts before fetching business data, reserving credits, or invoking the AI pipeline',
-      async () => {
-        const userId = `user-${uuid()}`;
+    it('aborts before fetching business data, reserving credits, or invoking the AI pipeline', async () => {
+      const userId = `user-${uuid()}`;
 
-        function delay<T>(ms: number, value: T): Promise<T> {
-          return new Promise((resolve) => setTimeout(() => resolve(value), ms));
-        }
+      function delay<T>(ms: number, value: T): Promise<T> {
+        return new Promise((resolve) => setTimeout(() => resolve(value), ms));
+      }
 
-        const input = {
-          businessId: 'biz-1',
-          objective: 'weekend_offer' as const,
-          offer: {
-            headline: 'Weekend Special',
-            price: 299,
-            type: 'percentage' as const,
-            validityStart: new Date().toISOString(),
-            validityEnd: new Date(Date.now() + 86400000).toISOString(),
-          },
-          duration: {
-            start: new Date().toISOString(),
-            end: new Date(Date.now() + 86400000).toISOString(),
-          },
-          audience: { localities: ['Kondapur'] },
-          cta: 'order_whatsapp' as const,
-          localization: {
-            country: 'India',
-            state: 'Telangana',
-            city: 'Hyderabad',
-            locality: 'Kondapur',
-            primaryLanguage: 'en' as const,
-            secondaryLanguage: 'en' as const,
-            languageMixing: 'minimal' as const,
-            regionalStyle: 'neutral' as const,
-            slangPreference: 'light' as const,
-            audienceDescription: 'Local food lovers',
-            brandTone: 'friendly' as const,
-            campaignStyle: 'funny' as const,
-            contentFormat: 'poster' as const,
-          },
-          idempotencyKey: uuid(),
-        };
+      const input = {
+        businessId: 'biz-1',
+        objective: 'weekend_offer' as const,
+        offer: {
+          headline: 'Weekend Special',
+          price: 299,
+          type: 'percentage' as const,
+          validityStart: new Date().toISOString(),
+          validityEnd: new Date(Date.now() + 86400000).toISOString(),
+        },
+        duration: {
+          start: new Date().toISOString(),
+          end: new Date(Date.now() + 86400000).toISOString(),
+        },
+        audience: { localities: ['Kondapur'] },
+        cta: 'order_whatsapp' as const,
+        localization: {
+          country: 'India',
+          state: 'Telangana',
+          city: 'Hyderabad',
+          locality: 'Kondapur',
+          primaryLanguage: 'en' as const,
+          secondaryLanguage: 'en' as const,
+          languageMixing: 'minimal' as const,
+          regionalStyle: 'neutral' as const,
+          slangPreference: 'light' as const,
+          audienceDescription: 'Local food lovers',
+          brandTone: 'friendly' as const,
+          campaignStyle: 'funny' as const,
+          contentFormat: 'poster' as const,
+        },
+        idempotencyKey: uuid(),
+      };
 
-        // As established directly in rateLimit.failSafe.test.ts, a
-        // checkRateLimit call against a genuinely unreachable Firestore
-        // host does not resolve or reject within any practical test
-        // window (confirmed against 20s/90s/182s of real wall-clock
-        // time) — there is no timeout wrapping it. So the assertion this
-        // test can make is bounded and honest: the callable does not
-        // resolve SUCCESSFULLY within 5s, and critically, none of the
-        // cost-sensitive collaborators downstream of checkRateLimit are
-        // ever invoked in that window either.
-        const outcome = await Promise.race([
-          (generateCampaignStrategy as any)
-            .run(callableRequest(input, userId))
-            .then(() => 'resolved' as const)
-            .catch(() => 'rejected' as const),
-          delay(5000, 'still-pending' as const),
-        ]);
+      // As established directly in rateLimit.failSafe.test.ts, a
+      // checkRateLimit call against a genuinely unreachable Firestore
+      // host does not resolve or reject within any practical test
+      // window (confirmed against 20s/90s/182s of real wall-clock
+      // time) — there is no timeout wrapping it. So the assertion this
+      // test can make is bounded and honest: the callable does not
+      // resolve SUCCESSFULLY within 5s, and critically, none of the
+      // cost-sensitive collaborators downstream of checkRateLimit are
+      // ever invoked in that window either.
+      const outcome = await Promise.race([
+        (generateCampaignStrategy as any)
+          .run(callableRequest(input, userId))
+          .then(() => 'resolved' as const)
+          .catch(() => 'rejected' as const),
+        delay(5000, 'still-pending' as const),
+      ]);
 
-        // The whole point: a broken rate-limiter persistence layer must
-        // never silently become "unlimited access" to a cost-sensitive
-        // AI operation. It does not resolve as a success, and — whether
-        // it's still pending or has failed by 5s — none of these were
-        // ever called.
-        expect(outcome).not.toBe('resolved');
-        expect(mockGetBusinessDoc).not.toHaveBeenCalled();
-        expect(mockExecuteWithUsageControl).not.toHaveBeenCalled();
-        expect(mockExecute).not.toHaveBeenCalled();
-      },
-      10_000
-    );
+      // The whole point: a broken rate-limiter persistence layer must
+      // never silently become "unlimited access" to a cost-sensitive
+      // AI operation. It does not resolve as a success, and — whether
+      // it's still pending or has failed by 5s — none of these were
+      // ever called.
+      expect(outcome).not.toBe('resolved');
+      expect(mockGetBusinessDoc).not.toHaveBeenCalled();
+      expect(mockExecuteWithUsageControl).not.toHaveBeenCalled();
+      expect(mockExecute).not.toHaveBeenCalled();
+    }, 10_000);
   }
 );
-
-
-

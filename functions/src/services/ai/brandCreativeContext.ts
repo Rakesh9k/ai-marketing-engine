@@ -22,6 +22,9 @@ export function getBrandCreativeContext(
       ? {
           primaryUrl: brandKit.logo.primary?.url,
           secondaryUrl: brandKit.logo.secondary?.url,
+          primaryStoragePath: brandKit.logo.primary?.storagePath || undefined,
+          primaryWidth: brandKit.logo.primary?.width || undefined,
+          primaryHeight: brandKit.logo.primary?.height || undefined,
         }
       : undefined,
     colors: {

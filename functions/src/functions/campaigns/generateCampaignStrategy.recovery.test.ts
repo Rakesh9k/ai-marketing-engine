@@ -51,7 +51,10 @@ function makeRequestData(businessId: string, idempotencyKey: string) {
       validityStart: new Date().toISOString(),
       validityEnd: new Date(Date.now() + 86400000).toISOString(),
     },
-    duration: { start: new Date().toISOString(), end: new Date(Date.now() + 86400000).toISOString() },
+    duration: {
+      start: new Date().toISOString(),
+      end: new Date(Date.now() + 86400000).toISOString(),
+    },
     audience: { localities: ['Kondapur'] },
     cta: 'order_whatsapp',
     localization: {
@@ -73,132 +76,147 @@ function makeRequestData(businessId: string, idempotencyKey: string) {
   };
 }
 
-describeIfEmulator('generateCampaignStrategy — failure recovery (Firestore emulator, Phase 12)', () => {
-  const db = admin.firestore();
+describeIfEmulator(
+  'generateCampaignStrategy — failure recovery (Firestore emulator, Phase 12)',
+  () => {
+    const db = admin.firestore();
 
-  afterAll(async () => {
-    await admin.app().delete();
-  });
-
-  async function seedUsage(userId: string, businessId: string, planId: 'free' | 'business' = 'business') {
-    const now = new Date();
-    const periodStart = new Date(now.getFullYear(), now.getMonth(), 1);
-    const usageId = `${userId}_${periodStart.toISOString().split('T')[0]}`;
-    await db.collection('usage').doc(usageId).set({
-      usageId,
-      userId,
-      periodStart: periodStart.toISOString(),
-      periodEnd: new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString(),
-      planId,
-      campaignsCreated: 0,
-      creditsUsed: 0,
-      imagesGenerated: 0,
-      copyGenerations: 0,
-      regenerations: 0,
-      failedGenerations: 0,
-      updatedAt: new Date().toISOString(),
+    afterAll(async () => {
+      await admin.app().delete();
     });
-    await db
-      .collection('users')
-      .doc(userId)
-      .set({ userId, businessIds: [businessId], role: 'user' });
-    return usageId;
-  }
 
-  beforeEach(() => jest.clearAllMocks());
+    async function seedUsage(
+      userId: string,
+      businessId: string,
+      planId: 'free' | 'business' = 'business'
+    ) {
+      const now = new Date();
+      const periodStart = new Date(now.getFullYear(), now.getMonth(), 1);
+      const usageId = `${userId}_${periodStart.toISOString().split('T')[0]}`;
+      await db
+        .collection('usage')
+        .doc(usageId)
+        .set({
+          usageId,
+          userId,
+          periodStart: periodStart.toISOString(),
+          periodEnd: new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString(),
+          planId,
+          campaignsCreated: 0,
+          creditsUsed: 0,
+          imagesGenerated: 0,
+          copyGenerations: 0,
+          regenerations: 0,
+          failedGenerations: 0,
+          updatedAt: new Date().toISOString(),
+        });
+      await db
+        .collection('users')
+        .doc(userId)
+        .set({ userId, businessIds: [businessId], role: 'user' });
+      return usageId;
+    }
 
-  it('CRITICAL: pipeline exception -> campaign reaches a terminal "failed" state (not stuck), error is populated, and reserved credits are refunded to their original balance', async () => {
-    const userId = `user-${uuid()}`;
-    const businessId = `biz-${uuid()}`;
-    await createBusinessDoc(makeBusiness(businessId, userId));
-    const usageId = await seedUsage(userId, businessId);
+    beforeEach(() => jest.clearAllMocks());
 
-    mockExecute.mockRejectedValue(new Error('AI provider timed out'));
+    it('CRITICAL: pipeline exception -> campaign reaches a terminal "failed" state (not stuck), error is populated, and reserved credits are refunded to their original balance', async () => {
+      const userId = `user-${uuid()}`;
+      const businessId = `biz-${uuid()}`;
+      await createBusinessDoc(makeBusiness(businessId, userId));
+      const usageId = await seedUsage(userId, businessId);
 
-    const request = callableRequest(makeRequestData(businessId, uuid()), userId);
-    await expect((generateCampaignStrategy as any).run(request)).rejects.toThrow();
+      mockExecute.mockRejectedValue(new Error('AI provider timed out'));
 
-    // The campaign document must exist and be in a real terminal state —
-    // before this phase's fix, it was left stuck at whatever intermediate
-    // status ('analyzing' etc.) it last reached, which the frontend's
-    // poll loop (GenerationProgress.tsx) would never recognize as done.
-    const usageSnap = await db.collection('usage').doc(usageId).get();
-    expect(usageSnap.data()!['creditsUsed']).toBe(0); // fully refunded, not stuck reserved
+      const request = callableRequest(makeRequestData(businessId, uuid()), userId);
+      await expect((generateCampaignStrategy as any).run(request)).rejects.toThrow();
 
-    // Find the campaign this request created (its ID isn't returned to us
-    // since the call rejected) by querying for this user's campaigns.
-    const campaignsSnap = await db.collection('campaigns').where('userId', '==', userId).get();
-    expect(campaignsSnap.size).toBe(1);
-    const campaign = campaignsSnap.docs[0]!.data();
-    expect(campaign['status']).toBe('failed');
-    expect(campaign['error']).toBeDefined();
-    expect(campaign['error'].message).toMatch(/AI provider timed out/);
-    expect(campaign['error'].retryable).toBe(true);
-  });
+      // The campaign document must exist and be in a real terminal state —
+      // before this phase's fix, it was left stuck at whatever intermediate
+      // status ('analyzing' etc.) it last reached, which the frontend's
+      // poll loop (GenerationProgress.tsx) would never recognize as done.
+      const usageSnap = await db.collection('usage').doc(usageId).get();
+      expect(usageSnap.data()!['creditsUsed']).toBe(0); // fully refunded, not stuck reserved
 
-  it('Truth Check FAIL: campaign reaches "failed" with error.code TRUTH_CHECK_FAILED, and credits are FINALIZED (charged), not refunded — consistent, documented, intentional behavior', async () => {
-    const userId = `user-${uuid()}`;
-    const businessId = `biz-${uuid()}`;
-    await createBusinessDoc(makeBusiness(businessId, userId));
-    const usageId = await seedUsage(userId, businessId);
+      // Find the campaign this request created (its ID isn't returned to us
+      // since the call rejected) by querying for this user's campaigns.
+      const campaignsSnap = await db.collection('campaigns').where('userId', '==', userId).get();
+      expect(campaignsSnap.size).toBe(1);
+      const campaign = campaignsSnap.docs[0]!.data();
+      expect(campaign['status']).toBe('failed');
+      expect(campaign['error']).toBeDefined();
+      expect(campaign['error'].message).toMatch(/AI provider timed out/);
+      expect(campaign['error'].retryable).toBe(true);
+    });
 
-    mockExecute.mockResolvedValue({
-      campaignPack: {
-        assets: [
-          {
-            assetId: 'asset_headline_0',
-            type: 'headline',
-            index: 0,
-            content: { text: 'Test headline' },
-            status: 'completed',
-            createdAt: new Date().toISOString(),
+    it('Truth Check FAIL: campaign reaches "failed" with error.code TRUTH_CHECK_FAILED, and credits are FINALIZED (charged), not refunded — consistent, documented, intentional behavior', async () => {
+      const userId = `user-${uuid()}`;
+      const businessId = `biz-${uuid()}`;
+      await createBusinessDoc(makeBusiness(businessId, userId));
+      const usageId = await seedUsage(userId, businessId);
+
+      mockExecute.mockResolvedValue({
+        campaignPack: {
+          assets: [
+            {
+              assetId: 'asset_headline_0',
+              type: 'headline',
+              index: 0,
+              content: { text: 'Test headline' },
+              status: 'completed',
+              createdAt: new Date().toISOString(),
+            },
+          ],
+          truthCheck: {
+            status: 'FAIL',
+            summary: 'Price mismatch detected',
+            checkedAt: new Date().toISOString(),
+            checks: [],
           },
-        ],
-        truthCheck: {
-          status: 'FAIL',
-          summary: 'Price mismatch detected',
-          checkedAt: new Date().toISOString(),
-          checks: [],
         },
-      },
+      });
+
+      const request = callableRequest(makeRequestData(businessId, uuid()), userId);
+      const result = await (generateCampaignStrategy as any).run(request);
+
+      const campaign = await getCampaignDoc(result.campaignId);
+      expect(campaign!.status).toBe('failed');
+      expect(campaign!.error?.code).toBe('TRUTH_CHECK_FAILED');
+      expect(campaign!.error?.message).toMatch(/Price mismatch/);
+
+      const usageSnap = await db.collection('usage').doc(usageId).get();
+      // Credits were finalized (charged), NOT refunded — the generation
+      // attempt genuinely completed and consumed AI compute; only Truth
+      // Check rejected the output. This mirrors regenerateAsset's existing
+      // behavior (Phase 6/10) and must not silently change.
+      expect(usageSnap.data()!['creditsUsed']).toBeGreaterThan(0);
     });
 
-    const request = callableRequest(makeRequestData(businessId, uuid()), userId);
-    const result = await (generateCampaignStrategy as any).run(request);
+    it('a failed generation does not prevent a subsequent legitimate retry (fresh idempotencyKey) from succeeding', async () => {
+      const userId = `user-${uuid()}`;
+      const businessId = `biz-${uuid()}`;
+      await createBusinessDoc(makeBusiness(businessId, userId));
+      await seedUsage(userId, businessId);
 
-    const campaign = await getCampaignDoc(result.campaignId);
-    expect(campaign!.status).toBe('failed');
-    expect(campaign!.error?.code).toBe('TRUTH_CHECK_FAILED');
-    expect(campaign!.error?.message).toMatch(/Price mismatch/);
+      mockExecute.mockRejectedValueOnce(new Error('transient provider error'));
+      const failingRequest = callableRequest(makeRequestData(businessId, uuid()), userId);
+      await expect((generateCampaignStrategy as any).run(failingRequest)).rejects.toThrow();
 
-    const usageSnap = await db.collection('usage').doc(usageId).get();
-    // Credits were finalized (charged), NOT refunded — the generation
-    // attempt genuinely completed and consumed AI compute; only Truth
-    // Check rejected the output. This mirrors regenerateAsset's existing
-    // behavior (Phase 6/10) and must not silently change.
-    expect(usageSnap.data()!['creditsUsed']).toBeGreaterThan(0);
-  });
+      mockExecute.mockResolvedValueOnce({
+        campaignPack: {
+          assets: [],
+          truthCheck: {
+            status: 'PASS',
+            summary: 'All good',
+            checkedAt: new Date().toISOString(),
+            checks: [],
+          },
+        },
+      });
+      const retryRequest = callableRequest(makeRequestData(businessId, uuid()), userId);
+      const result = await (generateCampaignStrategy as any).run(retryRequest);
 
-  it('a failed generation does not prevent a subsequent legitimate retry (fresh idempotencyKey) from succeeding', async () => {
-    const userId = `user-${uuid()}`;
-    const businessId = `biz-${uuid()}`;
-    await createBusinessDoc(makeBusiness(businessId, userId));
-    await seedUsage(userId, businessId);
-
-    mockExecute.mockRejectedValueOnce(new Error('transient provider error'));
-    const failingRequest = callableRequest(makeRequestData(businessId, uuid()), userId);
-    await expect((generateCampaignStrategy as any).run(failingRequest)).rejects.toThrow();
-
-    mockExecute.mockResolvedValueOnce({
-      campaignPack: {
-        assets: [],
-        truthCheck: { status: 'PASS', summary: 'All good', checkedAt: new Date().toISOString(), checks: [] },
-      },
+      const campaign = await getCampaignDoc(result.campaignId);
+      expect(campaign!.status).toBe('verified');
     });
-    const retryRequest = callableRequest(makeRequestData(businessId, uuid()), userId);
-    const result = await (generateCampaignStrategy as any).run(retryRequest);
-
-    const campaign = await getCampaignDoc(result.campaignId);
-    expect(campaign!.status).toBe('verified');
-  });
-});
+  }
+);

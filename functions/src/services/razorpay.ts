@@ -43,6 +43,7 @@ export function getRazorpayPlanId(plan: SubscriptionPlan): string {
     starter: config.RAZORPAY_STARTER_PLAN_ID || 'plan_starter',
     business: config.RAZORPAY_BUSINESS_PLAN_ID || 'plan_business',
     agency: config.RAZORPAY_AGENCY_PLAN_ID || 'plan_agency',
+    pro: '', // Razorpay never sold a Pro plan (added to SubscriptionPlan later); no plan ID, like 'free'.
   };
   return planMap[plan];
 }

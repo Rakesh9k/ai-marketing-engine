@@ -55,7 +55,12 @@ describe('wrapText', () => {
 });
 
 describe('composeCreativeSVG — factual accuracy (Phase 7 golden tests)', () => {
-  const svg = composeCreativeSVG('https://storage.example.com/hero.png', BASE_OVERLAY, DEFAULT_BRAND_STYLE, 'poster');
+  const svg = composeCreativeSVG(
+    'https://storage.example.com/hero.png',
+    BASE_OVERLAY,
+    DEFAULT_BRAND_STYLE,
+    'poster'
+  );
 
   it('is well-formed SVG referencing the given (permanent) base image URL', () => {
     expect(svg.startsWith('<svg')).toBe(true);
@@ -88,7 +93,12 @@ describe('composeCreativeSVG — factual accuracy (Phase 7 golden tests)', () =>
   });
 
   it('is deterministic — identical input always produces identical output', () => {
-    const svg2 = composeCreativeSVG('https://storage.example.com/hero.png', BASE_OVERLAY, DEFAULT_BRAND_STYLE, 'poster');
+    const svg2 = composeCreativeSVG(
+      'https://storage.example.com/hero.png',
+      BASE_OVERLAY,
+      DEFAULT_BRAND_STYLE,
+      'poster'
+    );
     expect(svg).toBe(svg2);
   });
 });
@@ -114,20 +124,26 @@ describe('composeCreativeSVG — readability across headline lengths (no overflo
     ['long', 'Weekend Biryani Special Offer Just For You This Saturday And Sunday Only'],
   ];
 
-  it.each(lengths)('%s headline stays within the canvas (no text coordinate exceeds declared width/height)', (_label, headline) => {
-    const overlay = { ...BASE_OVERLAY, headline };
-    const svg = composeCreativeSVG('https://x/y.png', overlay, DEFAULT_BRAND_STYLE, 'poster');
-    const { width, height } = CREATIVE_DIMENSIONS.poster;
+  it.each(lengths)(
+    '%s headline stays within the canvas (no text coordinate exceeds declared width/height)',
+    (_label, headline) => {
+      const overlay = { ...BASE_OVERLAY, headline };
+      const svg = composeCreativeSVG('https://x/y.png', overlay, DEFAULT_BRAND_STYLE, 'poster');
+      const { width, height } = CREATIVE_DIMENSIONS.poster;
 
-    const xMatches = [...svg.matchAll(/x="(-?\d+(?:\.\d+)?)"/g)].map((m) => parseFloat(m[1]!));
-    const yMatches = [...svg.matchAll(/y="(-?\d+(?:\.\d+)?)"/g)].map((m) => parseFloat(m[1]!));
+      const xMatches = [...svg.matchAll(/x="(-?\d+(?:\.\d+)?)"/g)].map((m) => parseFloat(m[1]!));
+      const yMatches = [...svg.matchAll(/y="(-?\d+(?:\.\d+)?)"/g)].map((m) => parseFloat(m[1]!));
 
-    expect(xMatches.every((x) => x >= 0 && x <= width)).toBe(true);
-    expect(yMatches.every((y) => y >= 0 && y <= height)).toBe(true);
-  });
+      expect(xMatches.every((x) => x >= 0 && x <= width)).toBe(true);
+      expect(yMatches.every((y) => y >= 0 && y <= height)).toBe(true);
+    }
+  );
 
   it('a very long business name does not break SVG well-formedness', () => {
-    const overlay = { ...BASE_OVERLAY, businessName: 'The Absolute Best Biryani And Kebab House Of Old City Hyderabad Est. 1970' };
+    const overlay = {
+      ...BASE_OVERLAY,
+      businessName: 'The Absolute Best Biryani And Kebab House Of Old City Hyderabad Est. 1970',
+    };
     const svg = composeCreativeSVG('https://x/y.png', overlay, DEFAULT_BRAND_STYLE, 'poster');
     expect(svg.startsWith('<svg')).toBe(true);
     expect(svg.trim().endsWith('</svg>')).toBe(true);
@@ -143,7 +159,12 @@ describe('composeCreativeSVG — no unauthorized claims injected', () => {
 
   it('omits the original-price strikethrough when none is provided', () => {
     const { originalPriceText: _drop, ...withoutOriginal } = BASE_OVERLAY;
-    const svg = composeCreativeSVG('https://x/y.png', withoutOriginal, DEFAULT_BRAND_STYLE, 'poster');
+    const svg = composeCreativeSVG(
+      'https://x/y.png',
+      withoutOriginal,
+      DEFAULT_BRAND_STYLE,
+      'poster'
+    );
     expect(svg).not.toContain('₹332');
   });
 });

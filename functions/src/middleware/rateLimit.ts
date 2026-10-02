@@ -36,8 +36,9 @@ const DEFAULT_CONFIG: RateLimitConfig = {
  *   provider cost per call. 10-20/hour comfortably covers legitimate
  *   iteration (a user regenerating a handful of variants) while bounding
  *   worst-case cost from a compromised/scripted account.
- * - createCampaign / createReelProject: cheap metadata writes, no AI/credit
- *   cost, but still the start of a workflow — generous but bounded.
+ * - createReelProject: cheap metadata writes, no AI/credit cost, but still
+ *   the start of a workflow — generous but bounded. (createCampaign was
+ *   removed in P0-2 — see index.ts — this entry went with it.)
  * - getUploadUrl / confirmUpload: sized for a normal multi-product-photo
  *   session; each upload needs one call to each, so limits match.
  * - getReelClipUploadUrl / confirmReelClipUpload: sized for MAX_REEL_CLIPS
@@ -54,7 +55,6 @@ export const rateLimitConfigs: Record<string, RateLimitConfig> = {
   generateCampaignStrategy: { maxRequests: 10, windowSeconds: 3600 },
   regenerateAsset: { maxRequests: 20, windowSeconds: 3600 },
   generateReel: { maxRequests: 10, windowSeconds: 3600 },
-  createCampaign: { maxRequests: 50, windowSeconds: 3600 },
   createReelProject: { maxRequests: 30, windowSeconds: 3600 },
   getUploadUrl: { maxRequests: 30, windowSeconds: 3600 },
   confirmUpload: { maxRequests: 30, windowSeconds: 3600 },
@@ -70,7 +70,16 @@ export const rateLimitConfigs: Record<string, RateLimitConfig> = {
   // createPayUPayment: same rationale as createSubscription — real money
   // movement, tight policy.
   createPayUPayment: { maxRequests: 5, windowSeconds: 3600 },
+  // Paddle checkout/cancel: same rationale — real money movement. Checkout is
+  // slightly looser than PayU's because a user may open several packs/plans
+  // while comparing; each call only creates an unpaid Paddle transaction.
+  createPaddleCheckout: { maxRequests: 10, windowSeconds: 3600 },
+  cancelPaddleSubscription: { maxRequests: 5, windowSeconds: 3600 },
   recordConsentAcceptance: { maxRequests: 10, windowSeconds: 3600 },
+  // analyzeReferenceStyle: real AI provider cost per call (Phase 8 Credits
+  // & Usage Enforcement Audit) — same order of magnitude as a single
+  // getUploadUrl/confirmUpload step in the same style-upload flow.
+  analyzeReferenceStyle: { maxRequests: 30, windowSeconds: 3600 },
 };
 
 export async function checkRateLimit(

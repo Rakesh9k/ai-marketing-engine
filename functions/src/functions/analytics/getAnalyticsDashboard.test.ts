@@ -23,7 +23,13 @@ describe('aggregateAnalyticsEvents', () => {
     const events: AnalyticsEventRecord[] = [
       { eventName: ANALYTICS_EVENTS.CAMPAIGN_STARTED, timestamp: iso('2026-01-05') },
       { eventName: ANALYTICS_EVENTS.CAMPAIGN_GENERATED, timestamp: iso('2026-01-05') },
-      { eventName: ANALYTICS_EVENTS.CAMPAIGN_GENERATED, timestamp: iso('2026-01-06') },
+      { eventName: ANALYTICS_EVENTS.CAMPAIGN_APPROVED, timestamp: iso('2026-01-05') },
+      { eventName: ANALYTICS_EVENTS.CAMPAIGN_SCHEDULED, timestamp: iso('2026-01-06') },
+      { eventName: ANALYTICS_EVENTS.CAMPAIGN_PUBLISHED, timestamp: iso('2026-01-06') },
+      { eventName: ANALYTICS_EVENTS.CAMPAIGN_FAILED, timestamp: iso('2026-01-06') },
+      { eventName: ANALYTICS_EVENTS.CAMPAIGN_REGENERATED, timestamp: iso('2026-01-07') },
+      { eventName: ANALYTICS_EVENTS.CREATIVE_LIKED, timestamp: iso('2026-01-07') },
+      { eventName: ANALYTICS_EVENTS.CREATIVE_DISLIKED, timestamp: iso('2026-01-07') },
       { eventName: ANALYTICS_EVENTS.ASSET_DOWNLOADED, timestamp: iso('2026-01-06') },
       { eventName: ANALYTICS_EVENTS.WHATSAPP_CLICKED, timestamp: iso('2026-01-07') },
     ];
@@ -34,7 +40,14 @@ describe('aggregateAnalyticsEvents', () => {
     );
 
     expect(totals.campaignsStarted).toBe(1);
-    expect(totals.campaignsGenerated).toBe(2);
+    expect(totals.campaignsGenerated).toBe(1);
+    expect(totals.campaignsApproved).toBe(1);
+    expect(totals.campaignsScheduled).toBe(1);
+    expect(totals.campaignsPublished).toBe(1);
+    expect(totals.campaignsFailed).toBe(1);
+    expect(totals.campaignsRegenerated).toBe(1);
+    expect(totals.creativeLikes).toBe(1);
+    expect(totals.creativeDislikes).toBe(1);
     expect(totals.assetsDownloaded).toBe(1);
     expect(totals.whatsappClicks).toBe(1);
   });
@@ -58,7 +71,9 @@ describe('aggregateAnalyticsEvents', () => {
   });
 
   it('an unrecognized/future event name is silently ignored, not miscounted into an existing bucket', () => {
-    const events: AnalyticsEventRecord[] = [{ eventName: 'some_future_event', timestamp: iso('2026-01-05') }];
+    const events: AnalyticsEventRecord[] = [
+      { eventName: 'some_future_event', timestamp: iso('2026-01-05') },
+    ];
     const { totals } = aggregateAnalyticsEvents(
       events,
       new Date('2026-01-01T00:00:00.000Z'),

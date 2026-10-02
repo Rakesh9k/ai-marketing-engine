@@ -17,28 +17,25 @@ import type { SubscriptionPlan } from '../../types';
 const db = admin.firestore();
 
 const createPayUPaymentSchema = z.object({
-  planId: z.enum(['starter', 'business', 'agency']),
+  planId: z.enum(['starter', 'business', 'pro', 'agency']),
+  billingCycle: z.enum(['monthly', 'yearly']).default('monthly'),
 });
 
 /**
- * Initiates a PayU Hosted Checkout payment for a plan purchase — the PayU
- * equivalent of createSubscription.ts's role, but architecturally
- * different: PayU Hosted Checkout is a full-page form-POST redirect, not an
- * in-page JS popup, so this callable returns the exact form fields (plus a
- * server-computed hash) the client must submit via a real HTML form, not a
- * checkout-widget config object.
- *
- * Server-side amount authority (task requirement, non-negotiable): the
- * client sends only `planId`; the price/amount is read from
- * config/pricing.ts here, never accepted from the client. This mirrors
- * createSubscription.ts's existing pattern exactly.
+ * Initiates a PayU Hosted Checkout payment for a plan purchase.
  */
 export const createPayUPayment = onCall(
-  { region: 'asia-south1', enforceAppCheck: true, maxInstances: 20 },
+  {
+    region: 'asia-south1',
+    enforceAppCheck: true,
+    maxInstances: 20,
+    secrets: ['PAYU_SALT'],
+  },
   validatedCallable(createPayUPaymentSchema, async (data, context) => {
     const { logger, startTime } = logFunctionStart('createPayUPayment', {
       userId: context.userId,
       planId: data.planId,
+      billingCycle: data.billingCycle,
     });
 
     try {
@@ -51,9 +48,6 @@ export const createPayUPayment = onCall(
 
       const envConfig = getEnvConfig();
       if (!envConfig.PAYU_CALLBACK_URL) {
-        // Fails loudly rather than silently pointing PayU at an undefined
-        // URL — this must be configured once the callback function's real
-        // deployed URL is known (see docs/PAYMENT_GATEWAY.md).
         throw new HttpsError(
           'failed-precondition',
           'Payments are not fully configured yet. Please try again later.'
@@ -61,12 +55,13 @@ export const createPayUPayment = onCall(
       }
 
       const planId = data.planId as SubscriptionPlan;
-      const amountINR = getPlanPrice(planId);
+      const billingCycle = data.billingCycle;
+      const amountINR = getPlanPrice(planId, billingCycle);
       const amount = amountINR.toFixed(2);
       const txnid = uuidv7();
 
       const payuConfig = getPayUConfig();
-      const productinfo = `Mitra ${planId} plan subscription`;
+      const productinfo = `Mitra ${planId} plan subscription (${billingCycle})`;
       const firstname = (user.displayName || user.email.split('@')[0] || 'Mitra User').slice(0, 60);
       const email = user.email;
       const phone = (user.phone || '').replace(/\D/g, '').slice(-10) || '0000000000';
@@ -80,14 +75,10 @@ export const createPayUPayment = onCall(
         email,
         udf1: context.userId,
         udf2: planId,
+        udf3: billingCycle,
         salt: payuConfig.salt,
       });
 
-      // Persist the pending transaction BEFORE returning the checkout
-      // params, so payuWebhook/payuCallback have something server-
-      // authoritative to reconcile against even if the customer never
-      // completes checkout (Phase 10/11 of the migration task — "persisted
-      // before checkout where appropriate").
       await db
         .collection('transactions')
         .doc(txnid)
@@ -98,15 +89,15 @@ export const createPayUPayment = onCall(
           amount: amountINR,
           currency: 'INR',
           balanceAfter: 0,
-          description: `Subscription payment for ${planId} plan`,
+          description: `Subscription payment for ${planId} plan (${billingCycle})`,
           provider: 'payu',
           payuTxnId: txnid,
           status: 'pending',
-          metadata: { planId },
+          metadata: { planId, billingCycle },
           createdAt: FieldValue.serverTimestamp(),
         });
 
-      logFunctionComplete(logger, startTime, { success: true, txnid, planId });
+      logFunctionComplete(logger, startTime, { success: true, txnid, planId, billingCycle });
 
       return {
         action: payuConfig.checkoutUrl,
@@ -121,8 +112,10 @@ export const createPayUPayment = onCall(
         furl: envConfig.PAYU_CALLBACK_URL,
         udf1: context.userId,
         udf2: planId,
+        udf3: billingCycle,
         hash,
       };
+
     } catch (error) {
       logFunctionError(logger, startTime, error as Error);
       throw mapErrorToHttpsError(error);

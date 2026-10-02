@@ -67,8 +67,8 @@ describeIfEmulator('verifyBusinessAccess (Firestore emulator, Phase 10)', () => 
   });
 
   it('rejects access to a nonexistent business rather than silently allowing it', async () => {
-    await expect(verifyBusinessAccess(`user_${uuid()}`, `biz_never_created_${uuid()}`)).rejects.toMatchObject(
-      { code: 'not-found' }
-    );
+    await expect(
+      verifyBusinessAccess(`user_${uuid()}`, `biz_never_created_${uuid()}`)
+    ).rejects.toMatchObject({ code: 'not-found' });
   });
 });

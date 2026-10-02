@@ -1,18 +1,54 @@
 rules_version = '2';
 service firebase.storage {
   match /b/{bucket}/o {
-    // Business assets — owner or agency member
-    match /businesses/{businessId}/{allPaths=**} {
-      allow read, write: if request.auth != null && 
+    // Server-generated campaign creatives (generatedAssetStorage.ts) — read
+    // only for the owner/agency member, write only via Cloud Functions
+    // (Admin SDK, bypasses these rules). Matched BEFORE the broad
+    // businesses/{businessId}/{allPaths=**} rule below, which otherwise
+    // granted the same owner unrestricted write access to this subtree —
+    // meaning a client could silently overwrite a Truth-Check-verified
+    // poster/story file after the fact (D1 in the fix plan).
+    match /businesses/{businessId}/campaigns/{campaignId}/generated/{fileName} {
+      allow read: if request.auth != null &&
         (businessId in request.auth.token.businessIds ||
-          (request.auth.token.role == 'agency_member' && 
+          (request.auth.token.role == 'agency_member' &&
             request.auth.token.agencyId == resource.metadata.agencyId));
+      allow write: if false;
     }
-    
-    // Temp uploads — owner only, TTL enforced by Cloud Function
+
+    // Business assets — owner or agency member. Read-only for clients: every
+    // real upload (products, brand logos, reel clips, etc.) goes through
+    // getUploadUrl.ts/getReelClipUploadUrl.ts (a short-lived V4 signed URL)
+    // and is only ever confirmed into the app via confirmUpload.ts/
+    // confirmReelClipUpload.ts (Admin SDK, bypasses these rules — and, as of
+    // Phase 4, itself re-verifies the real uploaded object's size/
+    // content-type before trusting it). No client code anywhere calls the
+    // Storage client SDK's write methods against this path (confirmed by
+    // grep) — the previous "allow read, write" for any business member left
+    // that path open regardless: a signed-in user with the Firebase web
+    // config (public by design) could use the client SDK directly to write
+    // an arbitrarily large file of any content type into their own
+    // business's folder, with no size/type limit enforced anywhere for that
+    // route. Closed to match the already-server-only `generated/` subtree
+    // above.
+    match /businesses/{businessId}/{allPaths=**} {
+      allow read: if request.auth != null &&
+        (businessId in request.auth.token.businessIds ||
+          (request.auth.token.role == 'agency_member' &&
+            request.auth.token.agencyId == resource.metadata.agencyId));
+      allow write: if false;
+    }
+
+    // Temp uploads. No code anywhere reads or writes this path (confirmed
+    // by grep across functions/src and src) — the comment's claimed "TTL
+    // enforced by Cloud Function" cleanup does not exist either. Previously
+    // open to any authenticated user's own uid with no size/content-type
+    // limit and no cleanup: a permanent, unmonitored, arbitrary-content
+    // dumping ground for anyone with a real (trivially created) Firebase
+    // Auth account. Closed entirely until a real temp-upload flow with an
+    // actual TTL mechanism is built to own this path.
     match /temp/{userId}/{fileName} {
-      allow write: if request.auth != null && request.auth.uid == userId;
-      allow read: if request.auth != null && request.auth.uid == userId;
+      allow read, write: if false;
     }
 
     // Shared, curated "Create a Reel" background music library (see

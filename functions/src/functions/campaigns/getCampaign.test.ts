@@ -13,7 +13,12 @@ const describeIfEmulator = emulatorHost ? describe : describe.skip;
 
 import * as admin from 'firebase-admin';
 import { getCampaign } from './getCampaign';
-import { createBusinessDoc, createProductDoc, createCampaignDoc, updateProductDoc } from '../../services/firestore';
+import {
+  createBusinessDoc,
+  createProductDoc,
+  createCampaignDoc,
+  updateProductDoc,
+} from '../../services/firestore';
 import { computeSourceFingerprint } from '../../services/ai/truthCheck';
 import type { Business, Product, Campaign } from '../../types';
 
@@ -90,7 +95,10 @@ describeIfEmulator('getCampaign — Truth Check staleness (Firestore emulator, P
         validityStart: new Date().toISOString(),
         validityEnd: new Date(Date.now() + 86400000).toISOString(),
       },
-      duration: { start: new Date().toISOString(), end: new Date(Date.now() + 86400000).toISOString() },
+      duration: {
+        start: new Date().toISOString(),
+        end: new Date(Date.now() + 86400000).toISOString(),
+      },
       audience: { localities: ['Kondapur'] },
       cta: 'order_whatsapp',
       localization: {} as Campaign['localization'],
@@ -130,7 +138,7 @@ describeIfEmulator('getCampaign — Truth Check staleness (Firestore emulator, P
     expect(afterPriceChange.campaign.metadata.truthCheckStatus).toBe('PASS');
   });
 
-  it('cross-tenant: User A cannot call getCampaign for Business B\'s campaign', async () => {
+  it("cross-tenant: User A cannot call getCampaign for Business B's campaign", async () => {
     const ownerId = `user-${uuid()}`;
     const attackerId = `user-${uuid()}`;
     const businessId = `biz-${uuid()}`;
@@ -149,7 +157,10 @@ describeIfEmulator('getCampaign — Truth Check staleness (Firestore emulator, P
         validityStart: new Date().toISOString(),
         validityEnd: new Date(Date.now() + 86400000).toISOString(),
       },
-      duration: { start: new Date().toISOString(), end: new Date(Date.now() + 86400000).toISOString() },
+      duration: {
+        start: new Date().toISOString(),
+        end: new Date(Date.now() + 86400000).toISOString(),
+      },
       audience: { localities: ['X'] },
       cta: 'order_whatsapp',
       localization: {} as Campaign['localization'],

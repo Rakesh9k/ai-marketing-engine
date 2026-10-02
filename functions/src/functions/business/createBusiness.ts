@@ -10,6 +10,8 @@ import { createBusinessDoc } from '../../services/firestore';
 import { trackEvent, ANALYTICS_EVENTS } from '../../services/analyticsService';
 import { logFunctionStart, logFunctionComplete, logFunctionError } from '../../utils/logging';
 import { mapErrorToHttpsError } from '../../utils/errors';
+import { websiteUrlSchema } from '../../utils/zodHelpers';
+import { requireBusinessAllowance } from '../../services/entitlements';
 import type { Business } from '../../types';
 
 const createBusinessSchema = z.object({
@@ -26,7 +28,7 @@ const createBusinessSchema = z.object({
   contact: z.object({
     phone: z.string().min(1),
     whatsapp: z.string().min(1),
-    website: z.string().url().optional().or(z.literal('')),
+    website: websiteUrlSchema,
     instagram: z.string().optional(),
   }),
   settings: z
@@ -136,6 +138,13 @@ export const createBusiness = onCall(
     const { logger, startTime } = logFunctionStart('createBusiness', { userId: context.userId });
 
     try {
+      // P0-4 (docs/P0_HARDENING_TRACKER.md): Free/Starter/Business plans are
+      // limited to 1 business profile (pricing page: "1 business profile");
+      // only Agency advertises "multi-business account management". Checked
+      // before any write, server-side — a client cannot bypass this by
+      // skipping frontend UI (TC-PLAN-003/004).
+      await requireBusinessAllowance(context.userId);
+
       const businessId = uuidv7();
       const now = new Date().toISOString();
 

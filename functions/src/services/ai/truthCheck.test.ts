@@ -62,9 +62,14 @@ function run(input: GenerationPipelineInput, copyText: string) {
 
 describe('Golden Test #1 — incorrect price FAILS', () => {
   it('SOURCE ₹299, GENERATED ₹399 -> FAIL', () => {
-    const result = run(baseInput({ offerOriginalPrice: undefined, offerType: 'fixed' }), 'Paneer Biryani from Test Biryani House now ₹399.');
+    const result = run(
+      baseInput({ offerOriginalPrice: undefined, offerType: 'fixed' }),
+      'Paneer Biryani from Test Biryani House now ₹399.'
+    );
     expect(result.status).toBe('FAIL');
-    const priceCheck = result.checks.find((c) => c.category === 'price' && c.expectedValue === '₹299');
+    const priceCheck = result.checks.find(
+      (c) => c.category === 'price' && c.expectedValue === '₹299'
+    );
     expect(priceCheck?.status).toBe('FAIL');
   });
 });
@@ -82,7 +87,9 @@ describe('Golden Test #2 — incorrect discount FAILS', () => {
 describe('Golden Test #3 — correct price PASSES', () => {
   it('SOURCE ₹299, GENERATED ₹299 -> price check passes', () => {
     const result = run(baseInput(), VALID_COPY_TEXT);
-    const priceCheck = result.checks.find((c) => c.category === 'price' && c.expectedValue === '₹299');
+    const priceCheck = result.checks.find(
+      (c) => c.category === 'price' && c.expectedValue === '₹299'
+    );
     expect(priceCheck?.status).toBe('PASS');
   });
 });
@@ -90,7 +97,9 @@ describe('Golden Test #3 — correct price PASSES', () => {
 describe('Golden Test #4 — correct discount PASSES', () => {
   it('SOURCE 10%, GENERATED 10% -> discount check passes, full result PASS', () => {
     const result = run(baseInput(), VALID_COPY_TEXT);
-    const offerCheck = result.checks.find((c) => c.category === 'offer' && c.reason?.includes('Discount'));
+    const offerCheck = result.checks.find(
+      (c) => c.category === 'offer' && c.reason?.includes('Discount')
+    );
     expect(offerCheck?.status).toBe('PASS');
     expect(result.status).toBe('PASS');
   });
@@ -99,7 +108,8 @@ describe('Golden Test #4 — correct discount PASSES', () => {
 describe('Golden Test #5 — missing discount fact + hallucinated discount NEVER PASSES', () => {
   it('no discount authorized, AI claims "20% OFF" -> NOT PASS', () => {
     const input = baseInput({ offerType: 'free_delivery', offerOriginalPrice: undefined });
-    const copy = 'Weekend Special! Paneer Biryani from Test Biryani House now ₹299 - 20% OFF! Kondapur, Hyderabad. 9876543210.';
+    const copy =
+      'Weekend Special! Paneer Biryani from Test Biryani House now ₹299 - 20% OFF! Kondapur, Hyderabad. 9876543210.';
     const result = run(input, copy);
     expect(result.status).not.toBe('PASS');
     expect(['FAIL', 'REVIEW_REQUIRED']).toContain(result.status);
@@ -122,7 +132,9 @@ describe('Golden Test #6 — incorrect phone FAILS', () => {
     // value in this fixture) stays correct, so this isolates the phone check.
     const copy = VALID_COPY_TEXT.replace('9123456780', '9199999999');
     const result = run(baseInput(), copy);
-    const phoneCheck = result.checks.find((c) => c.category === 'contact' && c.expectedValue === '9123456780');
+    const phoneCheck = result.checks.find(
+      (c) => c.category === 'contact' && c.expectedValue === '9123456780'
+    );
     expect(phoneCheck?.status).toBe('FAIL');
     expect(result.status).toBe('FAIL');
   });
@@ -158,7 +170,11 @@ describe('Golden Test #9 — client cannot manufacture PASS', () => {
     // an extra bogus property tacked onto the input object (as if a client
     // had smuggled one through) and confirm the result is unaffected.
     const input = baseInput();
-    const forgedInput = { ...input, verificationStatus: 'PASS', verified: true } as GenerationPipelineInput;
+    const forgedInput = {
+      ...input,
+      verificationStatus: 'PASS',
+      verified: true,
+    } as GenerationPipelineInput;
     const copy = 'Paneer Biryani from Test Biryani House now ₹399.'; // wrong price
 
     const realResult = run(input, copy);
@@ -209,16 +225,30 @@ describe('Golden Test #10 — source change invalidates stale verification', () 
     const phoneChanged = { ...originalFacts, businessPhone: '9111111111' };
     expect(isVerificationStale(fingerprint, phoneChanged)).toBe(true);
 
-    const locationChanged = { ...originalFacts, businessLocationText: 'Banjara Hills Hyderabad Telangana' };
+    const locationChanged = {
+      ...originalFacts,
+      businessLocationText: 'Banjara Hills Hyderabad Telangana',
+    };
     expect(isVerificationStale(fingerprint, locationChanged)).toBe(true);
   });
 
   it('a campaign with no stored fingerprint (predates this mechanism) is not flagged stale', () => {
-    expect(isVerificationStale(undefined, { businessPhone: '1', businessWhatsApp: '1', businessLocationText: 'x' })).toBe(false);
+    expect(
+      isVerificationStale(undefined, {
+        businessPhone: '1',
+        businessWhatsApp: '1',
+        businessLocationText: 'x',
+      })
+    ).toBe(false);
   });
 
   it('is deterministic — same facts always produce the same fingerprint', () => {
-    const facts = { businessPhone: '9876543210', businessWhatsApp: '9876543210', businessLocationText: 'Kondapur Hyderabad', productPrice: 299 };
+    const facts = {
+      businessPhone: '9876543210',
+      businessWhatsApp: '9876543210',
+      businessLocationText: 'Kondapur Hyderabad',
+      productPrice: 299,
+    };
     expect(computeSourceFingerprint(facts)).toBe(computeSourceFingerprint({ ...facts }));
   });
 });
@@ -267,9 +297,9 @@ describe('Phase 33 — verticalFingerprint covers Business Brain fields newly ed
 
   it('a campaign generated before Phase 33 (no stored verticalFingerprint) is never flagged stale on this dimension', () => {
     // storedFingerprint absent too, matching a genuinely pre-Phase-6 campaign.
-    expect(
-      isVerificationStale(undefined, coreFacts, undefined, { deliveryRadiusKm: 99 })
-    ).toBe(false);
+    expect(isVerificationStale(undefined, coreFacts, undefined, { deliveryRadiusKm: 99 })).toBe(
+      false
+    );
   });
 
   it('core staleness (Phase 6) and vertical staleness (Phase 33) are independent — either alone triggers stale', () => {
@@ -295,9 +325,9 @@ describe('Phase 33 — verticalFingerprint covers Business Brain fields newly ed
     ).toBe(true);
 
     // Neither changed.
-    expect(
-      isVerificationStale(fingerprint, coreFacts, verticalFingerprint, verticalFacts)
-    ).toBe(false);
+    expect(isVerificationStale(fingerprint, coreFacts, verticalFingerprint, verticalFacts)).toBe(
+      false
+    );
   });
 
   it('adding new fields to computeVerticalFactsFingerprint never altered the pre-existing computeSourceFingerprint output', () => {
@@ -305,7 +335,12 @@ describe('Phase 33 — verticalFingerprint covers Business Brain fields newly ed
     // the new fields into computeSourceFingerprint would change its hash
     // for every business, spuriously flagging all pre-Phase-33 campaigns
     // stale. This pins the original golden fingerprint value.
-    const facts = { businessPhone: '9876543210', businessWhatsApp: '9876543210', businessLocationText: 'Kondapur Hyderabad', productPrice: 299 };
+    const facts = {
+      businessPhone: '9876543210',
+      businessWhatsApp: '9876543210',
+      businessLocationText: 'Kondapur Hyderabad',
+      productPrice: 299,
+    };
     expect(computeSourceFingerprint(facts)).toBe(computeSourceFingerprint(facts));
     expect(computeSourceFingerprint(facts)).not.toBe(
       computeVerticalFactsFingerprint({ deliveryRadiusKm: 5 })
@@ -330,10 +365,13 @@ describe('Golden Test #11/12/13 — regeneration activation gating (the exact ru
 describe('Zod schema construction and safeParse behavior (regression guard)', () => {
   const schemas = { TruthValidationSchema, QualityValidationSchema, SafetyValidationSchema };
 
-  it.each(Object.entries(schemas))('%s is a real ZodObject with a working safeParse', (_name, schema) => {
-    expect(typeof (schema as z.ZodTypeAny).safeParse).toBe('function');
-    expect(typeof (schema as z.ZodTypeAny).parse).toBe('function');
-  });
+  it.each(Object.entries(schemas))(
+    '%s is a real ZodObject with a working safeParse',
+    (_name, schema) => {
+      expect(typeof (schema as z.ZodTypeAny).safeParse).toBe('function');
+      expect(typeof (schema as z.ZodTypeAny).parse).toBe('function');
+    }
+  );
 
   it('valid TruthValidationSchema output parses successfully', () => {
     const result = TruthValidationSchema.safeParse({
@@ -350,7 +388,11 @@ describe('Zod schema construction and safeParse behavior (regression guard)', ()
   });
 
   it('wrong field type fails safeParse', () => {
-    const result = TruthValidationSchema.safeParse({ passed: 'yes', violations: [], assetStatus: {} });
+    const result = TruthValidationSchema.safeParse({
+      passed: 'yes',
+      violations: [],
+      assetStatus: {},
+    });
     expect(result.success).toBe(false);
   });
 
@@ -390,14 +432,23 @@ describe('Fail-closed error handling', () => {
   });
 
   it('missing offer price in input is reported as REVIEW_REQUIRED, not silently PASS', () => {
-    const result = run(baseInput({ offerPrice: 0, offerOriginalPrice: undefined }), VALID_COPY_TEXT);
-    const priceCheck = result.checks.find((c) => c.category === 'price' && c.expectedValue === 'NOT_PROVIDED');
+    const result = run(
+      baseInput({ offerPrice: 0, offerOriginalPrice: undefined }),
+      VALID_COPY_TEXT
+    );
+    const priceCheck = result.checks.find(
+      (c) => c.category === 'price' && c.expectedValue === 'NOT_PROVIDED'
+    );
     expect(priceCheck?.status).toBe('REVIEW_REQUIRED');
   });
 
   it('runDeterministicTruthCheck does not throw on a missing/empty copyPack', () => {
     expect(() =>
-      runDeterministicTruthCheck(baseInput(), { businessUnderstanding: {}, productUnderstanding: {}, copyPack: {} })
+      runDeterministicTruthCheck(baseInput(), {
+        businessUnderstanding: {},
+        productUnderstanding: {},
+        copyPack: {},
+      })
     ).not.toThrow();
   });
 });
@@ -410,7 +461,10 @@ describe('Fail-closed error handling', () => {
  * PASS" rather than silently skipping the check.
  */
 describe('Phase 30 — salon service/package catalog claims', () => {
-  function salonInput(verticalProfile: Record<string, unknown>, overrides: Partial<GenerationPipelineInput> = {}) {
+  function salonInput(
+    verticalProfile: Record<string, unknown>,
+    overrides: Partial<GenerationPipelineInput> = {}
+  ) {
     return baseInput({
       vertical: 'salon',
       businessCategory: 'salon',
@@ -423,7 +477,8 @@ describe('Phase 30 — salon service/package catalog claims', () => {
   it('a business with NO defined services/packages is not checked at all (not applicable, not a silent PASS of a real claim)', () => {
     const result = run(salonInput({}), 'Book our amazing package deal today!');
     const catalogCheck = result.checks.find(
-      (c) => c.reason?.includes('defined for this business') || c.reason?.includes('defined catalog')
+      (c) =>
+        c.reason?.includes('defined for this business') || c.reason?.includes('defined catalog')
     );
     expect(catalogCheck).toBeUndefined();
   });
@@ -471,7 +526,7 @@ describe('Phase 30 — salon service/package catalog claims', () => {
     expect(catalogCheck!.status).toBe('PASS');
   });
 
-  it('generated copy naming NONE of the business\'s defined services is flagged (service existence)', () => {
+  it("generated copy naming NONE of the business's defined services is flagged (service existence)", () => {
     const result = run(
       salonInput({ services: [{ name: 'Haircut & Styling' }, { name: 'Manicure' }] }),
       'Come visit us for a relaxing spa day!'
@@ -499,13 +554,13 @@ describe('Phase 30 — salon service/package catalog claims', () => {
     const result = run(
       baseInput({
         vertical: 'restaurant',
-        businessBrain: { verticalProfile: { services: [{ name: 'Haircut' }], packages: [] } } as any,
+        businessBrain: {
+          verticalProfile: { services: [{ name: 'Haircut' }], packages: [] },
+        } as any,
       }),
       'Ask about our combo package deal!'
     );
-    const catalogCheck = result.checks.find((c) =>
-      c.reason?.includes('defined for this business')
-    );
+    const catalogCheck = result.checks.find((c) => c.reason?.includes('defined for this business'));
     expect(catalogCheck).toBeUndefined();
   });
 });
@@ -542,7 +597,9 @@ describe('Phase 31 — real estate property fact claims', () => {
 
   it('a business with NO defined properties is not checked at all (not applicable)', () => {
     const result = run(realEstateInput([]), '4BHK with a swimming pool, ready to move!');
-    const propertyCheck = result.checks.find((c) => c.category === 'product' && c.reason?.includes('bedrooms'));
+    const propertyCheck = result.checks.find(
+      (c) => c.category === 'product' && c.reason?.includes('bedrooms')
+    );
     expect(propertyCheck).toBeUndefined();
   });
 
@@ -580,7 +637,10 @@ describe('Phase 31 — real estate property fact claims', () => {
   });
 
   it('an invented possession-status claim FAILS (property is ready_to_move, copy claims under construction)', () => {
-    const result = run(realEstateInput([GREEN_MEADOWS]), 'This under construction project is a great buy.');
+    const result = run(
+      realEstateInput([GREEN_MEADOWS]),
+      'This under construction project is a great buy.'
+    );
     const possessionCheck = result.checks.find((c) => c.reason?.includes('possession status'));
     expect(possessionCheck).toBeDefined();
     expect(possessionCheck!.status).toBe('FAIL');
@@ -593,7 +653,10 @@ describe('Phase 31 — real estate property fact claims', () => {
   });
 
   it('an amenity not on file is flagged (property has gym+parking, copy claims a swimming pool)', () => {
-    const result = run(realEstateInput([GREEN_MEADOWS]), 'Enjoy the swimming pool at this property!');
+    const result = run(
+      realEstateInput([GREEN_MEADOWS]),
+      'Enjoy the swimming pool at this property!'
+    );
     const amenityCheck = result.checks.find((c) => c.reason?.includes('amenities not recorded'));
     expect(amenityCheck).toBeDefined();
     expect(amenityCheck!.status).toBe('REVIEW_REQUIRED');
@@ -611,7 +674,9 @@ describe('Phase 31 — real estate property fact claims', () => {
       'This ready to move 3 BHK has gym access and parking.'
     );
     const propertyPass = result.checks.find(
-      (c) => c.reason === 'Property facts (bedrooms/bathrooms/area/possession/amenities) are consistent with the defined listing.'
+      (c) =>
+        c.reason ===
+        'Property facts (bedrooms/bathrooms/area/possession/amenities) are consistent with the defined listing.'
     );
     expect(propertyPass).toBeDefined();
     expect(propertyPass!.status).toBe('PASS');
@@ -628,5 +693,236 @@ describe('Phase 31 — real estate property fact claims', () => {
     );
     const bedroomCheck = result.checks.find((c) => c.reason?.includes('bedrooms'));
     expect(bedroomCheck).toBeUndefined();
+  });
+});
+
+describe('K1 — comma-formatted prices no longer FAIL', () => {
+  it('₹1,999 (comma-formatted) PASSES when the expected price is 1999', () => {
+    const result = run(
+      baseInput({ offerPrice: 1999, offerOriginalPrice: undefined, offerType: 'fixed' }),
+      'Order now for just ₹1,999! Test Biryani House, Kondapur, Hyderabad. WhatsApp 9876543210, call 9123456780.'
+    );
+    const priceCheck = result.checks.find((c) => c.category === 'price');
+    expect(priceCheck!.status).toBe('PASS');
+  });
+
+  it('"Rs. 1,999/-" PASSES when the expected price is 1999', () => {
+    const result = run(
+      baseInput({ offerPrice: 1999, offerOriginalPrice: undefined, offerType: 'fixed' }),
+      'Order now for just Rs. 1,999/-! Test Biryani House, Kondapur, Hyderabad. WhatsApp 9876543210, call 9123456780.'
+    );
+    const priceCheck = result.checks.find((c) => c.category === 'price');
+    expect(priceCheck!.status).toBe('PASS');
+  });
+
+  it('a genuinely wrong comma-formatted price still FAILs', () => {
+    const result = run(
+      baseInput({ offerPrice: 1999, offerOriginalPrice: undefined, offerType: 'fixed' }),
+      'Order now for just ₹1,899! Test Biryani House, Kondapur, Hyderabad. WhatsApp 9876543210, call 9123456780.'
+    );
+    const priceCheck = result.checks.find((c) => c.category === 'price');
+    expect(priceCheck!.status).toBe('FAIL');
+  });
+});
+
+describe('K2 — product name check tolerates spacing/casing instead of exact-substring FAIL', () => {
+  it('"chicken dum-biryani" PASSES against expected "Chicken Dum Biryani"', () => {
+    const result = run(
+      baseInput({ productName: 'Chicken Dum Biryani' }),
+      'Try our chicken dum-biryani today! Test Biryani House, Kondapur, Hyderabad, ₹299 (was ₹332). WhatsApp 9876543210, call 9123456780.'
+    );
+    const productCheck = result.checks.find((c) => c.category === 'product');
+    expect(productCheck!.status).toBe('PASS');
+  });
+
+  it('a product name entirely absent from copy is REVIEW_REQUIRED, not FAIL', () => {
+    const result = run(
+      baseInput({ productName: 'Chicken Dum Biryani' }),
+      'Amazing weekend deal at Test Biryani House, Kondapur, Hyderabad, ₹299 (was ₹332). WhatsApp 9876543210, call 9123456780.'
+    );
+    const productCheck = result.checks.find((c) => c.category === 'product');
+    expect(productCheck!.status).toBe('REVIEW_REQUIRED');
+  });
+});
+
+describe('B3 — owner-quoted prohibited phrases', () => {
+  it('a quoted owner rule found verbatim in copy gives REVIEW_REQUIRED', () => {
+    const result = run(
+      baseInput({
+        businessBrain: {
+          businessRules: { pricingRules: `Never claim "lowest price in the city"` },
+        } as any,
+      }),
+      `${VALID_COPY_TEXT} We have the lowest price in the city!`
+    );
+    const claimCheck = result.checks.find((c) => c.reason?.includes('owner-prohibited phrase'));
+    expect(claimCheck).toBeDefined();
+    expect(claimCheck!.status).toBe('REVIEW_REQUIRED');
+  });
+
+  it('no quoted phrase present in copy PASSES that check', () => {
+    const result = run(
+      baseInput({
+        businessBrain: {
+          businessRules: { pricingRules: `Never claim "lowest price in the city"` },
+        } as any,
+      }),
+      VALID_COPY_TEXT
+    );
+    const claimCheck = result.checks.find((c) =>
+      c.expectedValue?.includes('lowest price in the city')
+    );
+    expect(claimCheck!.status).toBe('PASS');
+  });
+
+  it('no owner rules configured means no check is added at all', () => {
+    const result = run(baseInput(), VALID_COPY_TEXT);
+    const claimCheck = result.checks.find((c) => c.expectedValue?.startsWith('None of:'));
+    expect(claimCheck).toBeUndefined();
+  });
+});
+
+describe('G1 (Pass 2) — Truth Check validates against AUTHORITATIVE saved facts, not AI-derived ones', () => {
+  it('1. saved price ₹1,999 → generated ₹1,999 → PASS', () => {
+    const result = run(
+      baseInput({ offerPrice: 1999, offerOriginalPrice: undefined, offerType: 'fixed' }),
+      'Order now for just ₹1,999! Test Biryani House, Kondapur, Hyderabad. WhatsApp 9876543210, call 9123456780.'
+    );
+    expect(result.checks.find((c) => c.category === 'price')!.status).toBe('PASS');
+  });
+
+  it('2. saved price ₹1,999 → generated ₹1,499 → FAIL', () => {
+    const result = run(
+      baseInput({ offerPrice: 1999, offerOriginalPrice: undefined, offerType: 'fixed' }),
+      'Order now for just ₹1,499! Test Biryani House, Kondapur, Hyderabad. WhatsApp 9876543210, call 9123456780.'
+    );
+    expect(result.checks.find((c) => c.category === 'price')!.status).toBe('FAIL');
+    expect(result.status).toBe('FAIL');
+  });
+
+  it('3. saved product name "Chicken Biryani" → generated "Chicken Biryani" → PASS', () => {
+    const result = run(
+      baseInput({ productName: 'Chicken Biryani' }),
+      VALID_COPY_TEXT.replace('Paneer Biryani', 'Chicken Biryani')
+    );
+    expect(result.checks.find((c) => c.category === 'product')!.status).toBe('PASS');
+  });
+
+  it('4. saved product name "Chicken Biryani" → generated a DIFFERENT catalog product → FAIL', () => {
+    // catalogProductNames comes from input.businessBrain.products — the
+    // authoritative catalog, not anything the AI wrote. Naming a real but
+    // wrong catalog item is a genuine factual swap, distinct from simply
+    // not mentioning the product at all (see K2's REVIEW_REQUIRED case).
+    const result = run(
+      baseInput({
+        productName: 'Chicken Biryani',
+        businessBrain: {
+          products: [
+            {
+              productId: 'p1',
+              name: 'Chicken Biryani',
+              description: '',
+              price: 299,
+              category: 'main',
+              tags: [],
+              attributes: {},
+            },
+            {
+              productId: 'p2',
+              name: 'Mutton Biryani',
+              description: '',
+              price: 399,
+              category: 'main',
+              tags: [],
+              attributes: {},
+            },
+          ],
+        } as any,
+      }),
+      'Try our Mutton Biryani today! Test Biryani House, Kondapur, Hyderabad, ₹299 (was ₹332). WhatsApp 9876543210, call 9123456780.'
+    );
+    const productCheck = result.checks.find((c) => c.category === 'product');
+    expect(productCheck!.status).toBe('FAIL');
+    expect(result.status).toBe('FAIL');
+  });
+
+  it('5. an AI-derived hallucinated price fact must NOT become authoritative', () => {
+    // previousResults.businessUnderstanding is Stage 1's own AI output — a
+    // hallucinated "businessFacts" entry there must have zero effect on the
+    // price check, which is grounded only in input.offerPrice (the actual
+    // saved offer).
+    const input = baseInput({
+      offerPrice: 1999,
+      offerOriginalPrice: undefined,
+      offerType: 'fixed',
+    });
+    const result = runDeterministicTruthCheck(input, {
+      businessUnderstanding: {
+        businessFacts: [
+          {
+            category: 'price',
+            fact: 'Price: ₹1499 (hallucinated, never saved)',
+            source: 'ai-hallucination',
+            criticality: 'high',
+          },
+        ],
+      },
+      productUnderstanding: { productFacts: [] },
+      copyPack: makeCopyPack(
+        'Order now for just ₹1,999! Test Biryani House, Kondapur, Hyderabad. WhatsApp 9876543210, call 9123456780.'
+      ),
+    });
+    expect(result.checks.find((c) => c.category === 'price')!.status).toBe('PASS');
+  });
+
+  it('6. an AI-derived hallucinated operational fact must NOT be accepted as a saved fact', () => {
+    // previousResults.businessUnderstanding claims delivery is supported,
+    // but input.businessBrain.businessRules.deliveryRadiusKm (the actual
+    // saved value) says it isn't — the authoritative value must win.
+    const input = baseInput({ businessBrain: { businessRules: { deliveryRadiusKm: 0 } } as any });
+    const result = runDeterministicTruthCheck(input, {
+      businessUnderstanding: {
+        businessFacts: [
+          {
+            category: 'policy',
+            fact: 'Delivery radius: 15 km (hallucinated, never saved)',
+            source: 'ai-hallucination',
+            criticality: 'medium',
+          },
+        ],
+        businessRules: { availability: { deliveryRadiusKm: 15 } },
+      },
+      productUnderstanding: { productFacts: [] },
+      copyPack: makeCopyPack(`${VALID_COPY_TEXT} We deliver within 15km!`),
+    });
+    const opsCheck = result.checks.find(
+      (c) => c.category === 'operations' && c.reason?.toLowerCase().includes('delivery')
+    );
+    expect(opsCheck!.status).toBe('REVIEW_REQUIRED');
+  });
+
+  it('7. owner "never say X" rules remain enforced', () => {
+    const result = run(
+      baseInput({
+        businessBrain: {
+          businessRules: { pricingRules: `Never claim "lowest price in the city"` },
+        } as any,
+      }),
+      `${VALID_COPY_TEXT} We have the lowest price in the city!`
+    );
+    const claimCheck = result.checks.find((c) => c.reason?.includes('owner-prohibited phrase'));
+    expect(claimCheck!.status).toBe('REVIEW_REQUIRED');
+  });
+
+  it('8. missing authoritative data cannot PASS a claim that requires it (minimum order)', () => {
+    const result = run(
+      baseInput({ businessBrain: { businessRules: { minimumOrder: 0 } } as any }),
+      `${VALID_COPY_TEXT} Minimum order ₹200 applies.`
+    );
+    const minOrderCheck = result.checks.find((c) =>
+      c.reason?.toLowerCase().includes('minimum order')
+    );
+    expect(minOrderCheck!.status).toBe('REVIEW_REQUIRED');
+    expect(minOrderCheck!.status).not.toBe('PASS');
   });
 });

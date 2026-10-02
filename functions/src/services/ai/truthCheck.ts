@@ -448,8 +448,12 @@ export function runDeterministicTruthCheck(
   checks.push(businessNameCheck);
   if (businessNameCheck.status === 'FAIL') overallStatus = 'FAIL';
 
-  // 2. Product Name Check
-  const productNameCheck = checkProductName(allText, expectedProductName);
+  // 2. Product Name Check (G1: catalog names come from the authoritative
+  // input.businessBrain.products, not any AI-derived source)
+  const catalogProductNames = (input.businessBrain?.products || [])
+    .map((p) => p?.name)
+    .filter((name): name is string => Boolean(name));
+  const productNameCheck = checkProductName(allText, expectedProductName, catalogProductNames);
   checks.push(productNameCheck);
   if (productNameCheck.status === 'FAIL') overallStatus = 'FAIL';
 
@@ -544,15 +548,37 @@ export function runDeterministicTruthCheck(
   if (claimsCheck.status === 'FAIL') overallStatus = 'FAIL';
 
   // 11. Unsupported Claims Check
-  const unsupportedClaimsCheck = checkUnsupportedClaims(allText, previousResults, input.vertical);
+  const unsupportedClaimsCheck = checkUnsupportedClaims(
+    allText,
+    input.businessBrain?.businessRules,
+    input.vertical
+  );
   checks.push(unsupportedClaimsCheck);
   if (unsupportedClaimsCheck.status === 'FAIL') overallStatus = 'FAIL';
   else if (unsupportedClaimsCheck.status === 'REVIEW_REQUIRED' && overallStatus === 'PASS') {
     overallStatus = 'REVIEW_REQUIRED';
   }
 
-  // 11. Operations Check (Delivery, Takeaway, Dine-in, Hours)
-  const operationsCheck = checkOperations(allText, previousResults);
+  // 11b. Owner-defined prohibited phrases (B3 in the fix plan) — the owner
+  // can quote a specific phrase inside offerValidityRules/pricingRules
+  // (Business Profile) that must never appear verbatim in copy (e.g.
+  // "never say 'lowest price in the city'"). This was previously entered
+  // by the owner and passed into the copy prompt as a plain JSON dump, but
+  // nothing ever actually verified the model followed it.
+  const ownerPhraseCheck = checkOwnerProhibitedPhrases(allText, input.businessBrain?.businessRules);
+  if (ownerPhraseCheck) {
+    checks.push(ownerPhraseCheck);
+    if (ownerPhraseCheck.status === 'REVIEW_REQUIRED' && overallStatus === 'PASS') {
+      overallStatus = 'REVIEW_REQUIRED';
+    }
+  }
+
+  // 11. Operations Check (Delivery, Takeaway, Dine-in, Hours) — G1: verified
+  // against input.businessBrain.businessRules, the persisted, authoritative
+  // record, not previousResults.businessUnderstanding (Stage 1's AI-written
+  // summary of that same data, which could itself hallucinate a fact the
+  // owner never actually saved).
+  const operationsCheck = checkOperations(allText, input.businessBrain?.businessRules);
   checks.push(operationsCheck);
   if (operationsCheck.status === 'FAIL') overallStatus = 'FAIL';
   else if (operationsCheck.status === 'REVIEW_REQUIRED' && overallStatus === 'PASS') {
@@ -564,20 +590,29 @@ export function runDeterministicTruthCheck(
   checks.push(contactCheck);
   if (contactCheck.status === 'FAIL') overallStatus = 'FAIL';
 
-  // 13. Business Hours Check
-  const hoursCheck = checkBusinessHours(allText, previousResults);
+  // 13. Business Hours Check (G1: authoritative businessRules.openingHours)
+  const hoursCheck = checkBusinessHours(allText, input.businessBrain?.businessRules);
   checks.push(hoursCheck);
   if (hoursCheck.status === 'FAIL') overallStatus = 'FAIL';
+  else if (hoursCheck.status === 'REVIEW_REQUIRED' && overallStatus === 'PASS') {
+    overallStatus = 'REVIEW_REQUIRED';
+  }
 
-  // 14. Minimum Order Check
-  const minOrderCheck = checkMinimumOrder(allText, previousResults);
+  // 14. Minimum Order Check (G1: authoritative businessRules.minimumOrder)
+  const minOrderCheck = checkMinimumOrder(allText, input.businessBrain?.businessRules);
   checks.push(minOrderCheck);
   if (minOrderCheck.status === 'FAIL') overallStatus = 'FAIL';
+  else if (minOrderCheck.status === 'REVIEW_REQUIRED' && overallStatus === 'PASS') {
+    overallStatus = 'REVIEW_REQUIRED';
+  }
 
-  // 15. Delivery Radius Check
-  const deliveryRadiusCheck = checkDeliveryRadius(allText, previousResults);
+  // 15. Delivery Radius Check (G1: authoritative businessRules.deliveryRadiusKm)
+  const deliveryRadiusCheck = checkDeliveryRadius(allText, input.businessBrain?.businessRules);
   checks.push(deliveryRadiusCheck);
   if (deliveryRadiusCheck.status === 'FAIL') overallStatus = 'FAIL';
+  else if (deliveryRadiusCheck.status === 'REVIEW_REQUIRED' && overallStatus === 'PASS') {
+    overallStatus = 'REVIEW_REQUIRED';
+  }
 
   // 16. Salon Service/Package Catalog Check (Phase 30) — vertical-gated,
   // extends this SAME shared Truth Check rather than a separate one. Only
@@ -651,7 +686,28 @@ function checkBusinessName(allText: string, expectedName: string): TruthCheckIte
   };
 }
 
-function checkProductName(allText: string, expectedName: string): TruthCheckItem {
+/** Lowercase, strip punctuation, collapse whitespace — for fuzzy name comparison, not exact matching. */
+function normalizeNameForComparison(value: string): string {
+  return value
+    .toLowerCase()
+    .replace(/[^\p{L}\p{N}\s]/gu, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function checkProductName(
+  allText: string,
+  expectedName: string,
+  // The authoritative product catalog (input.businessBrain.products) — used
+  // ONLY to detect the specific, more serious case of a DIFFERENT real
+  // catalog product being named instead of the one this campaign is
+  // actually about (a genuine factual swap), which is a FAIL, not a
+  // REVIEW_REQUIRED. Absence of the expected name with no other catalog
+  // product named either stays REVIEW_REQUIRED — this check has no way to
+  // tell "not mentioned" from "a name we don't recognize" without a
+  // catalog to compare against.
+  catalogProductNames: string[] = []
+): TruthCheckItem {
   if (!expectedName) {
     return {
       category: 'product',
@@ -661,15 +717,69 @@ function checkProductName(allText: string, expectedName: string): TruthCheckItem
     };
   }
 
-  const passed = allText.includes(expectedName.toLowerCase());
+  // An exact substring match used to be required — but localized/
+  // transliterated copy (te_en/hi_en) or even a small spacing/hyphenation
+  // change (e.g. "chicken dum-biryani" vs "Chicken Dum Biryani") FAILed
+  // outright, charging the customer for a campaign whose product name was
+  // actually correct. Normalize both sides and accept meaningful token
+  // overlap; a genuine mismatch (no expected tokens present at all) is
+  // downgraded to REVIEW_REQUIRED rather than FAIL, since this check alone
+  // can't distinguish "not mentioned" from "a different catalogue product
+  // was named" without the full catalogue for comparison.
+  const normalizedExpected = normalizeNameForComparison(expectedName);
+  const normalizedText = normalizeNameForComparison(allText);
+
+  if (normalizedText.includes(normalizedExpected)) {
+    return {
+      category: 'product',
+      status: 'PASS',
+      generatedValue: expectedName,
+      expectedValue: expectedName,
+      reason: 'Product name matches',
+    };
+  }
+
+  const expectedTokens = normalizedExpected.split(' ').filter((t) => t.length > 1);
+  const textTokenSet = new Set(normalizedText.split(' '));
+  const matchedTokens = expectedTokens.filter((t) => textTokenSet.has(t));
+  const overlapRatio = expectedTokens.length > 0 ? matchedTokens.length / expectedTokens.length : 0;
+
+  if (expectedTokens.length > 0 && overlapRatio >= 0.6) {
+    return {
+      category: 'product',
+      status: 'PASS',
+      generatedValue: expectedName,
+      expectedValue: expectedName,
+      reason: `Product name matches closely (${matchedTokens.length}/${expectedTokens.length} words found)`,
+    };
+  }
+
+  const normalizedExpectedName = normalizedExpected;
+  const differentCatalogProduct = catalogProductNames
+    .map((name) => ({ raw: name, normalized: normalizeNameForComparison(name) }))
+    .find(
+      (p) =>
+        p.normalized &&
+        p.normalized !== normalizedExpectedName &&
+        normalizedText.includes(p.normalized)
+    );
+
+  if (differentCatalogProduct) {
+    return {
+      category: 'product',
+      status: 'FAIL',
+      generatedValue: differentCatalogProduct.raw,
+      expectedValue: expectedName,
+      reason: `Generated content names a different catalog product ("${differentCatalogProduct.raw}") instead of "${expectedName}"`,
+    };
+  }
+
   return {
     category: 'product',
-    status: passed ? 'PASS' : 'FAIL',
-    generatedValue: passed ? expectedName : 'NOT_FOUND',
+    status: 'REVIEW_REQUIRED',
+    generatedValue: 'NOT_FOUND',
     expectedValue: expectedName,
-    reason: passed
-      ? 'Product name matches'
-      : `Product name "${expectedName}" not found in generated content`,
+    reason: `Product name "${expectedName}" could not be confidently matched in generated content — needs manual review`,
   };
 }
 
@@ -684,11 +794,14 @@ function checkPrice(allText: string, expectedPrice: number): TruthCheckItem {
   }
 
   const expectedPriceStr = `₹${expectedPrice}`;
-  const priceMentions = allText.match(/(?:₹|Rs\.?\s?|INR\s?)\s*\d+/gi) || [];
-  const priceMatch = priceMentions.some((p) => {
-    const normalized = p.replace(/\s/g, '').replace(/Rs\.?/gi, '₹').replace(/INR/gi, '₹');
-    return normalized === expectedPriceStr.replace(/\s/g, '');
-  });
+  // Comma-grouped ("₹1,999"), decimal ("₹1999.50") and a trailing "/-"
+  // ("Rs. 1,999/-") are all normal, correctly-formatted Indian price
+  // notation — the old bare `\d+` here matched only "1" out of "₹1,999",
+  // so any comma-formatted price FAILed Truth Check outright even when the
+  // copy was factually correct.
+  const priceMentions =
+    allText.match(/(?:₹|Rs\.?\s?|INR\s?)\s*\d{1,3}(?:,\d{2,3})*(?:\.\d+)?(?:\/-)?/gi) || [];
+  const priceMatch = priceMentions.some((p) => normalizePrice(p) === expectedPrice);
 
   return {
     category: 'price',
@@ -1021,6 +1134,48 @@ function checkOfferValidity(
   };
 }
 
+/**
+ * Extracts quoted phrases ('...' or "...") from an owner-written rules
+ * field. Free text like "never claim to be the cheapest" has no reliable
+ * way to be turned into a substring check without risking false positives
+ * (matching on stray words like "cheapest" alone) — a quoted phrase is an
+ * explicit, unambiguous signal from the owner of exact wording to forbid.
+ */
+function extractQuotedPhrases(text: string): string[] {
+  const matches = text.match(/['"]([^'"]{3,100})['"]/g) || [];
+  return matches.map((m) => m.slice(1, -1).trim().toLowerCase()).filter(Boolean);
+}
+
+function checkOwnerProhibitedPhrases(
+  allText: string,
+  businessRules?: {
+    offerValidityRules?: string;
+    pricingRules?: string;
+    communication?: { brandRestrictions?: string[] };
+  }
+): TruthCheckItem | null {
+  const brandRestrictions = businessRules?.communication?.brandRestrictions || [];
+  const phrases = [
+    ...brandRestrictions.map((r) => r.toLowerCase()),
+    ...extractQuotedPhrases(businessRules?.offerValidityRules || ''),
+    ...extractQuotedPhrases(businessRules?.pricingRules || ''),
+  ].filter(Boolean);
+
+  if (phrases.length === 0) return null;
+
+  const found = phrases.filter((phrase) => allText.includes(phrase));
+  return {
+    category: 'claim',
+    status: found.length > 0 ? 'REVIEW_REQUIRED' : 'PASS',
+    generatedValue: found.join(', ') || 'NONE',
+    expectedValue: `None of: ${phrases.join(', ')}`,
+    reason:
+      found.length > 0
+        ? `Generated copy contains an owner-prohibited phrase: "${found[0]}"`
+        : 'No owner-prohibited phrases found',
+  };
+}
+
 function checkProhibitedClaims(allText: string): TruthCheckItem {
   const prohibitedClaims = [
     'best in',
@@ -1102,7 +1257,7 @@ function checkProhibitedClaims(allText: string): TruthCheckItem {
 
 function checkUnsupportedClaims(
   allText: string,
-  previousResults: any,
+  businessRules: AuthoritativeBusinessRules | undefined,
   vertical: GenerationPipelineInput['vertical']
 ): TruthCheckItem {
   const allTextLower = allText.toLowerCase();
@@ -1114,34 +1269,31 @@ function checkUnsupportedClaims(
   // their claim dictionaries are actually built — see that file's header.
   const claimChecks = getVerticalConfigOrDefault(vertical).truthCheckClaimKeywords;
 
-  const businessFacts = previousResults?.businessUnderstanding?.businessFacts || [];
-  const businessRules = previousResults?.businessUnderstanding?.businessRules || {};
-
   let hasUnsupportedClaim = false;
   let unsupportedDetails = '';
 
   for (const check of claimChecks) {
     if (allTextLower.includes(check.keyword)) {
-      const supportedByFacts = businessFacts.some((f: any) =>
-        f.fact.toLowerCase().includes(check.factCategory)
-      );
-
+      // G1: authoritative businessRules only — no more AI-written
+      // "businessFacts" as a second, less trustworthy way to pass this check.
       const supportedByRules = (() => {
         switch (check.factCategory) {
           case 'delivery':
-            return businessRules?.availability?.deliveryRadiusKm > 0;
+            return (businessRules?.deliveryRadiusKm ?? 0) > 0;
           case 'dine-in':
             return true;
           case 'takeaway':
             return true;
           case 'hours':
-            return !!businessRules?.factuality?.operatingHoursRespectRequired;
+            return Object.values(businessRules?.openingHours || {}).some(
+              (day) => day && !day.closed && day.open && day.close
+            );
           default:
             return false;
         }
       })();
 
-      if (!supportedByFacts && !supportedByRules) {
+      if (!supportedByRules) {
         hasUnsupportedClaim = true;
         unsupportedDetails += `${check.keyword} (${check.category}) not supported by Business Brain; `;
       }
@@ -1402,7 +1554,14 @@ function checkPropertyFactClaims(
   return items;
 }
 
-function checkOperations(allText: string, previousResults: any): TruthCheckItem {
+type AuthoritativeBusinessRules = NonNullable<
+  GenerationPipelineInput['businessBrain']
+>['businessRules'];
+
+function checkOperations(
+  allText: string,
+  businessRules: AuthoritativeBusinessRules | undefined
+): TruthCheckItem {
   const allTextLower = allText.toLowerCase();
 
   const opsKeywords = [
@@ -1424,14 +1583,10 @@ function checkOperations(allText: string, previousResults: any): TruthCheckItem 
     };
   }
 
-  const businessFacts = previousResults?.businessUnderstanding?.businessFacts || [];
-  const businessRules = previousResults?.businessUnderstanding?.businessRules || {};
-
-  const supportedOps = businessFacts.filter((f: any) =>
-    opsKeywords.some((kw) => f.fact.toLowerCase().includes(kw))
-  );
-
-  const deliverySupported = businessRules?.availability?.deliveryRadiusKm > 0;
+  // G1: sourced from the persisted, authoritative businessRules — not an AI
+  // model's own summary of that data (previousResults.businessUnderstanding),
+  // which could itself invent a delivery/operating fact the owner never saved.
+  const deliverySupported = (businessRules?.deliveryRadiusKm ?? 0) > 0;
 
   const unsupportedOps = opsMentions.filter((op) => {
     if (op === 'delivery' || op === 'home delivery') return !deliverySupported;
@@ -1511,7 +1666,10 @@ function checkContactInfo(allText: string, input: GenerationPipelineInput): Trut
   };
 }
 
-function checkBusinessHours(allText: string, previousResults: any): TruthCheckItem {
+function checkBusinessHours(
+  allText: string,
+  businessRules: AuthoritativeBusinessRules | undefined
+): TruthCheckItem {
   const allTextLower = allText.toLowerCase();
 
   const hoursKeywords = ['open', 'close', 'hours', 'timing', 'timings'];
@@ -1525,12 +1683,14 @@ function checkBusinessHours(allText: string, previousResults: any): TruthCheckIt
     };
   }
 
-  const businessFacts = previousResults?.businessUnderstanding?.businessFacts || [];
-  const supportedOps = businessFacts.filter((f: any) =>
-    hoursKeywords.some((kw) => f.fact.toLowerCase().includes(kw))
+  // G1: authoritative businessRules.openingHours — a day actually defined
+  // (open even one day) is what "supported" means here.
+  const openingHours = businessRules?.openingHours || {};
+  const hasDefinedHours = Object.values(openingHours).some(
+    (day) => day && !day.closed && day.open && day.close
   );
 
-  if (supportedOps.length === 0) {
+  if (!hasDefinedHours) {
     return {
       category: 'operations',
       status: 'REVIEW_REQUIRED',
@@ -1547,7 +1707,10 @@ function checkBusinessHours(allText: string, previousResults: any): TruthCheckIt
   };
 }
 
-function checkMinimumOrder(allText: string, previousResults: any): TruthCheckItem {
+function checkMinimumOrder(
+  allText: string,
+  businessRules: AuthoritativeBusinessRules | undefined
+): TruthCheckItem {
   const allTextLower = allText.toLowerCase();
 
   const minOrderKeywords = ['minimum order', 'min order', 'minimum value', 'min value'];
@@ -1561,11 +1724,13 @@ function checkMinimumOrder(allText: string, previousResults: any): TruthCheckIte
     };
   }
 
-  const businessRules = previousResults?.businessUnderstanding?.businessRules || {};
-  const minOrderRequired = businessRules?.availability?.minimumOrderRequired;
-  const minOrderAmount = businessRules?.availability?.minimumOrder;
+  // G1: authoritative businessRules.minimumOrder — a positive saved amount
+  // is what "a minimum order is actually defined" means, replacing the old
+  // (and structurally mismatched — CreativeBrief-shaped fields were being
+  // read off the raw Stage-1 AI JSON, which never had them) reference.
+  const minOrderAmount = businessRules?.minimumOrder ?? 0;
 
-  if (!minOrderRequired || !minOrderAmount) {
+  if (minOrderAmount <= 0) {
     return {
       category: 'operations',
       status: 'REVIEW_REQUIRED',
@@ -1582,7 +1747,10 @@ function checkMinimumOrder(allText: string, previousResults: any): TruthCheckIte
   };
 }
 
-function checkDeliveryRadius(allText: string, previousResults: any): TruthCheckItem {
+function checkDeliveryRadius(
+  allText: string,
+  businessRules: AuthoritativeBusinessRules | undefined
+): TruthCheckItem {
   const allTextLower = allText.toLowerCase();
 
   const radiusKeywords = [
@@ -1603,12 +1771,10 @@ function checkDeliveryRadius(allText: string, previousResults: any): TruthCheckI
     };
   }
 
-  const businessFacts = previousResults?.businessUnderstanding?.businessFacts || [];
-  const supportedOps = businessFacts.filter((f: any) =>
-    radiusKeywords.some((kw) => f.fact.toLowerCase().includes(kw))
-  );
+  // G1: authoritative businessRules.deliveryRadiusKm.
+  const hasDeliveryRadius = (businessRules?.deliveryRadiusKm ?? 0) > 0;
 
-  if (supportedOps.length === 0) {
+  if (!hasDeliveryRadius) {
     return {
       category: 'operations',
       status: 'REVIEW_REQUIRED',

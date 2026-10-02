@@ -30,7 +30,11 @@ const SECRET_PATTERNS: RegExp[] = [
   /\brzp_(live|test)_[A-Za-z0-9]{10,}\b/g,
 ];
 
-function redactSecrets(value: string): string {
+// Exported for utils/errors.ts: the same redaction must also be applied to
+// error messages returned to the CLIENT (mapErrorToHttpsError), not just to
+// what reaches Cloud Logging here — see the Error Handling Audit note there
+// for why that was a real, separate gap.
+export function redactSecrets(value: string): string {
   return SECRET_PATTERNS.reduce(
     (text, pattern) =>
       text.replace(pattern, (match, prefix) => (prefix ? `${prefix}[REDACTED]` : '[REDACTED]')),

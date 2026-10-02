@@ -37,7 +37,7 @@ describe('TemplateAdaptationPlanner', () => {
     createdAt: '',
     updatedAt: '',
     source: 'system' as any,
-    status: 'published' as any
+    status: 'published' as any,
   } as unknown as CreativeTemplate;
 
   const baseContext = {
@@ -49,7 +49,7 @@ describe('TemplateAdaptationPlanner', () => {
       objective: 'conversion',
       structure: { type: 'post', grammar: [] },
       visualGrammar: { emphasis: 'product' as any, composition: 'centered' as any },
-      constraints: {}
+      constraints: {},
     },
     context: {
       product: { name: 'Biryani', category: 'Food' },
@@ -174,25 +174,27 @@ describe('TemplateAdaptationPlanner', () => {
 
     it('returns a structured plan when AI succeeds', async () => {
       mockGenerate.mockResolvedValueOnce(validPlan);
-      
+
       const plan = await planner.adapt(baseInput);
       expect(plan).toEqual(validPlan);
-      
+
       // Ensure we call the provider wrapper, not Gemini directly
       expect(mockGenerate).toHaveBeenCalledTimes(1);
     });
 
     it('fails deterministically if AI throws (no fallback/fake plan)', async () => {
       mockGenerate.mockRejectedValueOnce(new Error('AI Failed'));
-      
+
       await expect(planner.adapt(baseInput)).rejects.toThrow('AI Failed');
     });
 
     it('fails validation if Reel plan is missing reelSequence', async () => {
       mockGenerate.mockResolvedValueOnce(validPlan);
       const reelInput = { ...baseInput, template: { ...baseTemplate, type: 'reel' as const } };
-      
-      await expect(planner.adapt(reelInput)).rejects.toThrow('Reel templates require a reelSequence');
+
+      await expect(planner.adapt(reelInput)).rejects.toThrow(
+        'Reel templates require a reelSequence'
+      );
     });
 
     it('fails validation if template grammar requires CTA but plan has none', async () => {
@@ -208,17 +210,19 @@ describe('TemplateAdaptationPlanner', () => {
       } as unknown as CreativeTemplate;
       const planWithoutCta = { ...validPlan, cta: undefined };
       mockGenerate.mockResolvedValueOnce(planWithoutCta);
-      
-      await expect(planner.adapt({ ...baseInput, template: ctaTemplate })).rejects.toThrow('requires a CTA');
+
+      await expect(planner.adapt({ ...baseInput, template: ctaTemplate })).rejects.toThrow(
+        'requires a CTA'
+      );
     });
   });
 
   describe('TEST: PROMPT CONSTRUCTION & CONTEXT INTEGRATION', () => {
     it('integrates template, objective, and selected context into the prompt', async () => {
       mockGenerate.mockResolvedValueOnce(validPlan);
-      
+
       await planner.adapt(baseInput);
-      
+
       const prompt = (mockGenerate.mock.calls[0] as any[])[0];
       expect(prompt).toContain('Name: Test Template');
       expect(prompt).toContain('Objective: conversion');
@@ -228,13 +232,13 @@ describe('TemplateAdaptationPlanner', () => {
 
     it('changes prompt when objective changes (SAME TEMPLATE, DIFFERENT OBJECTIVE)', async () => {
       mockGenerate.mockResolvedValue(validPlan);
-      
+
       await planner.adapt({ ...baseInput, objective: 'awareness' });
       const prompt1 = (mockGenerate.mock.calls[0] as any[])[0];
-      
+
       await planner.adapt({ ...baseInput, objective: 'conversion' });
       const prompt2 = (mockGenerate.mock.calls[1] as any[])[0];
-      
+
       expect(prompt1).toContain('Objective: awareness');
       expect(prompt2).toContain('Objective: conversion');
       expect(prompt1).not.toEqual(prompt2);
@@ -242,49 +246,58 @@ describe('TemplateAdaptationPlanner', () => {
 
     it('changes prompt when product changes (TEST: PRODUCT CHANGES PLAN)', async () => {
       mockGenerate.mockResolvedValue(validPlan);
-      
+
       await planner.adapt(baseInput);
       const prompt1 = (mockGenerate.mock.calls[0] as any[])[0];
-      
-      const newContext = { ...baseContext, context: { product: { name: 'Burger', category: 'Food' } } };
+
+      const newContext = {
+        ...baseContext,
+        context: { product: { name: 'Burger', category: 'Food' } },
+      };
       await planner.adapt({ ...baseInput, selectedContext: newContext });
       const prompt2 = (mockGenerate.mock.calls[1] as any[])[0];
-      
+
       expect(prompt1).toContain('Biryani');
       expect(prompt2).toContain('Burger');
     });
-    
+
     it('changes prompt when brand changes (TEST: BRAND CHANGES PLAN)', async () => {
       mockGenerate.mockResolvedValue(validPlan);
-      
+
       const brandContext = { ...baseContext, context: { brand: { tone: 'playful' as any } } };
       await planner.adapt({ ...baseInput, selectedContext: brandContext });
       const prompt1 = (mockGenerate.mock.calls[0] as any[])[0];
-      
+
       const brandContext2 = { ...baseContext, context: { brand: { tone: 'professional' as any } } };
       await planner.adapt({ ...baseInput, selectedContext: brandContext2 });
       const prompt2 = (mockGenerate.mock.calls[1] as any[])[0];
-      
+
       expect(prompt1).toContain('playful');
       expect(prompt2).toContain('professional');
     });
 
     it('changes prompt when localization changes (TEST: LOCALIZATION CHANGES PLAN)', async () => {
       mockGenerate.mockResolvedValue(validPlan);
-      
-      const localContext = { ...baseContext, context: { localization: { primaryLanguage: 'te' as any } } };
+
+      const localContext = {
+        ...baseContext,
+        context: { localization: { primaryLanguage: 'te' as any } },
+      };
       await planner.adapt({ ...baseInput, selectedContext: localContext });
-      
+
       const prompt = (mockGenerate.mock.calls[0] as any[])[0];
       expect(prompt).toContain('te');
     });
 
     it('changes prompt when style changes (TEST: STYLE CHANGES PLAN)', async () => {
       mockGenerate.mockResolvedValue(validPlan);
-      
-      const styleContext = { ...baseContext, context: { savedStyle: { tone: 'playful', humor: 'moderate' } as any } };
+
+      const styleContext = {
+        ...baseContext,
+        context: { savedStyle: { tone: 'playful', humor: 'moderate' } as any },
+      };
       await planner.adapt({ ...baseInput, selectedContext: styleContext });
-      
+
       const prompt = (mockGenerate.mock.calls[0] as any[])[0];
       expect(prompt).toContain('playful');
       expect(prompt).toContain('moderate');

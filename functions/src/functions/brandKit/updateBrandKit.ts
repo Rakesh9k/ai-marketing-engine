@@ -6,6 +6,7 @@ import { validatedCallable } from '../../middleware/validation';
 import { getBrandKitDoc, updateBrandKitDoc } from '../../services/firestore';
 import { logFunctionStart, logFunctionComplete, logFunctionError } from '../../utils/logging';
 import { mapErrorToHttpsError } from '../../utils/errors';
+import { requireFeature } from '../../services/entitlements';
 import type { BrandKit } from '../../types';
 
 const updateBrandKitSchema = z.object({
@@ -88,6 +89,8 @@ export const updateBrandKit = onCall(
     try {
       const { businessId, ...updateData } = data;
       await verifyBusinessAccess(context.userId, businessId);
+      // P0-4: same Business/Agency-tier gate as createBrandKit.ts.
+      await requireFeature(context.userId, 'brandKit');
 
       const existingBrandKit = await getBrandKitDoc(businessId);
       if (!existingBrandKit) {

@@ -28,7 +28,7 @@ export const ReelShotSchema = z.object({
   visualIntent: z.string(),
   productTreatment: z.string(),
   messagingPurpose: z.string(),
-  ctaPlacement: z.string().optional()
+  ctaPlacement: z.string().optional(),
 });
 export type ReelShot = z.infer<typeof ReelShotSchema>;
 
@@ -42,7 +42,7 @@ export const AdaptedCreativePlanSchema = z.object({
   coveredRoles: z.array(creativeGrammarRoleSchema).min(1),
   localizationApproach: z.string().optional(),
   cta: z.string().optional(),
-  reelSequence: z.array(ReelShotSchema).optional()
+  reelSequence: z.array(ReelShotSchema).optional(),
 });
 export type AdaptedCreativePlan = z.infer<typeof AdaptedCreativePlanSchema>;
 
@@ -57,9 +57,7 @@ export function validateTemplateSpecificOutput(
   input: TemplateAdaptationInput
 ): AdaptedCreativePlan {
   const grammar = input.template.structure.grammar ?? [];
-  const requiredRoles = new Set(
-    grammar.filter((step) => step.required).map((step) => step.role)
-  );
+  const requiredRoles = new Set(grammar.filter((step) => step.required).map((step) => step.role));
   const templateRoles = new Set(grammar.map((step) => step.role));
   const coveredRoles = new Set(plan.coveredRoles);
 
@@ -72,7 +70,9 @@ export function validateTemplateSpecificOutput(
   for (const role of requiredRoles) {
     if (!coveredRoles.has(role)) {
       const label = role === 'cta' ? 'CTA' : role;
-      throw new Error(`Template grammar requires the ${label} role but the plan does not cover it.`);
+      throw new Error(
+        `Template grammar requires the ${label} role but the plan does not cover it.`
+      );
     }
   }
 
@@ -105,7 +105,9 @@ export function validateTemplateSpecificOutput(
     const sequenceRoles = new Set(plan.reelSequence.map((shot) => shot.role));
     for (const role of sequenceRoles) {
       if (!templateRoles.has(role)) {
-        throw new Error(`Reel sequence covers ${role}, which is not part of the selected template grammar.`);
+        throw new Error(
+          `Reel sequence covers ${role}, which is not part of the selected template grammar.`
+        );
       }
     }
     for (const role of requiredRoles) {
@@ -129,7 +131,9 @@ export function validateTemplateSpecificOutput(
 export class TemplateAdaptationPlanner {
   async adapt(input: TemplateAdaptationInput): Promise<AdaptedCreativePlan> {
     const prompt = this.buildPrompt(input);
-    const plan = await generateStructuredText(prompt, AdaptedCreativePlanSchema, { temperature: 0.3 });
+    const plan = await generateStructuredText(prompt, AdaptedCreativePlanSchema, {
+      temperature: 0.3,
+    });
     this.validate(plan, input);
     return plan;
   }

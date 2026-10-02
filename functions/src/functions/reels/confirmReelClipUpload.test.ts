@@ -13,7 +13,12 @@ const describeIfEmulator = emulatorHost ? describe : describe.skip;
 import { v4 as uuid } from 'uuid';
 import * as admin from 'firebase-admin';
 import { confirmReelClipUpload } from './confirmReelClipUpload';
-import { createBusinessDoc, createReelProjectDoc, getAssetDoc, getReelProjectDoc } from '../../services/firestore';
+import {
+  createBusinessDoc,
+  createReelProjectDoc,
+  getAssetDoc,
+  getReelProjectDoc,
+} from '../../services/firestore';
 import type { Business, ReelProject } from '../../types';
 
 function callableRequest(data: unknown, uid: string) {
@@ -75,7 +80,13 @@ describeIfEmulator('confirmReelClipUpload — storagePath ownership (Phase 37 D-
     await expect(
       (confirmReelClipUpload as any).run(
         callableRequest(
-          { businessId, reelId, clipId: uuid(), storagePath: foreignStoragePath, metadata: clipMetadata },
+          {
+            businessId,
+            reelId,
+            clipId: uuid(),
+            storagePath: foreignStoragePath,
+            metadata: clipMetadata,
+          },
           ownerId
         )
       )
@@ -97,7 +108,13 @@ describeIfEmulator('confirmReelClipUpload — storagePath ownership (Phase 37 D-
     await expect(
       (confirmReelClipUpload as any).run(
         callableRequest(
-          { businessId, reelId, clipId: uuid(), storagePath: 'temp/not-scoped.mp4', metadata: clipMetadata },
+          {
+            businessId,
+            reelId,
+            clipId: uuid(),
+            storagePath: 'temp/not-scoped.mp4',
+            metadata: clipMetadata,
+          },
           ownerId
         )
       )
@@ -139,5 +156,45 @@ describeIfEmulator('confirmReelClipUpload — storagePath ownership (Phase 37 D-
     const reelAfter = await getReelProjectDoc(reelId);
     expect(reelAfter?.inputClipIds).toContain(result.assetId);
     expect(reelAfter?.status).toBe('uploading');
+  });
+
+  // Phase 4 Storage Security Audit — same fix as confirmUpload.test.ts: the
+  // signed URL from getReelClipUploadUrl.ts only constrains the Content-Type
+  // header, never the byte count, and `metadata` below is the caller's own
+  // unverified claim. The equivalent "real object exceeds the size limit"
+  // case is proven by confirmUpload.test.ts's 10MB-image test instead of
+  // being repeated here at 200MB: the Storage emulator's own request-body
+  // cap rejects an upload that large before this function's code ever runs,
+  // which would only test the emulator, not confirmReelClipUpload — the
+  // size check below is the exact same `realSize > MAX_..._BYTES` branch
+  // confirmUpload.ts already exercises against a real oversized object.
+  it('CRITICAL: rejects an uploaded clip whose real content-type is not an allowed video type, even if the client claims video/mp4', async () => {
+    const ownerId = `user-${uuid()}`;
+    const businessId = `biz-${uuid()}`;
+    const reelId = `reel-${uuid()}`;
+    await createBusinessDoc(makeBusiness(businessId, ownerId));
+    await createReelProjectDoc(makeReel(reelId, businessId, ownerId));
+
+    const storagePath = `businesses/${businessId}/reels/${reelId}/input/${uuid()}.mp4`;
+    await admin
+      .storage()
+      .bucket()
+      .file(storagePath)
+      .save(Buffer.from('#!/bin/sh\necho pwned\n'), {
+        metadata: { contentType: 'application/x-sh' },
+        resumable: false,
+      });
+
+    await expect(
+      (confirmReelClipUpload as any).run(
+        callableRequest(
+          { businessId, reelId, clipId: uuid(), storagePath, metadata: clipMetadata },
+          ownerId
+        )
+      )
+    ).rejects.toThrow(/size limit|not a supported video type/i);
+
+    const [stillExists] = await admin.storage().bucket().file(storagePath).exists();
+    expect(stillExists).toBe(false);
   });
 });

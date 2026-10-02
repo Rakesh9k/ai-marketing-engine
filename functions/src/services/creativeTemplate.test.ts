@@ -25,7 +25,8 @@ import type {
 const PROMOTION_TEMPLATE: CreativeTemplate = {
   id: 'promotion_offer_post',
   name: 'Offer Spotlight',
-  description: 'A conversion-focused structure that quickly presents value and ends with a direct CTA.',
+  description:
+    'A conversion-focused structure that quickly presents value and ends with a direct CTA.',
   type: 'post',
   objectives: ['promotion', 'conversion'],
   compatibleVerticals: ['restaurant', 'salon'],
@@ -33,7 +34,12 @@ const PROMOTION_TEMPLATE: CreativeTemplate = {
     type: 'post',
     grammar: [
       { id: 'hook', role: 'hook', purpose: 'Capture attention immediately', required: true },
-      { id: 'product', role: 'product', purpose: 'Introduce what is being offered', required: true },
+      {
+        id: 'product',
+        role: 'product',
+        purpose: 'Introduce what is being offered',
+        required: true,
+      },
       { id: 'offer', role: 'offer', purpose: 'State the value proposition', required: true },
       { id: 'urgency', role: 'urgency', purpose: 'Create a reason to act now', required: false },
       { id: 'cta', role: 'cta', purpose: 'Tell the viewer what to do next', required: true },
@@ -41,8 +47,16 @@ const PROMOTION_TEMPLATE: CreativeTemplate = {
   },
   visualGrammar: { emphasis: 'offer-led', composition: 'hero-product' },
   adaptationRules: [
-    { id: 'emphasize_offer_if_available', condition: { check: 'offerAvailable' }, action: { action: 'emphasize', role: 'offer' } },
-    { id: 'omit_urgency_if_no_proof', condition: { check: 'proofAvailable' }, action: { action: 'exclude', role: 'urgency' } },
+    {
+      id: 'emphasize_offer_if_available',
+      condition: { check: 'offerAvailable' },
+      action: { action: 'emphasize', role: 'offer' },
+    },
+    {
+      id: 'omit_urgency_if_no_proof',
+      condition: { check: 'proofAvailable' },
+      action: { action: 'exclude', role: 'urgency' },
+    },
   ],
   constraints: { type: 'post', minSections: 3, maxSections: 6, maxTextDensity: 'medium' },
   version: 1,
@@ -53,7 +67,8 @@ const PROMOTION_TEMPLATE: CreativeTemplate = {
 const AWARENESS_TEMPLATE: CreativeTemplate = {
   id: 'brand_awareness_intro',
   name: 'Who We Are',
-  description: 'Introduces the business identity and what sets it apart before showing the product.',
+  description:
+    'Introduces the business identity and what sets it apart before showing the product.',
   type: 'post',
   objectives: ['awareness'],
   compatibleVerticals: ['restaurant', 'salon', 'real_estate'],
@@ -62,14 +77,23 @@ const AWARENESS_TEMPLATE: CreativeTemplate = {
     grammar: [
       { id: 'hook', role: 'hook', purpose: 'Open with a relatable moment', required: true },
       { id: 'context', role: 'context', purpose: 'Establish who the business is', required: true },
-      { id: 'differentiator', role: 'differentiator', purpose: 'Explain what makes it different', required: false },
+      {
+        id: 'differentiator',
+        role: 'differentiator',
+        purpose: 'Explain what makes it different',
+        required: false,
+      },
       { id: 'product', role: 'product', purpose: 'Show the product in context', required: true },
       { id: 'cta', role: 'cta', purpose: 'Invite the viewer to engage', required: true },
     ],
   },
   visualGrammar: { emphasis: 'image-led', composition: 'editorial' },
   adaptationRules: [
-    { id: 'prioritize_product_if_image', condition: { check: 'productImageAvailable' }, action: { action: 'prioritize', role: 'product' } },
+    {
+      id: 'prioritize_product_if_image',
+      condition: { check: 'productImageAvailable' },
+      action: { action: 'prioritize', role: 'product' },
+    },
   ],
   constraints: { type: 'post', minSections: 3, maxSections: 6 },
   version: 1,
@@ -80,7 +104,8 @@ const AWARENESS_TEMPLATE: CreativeTemplate = {
 const ENGAGEMENT_REEL_TEMPLATE: CreativeTemplate = {
   id: 'promotion_conversion_reel',
   name: 'Reveal & Convert',
-  description: 'Sets up context, reveals the product, delivers a payoff, then closes on the offer and CTA.',
+  description:
+    'Sets up context, reveals the product, delivers a payoff, then closes on the offer and CTA.',
   type: 'reel',
   objectives: ['promotion', 'conversion'],
   compatibleVerticals: ['restaurant'],
@@ -90,19 +115,46 @@ const ENGAGEMENT_REEL_TEMPLATE: CreativeTemplate = {
       { id: 'hook', role: 'hook', purpose: 'Open with an emotional beat', required: true },
       { id: 'setup', role: 'setup', purpose: 'Set the scene before the reveal', required: true },
       { id: 'product', role: 'product', purpose: 'Reveal the product', required: true },
-      { id: 'payoff', role: 'payoff', purpose: 'Deliver the satisfying resolution beat', required: true },
+      {
+        id: 'payoff',
+        role: 'payoff',
+        purpose: 'Deliver the satisfying resolution beat',
+        required: true,
+      },
       { id: 'offer', role: 'offer', purpose: 'Present the offer', required: false },
       { id: 'cta', role: 'cta', purpose: 'Ask the viewer to act', required: true },
     ],
   },
   visualGrammar: { emphasis: 'product-led', composition: 'high-contrast' },
   adaptationRules: [
-    { id: 'emphasize_offer_if_available', condition: { check: 'offerAvailable' }, action: { action: 'emphasize', role: 'offer' } },
-    { id: 'exclude_offer_if_unavailable', condition: { check: 'offerAvailable' }, action: { action: 'exclude', role: 'offer' } },
-    { id: 'vertical_restaurant_prioritizes_product', condition: { check: 'vertical', equals: 'restaurant' }, action: { action: 'prioritize', role: 'product' } },
-    { id: 'whatsapp_cta_conversion_oriented', condition: { check: 'ctaType', equals: 'order_whatsapp' }, action: { action: 'emphasize', role: 'cta' } },
+    {
+      id: 'emphasize_offer_if_available',
+      condition: { check: 'offerAvailable' },
+      action: { action: 'emphasize', role: 'offer' },
+    },
+    {
+      id: 'exclude_offer_if_unavailable',
+      condition: { check: 'offerAvailable' },
+      action: { action: 'exclude', role: 'offer' },
+    },
+    {
+      id: 'vertical_restaurant_prioritizes_product',
+      condition: { check: 'vertical', equals: 'restaurant' },
+      action: { action: 'prioritize', role: 'product' },
+    },
+    {
+      id: 'whatsapp_cta_conversion_oriented',
+      condition: { check: 'ctaType', equals: 'order_whatsapp' },
+      action: { action: 'emphasize', role: 'cta' },
+    },
   ],
-  constraints: { type: 'reel', minSections: 4, maxSections: 8, minDurationSeconds: 15, maxDurationSeconds: 30 },
+  constraints: {
+    type: 'reel',
+    minSections: 4,
+    maxSections: 8,
+    minDurationSeconds: 15,
+    maxDurationSeconds: 30,
+  },
   version: 1,
   active: true,
   source: 'system',
@@ -151,7 +203,9 @@ describe('validateCreativeTemplate — objectives', () => {
   });
 
   it('rejects an unknown objective', () => {
-    expect(validateCreativeTemplate({ ...PROMOTION_TEMPLATE, objectives: ['virality'] }).valid).toBe(false);
+    expect(
+      validateCreativeTemplate({ ...PROMOTION_TEMPLATE, objectives: ['virality'] }).valid
+    ).toBe(false);
   });
 
   it('rejects an empty objectives array', () => {
@@ -160,24 +214,32 @@ describe('validateCreativeTemplate — objectives', () => {
 
   it('accepts multiple objectives on one template', () => {
     expect(
-      validateCreativeTemplate({ ...PROMOTION_TEMPLATE, objectives: ['promotion', 'conversion', 'retention'] }).valid
+      validateCreativeTemplate({
+        ...PROMOTION_TEMPLATE,
+        objectives: ['promotion', 'conversion', 'retention'],
+      }).valid
     ).toBe(true);
   });
 });
 
 describe('validateCreativeTemplate — compatibleVerticals', () => {
   it.each(BUSINESS_CATEGORIES)('accepts the canonical vertical "%s"', (vertical) => {
-    expect(validateCreativeTemplate({ ...PROMOTION_TEMPLATE, compatibleVerticals: [vertical] }).valid).toBe(true);
+    expect(
+      validateCreativeTemplate({ ...PROMOTION_TEMPLATE, compatibleVerticals: [vertical] }).valid
+    ).toBe(true);
   });
 
   it('rejects an unknown vertical', () => {
-    expect(validateCreativeTemplate({ ...PROMOTION_TEMPLATE, compatibleVerticals: ['cloud-kitchen'] }).valid).toBe(
-      false
-    );
+    expect(
+      validateCreativeTemplate({ ...PROMOTION_TEMPLATE, compatibleVerticals: ['cloud-kitchen'] })
+        .valid
+    ).toBe(false);
   });
 
   it('rejects an empty compatibleVerticals array', () => {
-    expect(validateCreativeTemplate({ ...PROMOTION_TEMPLATE, compatibleVerticals: [] }).valid).toBe(false);
+    expect(validateCreativeTemplate({ ...PROMOTION_TEMPLATE, compatibleVerticals: [] }).valid).toBe(
+      false
+    );
   });
 });
 
@@ -197,13 +259,18 @@ describe('validateCreativeTemplate — grammar / structure', () => {
   it('accepts a mix of required and optional steps', () => {
     const result = validateCreativeTemplate(PROMOTION_TEMPLATE);
     expect(result.template?.structure.grammar.find((s) => s.id === 'cta')?.required).toBe(true);
-    expect(result.template?.structure.grammar.find((s) => s.id === 'urgency')?.required).toBe(false);
+    expect(result.template?.structure.grammar.find((s) => s.id === 'urgency')?.required).toBe(
+      false
+    );
   });
 
   it.each(CREATIVE_GRAMMAR_ROLES)('accepts the canonical grammar role "%s"', (role) => {
     const result = validateCreativeTemplate({
       ...PROMOTION_TEMPLATE,
-      structure: { type: 'post', grammar: [{ id: 'step_1', role, purpose: 'test', required: true }] },
+      structure: {
+        type: 'post',
+        grammar: [{ id: 'step_1', role, purpose: 'test', required: true }],
+      },
       constraints: { ...PROMOTION_TEMPLATE.constraints, minSections: 1 },
     });
     expect(result.valid).toBe(true);
@@ -273,7 +340,11 @@ describe('CreativeTemplate — compile-time type safety', () => {
   });
 
   it('PostTemplateConstraints cannot be assigned to a ReelTemplateConstraints-typed variable', () => {
-    const postConstraints: PostTemplateConstraints = { type: 'post', minSections: 1, maxSections: 5 };
+    const postConstraints: PostTemplateConstraints = {
+      type: 'post',
+      minSections: 1,
+      maxSections: 5,
+    };
     // @ts-expect-error — PostTemplateConstraints is not assignable to ReelTemplateConstraints (discriminant mismatch, missing duration fields)
     const asReel: ReelTemplateConstraints = postConstraints;
     expect(asReel).toBeDefined();
@@ -283,14 +354,19 @@ describe('CreativeTemplate — compile-time type safety', () => {
 describe('validateCreativeTemplate — visual grammar', () => {
   it.each(VISUAL_EMPHASES)('accepts the canonical emphasis "%s"', (emphasis) => {
     expect(
-      validateCreativeTemplate({ ...PROMOTION_TEMPLATE, visualGrammar: { emphasis, composition: 'minimal' } }).valid
+      validateCreativeTemplate({
+        ...PROMOTION_TEMPLATE,
+        visualGrammar: { emphasis, composition: 'minimal' },
+      }).valid
     ).toBe(true);
   });
 
   it.each(VISUAL_COMPOSITIONS)('accepts the canonical composition "%s"', (composition) => {
     expect(
-      validateCreativeTemplate({ ...PROMOTION_TEMPLATE, visualGrammar: { emphasis: 'product-led', composition } })
-        .valid
+      validateCreativeTemplate({
+        ...PROMOTION_TEMPLATE,
+        visualGrammar: { emphasis: 'product-led', composition },
+      }).valid
     ).toBe(true);
   });
 
@@ -320,7 +396,11 @@ describe('validateCreativeTemplate — adaptation rules', () => {
     const result = validateCreativeTemplate({
       ...PROMOTION_TEMPLATE,
       adaptationRules: [
-        { id: 'r1', condition: { check: 'offerAvailable' }, action: { action: 'emphasize', role: 'offer' } },
+        {
+          id: 'r1',
+          condition: { check: 'offerAvailable' },
+          action: { action: 'emphasize', role: 'offer' },
+        },
       ],
     });
     expect(result.valid).toBe(true);
@@ -330,7 +410,11 @@ describe('validateCreativeTemplate — adaptation rules', () => {
     const result = validateCreativeTemplate({
       ...PROMOTION_TEMPLATE,
       adaptationRules: [
-        { id: 'r1', condition: { check: 'proofAvailable' }, action: { action: 'exclude', role: 'proof' } },
+        {
+          id: 'r1',
+          condition: { check: 'proofAvailable' },
+          action: { action: 'exclude', role: 'proof' },
+        },
       ],
     });
     expect(result.valid).toBe(true);
@@ -340,20 +424,32 @@ describe('validateCreativeTemplate — adaptation rules', () => {
     const result = validateCreativeTemplate({
       ...PROMOTION_TEMPLATE,
       adaptationRules: [
-        { id: 'r1', condition: { check: 'productImageAvailable' }, action: { action: 'prioritize', role: 'product' } },
+        {
+          id: 'r1',
+          condition: { check: 'productImageAvailable' },
+          action: { action: 'prioritize', role: 'product' },
+        },
       ],
     });
     expect(result.valid).toBe(true);
   });
 
   it('accepts an empty adaptationRules array (not every template needs adaptation logic)', () => {
-    expect(validateCreativeTemplate({ ...PROMOTION_TEMPLATE, adaptationRules: [] }).valid).toBe(true);
+    expect(validateCreativeTemplate({ ...PROMOTION_TEMPLATE, adaptationRules: [] }).valid).toBe(
+      true
+    );
   });
 
   it('rejects an unknown condition check', () => {
     const result = validateCreativeTemplate({
       ...PROMOTION_TEMPLATE,
-      adaptationRules: [{ id: 'r1', condition: { check: 'moonPhase' }, action: { action: 'emphasize', role: 'offer' } }],
+      adaptationRules: [
+        {
+          id: 'r1',
+          condition: { check: 'moonPhase' },
+          action: { action: 'emphasize', role: 'offer' },
+        },
+      ],
     });
     expect(result.valid).toBe(false);
   });
@@ -362,7 +458,11 @@ describe('validateCreativeTemplate — adaptation rules', () => {
     const result = validateCreativeTemplate({
       ...PROMOTION_TEMPLATE,
       adaptationRules: [
-        { id: 'r1', condition: { check: 'offerAvailable' }, action: { action: 'delete_business', role: 'offer' } },
+        {
+          id: 'r1',
+          condition: { check: 'offerAvailable' },
+          action: { action: 'delete_business', role: 'offer' },
+        },
       ],
     });
     expect(result.valid).toBe(false);
@@ -372,8 +472,16 @@ describe('validateCreativeTemplate — adaptation rules', () => {
     const result = validateCreativeTemplate({
       ...PROMOTION_TEMPLATE,
       adaptationRules: [
-        { id: 'r1', condition: { check: 'offerAvailable' }, action: { action: 'emphasize', role: 'offer' } },
-        { id: 'r1', condition: { check: 'proofAvailable' }, action: { action: 'exclude', role: 'proof' } },
+        {
+          id: 'r1',
+          condition: { check: 'offerAvailable' },
+          action: { action: 'emphasize', role: 'offer' },
+        },
+        {
+          id: 'r1',
+          condition: { check: 'proofAvailable' },
+          action: { action: 'exclude', role: 'proof' },
+        },
       ],
     });
     expect(result.valid).toBe(false);
@@ -384,7 +492,11 @@ describe('validateCreativeTemplate — adaptation rules', () => {
     const result = validateCreativeTemplate({
       ...PROMOTION_TEMPLATE,
       adaptationRules: [
-        { id: 'r1', condition: { check: 'proofAvailable' }, action: { action: 'fallback', role: 'proof', to: 'benefit' } },
+        {
+          id: 'r1',
+          condition: { check: 'proofAvailable' },
+          action: { action: 'fallback', role: 'proof', to: 'benefit' },
+        },
       ],
     });
     expect(result.valid).toBe(true);
@@ -394,8 +506,10 @@ describe('validateCreativeTemplate — adaptation rules', () => {
 describe('validateCreativeTemplate — constraints', () => {
   it('accepts valid POST constraints', () => {
     expect(
-      validateCreativeTemplate({ ...PROMOTION_TEMPLATE, constraints: { type: 'post', minSections: 2, maxSections: 5 } })
-        .valid
+      validateCreativeTemplate({
+        ...PROMOTION_TEMPLATE,
+        constraints: { type: 'post', minSections: 2, maxSections: 5 },
+      }).valid
     ).toBe(true);
   });
 
@@ -414,7 +528,13 @@ describe('validateCreativeTemplate — constraints', () => {
   it('rejects REEL constraints where minDurationSeconds > maxDurationSeconds', () => {
     const result = validateCreativeTemplate({
       ...ENGAGEMENT_REEL_TEMPLATE,
-      constraints: { type: 'reel', minSections: 4, maxSections: 8, minDurationSeconds: 40, maxDurationSeconds: 20 },
+      constraints: {
+        type: 'reel',
+        minSections: 4,
+        maxSections: 8,
+        minDurationSeconds: 40,
+        maxDurationSeconds: 20,
+      },
     });
     expect(result.valid).toBe(false);
   });
@@ -429,8 +549,11 @@ describe('validateCreativeTemplate — constraints', () => {
   });
 
   it('does not require a POST-only field (maxTextDensity) — it is optional', () => {
-    const { maxTextDensity: _unused, ...withoutDensity } = PROMOTION_TEMPLATE.constraints as PostTemplateConstraints;
-    expect(validateCreativeTemplate({ ...PROMOTION_TEMPLATE, constraints: withoutDensity }).valid).toBe(true);
+    const { maxTextDensity: _unused, ...withoutDensity } =
+      PROMOTION_TEMPLATE.constraints as PostTemplateConstraints;
+    expect(
+      validateCreativeTemplate({ ...PROMOTION_TEMPLATE, constraints: withoutDensity }).valid
+    ).toBe(true);
   });
 
   it('rejects REEL constraints missing REEL-only duration fields', () => {
@@ -474,7 +597,9 @@ describe('validateCreativeTemplate — template', () => {
   });
 
   it('rejects an invalid source value', () => {
-    expect(validateCreativeTemplate({ ...PROMOTION_TEMPLATE, source: 'ai_extracted' }).valid).toBe(false);
+    expect(validateCreativeTemplate({ ...PROMOTION_TEMPLATE, source: 'ai_extracted' }).valid).toBe(
+      false
+    );
   });
 
   it('rejects a non-boolean active value', () => {

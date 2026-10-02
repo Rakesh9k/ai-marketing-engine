@@ -1,9 +1,9 @@
-import type { 
-  CreativeTemplateType, 
-  CreativeObjective, 
+import type {
+  CreativeTemplateType,
+  CreativeObjective,
   CreativePreference,
   CreativePreferenceState,
-  CreativePreferenceSource
+  CreativePreferenceSource,
 } from '../types';
 import { creativeTemplateRegistry } from './creativeTemplateRegistry';
 import { getCreativePreferencesByBusiness } from './firestore';
@@ -55,12 +55,12 @@ export async function recommendCreativeTemplates(
   // 3. Determine evidence-backed candidates
   // Filter for 'preferred' templates and map to eligible templates
   const candidates: { template: any; pref: CreativePreference }[] = [];
-  
+
   for (const pref of preferences) {
     if (pref.preference !== 'preferred') continue;
-    
+
     // Check if preferred template is in the eligible templates
-    const matchingTemplate = availableTemplates.find(t => t.id === pref.templateId);
+    const matchingTemplate = availableTemplates.find((t) => t.id === pref.templateId);
     if (matchingTemplate) {
       candidates.push({ template: matchingTemplate, pref });
     }
@@ -86,7 +86,7 @@ export async function recommendCreativeTemplates(
     if (b.pref.confidence !== a.pref.confidence) {
       return b.pref.confidence - a.pref.confidence;
     }
-    
+
     if (b.pref.evidenceCount !== a.pref.evidenceCount) {
       return b.pref.evidenceCount - a.pref.evidenceCount;
     }
@@ -101,9 +101,9 @@ export async function recommendCreativeTemplates(
         message: 'Because you marked this style as preferred.',
       };
     }
-    
+
     // Use the actual threshold used in Phase 17
-    // A net score >= 2 makes it preferred. 
+    // A net score >= 2 makes it preferred.
     // We can use the positiveEvidenceCount / evidenceCount directly.
     if (pref.positiveEvidenceCount > 0) {
       return {
@@ -123,8 +123,8 @@ export async function recommendCreativeTemplates(
   if (!topCandidate) {
     return { alternatives: [], hasEnoughEvidence: false };
   }
-  
-  const alternatives = candidates.slice(1).map(c => ({
+
+  const alternatives = candidates.slice(1).map((c) => ({
     templateId: c.template.id,
     displayName: c.template.name,
     description: c.template.description,

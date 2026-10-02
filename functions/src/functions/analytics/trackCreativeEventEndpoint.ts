@@ -14,20 +14,23 @@ const schema = z.object({
   campaignId: z.string().optional(),
   creativeType: z.enum(['post', 'reel']).optional(),
   objective: z.string().optional(),
-  metadata: z.record(z.unknown()).optional().transform(meta => {
-    if (!meta) return meta;
-    // Phase 21 Analytics Security: scrub sensitive data
-    const safeMeta = { ...meta };
-    delete safeMeta['businessBrain'];
-    delete safeMeta['brandProfile'];
-    delete safeMeta['prompts'];
-    delete safeMeta['aiResponses'];
-    delete safeMeta['referenceImages'];
-    delete safeMeta['paymentData'];
-    delete safeMeta['creditCard'];
-    delete safeMeta['secrets'];
-    return safeMeta;
-  }),
+  metadata: z
+    .record(z.unknown())
+    .optional()
+    .transform((meta) => {
+      if (!meta) return meta;
+      // Phase 21 Analytics Security: scrub sensitive data
+      const safeMeta = { ...meta };
+      delete safeMeta['businessBrain'];
+      delete safeMeta['brandProfile'];
+      delete safeMeta['prompts'];
+      delete safeMeta['aiResponses'];
+      delete safeMeta['referenceImages'];
+      delete safeMeta['paymentData'];
+      delete safeMeta['creditCard'];
+      delete safeMeta['secrets'];
+      return safeMeta;
+    }),
 });
 
 export const trackCreativeEventEndpoint = onCall(

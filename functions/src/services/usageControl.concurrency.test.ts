@@ -22,20 +22,23 @@ describeIfEmulator('usageControl concurrency/race safety (Firestore emulator, Ph
     const now = new Date();
     const periodStart = new Date(now.getFullYear(), now.getMonth(), 1);
     const usageId = `${userId}_${periodStart.toISOString().split('T')[0]}`;
-    await db.collection('usage').doc(usageId).set({
-      usageId,
-      userId,
-      periodStart: periodStart.toISOString(),
-      periodEnd: new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString(),
-      planId,
-      campaignsCreated: 0,
-      creditsUsed: 0,
-      imagesGenerated: 0,
-      copyGenerations: 0,
-      regenerations: 0,
-      failedGenerations: 0,
-      updatedAt: new Date().toISOString(),
-    });
+    await db
+      .collection('usage')
+      .doc(usageId)
+      .set({
+        usageId,
+        userId,
+        periodStart: periodStart.toISOString(),
+        periodEnd: new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString(),
+        planId,
+        campaignsCreated: 0,
+        creditsUsed: 0,
+        imagesGenerated: 0,
+        copyGenerations: 0,
+        regenerations: 0,
+        failedGenerations: 0,
+        updatedAt: new Date().toISOString(),
+      });
     return usageId;
   }
 
@@ -78,7 +81,9 @@ describeIfEmulator('usageControl concurrency/race safety (Firestore emulator, Ph
 
     const attempts = Array.from({ length: 10 }, () => uuid());
     const results = await Promise.allSettled(
-      attempts.map((opId) => usageControl.reserveCreditsForOperation(userId, opId, 'campaign_generation', 100))
+      attempts.map((opId) =>
+        usageControl.reserveCreditsForOperation(userId, opId, 'campaign_generation', 100)
+      )
     );
 
     const fulfilled = results.filter((r) => r.status === 'fulfilled');
@@ -151,7 +156,9 @@ describeIfEmulator('usageControl concurrency/race safety (Firestore emulator, Ph
     const attempts = Array.from({ length: 5 }, () => uuid());
 
     const results = await Promise.allSettled(
-      attempts.map((opId) => usageControl.reserveCreditsForOperation(userId, opId, 'campaign_generation', 60))
+      attempts.map((opId) =>
+        usageControl.reserveCreditsForOperation(userId, opId, 'campaign_generation', 60)
+      )
     );
 
     const fulfilled = results.filter((r) => r.status === 'fulfilled');

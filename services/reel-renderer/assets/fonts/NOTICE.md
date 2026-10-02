@@ -6,11 +6,11 @@ build/host, with zero network access required at render time or even at
 Docker build time for fonts specifically (only `npm install` and the base
 image pull still need network, same as before).
 
-| File | Family | Style | Source | License |
-|---|---|---|---|---|
-| `NotoSans-Bold.ttf` | Noto Sans | Bold | `github.com/notofonts/NotoSans`, `fonts/ttf/hinted/instance_ttf/NotoSans-Bold.ttf` (static Bold instance of the variable font, `main` branch) | SIL OFL 1.1 |
-| `NotoSansDevanagari-Bold.ttf` | Noto Sans Devanagari | Bold | `github.com/notofonts/NotoSansDevanagari`, `fonts/ttf/hinted/instance_ttf/NotoSansDevanagari-Bold.ttf` | SIL OFL 1.1 |
-| `NotoSansTelugu-Bold.ttf` | Noto Sans Telugu | Bold | `github.com/notofonts/NotoSansTelugu`, `fonts/ttf/hinted/instance_ttf/NotoSansTelugu-Bold.ttf` | SIL OFL 1.1 |
+| File                          | Family               | Style | Source                                                                                                                                        | License     |
+| ----------------------------- | -------------------- | ----- | --------------------------------------------------------------------------------------------------------------------------------------------- | ----------- |
+| `NotoSans-Bold.ttf`           | Noto Sans            | Bold  | `github.com/notofonts/NotoSans`, `fonts/ttf/hinted/instance_ttf/NotoSans-Bold.ttf` (static Bold instance of the variable font, `main` branch) | SIL OFL 1.1 |
+| `NotoSansDevanagari-Bold.ttf` | Noto Sans Devanagari | Bold  | `github.com/notofonts/NotoSansDevanagari`, `fonts/ttf/hinted/instance_ttf/NotoSansDevanagari-Bold.ttf`                                        | SIL OFL 1.1 |
+| `NotoSansTelugu-Bold.ttf`     | Noto Sans Telugu     | Bold  | `github.com/notofonts/NotoSansTelugu`, `fonts/ttf/hinted/instance_ttf/NotoSansTelugu-Bold.ttf`                                                | SIL OFL 1.1 |
 
 Downloaded 2026-09-16. `LICENSE-OFL.txt` is the SIL Open Font License 1.1
 text (identical across all three families/repos) — permissive, royalty-free,

@@ -54,6 +54,8 @@ export interface AnalyticsEventRecord {
 export interface DailyActivityPoint {
   date: string; // YYYY-MM-DD (UTC)
   campaignsGenerated: number;
+  campaignsScheduled: number;
+  campaignsPublished: number;
   assetsDownloaded: number;
   whatsappClicks: number;
 }
@@ -61,6 +63,13 @@ export interface DailyActivityPoint {
 export interface AnalyticsDashboardTotals {
   campaignsStarted: number;
   campaignsGenerated: number;
+  campaignsApproved: number;
+  campaignsScheduled: number;
+  campaignsPublished: number;
+  campaignsFailed: number;
+  campaignsRegenerated: number;
+  creativeLikes: number;
+  creativeDislikes: number;
   assetsDownloaded: number;
   whatsappClicks: number;
 }
@@ -84,6 +93,7 @@ export interface AnalyticsDashboardResult {
    * (a real, knowable state — the free tier — not missing data).
    */
   subscription: { planId: string; status: string } | null;
+  performanceRecommendations?: import('../../types/recommendation').PerformanceRecommendationResult;
 }
 
 /**
@@ -100,6 +110,13 @@ export function aggregateAnalyticsEvents(
   const totals: AnalyticsDashboardTotals = {
     campaignsStarted: 0,
     campaignsGenerated: 0,
+    campaignsApproved: 0,
+    campaignsScheduled: 0,
+    campaignsPublished: 0,
+    campaignsFailed: 0,
+    campaignsRegenerated: 0,
+    creativeLikes: 0,
+    creativeDislikes: 0,
     assetsDownloaded: 0,
     whatsappClicks: 0,
   };
@@ -113,7 +130,14 @@ export function aggregateAnalyticsEvents(
   );
   while (cursor <= endDay) {
     const key = cursor.toISOString().slice(0, 10);
-    dayMap.set(key, { date: key, campaignsGenerated: 0, assetsDownloaded: 0, whatsappClicks: 0 });
+    dayMap.set(key, {
+      date: key,
+      campaignsGenerated: 0,
+      campaignsScheduled: 0,
+      campaignsPublished: 0,
+      assetsDownloaded: 0,
+      whatsappClicks: 0,
+    });
     cursor.setUTCDate(cursor.getUTCDate() + 1);
   }
 
@@ -128,6 +152,31 @@ export function aggregateAnalyticsEvents(
       case ANALYTICS_EVENTS.CAMPAIGN_GENERATED:
         totals.campaignsGenerated += 1;
         if (bucket) bucket.campaignsGenerated += 1;
+        break;
+      case ANALYTICS_EVENTS.CAMPAIGN_APPROVED:
+        totals.campaignsApproved += 1;
+        break;
+      case ANALYTICS_EVENTS.CAMPAIGN_SCHEDULED:
+        totals.campaignsScheduled += 1;
+        if (bucket) bucket.campaignsScheduled += 1;
+        break;
+      case ANALYTICS_EVENTS.CAMPAIGN_PUBLISHED:
+        totals.campaignsPublished += 1;
+        if (bucket) bucket.campaignsPublished += 1;
+        break;
+      case ANALYTICS_EVENTS.CAMPAIGN_FAILED:
+        totals.campaignsFailed += 1;
+        break;
+      case ANALYTICS_EVENTS.CAMPAIGN_REGENERATED:
+        totals.campaignsRegenerated += 1;
+        break;
+      case ANALYTICS_EVENTS.CREATIVE_LIKED:
+      case ANALYTICS_EVENTS.CREATIVE_APPROVED:
+        totals.creativeLikes += 1;
+        break;
+      case ANALYTICS_EVENTS.CREATIVE_DISLIKED:
+      case ANALYTICS_EVENTS.CREATIVE_REJECTED:
+        totals.creativeDislikes += 1;
         break;
       case ANALYTICS_EVENTS.ASSET_DOWNLOADED:
         totals.assetsDownloaded += 1;
@@ -212,6 +261,11 @@ export const getAnalyticsDashboard = onCall(
       // `subscription` field doc comment on AnalyticsDashboardResult.
       const subscription = await getSubscriptionByUser(business.userId);
 
+      const { performanceRecommendationService } =
+        await import('../../services/recommendation/performanceRecommendationService.js');
+      const performanceRecommendations =
+        await performanceRecommendationService.getRecommendationsForBusiness(data.businessId);
+
       const result: AnalyticsDashboardResult = {
         businessId: data.businessId,
         rangeDays: days,
@@ -224,6 +278,7 @@ export const getAnalyticsDashboard = onCall(
         subscription: subscription
           ? { planId: subscription.planId, status: subscription.status }
           : null,
+        performanceRecommendations,
       };
 
       logFunctionComplete(logger, startTime, { success: true, eventsAggregated: events.length });

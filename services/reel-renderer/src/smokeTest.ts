@@ -39,21 +39,37 @@ async function main() {
 
     console.log('Generating synthetic test inputs...');
     await runFfmpeg([
-      '-f', 'lavfi', '-i', 'testsrc=duration=4:size=640x480:rate=15',
-      '-c:v', 'libx264', '-pix_fmt', 'yuv420p', clip1,
+      '-f',
+      'lavfi',
+      '-i',
+      'testsrc=duration=4:size=640x480:rate=15',
+      '-c:v',
+      'libx264',
+      '-pix_fmt',
+      'yuv420p',
+      clip1,
     ]);
     await runFfmpeg([
-      '-f', 'lavfi', '-i', 'testsrc2=duration=3:size=480x854:rate=15',
-      '-c:v', 'libx264', '-pix_fmt', 'yuv420p', clip2,
+      '-f',
+      'lavfi',
+      '-i',
+      'testsrc2=duration=3:size=480x854:rate=15',
+      '-c:v',
+      'libx264',
+      '-pix_fmt',
+      'yuv420p',
+      clip2,
     ]);
     await runFfmpeg([
-      '-f', 'lavfi', '-i', 'sine=frequency=440:duration=8',
-      '-c:a', 'libmp3lame', music,
+      '-f',
+      'lavfi',
+      '-i',
+      'sine=frequency=440:duration=8',
+      '-c:a',
+      'libmp3lame',
+      music,
     ]);
-    await runFfmpeg([
-      '-f', 'lavfi', '-i', 'color=c=red:s=200x200:d=1',
-      '-frames:v', '1', logo,
-    ]);
+    await runFfmpeg(['-f', 'lavfi', '-i', 'color=c=red:s=200x200:d=1', '-frames:v', '1', logo]);
 
     // 2. Sanity-check analyze-clip's building blocks against clip1.
     console.log('Probing clip1...');

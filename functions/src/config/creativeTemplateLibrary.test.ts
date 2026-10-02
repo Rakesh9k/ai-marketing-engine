@@ -57,11 +57,7 @@ const HARDCODED_LOCALIZATION_TERMS = [
 ];
 
 function allTextFields(template: (typeof BUILTIN_CREATIVE_TEMPLATES)[number]): string[] {
-  return [
-    template.name,
-    template.description,
-    ...template.structure.grammar.map((s) => s.purpose),
-  ];
+  return [template.name, template.description, ...template.structure.grammar.map((s) => s.purpose)];
 }
 
 describe('BUILTIN_CREATIVE_TEMPLATES — count', () => {
@@ -120,9 +116,12 @@ describe('BUILTIN_CREATIVE_TEMPLATES — required coverage', () => {
     'reel-brand-story',
   ];
 
-  it.each([...expectedPostIds, ...expectedReelIds])('includes the required template id "%s"', (id) => {
-    expect(BUILTIN_CREATIVE_TEMPLATES.some((t) => t.id === id)).toBe(true);
-  });
+  it.each([...expectedPostIds, ...expectedReelIds])(
+    'includes the required template id "%s"',
+    (id) => {
+      expect(BUILTIN_CREATIVE_TEMPLATES.some((t) => t.id === id)).toBe(true);
+    }
+  );
 
   it('does NOT retain the two Phase 4 Reel ids that were reconciled away (reel-offer-drop, reel-local-relatable)', () => {
     expect(BUILTIN_CREATIVE_TEMPLATES.some((t) => t.id === 'reel-offer-drop')).toBe(false);
@@ -219,7 +218,11 @@ describe('BUILTIN_CREATIVE_TEMPLATES — distinctiveness', () => {
   });
 
   it('the library covers at least 8 distinct dominant visual emphases/compositions combined', () => {
-    const combos = new Set(BUILTIN_CREATIVE_TEMPLATES.map((t) => `${t.visualGrammar.emphasis}:${t.visualGrammar.composition}`));
+    const combos = new Set(
+      BUILTIN_CREATIVE_TEMPLATES.map(
+        (t) => `${t.visualGrammar.emphasis}:${t.visualGrammar.composition}`
+      )
+    );
     expect(combos.size).toBeGreaterThanOrEqual(8);
   });
 
@@ -273,7 +276,9 @@ describe('BUILTIN_CREATIVE_TEMPLATES — distinctiveness', () => {
   });
 
   it('Problem→Solution and How It Works are meaningfully different grammars (problem/agitation/solution vs. process/steps/result)', () => {
-    const problemSolution = BUILTIN_CREATIVE_TEMPLATES.find((t) => t.id === 'reel-problem-solution');
+    const problemSolution = BUILTIN_CREATIVE_TEMPLATES.find(
+      (t) => t.id === 'reel-problem-solution'
+    );
     const howItWorks = BUILTIN_CREATIVE_TEMPLATES.find((t) => t.id === 'reel-how-it-works');
     expect(problemSolution?.structure.grammar.map((s) => s.role)).not.toEqual(
       howItWorks?.structure.grammar.map((s) => s.role)
@@ -283,25 +288,45 @@ describe('BUILTIN_CREATIVE_TEMPLATES — distinctiveness', () => {
 
 describe('BUILTIN_CREATIVE_TEMPLATES — Phase 5 20-template coverage matrix', () => {
   const reelIdsByCategory: Record<string, string[]> = {
-    product: ['reel-product-reveal', 'reel-3-shot-food', 'reel-cinematic-product', 'reel-product-detail'],
+    product: [
+      'reel-product-reveal',
+      'reel-3-shot-food',
+      'reel-cinematic-product',
+      'reel-product-detail',
+    ],
     offer: ['reel-offer', 'reel-limited-time-offer', 'reel-bundle-combo', 'reel-price-value'],
-    story: ['reel-problem-solution', 'reel-before-after', 'reel-customer-journey', 'reel-how-it-works'],
-    engagement: ['reel-local-comedy', 'reel-pov', 'reel-relatable-situation', 'reel-question-interaction'],
+    story: [
+      'reel-problem-solution',
+      'reel-before-after',
+      'reel-customer-journey',
+      'reel-how-it-works',
+    ],
+    engagement: [
+      'reel-local-comedy',
+      'reel-pov',
+      'reel-relatable-situation',
+      'reel-question-interaction',
+    ],
     trust: ['reel-customer-proof', 'reel-behind-scenes'],
     brand: ['reel-new-launch', 'reel-brand-story'],
   };
 
-  it.each(Object.entries(reelIdsByCategory))('every "%s" category id exists in the library', (_category, ids) => {
-    for (const id of ids) {
-      expect(BUILTIN_CREATIVE_TEMPLATES.some((t) => t.id === id)).toBe(true);
+  it.each(Object.entries(reelIdsByCategory))(
+    'every "%s" category id exists in the library',
+    (_category, ids) => {
+      for (const id of ids) {
+        expect(BUILTIN_CREATIVE_TEMPLATES.some((t) => t.id === id)).toBe(true);
+      }
     }
-  });
+  );
 
   it('the six categories account for exactly the 20 canonical Reel ids (no gaps, no extras)', () => {
     const allCategorized = Object.values(reelIdsByCategory).flat();
     expect(allCategorized.length).toBe(20);
     expect(new Set(allCategorized).size).toBe(20);
-    const actualReelIds = BUILTIN_CREATIVE_TEMPLATES.filter((t) => t.type === 'reel').map((t) => t.id);
+    const actualReelIds = BUILTIN_CREATIVE_TEMPLATES.filter((t) => t.type === 'reel').map(
+      (t) => t.id
+    );
     expect([...allCategorized].sort()).toEqual([...actualReelIds].sort());
   });
 });

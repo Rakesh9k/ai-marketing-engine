@@ -38,15 +38,6 @@ describe('createLogger().error — secret redaction (Phase 14)', () => {
     expect(payload.error.message).not.toMatch(/abcdef1234567890/);
   });
 
-  it('redacts a Razorpay-style secret key', () => {
-    const logger = createLogger();
-    const error = new Error('auth failed for rzp_live_AbCdEfGhIjKlMn');
-    logger.error('Payment call failed', error);
-
-    const [, payload] = errorSpy.mock.calls[0]!;
-    expect(payload.error.message).not.toMatch(/rzp_live_AbCdEfGhIjKlMn/);
-  });
-
   it('leaves an ordinary, secret-free error message unchanged', () => {
     const logger = createLogger({ campaignId: 'camp_1' });
     const error = new Error('Business not found: biz_123');

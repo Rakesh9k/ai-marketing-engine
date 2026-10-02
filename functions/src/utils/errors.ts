@@ -1,5 +1,6 @@
 import { HttpsError } from 'firebase-functions/v2/https';
 import { UnsupportedVerticalError } from '../config/verticals';
+import { redactSecrets } from './logging';
 
 export class AppError extends Error {
   constructor(
@@ -70,7 +71,7 @@ export class RateLimitError extends AppError {
   }
 }
 
-export function mapErrorToHttpsError(error: unknown): HttpsError {
+function buildHttpsError(error: unknown): HttpsError {
   // An HttpsError (e.g. checkRateLimit's 'resource-exhausted', or
   // verifyAuth's 'unauthenticated') already carries the correct callable
   // error code, message, and details. Without this check it fell through
@@ -93,8 +94,55 @@ export function mapErrorToHttpsError(error: unknown): HttpsError {
   if (error instanceof UnsupportedVerticalError) {
     return new HttpsError('invalid-argument', error.message, { vertical: error.vertical });
   }
+  // usageControl.ts's UsageControlError (plain Error + .code, not an
+  // AppError subclass — that module deliberately has no firebase-functions
+  // dependency). Without this, every credit/reservation error — including
+  // DUPLICATE_REQUEST_IN_PROGRESS (M3, Pass 2) — collapsed to a generic
+  // 'internal' error, indistinguishable from a real server failure, which
+  // would make the frontend treat a "please retry in a moment" condition
+  // the same as a hard failure requiring a fresh idempotency key.
+  if (error instanceof Error && 'code' in error) {
+    const usageCodeMap: Record<string, HttpsError['code']> = {
+      INSUFFICIENT_CREDITS: 'resource-exhausted',
+      DUPLICATE_REQUEST_IN_PROGRESS: 'already-exists',
+      ALREADY_FINALIZED: 'already-exists',
+      ALREADY_REFUNDED: 'failed-precondition',
+      UNAUTHORIZED: 'permission-denied',
+      OPERATION_NOT_FOUND: 'not-found',
+      // P0-4: entitlements.ts's EntitlementError — same plain Error + .code
+      // shape, same reasoning (no firebase-functions dependency in that
+      // module either).
+      FEATURE_NOT_AVAILABLE: 'permission-denied',
+      PLAN_UPGRADE_REQUIRED: 'permission-denied',
+      CAMPAIGN_QUOTA_EXCEEDED: 'resource-exhausted',
+      BUSINESS_LIMIT_REACHED: 'resource-exhausted',
+    };
+    const mapped = usageCodeMap[(error as { code: string }).code];
+    if (mapped) {
+      return new HttpsError(mapped, error.message);
+    }
+  }
   if (error instanceof Error) {
     return new HttpsError('internal', error.message);
   }
   return new HttpsError('internal', 'An unexpected error occurred');
+}
+
+export function mapErrorToHttpsError(error: unknown): HttpsError {
+  const httpsError = buildHttpsError(error);
+  // Error Handling Audit: every branch above ultimately traces back to some
+  // caller's `throw new Error(...)` somewhere in the call chain — including,
+  // several layers down, a raw AI provider SDK exception (see
+  // services/ai/text.ts/image.ts/vision.ts, which wrap-and-rethrow rather
+  // than swallow). logging.ts's redactSecrets already strips API
+  // keys/tokens/bearer headers before an error reaches Cloud Logging, but
+  // that redaction was never applied to what gets sent back to the CLIENT —
+  // this was the one place a raw provider error message (e.g. Gemini's
+  // client embedding its own `?key=...` query param in a network-failure
+  // message) could reach a real user's browser verbatim. Redacting the
+  // final message here, once, covers every branch above by construction
+  // rather than requiring every future error-construction site to remember
+  // to do it individually. HttpsError's own `code`/`details` are untouched —
+  // only `message` (free-form text) can ever contain this shape of leak.
+  return new HttpsError(httpsError.code, redactSecrets(httpsError.message), httpsError.details);
 }

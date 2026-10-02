@@ -1,4 +1,3 @@
-
 import { z } from 'zod';
 import { generateStructuredText, classifyReelClipThumbnails } from './index';
 import { getVideoRenderer } from '../videoRenderer';
@@ -40,7 +39,9 @@ export async function analyzeReelClips(
   const renderer = getVideoRenderer();
 
   const deterministic = await Promise.all(
-    clips.map((clip) => renderer.analyzeClip({ clipId: clip.clipId, storagePath: clip.storagePath }))
+    clips.map((clip) =>
+      renderer.analyzeClip({ clipId: clip.clipId, storagePath: clip.storagePath })
+    )
   );
 
   const withThumbnailUrls = await Promise.all(
@@ -104,7 +105,10 @@ export const ReelEditPlanSchema = z.object({
     .min(2)
     .max(8),
   offer: z
-    .object({ text: z.string().min(1).max(MAX_SEGMENT_TEXT_LENGTH), durationMs: z.number().int().positive() })
+    .object({
+      text: z.string().min(1).max(MAX_SEGMENT_TEXT_LENGTH),
+      durationMs: z.number().int().positive(),
+    })
     .optional(),
   ending: z.object({
     text: z.string().min(1).max(MAX_SEGMENT_TEXT_LENGTH),
@@ -145,7 +149,18 @@ interface BuildPromptInput {
  * a price, phone number, or offer it wasn't handed here.
  */
 export function buildReelEditPlanPrompt(input: BuildPromptInput): string {
-  const { business, goal, style, durationSeconds, offer, cta, additionalMessage, clipAnalyses, creativeTemplateContext, adaptedCreativePlan } = input;
+  const {
+    business,
+    goal,
+    style,
+    durationSeconds,
+    offer,
+    cta,
+    additionalMessage,
+    clipAnalyses,
+    creativeTemplateContext,
+    adaptedCreativePlan,
+  } = input;
   const defaultTemplate = GOAL_DEFAULT_TEMPLATE[goal];
   const defaultTransition = STYLE_TRANSITION_DEFAULTS[style];
   const music = pickDefaultMusicTrack(style, goal);
@@ -156,7 +171,7 @@ export function buildReelEditPlanPrompt(input: BuildPromptInput): string {
     .filter(Boolean)
     .join(', ');
 
-  const templateContextSection = creativeTemplateContext 
+  const templateContextSection = creativeTemplateContext
     ? `
 TEMPLATE:
 ${creativeTemplateContext.template.name} (${creativeTemplateContext.template.id})
@@ -164,7 +179,7 @@ Type: ${creativeTemplateContext.template.type}
 Objectives: ${creativeTemplateContext.template.objectives.join(', ')}
 
 STRUCTURE:
-${creativeTemplateContext.template.structure.grammar.map(g => `- ${g.role}: ${g.purpose}${g.required ? ' (REQUIRED)' : ' (OPTIONAL)'}`).join('\n')}
+${creativeTemplateContext.template.structure.grammar.map((g) => `- ${g.role}: ${g.purpose}${g.required ? ' (REQUIRED)' : ' (OPTIONAL)'}`).join('\n')}
 
 VISUAL GRAMMAR:
 Emphasis: ${creativeTemplateContext.template.visualGrammar.emphasis}
@@ -255,7 +270,9 @@ export function validateReelEditPlan(
   const repairedSegments = plan.segments.map((segment) => {
     const clip = clipsById.get(segment.clipId);
     if (!clip) {
-      throw new ReelEditPlanValidationError(`Edit plan references unknown clipId "${segment.clipId}"`);
+      throw new ReelEditPlanValidationError(
+        `Edit plan references unknown clipId "${segment.clipId}"`
+      );
     }
     let { startMs, endMs } = segment;
     if (startMs < 0) startMs = 0;
@@ -305,7 +322,9 @@ export function validateReelEditPlan(
  * Orchestrates Stage B with the "repair once, regenerate once, else fail"
  * policy from AGENTS.md section 13.
  */
-export async function generateValidatedReelEditPlan(input: BuildPromptInput): Promise<ReelEditPlan> {
+export async function generateValidatedReelEditPlan(
+  input: BuildPromptInput
+): Promise<ReelEditPlan> {
   try {
     return await generateReelEditPlan(input);
   } catch (firstError) {

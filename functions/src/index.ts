@@ -39,15 +39,14 @@ export { listProducts } from './functions/products/listProducts';
 export { getProduct } from './functions/products/getProduct';
 export { updateProduct } from './functions/products/updateProduct';
 export { archiveProduct } from './functions/products/archiveProduct';
-// createCampaign is intentionally NOT deployed here. It reserves credits via
-// the legacy reserveCredits() path but never calls confirmCredits/
-// refundCredits — every invocation permanently burns the caller's credits
-// with no recovery path (see docs/LEGAL_COMPLIANCE_AUDIT_REPORT.md, finding
-// F2 / candidate C2). The shipped frontend has only ever called
-// generateCampaignStrategy (see that file's own comment), so removing this
-// export changes no user-facing behavior; it only stops the callable from
-// being directly invocable. The handler and its tests are untouched — they
-// import functions/campaigns/createCampaign.ts directly, not this file.
+// P0-2 (docs/P0_HARDENING_TRACKER.md): createCampaign.ts (and its
+// competing reserveCredits() credit path in services/firestore.ts) has been
+// deleted entirely, not just unplugged — it was never deployed, the shipped
+// frontend has only ever called generateCampaignStrategy, and it had no
+// matching refund/finalize path (see docs/LEGAL_COMPLIANCE_AUDIT_REPORT.md,
+// finding F2 / candidate C2). One credit reservation implementation now
+// exists: services/usageControl.ts, used by generateCampaignStrategy and
+// regenerateAsset.
 export { generateCampaignStrategy } from './functions/campaigns/generateCampaignStrategy';
 export { getCampaign } from './functions/campaigns/getCampaign';
 export { listCampaigns } from './functions/campaigns/listCampaigns';
@@ -59,19 +58,25 @@ export { onUserCreatedHandler } from './functions/auth/onUserCreated';
 export { onUserDeletedHandler } from './functions/auth/onUserCreated';
 export { getUploadUrl } from './functions/assets/getUploadUrl';
 export { confirmUpload } from './functions/assets/confirmUpload';
-// Razorpay: kept deployed, but no longer the active checkout path on the
-// billing page (see src/app/billing/page.tsx) — PayU is now primary. Not
-// removed per the migration's own rule: existing Razorpay subscriptions
-// created before this migration must keep working (renewal webhooks,
-// cancellation) until they naturally lapse, and this function hasn't been
-// re-verified as dead. See docs/PAYMENT_GATEWAY.md "Razorpay legacy".
-export { razorpayWebhook } from './functions/webhooks/razorpayWebhook';
-export { createSubscription } from './functions/subscriptions/createSubscription';
-export { verifyPayment } from './functions/subscriptions/verifyPayment';
-export { cancelSubscription } from './functions/subscriptions/cancelSubscription';
-export { createPayUPayment } from './functions/subscriptions/createPayUPayment';
-export { payuCallback } from './functions/webhooks/payuCallback';
-export { payuWebhook } from './functions/webhooks/payuWebhook';
+export { deleteAsset } from './functions/assets/deleteAsset';
+// Disabled third-party payment/subscription functions (require PAYU_SALT / PADDLE secrets)
+// export { createPayUPayment } from './functions/subscriptions/createPayUPayment';
+// export { payuCallback } from './functions/webhooks/payuCallback';
+// export { payuWebhook } from './functions/webhooks/payuWebhook';
+// export { createPaddleCheckout } from './functions/subscriptions/createPaddleCheckout';
+// export { cancelPaddleSubscription } from './functions/subscriptions/cancelPaddleSubscription';
+// export { paddleWebhook } from './functions/webhooks/paddleWebhook';
+
+// M2 (Pass 2): scheduled reconciliation for stuck 'pending' credit
+// reservations (see reconcileStaleReservations.ts's own doc comment).
+export { reconcileStaleReservations } from './functions/usage/reconcileStaleReservations';
+// Phase 10 Rate Limiting & Abuse Protection audit (finding F-5): periodic
+// cleanup for expired rate_limits documents (see cleanupExpiredRateLimits.ts's
+// own doc comment).
+export { cleanupExpiredRateLimits } from './functions/usage/cleanupExpiredRateLimits';
+// Daily subscription expiry: transitions cancelAtPeriodEnd subscriptions to
+// 'canceled' once currentPeriodEnd has passed (see expireSubscriptions.ts).
+export { expireSubscriptions } from './functions/subscriptions/expireSubscriptions';
 export { requestAccountDeletion } from './functions/auth/requestAccountDeletion';
 export { recordConsentAcceptance } from './functions/auth/recordConsentAcceptance';
 export { trackAnalyticsEvent } from './functions/analytics/trackAnalyticsEvent';
@@ -79,9 +84,38 @@ export { trackCreativeEventEndpoint } from './functions/analytics/trackCreativeE
 export { getAnalyticsDashboard } from './functions/analytics/getAnalyticsDashboard';
 export { recordWhatsAppClick } from './functions/analytics/recordWhatsAppClick';
 export { getCampaignPerformance } from './functions/analytics/getCampaignPerformance';
+export { syncCampaignPerformance } from './functions/analytics/syncCampaignPerformance';
+export { getPerformanceRecommendations } from './functions/analytics/getPerformanceRecommendations';
 export { createReelProject } from './functions/reels/createReelProject';
 export { getReelClipUploadUrl } from './functions/reels/getReelClipUploadUrl';
 export { confirmReelClipUpload } from './functions/reels/confirmReelClipUpload';
 export { generateReel } from './functions/reels/generateReel';
 export { getReel } from './functions/reels/getReel';
 export { listReels } from './functions/reels/listReels';
+
+// Disabled Meta social connection functions (require META_APP_SECRET / META_TOKEN_ENCRYPTION_KEY)
+// export { initiateMetaOAuth } from './functions/meta/initiateMetaOAuth';
+// export { metaCallback } from './functions/meta/metaCallback';
+// export { getPendingMetaPages } from './functions/meta/getPendingMetaPages';
+// export { selectMetaPage } from './functions/meta/selectMetaPage';
+// export { listSocialConnections } from './functions/meta/listSocialConnections';
+// export { disconnectMetaConnection } from './functions/meta/disconnectMetaConnection';
+
+// Disabled social publishing and scheduling functions
+// export { createPublishJob } from './functions/publishing/createPublishJob';
+// export { cancelPublishJob } from './functions/publishing/cancelPublishJob';
+// export { retryPublishJob } from './functions/publishing/retryPublishJob';
+// export { listCampaignPublishJobs } from './functions/publishing/listCampaignPublishJobs';
+// export { processScheduledPublishJobs } from './functions/publishing/processScheduledPublishJobs';
+// export { createSchedule } from './functions/scheduling/createSchedule';
+// export { cancelSchedule } from './functions/scheduling/cancelSchedule';
+// export { reschedulePost } from './functions/scheduling/reschedulePost';
+// export { retrySchedule } from './functions/scheduling/retrySchedule';
+// export { listCampaignScheduledPosts } from './functions/scheduling/listCampaignScheduledPosts';
+// export { processScheduledPosts } from './functions/scheduling/processScheduledPosts';
+
+export { generateMarketingPlan } from './functions/calendar/generateMarketingPlan';
+export { getMarketingPlan } from './functions/calendar/getMarketingPlan';
+export { updateCalendarItem } from './functions/calendar/updateCalendarItem';
+export { skipCalendarItem } from './functions/calendar/skipCalendarItem';
+export { createCampaignFromCalendarItem } from './functions/calendar/createCampaignFromCalendarItem';

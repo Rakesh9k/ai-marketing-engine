@@ -1,4 +1,9 @@
-import type { CreativeTemplate, CreativeTemplateType, CreativeObjective, BusinessCategory } from '../types';
+import type {
+  CreativeTemplate,
+  CreativeTemplateType,
+  CreativeObjective,
+  BusinessCategory,
+} from '../types';
 import { validateCreativeTemplate } from './creativeTemplate';
 import { BUILTIN_CREATIVE_TEMPLATES } from '../config/creativeTemplateLibrary';
 
@@ -111,6 +116,5 @@ function deepFreeze<T>(value: T): T {
  * constructing its own `BuiltinCreativeTemplateRegistry`; the class
  * itself stays exported for tests that need isolated fixtures.
  */
-export const creativeTemplateRegistry: CreativeTemplateRegistry = new BuiltinCreativeTemplateRegistry(
-  BUILTIN_CREATIVE_TEMPLATES
-);
+export const creativeTemplateRegistry: CreativeTemplateRegistry =
+  new BuiltinCreativeTemplateRegistry(BUILTIN_CREATIVE_TEMPLATES);

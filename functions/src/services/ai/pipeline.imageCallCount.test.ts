@@ -20,11 +20,15 @@ jest.mock('./index', () => ({
   generateImage: (...args: unknown[]) => generateImageMock(...args),
 }));
 
-const fetchAsBufferMock = jest.fn().mockResolvedValue({ buffer: Buffer.from('fake-bytes'), contentType: 'image/png' });
-const uploadGeneratedAssetMock = jest.fn().mockImplementation(async (businessId: string, campaignId: string, type: string) => ({
-  url: `https://storage.example.com/${businessId}/${campaignId}/${type}-${Math.random()}`,
-  storagePath: `businesses/${businessId}/campaigns/${campaignId}/generated/${type}.png`,
-}));
+const fetchAsBufferMock = jest
+  .fn()
+  .mockResolvedValue({ buffer: Buffer.from('fake-bytes'), contentType: 'image/png' });
+const uploadGeneratedAssetMock = jest
+  .fn()
+  .mockImplementation(async (businessId: string, campaignId: string, type: string) => ({
+    url: `https://storage.example.com/${businessId}/${campaignId}/${type}-${Math.random()}`,
+    storagePath: `businesses/${businessId}/campaigns/${campaignId}/generated/${type}.png`,
+  }));
 
 jest.mock('./generatedAssetStorage', () => ({
   fetchAsBuffer: (...args: unknown[]) => fetchAsBufferMock(...args),
@@ -95,7 +99,20 @@ describe('GenerationPipeline — actual image-provider call count (Phase 7)', ()
   it('every generated asset uses an asset type that actually exists in the shared AssetType enum (no "story_frame"/"reel_frame")', async () => {
     const pipeline = new GenerationPipeline();
     const result = await pipeline.execute(makeInput());
-    const validTypes = ['poster', 'headline', 'ad_copy', 'caption', 'story', 'reel', 'whatsapp', 'cta', 'product', 'campaign', 'brand-kit', 'logo'];
+    const validTypes = [
+      'poster',
+      'headline',
+      'ad_copy',
+      'caption',
+      'story',
+      'reel',
+      'whatsapp',
+      'cta',
+      'product',
+      'campaign',
+      'brand-kit',
+      'logo',
+    ];
     for (const asset of result.campaignPack.assets) {
       expect(validTypes).toContain(asset.type);
     }
@@ -114,10 +131,34 @@ describe('GenerationPipeline — actual image-provider call count (Phase 7)', ()
   });
 
   it('if the single AI image call fails, generation fails outright rather than silently shipping a text-only campaign (routes into the existing credit-refund path)', async () => {
-    generateImageMock.mockResolvedValueOnce({ success: false, provider: 'openai', model: 'dall-e-3', error: { code: 'X', message: 'boom' } });
+    generateImageMock.mockResolvedValueOnce({
+      success: false,
+      provider: 'openai',
+      model: 'dall-e-3',
+      error: { code: 'X', message: 'boom' },
+    });
 
     const pipeline = new GenerationPipeline();
     await expect(pipeline.execute(makeInput())).rejects.toThrow(/Image generation failed/);
     expect(uploadGeneratedAssetMock).not.toHaveBeenCalled();
+  });
+});
+
+describe('GenerationPipeline — Gemini inline image bytes', () => {
+  beforeEach(() => jest.clearAllMocks());
+
+  it('uses inline bytes from the provider directly (no URL download) and still persists to Storage', async () => {
+    generateImageMock.mockResolvedValueOnce({
+      success: true,
+      imageData: { base64: Buffer.from('gemini-bytes').toString('base64'), mimeType: 'image/png' },
+      provider: 'gemini',
+      model: 'gemini-2.5-flash-image',
+    });
+    const result = await new GenerationPipeline().execute(makeInput());
+
+    expect(result.success).toBe(true);
+    expect(fetchAsBufferMock).not.toHaveBeenCalled();
+    expect(uploadGeneratedAssetMock).toHaveBeenCalled();
+    expect(uploadGeneratedAssetMock.mock.calls[0][3].toString()).toBe('gemini-bytes');
   });
 });

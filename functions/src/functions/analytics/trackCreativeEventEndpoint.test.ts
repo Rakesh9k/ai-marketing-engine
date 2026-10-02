@@ -3,11 +3,11 @@ import { verifyBusinessAccess } from '../../middleware/auth';
 import { trackCreativeEvent } from '../../services/analyticsService';
 
 jest.mock('../../middleware/auth', () => ({
-  verifyBusinessAccess: jest.fn()
+  verifyBusinessAccess: jest.fn(),
 }));
 
 jest.mock('../../services/analyticsService', () => ({
-  trackCreativeEvent: jest.fn()
+  trackCreativeEvent: jest.fn(),
 }));
 
 function callableRequest(data: unknown, uid = 'user-1') {
@@ -21,7 +21,9 @@ describe('trackCreativeEventEndpoint callable', () => {
   });
 
   it('requires authentication', async () => {
-    await expect((trackCreativeEventEndpoint as any).run({ data: {}, auth: null } as any)).rejects.toThrow('Authentication required');
+    await expect(
+      (trackCreativeEventEndpoint as any).run({ data: {}, auth: null } as any)
+    ).rejects.toThrow('Authentication required');
   });
 
   it('tenant isolation: client cannot submit for another business', async () => {
@@ -31,21 +33,24 @@ describe('trackCreativeEventEndpoint callable', () => {
         callableRequest({
           eventType: 'creative_template_viewed',
           businessId: 'biz-2',
-          templateId: 'tmpl-1'
+          templateId: 'tmpl-1',
         })
       )
     ).rejects.toThrow();
   });
 
   it('user identity: server explicitly passes context.auth.uid, ignoring payload spoofing', async () => {
-    // The callable payload doesn't even accept `userId`. 
+    // The callable payload doesn't even accept `userId`.
     // It takes it from context.userId.
     await (trackCreativeEventEndpoint as any).run(
-      callableRequest({
-        eventType: 'creative_template_selected',
-        businessId: 'biz-1',
-        templateId: 'tmpl-1'
-      }, 'real-user')
+      callableRequest(
+        {
+          eventType: 'creative_template_selected',
+          businessId: 'biz-1',
+          templateId: 'tmpl-1',
+        },
+        'real-user'
+      )
     );
 
     const callArg = (trackCreativeEvent as jest.Mock).mock.calls[0][0];
@@ -62,8 +67,8 @@ describe('trackCreativeEventEndpoint callable', () => {
           businessBrain: { some: 'secret data' },
           creditCard: '1234',
           prompts: 'some raw prompt',
-          safeKey: 'safeValue'
-        }
+          safeKey: 'safeValue',
+        },
       })
     );
 
@@ -83,7 +88,7 @@ describe('trackCreativeEventEndpoint callable', () => {
         businessId: 'biz-1',
         templateId: 'tmpl-1',
         campaignId: 'camp-1',
-        creativeType: 'post'
+        creativeType: 'post',
       })
     );
     expect(result.success).toBe(true);
@@ -97,7 +102,7 @@ describe('trackCreativeEventEndpoint callable', () => {
 
   it('analytics idempotency tests', () => {
     // Idempotency: Currently the implementation appends a random string/timestamp to create eventId
-    // Meaning identical payload will result in a new record. 
+    // Meaning identical payload will result in a new record.
     // "Do not introduce global deduplication if the architecture intentionally permits separate events of the same type."
     // The design intentionally logs everything as a timeseries append-only log.
     expect(true).toBe(true);

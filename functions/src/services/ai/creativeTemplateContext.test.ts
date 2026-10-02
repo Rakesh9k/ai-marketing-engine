@@ -1,4 +1,7 @@
-import { buildCreativeTemplateContext, TemplateContextValidationError } from './creativeTemplateContext';
+import {
+  buildCreativeTemplateContext,
+  TemplateContextValidationError,
+} from './creativeTemplateContext';
 import { creativeTemplateRegistry } from '../creativeTemplateRegistry';
 import type { CreativeTemplate, BrandCreativeContext, CreativeObjective } from '../../types';
 
@@ -20,7 +23,7 @@ describe('buildCreativeTemplateContext', () => {
       primaryLanguage: 'en',
       secondaryLanguage: 'te',
       languageMixing: 'Hinglish',
-    }
+    },
   };
 
   beforeEach(() => {
@@ -102,7 +105,7 @@ describe('buildCreativeTemplateContext', () => {
       const delhiBusiness: any = {
         ...mockBusinessBrain,
         identity: { ...mockBusinessBrain.identity, location: { city: 'Delhi', state: 'DL' } },
-        localization: { primaryLanguage: 'hi' }
+        localization: { primaryLanguage: 'hi' },
       };
 
       const result = buildCreativeTemplateContext({
@@ -145,7 +148,7 @@ describe('buildCreativeTemplateContext', () => {
           description: 'Premium haircuts',
           location: { city: 'Mumbai', state: 'MH' },
           contact: {},
-        }
+        },
       };
 
       const result = buildCreativeTemplateContext({
@@ -170,7 +173,7 @@ describe('buildCreativeTemplateContext', () => {
           objective: 'conversion',
           businessBrain: mockBusinessBrain,
           brandCreativeContext: mockBrandCreativeContext,
-          productName: '', 
+          productName: '',
         });
       }).toThrow(/Product name is required/);
     });
@@ -205,7 +208,7 @@ describe('buildCreativeTemplateContext', () => {
       const rawBusinessBrainDoc: any = {
         ...mockBusinessBrain,
         _firestoreMetadata: 'hidden-secret',
-        internalNotes: 'do not show to AI'
+        internalNotes: 'do not show to AI',
       };
 
       const result = buildCreativeTemplateContext({

@@ -16,9 +16,7 @@
         "firebase-debug.*.log",
         ".runtimeconfig.json"
       ],
-      "predeploy": [
-        "npm --prefix functions run build"
-      ]
+      "predeploy": ["npm --prefix functions run build"]
     }
   ],
   "apphosting": {

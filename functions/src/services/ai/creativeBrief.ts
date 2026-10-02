@@ -22,7 +22,8 @@ import type {
  */
 export interface CreativeBrief {
   /** Campaign objective */
-  readonly objective: string; readonly creativeTemplateContext?: import('./creativeTemplateContext').CreativeTemplateContext;
+  readonly objective: string;
+  readonly creativeTemplateContext?: import('./creativeTemplateContext').CreativeTemplateContext;
 
   /** Product being marketed */
   readonly product: {
@@ -54,6 +55,9 @@ export interface CreativeBrief {
     readonly tone?: string;
     readonly visualStyle?: string;
     readonly logoUrl?: string;
+    readonly logoStoragePath?: string;
+    readonly logoWidth?: number;
+    readonly logoHeight?: number;
     readonly fonts?: {
       readonly heading?: string;
       readonly body?: string;
@@ -172,7 +176,8 @@ export interface CreativeBriefInput {
   /** Business rules */
   readonly businessRules: BusinessRules;
   /** CTA type */
-  readonly cta: CTAType; readonly creativeTemplateContext?: import('./creativeTemplateContext').CreativeTemplateContext;
+  readonly cta: CTAType;
+  readonly creativeTemplateContext?: import('./creativeTemplateContext').CreativeTemplateContext;
 }
 
 /**
@@ -210,7 +215,8 @@ export function buildCreativeBrief(input: CreativeBriefInput): CreativeBrief {
   const prohibitedElements = buildProhibitedElements(input);
 
   return {
-    objective: input.objective, creativeTemplateContext: input.creativeTemplateContext,
+    objective: input.objective,
+    creativeTemplateContext: input.creativeTemplateContext,
     product: {
       id: product.productId,
       name: product.name,
@@ -238,6 +244,9 @@ export function buildCreativeBrief(input: CreativeBriefInput): CreativeBrief {
       tone: brandProfile.tone,
       visualStyle: brandProfile.visualPreferences,
       logoUrl: brandProfile.logo?.primaryUrl,
+      logoStoragePath: brandProfile.logo?.primaryStoragePath,
+      logoWidth: brandProfile.logo?.primaryWidth,
+      logoHeight: brandProfile.logo?.primaryHeight,
       fonts: {
         heading: brandProfile.fonts?.heading,
         body: brandProfile.fonts?.body,

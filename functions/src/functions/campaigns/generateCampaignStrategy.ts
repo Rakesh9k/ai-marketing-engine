@@ -14,6 +14,7 @@ import {
   createCampaignAssets,
   getSavedStyleDoc,
   getCreativePreferencesByBusiness,
+  getCampaignByIdempotencyKey,
 } from '../../services/firestore';
 import { logFunctionStart, logFunctionComplete, logFunctionError } from '../../utils/logging';
 import { mapErrorToHttpsError } from '../../utils/errors';
@@ -26,14 +27,77 @@ import {
   getGenerationCost,
   USAGE_ERROR_CODES,
 } from '../../services/usageControl';
-import { trackEvent, trackCreativeEvent, ANALYTICS_EVENTS } from '../../services/analyticsService';
+import {
+  trackEvent,
+  trackCreativeEvent,
+  trackCampaignApproved,
+  ANALYTICS_EVENTS,
+} from '../../services/analyticsService';
 import {
   computeSourceFingerprint,
   computeVerticalFactsFingerprint,
 } from '../../services/ai/truthCheck';
 import { assertVerticalImplemented, getVerticalConfig } from '../../config/verticals';
+import { requireCampaignAllowance } from '../../services/entitlements';
 import { ValidationError } from '../../utils/errors';
 import { toSavedStyleContext } from '../../services/savedStyle';
+import { creativeTemplateRegistry } from '../../services/creativeTemplateRegistry';
+import type { CampaignObjective, CreativeObjective } from '../../types';
+
+// A reasonable default mapping from the business-facing campaign objective
+// to the Creative Template system's objective vocabulary. Used only to pick
+// a starting guess — resolveCreativeObjective below always defers to
+// whatever the selected template actually supports.
+const CAMPAIGN_TO_CREATIVE_OBJECTIVE: Record<CampaignObjective, CreativeObjective> = {
+  weekend_offer: 'promotion',
+  new_dish: 'launch',
+  festival: 'promotion',
+  discount: 'promotion',
+  brand_awareness: 'awareness',
+  service_promotion: 'promotion',
+  package_promotion: 'promotion',
+  appointment_promotion: 'conversion',
+  new_service: 'launch',
+  property_promotion: 'promotion',
+  new_listing: 'launch',
+  open_house: 'engagement',
+  project_promotion: 'promotion',
+};
+
+/**
+ * Picks a `creativeObjective` that the selected template actually supports.
+ * The client used to always send `'conversion'`, which
+ * `buildCreativeTemplateContext` rejects outright for any template whose
+ * `objectives` doesn't include it (festival, new-launch, and 7 others of
+ * the 30 built-in templates) — failing generation before the pipeline even
+ * starts. Without a template, there's nothing to validate against, so the
+ * requested/mapped value passes through unchanged (pipeline.ts only calls
+ * buildCreativeTemplateContext when both templateId and creativeObjective
+ * are set).
+ */
+function resolveCreativeObjective(
+  templateId: string | undefined,
+  campaignObjective: CampaignObjective,
+  requested: string | undefined
+): CreativeObjective | undefined {
+  const mapped = CAMPAIGN_TO_CREATIVE_OBJECTIVE[campaignObjective];
+  if (!templateId) {
+    return (requested as CreativeObjective | undefined) || mapped;
+  }
+  const template = creativeTemplateRegistry.getCreativeTemplate(templateId);
+  if (!template) {
+    // Unknown/invalid templateId — let the existing "Template not found"
+    // error from buildCreativeTemplateContext surface as before.
+    return (requested as CreativeObjective | undefined) || mapped;
+  }
+  if (requested && template.objectives.includes(requested as CreativeObjective)) {
+    return requested as CreativeObjective;
+  }
+  if (template.objectives.includes(mapped)) {
+    return mapped;
+  }
+  return template.objectives[0];
+}
 
 const generateCampaignStrategySchema = z.object({
   businessId: z.string().min(1),
@@ -145,7 +209,19 @@ const generateCampaignStrategySchema = z.object({
 });
 
 export const generateCampaignStrategy = onCall(
-  { region: 'asia-south1', enforceAppCheck: true, maxInstances: 50, timeoutSeconds: 540, memory: '2GiB' },
+  {
+    region: 'asia-south1',
+    enforceAppCheck: true,
+    maxInstances: 50,
+    timeoutSeconds: 540,
+    memory: '2GiB',
+    // Phase 12 Secret Handling audit: binds this function's Cloud Run
+    // instance to the named Google Secret Manager secret (set via
+    // `firebase functions:secrets:set GEMINI_API_KEY`) so config/env.ts's
+    // process.env.GEMINI_API_KEY read is actually backed by Secret Manager
+    // in production, not a plain/manually-set Cloud Run env var.
+    secrets: ['GEMINI_API_KEY'],
+  },
   validatedCallable(generateCampaignStrategySchema, async (data, context) => {
     const { logger, startTime } = logFunctionStart('generateCampaignStrategy', {
       userId: context.userId,
@@ -162,6 +238,17 @@ export const generateCampaignStrategy = onCall(
     try {
       await verifyBusinessAccess(context.userId, data.businessId);
       await checkRateLimit(userId, 'generateCampaignStrategy');
+
+      // M3 (Pass 2): a retry of a request that already completed (client
+      // timeout-and-retry, a network-level resend of the exact same HTTP
+      // request) must return the campaign that request already created —
+      // not reserve credits and run the entire 13-stage pipeline again for
+      // the exact same idempotencyKey. Checked before any credit
+      // reservation so a genuine replay never touches usageControl at all.
+      const existingCampaign = await getCampaignByIdempotencyKey(data.idempotencyKey);
+      if (existingCampaign) {
+        return { campaignId: existingCampaign.campaignId, campaign: existingCampaign };
+      }
 
       // Phase 29: fetched here, before any credit reservation, so that an
       // unsupported vertical (assertVerticalImplemented below) — or a
@@ -211,7 +298,19 @@ export const generateCampaignStrategy = onCall(
         );
       }
 
+      // P0-4 (docs/P0_HARDENING_TRACKER.md): plan-tier campaign quota,
+      // checked BEFORE any credit reservation or AI provider call — a
+      // Free/Starter user who has already used their monthly campaign
+      // allowance is rejected here with zero credits consumed and zero AI
+      // cost, not merely hidden by frontend UI (TC-PLAN-002/005).
+      await requireCampaignAllowance(userId);
+
       const now = new Date().toISOString();
+      const resolvedCreativeObjective = resolveCreativeObjective(
+        data.templateId,
+        data.objective,
+        data.creativeObjective
+      );
 
       // Execute generation with full usage control:
       // - Check eligibility
@@ -270,7 +369,7 @@ export const generateCampaignStrategy = onCall(
             userId,
             objective: data.objective,
             templateId: data.templateId,
-            creativeObjective: data.creativeObjective as any,
+            creativeObjective: resolvedCreativeObjective,
             savedStyleId: savedStyle?.styleId,
             savedStyleVersion: savedStyle?.version,
             productId: data.productId,
@@ -335,13 +434,21 @@ export const generateCampaignStrategy = onCall(
               .map((p) => p.templateId),
           };
 
+          const { performanceRecommendationService } =
+            await import('../../services/recommendation/performanceRecommendationService.js');
+          const performanceRecommendations =
+            await performanceRecommendationService.buildGenerationRecommendationContext(
+              data.businessId
+            );
+
           const pipeline = new GenerationPipeline();
           const result = await pipeline.execute({
             businessId: data.businessId,
             templateId: data.templateId,
-            creativeObjective: data.creativeObjective as any,
+            creativeObjective: resolvedCreativeObjective,
             campaignId,
             creativePreferences,
+            performanceRecommendations,
             businessName: business.name,
             businessCategory: business.category,
             businessLocation: {
@@ -384,26 +491,13 @@ export const generateCampaignStrategy = onCall(
             updatedAt: new Date().toISOString(),
           });
 
-          // Save campaign assets to Firestore
+          // P0-1 (Truth Check gating): the verdict must be known BEFORE any
+          // asset is persisted or its Storage object kept around — this used
+          // to run in the opposite order, so every generated asset (poster/
+          // story image files + Firestore CampaignAsset docs with imageUrl)
+          // was already saved and fetchable by the time a FAIL verdict was
+          // even computed below. See docs/P0_HARDENING_TRACKER.md P0-1.
           const campaignPack = result.campaignPack;
-          if (campaignPack && campaignPack.assets) {
-            const assetsToSave: CampaignAsset[] = campaignPack.assets.map((asset: any) => ({
-              assetId: asset.assetId,
-              campaignId,
-              businessId: data.businessId,
-              type: asset.type as any,
-              index: asset.index,
-              content: asset.content,
-              imageUrl: asset.imageUrl,
-              status: asset.status,
-              promptUsed: asset.content?.prompt,
-              modelUsed: 'dall-e-3',
-              createdAt: asset.createdAt,
-            }));
-            await createCampaignAssets(assetsToSave);
-          }
-
-          // Update campaign with final results
           const truthCheckStatus = campaignPack?.truthCheck?.status || 'REVIEW_REQUIRED';
           const truthCheckResult = campaignPack?.truthCheck ?? undefined;
           const finalStatus =
@@ -412,6 +506,39 @@ export const generateCampaignStrategy = onCall(
               : truthCheckStatus === 'FAIL'
                 ? 'failed'
                 : 'generated';
+
+          if (finalStatus === 'failed') {
+            // DISCARD: no CampaignAsset doc is ever created for a rejected
+            // campaign (no imageUrl/content can leak via Firestore), and the
+            // Storage objects the pipeline already uploaded are deleted so a
+            // client that captured a token URL mid-generation can't fetch it
+            // afterward either (see deleteGeneratedAssets's doc comment —
+            // those URLs bypass storage.rules entirely, so deletion is the
+            // only real revocation).
+            const { deleteGeneratedAssets } =
+              await import('../../services/ai/generatedAssetStorage.js');
+            await deleteGeneratedAssets(result.allGeneratedStoragePaths || []);
+          } else if (campaignPack && campaignPack.assets) {
+            // PERSIST: only reached for PASS / REVIEW_REQUIRED verdicts.
+            const assetsToSave: CampaignAsset[] = campaignPack.assets.map((asset: any) => ({
+              assetId: asset.assetId,
+              campaignId,
+              businessId: data.businessId,
+              type: asset.type as any,
+              index: asset.index,
+              content: asset.content,
+              imageUrl: asset.imageUrl,
+              // F2: durable reference, now actually populated by the
+              // pipeline (previously this field existed on the type but was
+              // never set — undefined here silently dropped it).
+              storagePath: asset.storagePath,
+              status: asset.status,
+              promptUsed: asset.content?.prompt,
+              modelUsed: 'dall-e-3',
+              createdAt: asset.createdAt,
+            }));
+            await createCampaignAssets(assetsToSave);
+          }
 
           // Fingerprint the exact source facts Truth Check compared against,
           // so a later change to business contact/location or product price
@@ -494,6 +621,10 @@ export const generateCampaignStrategy = onCall(
             campaignId
           );
 
+          if (finalStatus === 'verified') {
+            await trackCampaignApproved(userId, data.businessId, campaignId);
+          }
+
           if (campaignPack?.assets?.length > 0) {
             const asset = campaignPack.assets[0];
             await trackCreativeEvent({
@@ -505,7 +636,7 @@ export const generateCampaignStrategy = onCall(
               templateId: data.templateId,
               templateVersion: 1, // Assume v1 if not explicitly versioned yet
               creativeType: 'post',
-              objective: data.objective
+              objective: data.objective,
             });
           }
 
@@ -568,5 +699,3 @@ export const generateCampaignStrategy = onCall(
     }
   })
 );
-
-
