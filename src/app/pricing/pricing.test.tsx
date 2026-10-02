@@ -59,6 +59,7 @@ const openPaddleCheckoutMock = jest.fn();
 jest.mock('@/lib/paddle/initPaddle', () => ({
   previewPrices: (...args: unknown[]) => previewPricesMock(...args),
   openPaddleCheckout: (...args: unknown[]) => openPaddleCheckoutMock(...args),
+  setPaddleCustomer: jest.fn(),
 }));
 
 import PricingPageClient from './PricingPageClient';

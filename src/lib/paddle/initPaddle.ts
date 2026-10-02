@@ -16,6 +16,24 @@ import { getPaddleClientConfig } from './config';
 let paddleInstance: Paddle | undefined;
 let initPromise: Promise<Paddle> | undefined;
 let activeCheckoutHandlers: { onClose?: () => void } = {};
+/** Paddle customer ID (ctm_…) of the signed-in user, for Paddle Retain. Never an email or Mitra uid. */
+let paddleCustomerId: string | undefined;
+
+const PADDLE_CUSTOMER_ID = /^ctm_[a-z0-9]+$/;
+
+/**
+ * Tells Paddle.js which Paddle customer is signed in (`pwCustomer`), as Paddle Retain requires.
+ *
+ * Only a real Paddle customer ID is accepted; anything else (missing, an email, a Mitra uid)
+ * clears it. Call with `undefined` on sign-out so a shared browser never carries one user's
+ * ID into the next session. Safe to call before or after Paddle.js has initialised.
+ */
+export function setPaddleCustomer(customerId?: string | null): void {
+  const next = customerId && PADDLE_CUSTOMER_ID.test(customerId) ? customerId : undefined;
+  if (next === paddleCustomerId) return;
+  paddleCustomerId = next;
+  paddleInstance?.Update({ pwCustomer: next ? { id: next } : {} });
+}
 
 async function ensurePaddle(): Promise<Paddle> {
   if (paddleInstance) return paddleInstance;
@@ -25,9 +43,11 @@ async function ensurePaddle(): Promise<Paddle> {
 
   if (!initPromise) {
     const { environment, token } = getPaddleClientConfig(); // throws if misconfigured
+    const customerAtInit = paddleCustomerId;
     initPromise = initializePaddle({
       environment,
       token,
+      ...(customerAtInit ? { pwCustomer: { id: customerAtInit } } : {}),
       eventCallback: (event) => {
         if (event.name === ('checkout.closed' as CheckoutEventNames)) {
           activeCheckoutHandlers.onClose?.();
@@ -36,6 +56,10 @@ async function ensurePaddle(): Promise<Paddle> {
     }).then((instance) => {
       if (!instance) throw new Error('Paddle.js failed to initialise');
       paddleInstance = instance;
+      // The customer may have changed while Paddle.js was still loading.
+      if (paddleCustomerId !== customerAtInit) {
+        instance.Update({ pwCustomer: paddleCustomerId ? { id: paddleCustomerId } : {} });
+      }
       return instance;
     });
     // Allow a retry after a transient load failure instead of caching the rejection.

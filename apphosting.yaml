@@ -54,6 +54,67 @@ env:
     value: '6Lfrer4tAAAAAOhwU88DuXobbIT1sDKJkFtlGOE3'
     availability:
       - BUILD
+  # --- Paddle (production backend `mitra-web` only) ---------------------------------
+  # The environment is explicit: src/lib/paddle/config.ts throws on a missing/inconsistent
+  # value and requires a `live_` token for 'production'. The client token and the 11 price
+  # IDs are browser-public by design, but are NOT committed here: each is a Cloud Secret
+  # Manager reference whose secret ID equals the variable name. Create them before the first
+  # rollout (`firebase apphosting:secrets:set <NAME>`); a missing secret fails the build
+  # instead of shipping sandbox values. Server-side Paddle secrets (PADDLE_API_KEY,
+  # PADDLE_WEBHOOK_SECRET) stay in Cloud Functions secrets, never here.
+  - variable: NEXT_PUBLIC_PADDLE_ENVIRONMENT
+    value: 'production'
+    availability:
+      - BUILD
+      - RUNTIME
+  - variable: NEXT_PUBLIC_PADDLE_CLIENT_TOKEN
+    secret: NEXT_PUBLIC_PADDLE_CLIENT_TOKEN
+    availability:
+      - BUILD
+  - variable: NEXT_PUBLIC_PADDLE_PRICE_ID_STARTER_MONTHLY
+    secret: NEXT_PUBLIC_PADDLE_PRICE_ID_STARTER_MONTHLY
+    availability:
+      - BUILD
+  - variable: NEXT_PUBLIC_PADDLE_PRICE_ID_STARTER_YEARLY
+    secret: NEXT_PUBLIC_PADDLE_PRICE_ID_STARTER_YEARLY
+    availability:
+      - BUILD
+  - variable: NEXT_PUBLIC_PADDLE_PRICE_ID_BUSINESS_MONTHLY
+    secret: NEXT_PUBLIC_PADDLE_PRICE_ID_BUSINESS_MONTHLY
+    availability:
+      - BUILD
+  - variable: NEXT_PUBLIC_PADDLE_PRICE_ID_BUSINESS_YEARLY
+    secret: NEXT_PUBLIC_PADDLE_PRICE_ID_BUSINESS_YEARLY
+    availability:
+      - BUILD
+  - variable: NEXT_PUBLIC_PADDLE_PRICE_ID_PRO_MONTHLY
+    secret: NEXT_PUBLIC_PADDLE_PRICE_ID_PRO_MONTHLY
+    availability:
+      - BUILD
+  - variable: NEXT_PUBLIC_PADDLE_PRICE_ID_PRO_YEARLY
+    secret: NEXT_PUBLIC_PADDLE_PRICE_ID_PRO_YEARLY
+    availability:
+      - BUILD
+  - variable: NEXT_PUBLIC_PADDLE_PRICE_ID_AGENCY_MONTHLY
+    secret: NEXT_PUBLIC_PADDLE_PRICE_ID_AGENCY_MONTHLY
+    availability:
+      - BUILD
+  - variable: NEXT_PUBLIC_PADDLE_PRICE_ID_AGENCY_YEARLY
+    secret: NEXT_PUBLIC_PADDLE_PRICE_ID_AGENCY_YEARLY
+    availability:
+      - BUILD
+  - variable: NEXT_PUBLIC_PADDLE_PRICE_ID_PACK_500
+    secret: NEXT_PUBLIC_PADDLE_PRICE_ID_PACK_500
+    availability:
+      - BUILD
+  - variable: NEXT_PUBLIC_PADDLE_PRICE_ID_PACK_1200
+    secret: NEXT_PUBLIC_PADDLE_PRICE_ID_PACK_1200
+    availability:
+      - BUILD
+  - variable: NEXT_PUBLIC_PADDLE_PRICE_ID_PACK_3000
+    secret: NEXT_PUBLIC_PADDLE_PRICE_ID_PACK_3000
+    availability:
+      - BUILD
   # Production must never talk to the local emulators. Set explicitly so a stray
   # .env.local can never switch emulator wiring on in a hosted build.
   - variable: NEXT_PUBLIC_USE_EMULATORS

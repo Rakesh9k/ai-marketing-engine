@@ -7,7 +7,7 @@ export const metadata: Metadata = {
   description: 'Refund policy for Mitra, the AI marketing engine by Brainwise.',
 };
 
-const EFFECTIVE_DATE = '2026-09-22';
+const EFFECTIVE_DATE = '2026-10-02';
 
 export default function RefundPage() {
   return (
@@ -23,49 +23,44 @@ export default function RefundPage() {
 
       <div className="border-border-light bg-surface mb-8 rounded-2xl border p-4">
         <p className="text-body text-text-secondary">
-          <strong>Status of this document:</strong> Mitra does not currently have an automated
-          refund mechanism, and a formal refund policy (what qualifies, time limits, partial vs.
-          full refunds) has not yet been decided by the founder. This page states that honestly
-          rather than inventing terms. If you believe you are owed a refund, contact{' '}
-          <a href="mailto:support@brain-wise.com" className="text-brand-600 hover:underline">
-            support@brain-wise.com
-          </a>{' '}
-          and we will review your request manually.
+          <strong>Status of this document:</strong> This policy has not yet been reviewed by legal
+          counsel. Refund requests are reviewed manually; there is no self-service refund button.
+          Applicable law and Paddle's terms take precedence over this policy.
         </p>
       </div>
 
       <section className="mb-8">
-        <h2 className="text-h3 text-text-primary mb-2 font-semibold">1. Current state</h2>
+        <h2 className="text-h3 text-text-primary mb-2 font-semibold">1. Who processes payments</h2>
         <p className="text-body text-text-secondary">
-          Payments are processed through PayU (some existing subscriptions may still be processed
-          through Razorpay, the previous payment provider). As of this version of the Service, Mitra
-          does not automatically issue refunds for subscription payments, and there is no
-          self-service "request a refund" button in the app. Any refund request received today is
-          reviewed and, if approved, processed manually by the team — it is not governed by a
-          published, finalized policy.
+          Paddle.com is the Merchant of Record for our orders and handles returns and refund
+          processing. Refunds, where approved, are returned through Paddle to the original payment
+          method. Mitra by BrainWise is provided by Brainwise Solutions.
         </p>
       </section>
 
       <section className="mb-8">
-        <h2 className="text-h3 text-text-primary mb-2 font-semibold">
-          2. What has not been decided yet
-        </h2>
-        <p className="text-body text-text-secondary">
-          <strong>Founder decision required</strong> on each of the following, none of which is
-          invented or implied by this page:
-        </p>
-        <ul className="text-body text-text-secondary mt-2 list-disc space-y-1 pl-6">
-          <li>Whether refunds are offered at all, and under what circumstances.</li>
-          <li>Any time window within which a refund may be requested.</li>
-          <li>Whether refunds are full, partial, or prorated based on credits already used.</li>
+        <h2 className="text-h3 text-text-primary mb-2 font-semibold">2. What can be refunded</h2>
+        <ul className="text-body text-text-secondary list-disc space-y-1 pl-6">
           <li>
-            How a failed AI generation that still consumed credits is treated for refund purposes.
+            <strong>First-time subscription purchase:</strong> refundable within 7 days of purchase
+            if the credits associated with that purchase have not been used.
           </li>
           <li>
-            Whether cancellation (see our Cancellation Policy) entitles you to any refund for the
-            current billing period — by default it does not.
+            <strong>Credit packs:</strong> refundable within 7 days of purchase if none of the
+            purchased credits have been used.
+          </li>
+          <li>
+            <strong>Subscription renewals:</strong> generally not refundable, except for billing
+            errors, duplicate charges, where required by applicable law or applicable Paddle terms,
+            or another exception we specifically approve.
           </li>
         </ul>
+        <p className="text-body text-text-secondary mt-2">
+          Every request is reviewed manually. Applicable law and Paddle's terms take precedence over
+          this policy. Cancelling a subscription (see our Cancellation Policy) does not by itself
+          trigger a refund, and a refund does not automatically reverse or adjust credits already
+          granted or used.
+        </p>
       </section>
 
       <section className="mb-8">

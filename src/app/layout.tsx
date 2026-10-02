@@ -23,7 +23,7 @@ const THEME_INIT_SCRIPT = `
 `;
 
 export const metadata: Metadata = {
-  metadataBase: new URL('https://brain-wise.com'),
+  metadataBase: new URL('https://www.brain-wise.com'),
   title: 'Mitra — One photo. A month of marketing.',
   description:
     "Give Mitra your business and photos and create a month's worth of marketing content — posts, captions, offers, stories, reels and WhatsApp messages.",
@@ -41,7 +41,7 @@ export const metadata: Metadata = {
   openGraph: {
     type: 'website',
     locale: 'en_IN',
-    url: 'https://brain-wise.com',
+    url: 'https://www.brain-wise.com',
     siteName: 'Mitra',
     title: 'Mitra — One photo. A month of marketing.',
     description:

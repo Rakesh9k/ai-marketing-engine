@@ -7,7 +7,7 @@ export const metadata: Metadata = {
   description: 'Terms of Service for Mitra, the AI marketing engine by Brainwise.',
 };
 
-const EFFECTIVE_DATE = '2026-09-22';
+const EFFECTIVE_DATE = '2026-10-02';
 
 export default function TermsPage() {
   return (
@@ -23,24 +23,19 @@ export default function TermsPage() {
 
       <div className="border-border-light bg-surface mb-8 rounded-2xl border p-4">
         <p className="text-body text-text-secondary">
-          <strong>Status of this document:</strong> This page describes, as accurately as possible,
-          the Mitra service as it is actually implemented today. Several items below (operating
-          entity name and registered address, refund/cancellation policy, governing law) have not
-          yet been decided by the founder or reviewed by legal counsel, and are marked as such
-          rather than invented. Do not treat this document as legally complete.
+          <strong>Status of this document:</strong> This page describes the Mitra service as it is
+          implemented today. It has not yet been reviewed by legal counsel.
         </p>
       </div>
 
       <section className="mb-8">
         <h2 className="text-h3 text-text-primary mb-2 font-semibold">1. Who operates Mitra</h2>
         <p className="text-body text-text-secondary">
-          Mitra ("the Service") is operated under the "Mitra by Brainwise" brand at brain-wise.com.
-          The formal registered legal entity that operates Mitra has not yet been documented in a
-          form this page can confirm.{' '}
-          <strong>
-            Legal entity name and registered business address: founder decision required.
-          </strong>{' '}
-          Until this is confirmed, no company name, CIN/LLPIN, or registered address is stated here.
+          Mitra ("the Service") is provided at brain-wise.com by{' '}
+          <strong>Brainwise Solutions</strong>, a sole proprietorship, with its address at Aliabad
+          Jhanda, Charminar, Hyderabad, Telangana – 500053, India. "BrainWise" is the brand and
+          product identity used by Brainwise Solutions, and "Mitra by BrainWise" is the name under
+          which the Service is offered to you.
         </p>
       </section>
 
@@ -52,7 +47,8 @@ export default function TermsPage() {
           copy and AI-generated campaign images. Copy and image analysis are generated using Google
           Gemini models; images are generated using OpenAI's image models. Generated campaigns can
           be downloaded or shared, including via WhatsApp links. Generation and related actions
-          consume credits, which are granted through paid subscription plans purchased via PayU.
+          consume credits, which are granted through paid subscription plans and one-time credit
+          packs.
         </p>
       </section>
 
@@ -114,26 +110,44 @@ export default function TermsPage() {
           7. Credits, subscriptions, and payments
         </h2>
         <p className="text-body text-text-secondary">
-          Paid plans are billed through PayU. Credits are granted when a payment is confirmed and
-          are consumed as you generate campaign content. You can cancel your subscription yourself
-          from the Billing page — see our{' '}
+          Our order process is conducted by our online reseller Paddle.com. Paddle.com is the
+          Merchant of Record for all our orders. Paddle provides all customer service inquiries and
+          handles returns. Payment details are entered with Paddle; Mitra does not receive or store
+          your card or bank details. Paid plans renew automatically at the end of the selected
+          billing interval (monthly or yearly) until you cancel. Credits are granted when a payment
+          is confirmed and are consumed as you generate campaign content. Plan credits are valid
+          through the calendar month in which they apply and do not roll over; credits from a
+          one-time credit pack also do not roll over.
+        </p>
+        <p className="text-body text-text-secondary mt-2">
+          You can cancel your subscription yourself from the Billing page. Cancelling stops future
+          renewal; you keep access through the period you have already paid for, with no immediate
+          downgrade and no automatic refund or credit reversal. Plans cannot be switched in place.
+          See our{' '}
           <Link href="/cancellation" className="text-brand-600 hover:underline">
             Cancellation Policy
           </Link>{' '}
-          for exactly what that does and does not do. One-time top-up credit packs are shown in the
-          billing page as a planned feature and are not yet purchasable.
-        </p>
-        <p className="text-body text-text-secondary mt-2">
-          <strong>Refund policy and credit-expiry terms: founder decision required.</strong> No
-          refund or credit-expiry policy has been finalized — see our{' '}
+          and{' '}
           <Link href="/refund" className="text-brand-600 hover:underline">
             Refund Policy
-          </Link>
-          . Until one is published there, do not rely on any assumed refund terms — contact{' '}
+          </Link>{' '}
+          for details. Refund requests are reviewed manually (Paddle processes refunds as Merchant
+          of Record), and applicable law and Paddle's terms take precedence. Questions about
+          billing:{' '}
           <a href="mailto:support@brain-wise.com" className="text-brand-600 hover:underline">
             support@brain-wise.com
-          </a>{' '}
-          with any billing question.
+          </a>
+          .
+        </p>
+        <p className="text-body text-text-secondary mt-2">
+          Paddle, as Merchant of Record, issues the invoice or receipt for your payment, and handles
+          sales tax on it. Billing, transaction, accounting, tax, and related business records may be
+          retained for as long as required by applicable law and legitimate accounting/business
+          purposes, subject to our{' '}
+          <Link href="/privacy" className="text-brand-600 hover:underline">
+            Privacy Policy
+          </Link>
+          .
         </p>
       </section>
 
@@ -172,18 +186,15 @@ export default function TermsPage() {
           10. Governing law and disputes
         </h2>
         <p className="text-body text-text-secondary">
-          <strong>
-            Governing law, jurisdiction, and dispute-resolution mechanism: founder decision
-            required, legal counsel recommended.
-          </strong>{' '}
-          This section has not yet been finalized.
+          These Terms are governed by the laws of India. Disputes may be brought before the courts
+          having jurisdiction in Hyderabad, Telangana, India.
         </p>
       </section>
 
       <section className="mb-8">
         <h2 className="text-h3 text-text-primary mb-2 font-semibold">11. Contact</h2>
         <p className="text-body text-text-secondary">
-          Questions about these Terms:{' '}
+          Questions, support, or grievances about these Terms:{' '}
           <a href="mailto:support@brain-wise.com" className="text-brand-600 hover:underline">
             support@brain-wise.com
           </a>

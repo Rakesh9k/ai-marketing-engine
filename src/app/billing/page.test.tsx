@@ -61,7 +61,9 @@ const openPaddleCheckoutMock = jest.fn();
 jest.mock('@/lib/paddle/initPaddle', () => ({
   previewPrices: (...args: unknown[]) => previewPricesMock(...args),
   openPaddleCheckout: (...args: unknown[]) => openPaddleCheckoutMock(...args),
+  setPaddleCustomer: jest.fn(),
 }));
+jest.mock('@/features/billing/useSyncPaddleCustomer', () => ({ useSyncPaddleCustomer: jest.fn() }));
 
 import BillingPage from './page';
 

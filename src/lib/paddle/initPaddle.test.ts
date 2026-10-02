@@ -13,6 +13,7 @@ jest.mock('@paddle/paddle-js', () => ({
 const pricePreview = jest.fn();
 const checkoutOpen = jest.fn();
 const checkoutClose = jest.fn();
+const paddleUpdate = jest.fn();
 
 function loadFresh() {
   let mod!: typeof InitPaddle;
@@ -35,6 +36,7 @@ describe('initPaddle', () => {
     initializePaddleMock.mockResolvedValue({
       PricePreview: pricePreview,
       Checkout: { open: checkoutOpen, close: checkoutClose },
+      Update: paddleUpdate,
     });
   });
   afterEach(() => {
@@ -115,6 +117,49 @@ describe('initPaddle', () => {
     const { previewPrices } = loadFresh();
     expect(await previewPrices([])).toEqual({});
     expect(initializePaddleMock).not.toHaveBeenCalled();
+  });
+
+  describe('Paddle Retain pwCustomer', () => {
+    beforeEach(() => {
+      pricePreview.mockResolvedValue({ data: { details: { lineItems: [] } } });
+    });
+
+    it('omits pwCustomer when no customer is known', async () => {
+      await loadFresh().previewPrices(['pri_a']);
+      expect('pwCustomer' in initializePaddleMock.mock.calls[0]![0]).toBe(false);
+    });
+
+    it('passes the Paddle customer ID at initialisation when known beforehand', async () => {
+      const { setPaddleCustomer, previewPrices } = loadFresh();
+      setPaddleCustomer('ctm_01abc');
+      await previewPrices(['pri_a']);
+      expect(initializePaddleMock.mock.calls[0]![0].pwCustomer).toEqual({ id: 'ctm_01abc' });
+    });
+
+    it('updates an already-initialised Paddle.js, and clears it on sign-out', async () => {
+      const { setPaddleCustomer, previewPrices } = loadFresh();
+      await previewPrices(['pri_a']);
+      setPaddleCustomer('ctm_01abc');
+      expect(paddleUpdate).toHaveBeenLastCalledWith({ pwCustomer: { id: 'ctm_01abc' } });
+      setPaddleCustomer(undefined);
+      expect(paddleUpdate).toHaveBeenLastCalledWith({ pwCustomer: {} });
+    });
+
+    it('applies a customer set while Paddle.js was still loading', async () => {
+      const { setPaddleCustomer, previewPrices } = loadFresh();
+      const pending = previewPrices(['pri_a']);
+      setPaddleCustomer('ctm_01abc');
+      await pending;
+      expect(paddleUpdate).toHaveBeenLastCalledWith({ pwCustomer: { id: 'ctm_01abc' } });
+    });
+
+    it('rejects anything that is not a Paddle customer ID (email, Mitra uid)', async () => {
+      const { setPaddleCustomer, previewPrices } = loadFresh();
+      await previewPrices(['pri_a']);
+      setPaddleCustomer('a@b.com');
+      setPaddleCustomer('Abc123uid');
+      expect(paddleUpdate).not.toHaveBeenCalled();
+    });
   });
 
   it('opens a one-page overlay for the transaction with a success URL', async () => {

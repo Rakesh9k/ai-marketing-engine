@@ -65,7 +65,8 @@ export default function CancellationPage() {
           4. What cancelling does not do
         </h2>
         <p className="text-body text-text-secondary">
-          Cancelling does not by itself refund a payment. Refund requests are handled under our{' '}
+          Cancelling does not by itself refund a payment, and it does not reverse or remove credits
+          already granted or used. Refund requests are handled under our{' '}
           <Link href="/refund" className="text-brand-600 hover:underline">
             Refund Policy
           </Link>

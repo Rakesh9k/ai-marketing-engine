@@ -421,7 +421,7 @@ export function CampaignWizard({ userId }: CampaignWizardProps) {
         friendly = "You don't have enough credits for this campaign.";
       } else if (message.toLowerCase().includes('subscription')) {
         friendly =
-          'Your current plan doesn’t support this action. Please upgrade your subscription.';
+          'Your current plan doesn’t support this action. Please choose a plan or credit pack on the Billing page.';
       }
       setSubmitError(friendly);
       setPhase('failed');

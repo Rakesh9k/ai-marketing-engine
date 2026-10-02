@@ -12,6 +12,7 @@ import { doc, getDoc } from 'firebase/firestore';
 import { getFirebaseDb } from '@/lib/firebase/client';
 import { PLANS, PLAN_RANK, type SubscriptionPlan, type PlanDefinition } from '@/lib/config/pricing';
 import { getTierPriceId, intervalOf } from '@/lib/paddle/catalog';
+import { setPaddleCustomer } from '@/lib/paddle/initPaddle';
 import { usePaddlePrices } from '@/features/billing/usePaddlePrices';
 import { usePaddleCheckout } from '@/features/billing/usePaddleCheckout';
 import { PaddlePrice, PriceStatusBanner } from '@/features/billing/components/PaddlePrice';
@@ -174,6 +175,7 @@ export default function PricingPageClient({ countryCode }: { countryCode?: strin
     if (authStatus !== 'authenticated' || !user) {
       setActivePlanId(null);
       setHasLiveSubscription(false);
+      setPaddleCustomer(undefined);
       return;
     }
 
@@ -187,6 +189,11 @@ export default function PricingPageClient({ countryCode }: { countryCode?: strin
 
         const userSnap = await getDoc(doc(db, 'users', user.uid));
         if (cancelled) return;
+
+        // Paddle Retain: tell Paddle.js which Paddle customer this is (no-op if none yet).
+        setPaddleCustomer(
+          userSnap.exists() ? (userSnap.data()['paddleCustomerId'] as string | undefined) : undefined
+        );
 
         const subscriptionId = userSnap.exists()
           ? (userSnap.data()['subscriptionId'] as string | undefined)

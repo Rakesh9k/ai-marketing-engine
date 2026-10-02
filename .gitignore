@@ -71,3 +71,9 @@ yarn-error.log*
 
 # One-off scratch/patch scripts (P4-2 in docs/COMPLETE_CAMPAIGN_FLOW_FIX_PLAN.md)
 /scripts/archive/
+
+# Local tooling state and scratch artifacts (never part of the product)
+/.agent/
+/.agents/
+/.claude/
+/scratch_test.png

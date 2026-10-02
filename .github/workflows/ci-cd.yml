@@ -5,6 +5,9 @@ on:
     branches: [master, develop]
   pull_request:
     branches: [master, develop]
+  # Production Functions are deployed deliberately (see docs/PRODUCTION_PADDLE_DEPLOYMENT_RUNBOOK.md),
+  # never as a side effect of a push to master.
+  workflow_dispatch:
 
 env:
   NODE_VERSION: '20'
@@ -222,7 +225,8 @@ jobs:
   deploy-backend-production:
     name: Deploy Backend to Production
     needs: [frontend-lint, functions-lint, test, security-rules-test]
-    if: github.ref == 'refs/heads/master'
+    # Manual runs only: a push to master must NOT deploy every Cloud Function to production.
+    if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/master'
     runs-on: ubuntu-latest
     environment: production
     steps:

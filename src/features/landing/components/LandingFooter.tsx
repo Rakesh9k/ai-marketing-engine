@@ -8,6 +8,7 @@ export function LandingFooter() {
 
   const productLinks = [
     { label: 'Create Campaign', href: '/signup' },
+    { label: 'Pricing', href: '/pricing' },
     { label: 'My Business', href: '/business' },
     { label: 'Templates', href: '/solutions' },
     { label: 'Analytics', href: '/analytics' },

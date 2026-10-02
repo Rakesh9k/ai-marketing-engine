@@ -7,7 +7,7 @@ export const metadata: Metadata = {
   description: 'Privacy Policy for Mitra, the AI marketing engine by Brainwise.',
 };
 
-const EFFECTIVE_DATE = '2026-09-22';
+const EFFECTIVE_DATE = '2026-10-02';
 
 export default function PrivacyPage() {
   return (
@@ -23,10 +23,8 @@ export default function PrivacyPage() {
 
       <div className="border-border-light bg-surface mb-8 rounded-2xl border p-4">
         <p className="text-body text-text-secondary">
-          <strong>Status of this document:</strong> This page describes, as accurately as possible,
-          what personal data Mitra actually collects and how it is actually used today. Items that
-          depend on a business decision not yet made (retention periods, a dedicated privacy
-          contact, international-transfer scope) are marked as such rather than invented.
+          <strong>Status of this document:</strong> This page describes what personal data Mitra
+          collects and how it is used today. It has not yet been reviewed by legal counsel.
         </p>
       </div>
 
@@ -34,9 +32,10 @@ export default function PrivacyPage() {
         <h2 className="text-h3 text-text-primary mb-2 font-semibold">1. Who this policy covers</h2>
         <p className="text-body text-text-secondary">
           This policy covers personal data processed through the Mitra application at
-          brain-wise.com. As with our Terms of Service, the formal registered legal entity operating
-          Mitra has not yet been documented on this page —{' '}
-          <strong>legal entity name and address: founder decision required.</strong>
+          brain-wise.com. The Service is provided by <strong>Brainwise Solutions</strong>, a sole
+          proprietorship at Aliabad Jhanda, Charminar, Hyderabad, Telangana – 500053, India
+          (&quot;Mitra by BrainWise&quot;; BrainWise is the brand identity used by Brainwise
+          Solutions).
         </p>
       </section>
 
@@ -102,9 +101,8 @@ export default function PrivacyPage() {
               <td className="py-2 pr-2">Granting credits, showing billing history</td>
               <td className="py-2">
                 Firestore stores plan/status/transaction records only. Card, bank, and UPI details
-                are collected and processed by PayU directly (or, for a subscription created before
-                this payment provider was introduced, by Razorpay) — Mitra does not receive or store
-                your card or bank account details.
+                are entered with and processed by Paddle, the Merchant of Record for our orders —
+                Mitra does not receive or store your card or bank account details.
               </td>
             </tr>
             <tr className="border-border-light border-b">
@@ -145,13 +143,9 @@ export default function PrivacyPage() {
             information to generate campaign images.
           </li>
           <li>
-            <strong>PayU</strong> — processes payments; receives your payment details directly and
-            confirms payment status to Mitra via a server-to-server webhook.
-          </li>
-          <li>
-            <strong>Razorpay</strong> — the previous payment processor. No longer used for new
-            purchases; retained here because a subscription created before this change may still be
-            processed by Razorpay until it lapses or is renewed under PayU.
+            <strong>Paddle</strong> — Merchant of Record for our orders; receives your payment
+            details directly and confirms payment status to Mitra via a signed server-to-server
+            webhook.
           </li>
           <li>
             <strong>Cloud Run (Google Cloud)</strong> — a separate hosted service that renders your
@@ -200,31 +194,24 @@ export default function PrivacyPage() {
           deletes your login (Firebase Authentication account) and archives the businesses you own.
           It does <strong>not</strong> currently delete: your campaign, product, and generated-asset
           records; files in Cloud Storage; usage/credit history; or transaction/billing records.
-          Transaction records in particular may be retained where required for legal, tax, or
-          fraud-prevention purposes. If you want any of the non-deleted data removed as well, email{' '}
+          Billing, transaction, and tax records are not deleted immediately on account deletion
+          where they must be kept (see section 7). If you want other non-deleted data removed as
+          well, email{' '}
           <a href="mailto:support@brain-wise.com" className="text-brand-600 hover:underline">
             support@brain-wise.com
           </a>{' '}
-          and we will review the request manually.{' '}
-          <strong>
-            A finalized retention schedule and a fully automated cascading deletion of all remaining
-            data: founder + legal counsel decision required.
-          </strong>{' '}
-          You can also request access to or correction of your personal data via the same email
-          address.
+          and we will review the request manually. You can also request access to or correction of
+          your personal data via the same email address.
         </p>
       </section>
 
       <section className="mb-8">
         <h2 className="text-h3 text-text-primary mb-2 font-semibold">7. Data retention</h2>
         <p className="text-body text-text-secondary">
-          <strong>
-            Specific retention periods for account, campaign, asset, and log data: founder decision
-            required.
-          </strong>{' '}
-          No fixed retention schedule has been finalized. Data is currently retained for as long as
-          your account remains active plus the time needed to respond to support, legal, or security
-          requirements.
+          Billing, transaction, accounting, tax, and related business records may be retained for as
+          long as required by applicable law and legitimate accounting/business purposes. Other data
+          is retained for as long as your account remains active plus the time needed to respond to
+          support, legal, or security requirements.
         </p>
       </section>
 
@@ -237,11 +224,7 @@ export default function PrivacyPage() {
           <a href="mailto:support@brain-wise.com" className="text-brand-600 hover:underline">
             support@brain-wise.com
           </a>
-          .{' '}
-          <strong>
-            Whether this address is monitored as a dedicated privacy/grievance channel, or whether a
-            separate address should be designated: founder confirmation required.
-          </strong>
+          . This is the grievance and support contact for Brainwise Solutions.
         </p>
       </section>
 
@@ -259,9 +242,8 @@ export default function PrivacyPage() {
           We may update this policy as the product or our data practices change. The "Effective
           date" above reflects the last update. When you sign up, your acceptance of this policy's
           then-current version (and the Terms of Service's) is recorded on your account with a
-          server-generated timestamp. Whether existing users must explicitly re-accept after a
-          future material change to this policy has not yet been decided —{' '}
-          <strong>re-acceptance requirement: founder decision required.</strong>
+          server-generated timestamp. Re-acceptance: users may be required to acknowledge or consent
+          to material changes where required by applicable law or the applicable consent mechanism.
         </p>
       </section>
 

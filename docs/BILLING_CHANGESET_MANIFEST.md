@@ -71,10 +71,10 @@ A secret scan over every committed file found nothing real (matches were documen
   would not compile. Treat reviving it as a separate issue.
 
 ## Unresolved items (nothing here blocks the commits; all block production)
-1. **D2** — legal entity details (see `docs/LEGAL_PADDLE_WORDING_DRAFT.md`). Terms/Privacy/Refund are unchanged.
+1. **D2** — supplied and applied (uncommitted) to Terms/Privacy/Refund/Cancellation; guarded by `src/app/legalPages.test.tsx`.
 2. **D4** — counts of live paid PayU/Razorpay subscriptions (run `scripts/audit-legacy-subscribers.mjs` or the Console check).
 3. `public/` images (above).
-4. Terms/Privacy/Refund still say PayU/Razorpay and "founder decision required" until D2/D4 arrive.
+4. D4 = 0 active PayU, 0 active Razorpay: legacy provider wording removed from customer pages (source/functions untouched); Privacy still has open items (re-acceptance rule, subprocessor DPA status).
 5. Not yet done: deployed Sandbox verification, Vercel env scoping, live domain / default payment link / webhook, rotation of
    the three exposed API keys, ₹499 live test, test-data cleanup (runbook).
 6. Known pre-existing emulator failures (6 suites / 18 tests; need Auth+Storage emulators): `getAnalyticsDashboard.emulator`,

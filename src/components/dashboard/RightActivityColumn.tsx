@@ -156,11 +156,11 @@ export function RightActivityColumn({ business }: RightActivityColumnProps) {
         <div className="relative z-10 space-y-2 max-w-[200px]">
           <h4 className="text-sm font-bold text-white">Need more credits?</h4>
           <p className="text-[11px] text-neutral-300 leading-snug">
-            Upgrade your plan to get more AI campaigns, wider reach, and more orders.
+            Subscribe to a plan or buy a credit pack to create more campaigns.
           </p>
           <Link href="/billing" className="inline-block pt-1">
             <button className="rounded-xl bg-[#E84D1A] px-3.5 py-1.5 text-xs font-semibold text-white shadow-sm hover:bg-[#d04113] transition-all">
-              Upgrade Now &rarr;
+              View plans &amp; packs &rarr;
             </button>
           </Link>
         </div>

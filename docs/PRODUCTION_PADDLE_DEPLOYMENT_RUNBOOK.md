@@ -186,3 +186,16 @@ Note `firebase.json` ignores only `*.local`, so a `.env.<projectId>` file *is* d
 - Refunds are not automated (logged for manual review).
 - Top-up credits are per calendar month and do not roll over (needs policy D3).
 - `/cancellation` has no page of its own (it redirects to `/refund`).
+
+## 9. Production configuration readiness (2026-10-02) — names only, NOT deployed
+
+Production web = **Firebase App Hosting → backend `mitra-web` → branch `master`**, canonical `https://www.brain-wise.com`. Vercel is not production.
+
+**Web (`apphosting.yaml`, backend `mitra-web`)** — `NEXT_PUBLIC_PADDLE_ENVIRONMENT=production` is a plain value; the client token and the 11 price IDs are Secret Manager references (secret ID = variable name). Create each secret once with `firebase apphosting:secrets:set <NAME>` and grant the backend access when prompted:
+`NEXT_PUBLIC_PADDLE_CLIENT_TOKEN`, `NEXT_PUBLIC_PADDLE_PRICE_ID_{STARTER,BUSINESS,PRO,AGENCY}_{MONTHLY,YEARLY}`, `NEXT_PUBLIC_PADDLE_PRICE_ID_PACK_{500,1200,3000}`. The token must start `live_`. A missing secret fails the build (intended); do not merge to `master` before they exist. No Paddle live values for local dev or previews.
+
+**Functions** — secrets (new, rotated values only; enter via the CLI prompt, never in chat/files): `firebase functions:secrets:set PADDLE_API_KEY`, `firebase functions:secrets:set PADDLE_WEBHOOK_SECRET`. Params in the gitignored `functions/.env.<project-id>` at deploy time: `PADDLE_ENVIRONMENT=production` and `PADDLE_PRICE_ID_{STARTER,BUSINESS,PRO,AGENCY}_{MONTHLY,YEARLY}`, `PADDLE_PRICE_ID_PACK_{500,1200,3000}`. Mismatched environment/key prefixes throw at runtime by design.
+
+**Mapping** — 11 price variables = 4 paid plans x {monthly, yearly} + 3 credit packs. Free has no Paddle price. No notification-destination ID is read by any code; `paddleWebhook` needs only the signing secret (idempotency is keyed on the event/transaction, not the destination).
+
+**Manual, not done by code:** rotate/revoke the live API key and webhook secret that were pasted in chat; Firebase Console → Authentication → Settings → Authorized domains must include `www.brain-wise.com`; attach `www.brain-wise.com` to `mitra-web` (App Hosting → Domains) and confirm the backend's live branch is `master`; Paddle dashboard: default payment link, domain approval, payouts/business verification; update the live destination URL in place after `paddleWebhook` is deployed.

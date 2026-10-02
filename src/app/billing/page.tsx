@@ -14,6 +14,7 @@ import { callFunction } from '@/services/api';
 import { getTierPriceId, intervalOf } from '@/lib/paddle/catalog';
 import { usePaddlePrices } from '@/features/billing/usePaddlePrices';
 import { usePaddleCheckout } from '@/features/billing/usePaddleCheckout';
+import { useSyncPaddleCustomer } from '@/features/billing/useSyncPaddleCustomer';
 import { PaddlePrice, PriceStatusBanner } from '@/features/billing/components/PaddlePrice';
 import { CreditPackCards } from '@/features/billing/components/CreditPackCards';
 import { isVisibleTransaction } from '@/features/billing/visibleTransactions';
@@ -30,6 +31,7 @@ interface CancelSubscriptionResponse {
 export default function BillingPage() {
   const { user, logout } = useAuth();
   const { showToast } = useToast();
+  useSyncPaddleCustomer(user?.uid);
   const [subscription, setSubscription] = useState<Subscription | null>(null);
   const [usage, setUsage] = useState<Usage | null>(null);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
