@@ -1,6 +1,5 @@
-import type { CreativeTemplate, BrandCreativeContext, CreativeObjective } from '../../types';
+import type { BrandCreativeContext, CreativeObjective } from '../../types';
 import type {
-  BusinessBrainContext,
   ProductContext,
   OfferContext,
   AudienceContext,

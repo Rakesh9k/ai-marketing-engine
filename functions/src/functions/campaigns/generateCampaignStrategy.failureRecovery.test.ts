@@ -173,7 +173,7 @@ describe('generateCampaignStrategy — failure recovery (Phase 9 / Phase 12 fix)
       expect.objectContaining({
         status: 'failed',
         error: expect.objectContaining({
-          message: expect.stringContaining('timed out'),
+          message: expect.stringContaining('taking longer than expected'),
         }),
       })
     );

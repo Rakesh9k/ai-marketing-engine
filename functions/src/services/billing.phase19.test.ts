@@ -16,7 +16,7 @@ describe('Phase 19 Billing System Invariants & Top-Up Operations', () => {
   });
 
   it('correctly calculates operation costs for AI generation tasks', () => {
-    expect(getGenerationCost('campaign_generation')).toBe(140);
+    expect(getGenerationCost('campaign_generation')).toBe(100);
     expect(getGenerationCost('reel_generation')).toBe(80);
     expect(getGenerationCost('regeneration')).toBe(10);
     expect(getGenerationCost('image_generation')).toBe(20);
@@ -39,7 +39,7 @@ describe('Phase 19 Billing System Invariants & Top-Up Operations', () => {
     // Top-ups land in bonusCredits (enforced by usageControl) and keep the display total in step.
     expect(mockTx.update).toHaveBeenCalledWith(mockUsageRef, {
       bonusCredits: 500,
-      creditsIncluded: 600, // free plan 100 + 500 bonus
+      creditsIncluded: PRICING.subscriptionTiers.free.monthlyCredits + 500, // free plan + 500 bonus
       updatedAt: expect.anything(),
     });
   });
@@ -47,7 +47,10 @@ describe('Phase 19 Billing System Invariants & Top-Up Operations', () => {
   it('accumulates top-ups on top of existing bonus credits and the current plan', () => {
     const mockTx = { set: jest.fn(), update: jest.fn() } as any;
     const mockUsageRef = { id: 'user1_2026-09-01' } as any;
-    const mockUsageSnap = { exists: true, data: () => ({ planId: 'starter', bonusCredits: 500 }) } as any;
+    const mockUsageSnap = {
+      exists: true,
+      data: () => ({ planId: 'starter', bonusCredits: 500 }),
+    } as any;
 
     grantTopUpCredits(mockTx, 'user1', 1200, mockUsageRef, mockUsageSnap);
 
@@ -62,12 +65,19 @@ describe('Phase 19 Billing System Invariants & Top-Up Operations', () => {
   it('applyPlanEntitlement sets (not increments) the plan and preserves bonus credits', () => {
     const mockTx = { set: jest.fn(), update: jest.fn() } as any;
     const mockUsageRef = { id: 'user1_2026-09-01' } as any;
-    const mockUsageSnap = { exists: true, data: () => ({ planId: 'free', bonusCredits: 500 }) } as any;
+    const mockUsageSnap = {
+      exists: true,
+      data: () => ({ planId: 'free', bonusCredits: 500 }),
+    } as any;
 
     expect(applyPlanEntitlement(mockTx, 'user1', 'pro', mockUsageRef, mockUsageSnap)).toBe(2500);
     expect(applyPlanEntitlement(mockTx, 'user1', 'pro', mockUsageRef, mockUsageSnap)).toBe(2500);
     for (const call of mockTx.update.mock.calls) {
-      expect(call[1]).toEqual({ planId: 'pro', creditsIncluded: 3000, updatedAt: expect.anything() });
+      expect(call[1]).toEqual({
+        planId: 'pro',
+        creditsIncluded: 3000,
+        updatedAt: expect.anything(),
+      });
     }
   });
 

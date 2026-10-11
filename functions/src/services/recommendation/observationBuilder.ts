@@ -8,7 +8,6 @@ import type {
 } from '../../types/recommendation';
 import {
   getCampaignDoc,
-  getPublishJobDoc,
   getScheduledPostDoc,
   setPerformanceObservationDoc,
   getPerformanceObservationDoc,
@@ -222,7 +221,7 @@ export async function buildAndSavePerformanceObservation(
 async function fetchFeedbackSignals(
   businessId: string,
   campaignId: string,
-  publishJobId: string
+  _publishJobId: string
 ): Promise<PerformanceObservationFeedback> {
   const db = admin.firestore();
 

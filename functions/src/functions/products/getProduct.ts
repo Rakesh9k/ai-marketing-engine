@@ -6,7 +6,6 @@ import { validatedCallable } from '../../middleware/validation';
 import { getProductDoc } from '../../services/firestore';
 import { logFunctionStart, logFunctionComplete, logFunctionError } from '../../utils/logging';
 import { mapErrorToHttpsError } from '../../utils/errors';
-import type { Product } from '../../types';
 
 const getProductSchema = z.object({
   productId: z.string().min(1),

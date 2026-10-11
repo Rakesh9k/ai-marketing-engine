@@ -106,7 +106,7 @@ describe('recommendCreativeTemplates', () => {
 
   it('7.10 Tenant isolation: is handled implicitly because getCreativePreferencesByBusiness fetches by businessId', () => {
     // Asserting that getCreativePreferencesByBusiness is called with the right businessId
-    recommendCreativeTemplates({ businessId: 'biz-2' });
+    void recommendCreativeTemplates({ businessId: 'biz-2' });
     expect(mockPrefs).toHaveBeenCalledWith('biz-2');
   });
 

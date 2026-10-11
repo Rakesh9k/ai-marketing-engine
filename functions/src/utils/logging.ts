@@ -35,11 +35,28 @@ const SECRET_PATTERNS: RegExp[] = [
 // what reaches Cloud Logging here — see the Error Handling Audit note there
 // for why that was a real, separate gap.
 export function redactSecrets(value: string): string {
-  return SECRET_PATTERNS.reduce(
+  const byShape = SECRET_PATTERNS.reduce(
     (text, pattern) =>
       text.replace(pattern, (match, prefix) => (prefix ? `${prefix}[REDACTED]` : '[REDACTED]')),
     value
   );
+  return redactConfiguredSecrets(byShape);
+}
+
+// The shape rules above only know some key formats, and the production Gemini key is not one of them.
+// So the configured secrets themselves — any env var named like a credential — are also removed by
+// value, whatever their format. Short values are ignored: they are not credentials and would mangle
+// ordinary text.
+const SECRET_ENV_NAME = /(?:API_KEY|SECRET|TOKEN|PASSWORD|PRIVATE_KEY)$/;
+const MIN_SECRET_LENGTH = 12;
+
+function redactConfiguredSecrets(text: string): string {
+  let out = text;
+  for (const [name, secret] of Object.entries(process.env)) {
+    if (!secret || secret.length < MIN_SECRET_LENGTH || !SECRET_ENV_NAME.test(name)) continue;
+    if (out.includes(secret)) out = out.split(secret).join('[REDACTED]');
+  }
+  return out;
 }
 
 /**

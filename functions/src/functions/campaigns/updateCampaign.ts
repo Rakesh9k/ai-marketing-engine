@@ -30,8 +30,9 @@ const updateCampaignSchema = z.object({
       price: z.number().positive(),
       originalPrice: z.number().positive().optional(),
       type: z.enum(['percentage', 'fixed', 'bogo', 'combo', 'free_delivery', 'loyalty']),
-      validityStart: z.string().datetime(),
-      validityEnd: z.string().datetime(),
+      validityStart: z.string().datetime().optional(),
+      validityEnd: z.string().datetime().optional(),
+      validitySource: z.enum(['owner_dates', 'whole_campaign']).optional(),
       terms: z.string().max(1000).optional(),
     })
     .optional(),

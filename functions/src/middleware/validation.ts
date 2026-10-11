@@ -91,6 +91,13 @@ export function validatedCallable<T, R>(
         userId: request.auth.uid,
         fieldErrors: error instanceof ValidationError ? Object.keys(error.fieldErrors) : undefined,
       });
+      // A bare ValidationError reaches the client as a 500 INTERNAL ("unhandled error"); bad input
+      // is the caller's mistake, so report it as invalid-argument with the failing field names.
+      if (error instanceof ValidationError) {
+        throw new HttpsError('invalid-argument', 'Invalid input', {
+          fields: Object.keys(error.fieldErrors),
+        });
+      }
       throw error;
     }
     return handler(validatedData, {

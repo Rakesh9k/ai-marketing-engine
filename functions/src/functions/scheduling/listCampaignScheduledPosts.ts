@@ -7,7 +7,7 @@ const listCampaignScheduledPostsSchema = z.object({
   campaignId: z.string().min(1),
 });
 
-export const listCampaignScheduledPosts = onCall(async (request) => {
+export const listCampaignScheduledPosts = onCall({ enforceAppCheck: true }, async (request) => {
   const logCtx = logFunctionStart('listCampaignScheduledPosts', { authUid: request.auth?.uid });
 
   if (!request.auth) {

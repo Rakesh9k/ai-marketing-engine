@@ -78,20 +78,23 @@ describeIfEmulator('razorpayWebhook (Firestore emulator, Phase 10)', () => {
     const now = new Date();
     const periodStart = new Date(now.getFullYear(), now.getMonth(), 1);
     const usageId = `${userId}_${periodStart.toISOString().split('T')[0]}`;
-    await db.collection('usage').doc(usageId).set({
-      usageId,
-      userId,
-      periodStart: periodStart.toISOString(),
-      periodEnd: new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString(),
-      planId,
-      campaignsCreated: 0,
-      creditsUsed: 0,
-      imagesGenerated: 0,
-      copyGenerations: 0,
-      regenerations: 0,
-      failedGenerations: 0,
-      updatedAt: new Date().toISOString(),
-    });
+    await db
+      .collection('usage')
+      .doc(usageId)
+      .set({
+        usageId,
+        userId,
+        periodStart: periodStart.toISOString(),
+        periodEnd: new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString(),
+        planId,
+        campaignsCreated: 0,
+        creditsUsed: 0,
+        imagesGenerated: 0,
+        copyGenerations: 0,
+        regenerations: 0,
+        failedGenerations: 0,
+        updatedAt: new Date().toISOString(),
+      });
     return usageId;
   }
 
@@ -126,7 +129,9 @@ describeIfEmulator('razorpayWebhook (Firestore emulator, Phase 10)', () => {
     // reads (see usageControl.ts) — this is the real, enforced entitlement.
     const usageDoc = await db
       .collection('usage')
-      .doc(`${userId}_${new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split('T')[0]}`)
+      .doc(
+        `${userId}_${new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split('T')[0]}`
+      )
       .get();
     expect(usageDoc.data()!['planId']).toBe('business');
   });
@@ -165,7 +170,10 @@ describeIfEmulator('razorpayWebhook (Firestore emulator, Phase 10)', () => {
     const a = makeReqRes(event);
     const b = makeReqRes(event);
 
-    await Promise.all([razorpayWebhook(a.req as any, a.res as any), razorpayWebhook(b.req as any, b.res as any)]);
+    await Promise.all([
+      razorpayWebhook(a.req as any, a.res as any),
+      razorpayWebhook(b.req as any, b.res as any),
+    ]);
 
     expect(a.res._status).toBe(200);
     expect(b.res._status).toBe(200);
@@ -180,9 +188,13 @@ describeIfEmulator('razorpayWebhook (Firestore emulator, Phase 10)', () => {
     const paymentId1 = `pay_${crypto.randomUUID()}`;
     const paymentId2 = `pay_${crypto.randomUUID()}`;
 
-    const e1 = makeReqRes(paymentCapturedEvent(`evt_${crypto.randomUUID()}`, userId, 'business', paymentId1));
+    const e1 = makeReqRes(
+      paymentCapturedEvent(`evt_${crypto.randomUUID()}`, userId, 'business', paymentId1)
+    );
     await razorpayWebhook(e1.req as any, e1.res as any);
-    const e2 = makeReqRes(paymentCapturedEvent(`evt_${crypto.randomUUID()}`, userId, 'business', paymentId2));
+    const e2 = makeReqRes(
+      paymentCapturedEvent(`evt_${crypto.randomUUID()}`, userId, 'business', paymentId2)
+    );
     await razorpayWebhook(e2.req as any, e2.res as any);
 
     const tx1 = await db.collection('transactions').doc(paymentId1).get();

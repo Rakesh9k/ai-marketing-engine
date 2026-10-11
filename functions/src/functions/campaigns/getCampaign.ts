@@ -7,7 +7,6 @@ import { getCampaignDoc, getBusinessDoc, getProductDoc } from '../../services/fi
 import { logFunctionStart, logFunctionComplete, logFunctionError } from '../../utils/logging';
 import { mapErrorToHttpsError } from '../../utils/errors';
 import { isVerificationStale } from '../../services/ai/truthCheck';
-import type { Campaign } from '../../types';
 
 const getCampaignSchema = z.object({
   campaignId: z.string().min(1),

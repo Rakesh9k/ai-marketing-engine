@@ -1,4 +1,4 @@
-import { selectCreativeContext, type CreativeTask } from './creativeContextSelector';
+import { selectCreativeContext } from './creativeContextSelector';
 import type { CreativeTemplateContext } from './creativeTemplateContext';
 import { creativeTemplateRegistry } from '../creativeTemplateRegistry';
 import type { CreativeTemplate, LanguageCode } from '../../types';
@@ -151,7 +151,7 @@ describe('CreativeContextSelector', () => {
       const offerCtx = createMockTemplateContext('post-offer');
 
       const heroResult = selectCreativeContext({ task: 'creative_copy', templateContext: heroCtx });
-      const offerResult = selectCreativeContext({
+      const _offerResult = selectCreativeContext({
         task: 'creative_copy',
         templateContext: offerCtx,
       });

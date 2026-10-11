@@ -7,7 +7,7 @@ const retryScheduleSchema = z.object({
   scheduledPostId: z.string().min(1),
 });
 
-export const retrySchedule = onCall(async (request) => {
+export const retrySchedule = onCall({ enforceAppCheck: true }, async (request) => {
   const logCtx = logFunctionStart('retrySchedule', { authUid: request.auth?.uid });
 
   if (!request.auth) {

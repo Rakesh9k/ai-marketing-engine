@@ -8,7 +8,6 @@ import type {
   PublishStatusCheckOutput,
 } from '../PublishingProvider';
 import type { PublishErrorCode } from '../../../types/publishing';
-import { logFunctionError } from '../../../utils/logging';
 
 export class MetaPublishingError extends Error {
   constructor(

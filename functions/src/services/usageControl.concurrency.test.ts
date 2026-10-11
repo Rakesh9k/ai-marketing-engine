@@ -152,48 +152,48 @@ describeIfEmulator('usageControl concurrency/race safety (Firestore emulator, Ph
 
   it('negative balance is impossible: a request for more credits than remain is always rejected, even with several competing requests', async () => {
     const userId = testUserId();
-    const usageId = await seedActiveUsage(userId, 'free'); // 100 monthly credits
+    const usageId = await seedActiveUsage(userId, 'free'); // 140 monthly credits (free)
     const attempts = Array.from({ length: 5 }, () => uuid());
 
     const results = await Promise.allSettled(
       attempts.map((opId) =>
-        usageControl.reserveCreditsForOperation(userId, opId, 'campaign_generation', 60)
+        usageControl.reserveCreditsForOperation(userId, opId, 'campaign_generation', 100)
       )
     );
 
     const fulfilled = results.filter((r) => r.status === 'fulfilled');
-    // 100 available / 60 each -> at most one can succeed.
+    // 140 available / 100 each -> at most one can succeed.
     expect(fulfilled.length).toBeLessThanOrEqual(1);
 
     const usageSnap = await db.collection('usage').doc(usageId).get();
-    expect(usageSnap.data()!['creditsUsed']).toBeLessThanOrEqual(100);
+    expect(usageSnap.data()!['creditsUsed']).toBeLessThanOrEqual(140);
     expect(usageSnap.data()!['creditsUsed']).toBeGreaterThanOrEqual(0);
   });
 
-  it('GOLDEN CREDIT TEST (§74): reserve 60 of 100, finalize, re-finalize is a no-op, a second 60-credit reservation is rejected (no negative balance)', async () => {
+  it('GOLDEN CREDIT TEST (§74): reserve 100 of 140, finalize, re-finalize is a no-op, a second 100-credit reservation is rejected (no negative balance)', async () => {
     const userId = testUserId();
-    const usageId = await seedActiveUsage(userId, 'free'); // 100 monthly credits
+    const usageId = await seedActiveUsage(userId, 'free'); // 140 monthly credits (free)
     const op1 = uuid();
 
-    await usageControl.reserveCreditsForOperation(userId, op1, 'campaign_generation', 60);
+    await usageControl.reserveCreditsForOperation(userId, op1, 'campaign_generation', 100);
     let usageSnap = await db.collection('usage').doc(usageId).get();
-    expect(usageSnap.data()!['creditsUsed']).toBe(60); // 40 remaining
+    expect(usageSnap.data()!['creditsUsed']).toBe(100); // 40 remaining
 
     await usageControl.finalizeReservation(op1);
     usageSnap = await db.collection('usage').doc(usageId).get();
-    expect(usageSnap.data()!['creditsUsed']).toBe(60);
+    expect(usageSnap.data()!['creditsUsed']).toBe(100);
 
     await usageControl.finalizeReservation(op1); // idempotent re-finalize
     usageSnap = await db.collection('usage').doc(usageId).get();
-    expect(usageSnap.data()!['creditsUsed']).toBe(60); // unchanged, not 120
+    expect(usageSnap.data()!['creditsUsed']).toBe(100); // unchanged, not 200
 
     const op2 = uuid();
     await expect(
-      usageControl.reserveCreditsForOperation(userId, op2, 'campaign_generation', 60)
+      usageControl.reserveCreditsForOperation(userId, op2, 'campaign_generation', 100)
     ).rejects.toMatchObject({ code: 'INSUFFICIENT_CREDITS' });
 
     usageSnap = await db.collection('usage').doc(usageId).get();
-    expect(usageSnap.data()!['creditsUsed']).toBe(60); // never went negative / over-committed
+    expect(usageSnap.data()!['creditsUsed']).toBe(100); // never went negative / over-committed
   });
 
   it('GOLDEN FAILURE TEST (§75): reserve 60, refund, re-refund is a no-op — never restores credits twice', async () => {

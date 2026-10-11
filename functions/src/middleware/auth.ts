@@ -47,7 +47,7 @@ export async function verifyAuthAndBusinessAccess<T extends Record<string, any>>
   request: CallableRequest<T>,
   businessIdField = 'businessId' as keyof T
 ): Promise<{ userId: string; businessId: string }> {
-  const { userId, token } = await verifyAuth(request);
+  const { userId, token: _token } = await verifyAuth(request);
   const businessId = request.data[businessIdField] as string;
   if (!businessId) {
     throw new HttpsError('invalid-argument', 'businessId is required');
@@ -63,7 +63,36 @@ export function requireRole(request: CallableRequest, allowedRoles: string[]): v
   }
 }
 
+/**
+ * Server-side admin gate for any future admin callable/HTTPS function. Admin is a verified
+ * Firebase Auth custom claim (role === 'admin'): the claim lives inside the signed ID token, so
+ * a client cannot forge it, and there is no client-writable field it is derived from
+ * (firestore.rules pins users.role). Never gate admin behaviour on UI state.
+ *
+ * Admins are granted out-of-band by an operator with Admin SDK credentials; application code
+ * can not mint the claim (see setCustomClaims).
+ */
+export function requireAdmin(request: CallableRequest): { userId: string } {
+  if (!request.auth) {
+    throw new HttpsError('unauthenticated', 'Authentication required');
+  }
+  if (request.auth.token['role'] !== 'admin') {
+    authzLogger.warn('Admin access denied', { userId: request.auth.uid });
+    throw new HttpsError('permission-denied', 'Insufficient permissions');
+  }
+  return { userId: request.auth.uid };
+}
+
 export async function setCustomClaims(uid: string, claims: Record<string, any>): Promise<void> {
+  // Application code may refresh claims from the users/{uid} document, but must never be able
+  // to mint an admin: refuse it here so no caller (now or later) can escalate by passing
+  // role: 'admin' through this helper.
+  if (claims['role'] === 'admin') {
+    throw new HttpsError(
+      'permission-denied',
+      'Admin claims cannot be assigned by application code'
+    );
+  }
   await admin.auth().setCustomUserClaims(uid, claims);
 }
 

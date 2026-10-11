@@ -1,4 +1,3 @@
-import { z } from 'zod';
 import type {
   CreativeTemplate,
   CreativeObjective,
@@ -23,8 +22,8 @@ export interface OfferContext {
   price: number;
   originalPrice?: number;
   type: string;
-  validityStart: string;
-  validityEnd: string;
+  validityStart?: string;
+  validityEnd?: string;
   terms?: string;
 }
 

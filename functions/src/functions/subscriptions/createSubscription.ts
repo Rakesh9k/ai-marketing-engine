@@ -10,10 +10,9 @@ import {
   createRazorpaySubscription,
   getPlanPrice,
   getRazorpayPlanId,
-  CreateSubscriptionInput,
 } from '../../services/razorpay';
 import { createSubscriptionDoc } from '../../services/firestore';
-import type { Subscription, SubscriptionPlan, SubscriptionStatus } from '../../types';
+import type { Subscription, SubscriptionStatus } from '../../types';
 
 const createSubscriptionSchema = z.object({
   planId: z.enum(['starter', 'business', 'agency']),

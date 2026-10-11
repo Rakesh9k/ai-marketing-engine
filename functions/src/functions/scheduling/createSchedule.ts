@@ -14,7 +14,7 @@ const createScheduleSchema = z.object({
   idempotencyKey: z.string().optional(),
 });
 
-export const createSchedule = onCall(async (request) => {
+export const createSchedule = onCall({ enforceAppCheck: true }, async (request) => {
   const logCtx = logFunctionStart('createSchedule', { authUid: request.auth?.uid });
 
   if (!request.auth) {

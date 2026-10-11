@@ -34,7 +34,10 @@ describeIfEmulator('verifyPayment (Firestore emulator, Phase 10)', () => {
     await admin.app().delete();
   });
 
-  async function seedSubscription(userId: string, razorpaySubscriptionId: string): Promise<Subscription> {
+  async function seedSubscription(
+    userId: string,
+    razorpaySubscriptionId: string
+  ): Promise<Subscription> {
     const sub: Subscription = {
       subscriptionId: razorpaySubscriptionId,
       userId,
@@ -61,7 +64,10 @@ describeIfEmulator('verifyPayment (Firestore emulator, Phase 10)', () => {
     const razorpaySubscriptionId = `sub_${crypto.randomUUID()}`;
     await seedSubscription(userId, razorpaySubscriptionId);
 
-    paymentsFetchMock.mockResolvedValue({ status: 'captured', created_at: Math.floor(Date.now() / 1000) });
+    paymentsFetchMock.mockResolvedValue({
+      status: 'captured',
+      created_at: Math.floor(Date.now() / 1000),
+    });
 
     const result = await (verifyPayment as any).run(
       callableRequest(
@@ -89,7 +95,11 @@ describeIfEmulator('verifyPayment (Firestore emulator, Phase 10)', () => {
     await expect(
       (verifyPayment as any).run(
         callableRequest(
-          { razorpaySubscriptionId, razorpayPaymentId: `pay_${crypto.randomUUID()}`, razorpaySignature: 'x' },
+          {
+            razorpaySubscriptionId,
+            razorpayPaymentId: `pay_${crypto.randomUUID()}`,
+            razorpaySignature: 'x',
+          },
           userId
         )
       )
@@ -109,25 +119,36 @@ describeIfEmulator('verifyPayment (Firestore emulator, Phase 10)', () => {
     await expect(
       (verifyPayment as any).run(
         callableRequest(
-          { razorpaySubscriptionId, razorpayPaymentId: `pay_${crypto.randomUUID()}`, razorpaySignature: 'x' },
+          {
+            razorpaySubscriptionId,
+            razorpayPaymentId: `pay_${crypto.randomUUID()}`,
+            razorpaySignature: 'x',
+          },
           userId
         )
       )
     ).rejects.toThrow(/not captured/i);
   });
 
-  it('cross-user isolation: User A cannot verify/activate User B\'s subscription', async () => {
+  it("cross-user isolation: User A cannot verify/activate User B's subscription", async () => {
     const ownerId = `user-${crypto.randomUUID()}`;
     const attackerId = `user-${crypto.randomUUID()}`;
     const razorpaySubscriptionId = `sub_${crypto.randomUUID()}`;
     await seedSubscription(ownerId, razorpaySubscriptionId);
 
-    paymentsFetchMock.mockResolvedValue({ status: 'captured', created_at: Math.floor(Date.now() / 1000) });
+    paymentsFetchMock.mockResolvedValue({
+      status: 'captured',
+      created_at: Math.floor(Date.now() / 1000),
+    });
 
     await expect(
       (verifyPayment as any).run(
         callableRequest(
-          { razorpaySubscriptionId, razorpayPaymentId: `pay_${crypto.randomUUID()}`, razorpaySignature: 'x' },
+          {
+            razorpaySubscriptionId,
+            razorpayPaymentId: `pay_${crypto.randomUUID()}`,
+            razorpaySignature: 'x',
+          },
           attackerId
         )
       )
@@ -141,12 +162,30 @@ describeIfEmulator('verifyPayment (Firestore emulator, Phase 10)', () => {
     const userId = `user-${crypto.randomUUID()}`;
     const razorpaySubscriptionId = `sub_${crypto.randomUUID()}`;
     await seedSubscription(userId, razorpaySubscriptionId);
-    paymentsFetchMock.mockResolvedValue({ status: 'captured', created_at: Math.floor(Date.now() / 1000) });
+    paymentsFetchMock.mockResolvedValue({
+      status: 'captured',
+      created_at: Math.floor(Date.now() / 1000),
+    });
 
     const paymentId = `pay_${crypto.randomUUID()}`;
-    await (verifyPayment as any).run(callableRequest({ razorpaySubscriptionId, razorpayPaymentId: paymentId, razorpaySignature: 'x' }, userId));
-    await (verifyPayment as any).run(callableRequest({ razorpaySubscriptionId, razorpayPaymentId: paymentId, razorpaySignature: 'x' }, userId));
-    await (verifyPayment as any).run(callableRequest({ razorpaySubscriptionId, razorpayPaymentId: paymentId, razorpaySignature: 'x' }, userId));
+    await (verifyPayment as any).run(
+      callableRequest(
+        { razorpaySubscriptionId, razorpayPaymentId: paymentId, razorpaySignature: 'x' },
+        userId
+      )
+    );
+    await (verifyPayment as any).run(
+      callableRequest(
+        { razorpaySubscriptionId, razorpayPaymentId: paymentId, razorpaySignature: 'x' },
+        userId
+      )
+    );
+    await (verifyPayment as any).run(
+      callableRequest(
+        { razorpaySubscriptionId, razorpayPaymentId: paymentId, razorpaySignature: 'x' },
+        userId
+      )
+    );
 
     // No transaction/credit-grant record is created by this path at all —
     // credit granting is exclusively the webhook's responsibility

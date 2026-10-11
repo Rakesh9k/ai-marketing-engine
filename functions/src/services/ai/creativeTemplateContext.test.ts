@@ -2,8 +2,7 @@ import {
   buildCreativeTemplateContext,
   TemplateContextValidationError,
 } from './creativeTemplateContext';
-import { creativeTemplateRegistry } from '../creativeTemplateRegistry';
-import type { CreativeTemplate, BrandCreativeContext, CreativeObjective } from '../../types';
+import type { BrandCreativeContext, CreativeObjective } from '../../types';
 
 describe('buildCreativeTemplateContext', () => {
   const mockBrandCreativeContext: BrandCreativeContext = {

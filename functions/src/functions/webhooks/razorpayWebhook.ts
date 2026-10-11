@@ -1,6 +1,6 @@
 import { onRequest } from 'firebase-functions/v2/https';
 import * as admin from 'firebase-admin';
-import { FieldValue, Timestamp } from 'firebase-admin/firestore';
+import { FieldValue } from 'firebase-admin/firestore';
 import { getEnvConfig } from '../../config/env';
 import {
   createLogger,
@@ -18,18 +18,8 @@ import {
 // bank/VPA details — straight into Cloud Logging.
 const webhookLogger = createLogger({ function: 'razorpayWebhook' });
 import { trackEvent, ANALYTICS_EVENTS } from '../../services/analyticsService';
-import {
-  verifyWebhookSignature,
-  getRazorpayClient,
-  calculateCreditsToGrant,
-} from '../../services/razorpay';
-import {
-  getUsageDocId,
-  getUsageDoc,
-  createUsageDoc,
-  incrementUsageField,
-} from '../../services/firestore';
-import { createTransactionDoc } from '../../services/firestore';
+import { verifyWebhookSignature, calculateCreditsToGrant } from '../../services/razorpay';
+import { getUsageDocId } from '../../services/firestore';
 import type {
   Transaction,
   TransactionType,

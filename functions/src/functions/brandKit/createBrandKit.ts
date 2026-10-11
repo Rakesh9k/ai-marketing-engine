@@ -1,4 +1,4 @@
-import { onCall, HttpsError } from 'firebase-functions/v2/https';
+import { onCall } from 'firebase-functions/v2/https';
 import { z } from 'zod';
 
 import { verifyBusinessAccess } from '../../middleware/auth';
@@ -84,7 +84,7 @@ export const createBrandKit = onCall(
       // never advertised it. Enforced server-side (TC-PLAN-003/004/005).
       await requireFeature(context.userId, 'brandKit');
 
-      const existingBrandKit = await getBrandKitDoc(data.businessId);
+      const _existingBrandKit = await getBrandKitDoc(data.businessId);
       const now = new Date().toISOString();
 
       const brandKit: BrandKit = {

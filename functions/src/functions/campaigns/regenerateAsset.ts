@@ -30,7 +30,6 @@ import {
   USAGE_ERROR_CODES,
 } from '../../services/usageControl';
 import { trackCreativeEvent, trackCampaignRegenerated } from '../../services/analyticsService';
-import type { UsageErrorCode } from '../../services/usageControl';
 
 const regenerateAssetSchema = z.object({
   campaignId: z.string().min(1),
@@ -115,7 +114,7 @@ export const regenerateAsset = onCall(
       }
 
       // Calculate credits required for regeneration
-      const creditsRequired = getGenerationCost('regeneration');
+      const _creditsRequired = getGenerationCost('regeneration');
 
       // Execute regeneration with full usage control:
       // - Check eligibility

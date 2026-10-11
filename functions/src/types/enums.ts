@@ -1,6 +1,6 @@
 export type UserRole = 'user' | 'agency_admin' | 'agency_member';
 
-export type BusinessCategory = 'restaurant' | 'salon' | 'real_estate';
+export type BusinessCategory = 'restaurant' | 'salon' | 'real_estate' | 'general';
 
 export type BusinessStatus = 'active' | 'archived';
 

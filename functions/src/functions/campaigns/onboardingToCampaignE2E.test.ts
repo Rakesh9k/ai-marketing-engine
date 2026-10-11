@@ -23,6 +23,7 @@ const trackEventMock = jest.fn().mockResolvedValue(undefined);
 jest.mock('../../services/analyticsService', () => ({
   trackEvent: (...args: unknown[]) => trackEventMock(...args),
   trackCreativeEvent: jest.fn().mockResolvedValue(undefined),
+  trackCampaignApproved: jest.fn().mockResolvedValue(undefined),
   ANALYTICS_EVENTS: {
     ONBOARDING_COMPLETE: 'onboarding_complete',
     CAMPAIGN_STARTED: 'campaign_started',
@@ -41,9 +42,15 @@ import { createBusiness } from '../business/createBusiness';
 import { generateCampaignStrategy } from './generateCampaignStrategy';
 import { getCampaign } from './getCampaign';
 import { listCampaigns } from './listCampaigns';
+import { getGenerationCost } from '../../services/usageControl';
+
+const CAMPAIGN_COST = getGenerationCost('campaign_generation');
+
+// createBusiness requires a verified email for password users (middleware/emailVerification.ts).
+const VERIFIED_TOKEN = { email_verified: true, firebase: { sign_in_provider: 'password' } };
 
 function callableRequest(data: unknown, uid: string) {
-  return { data, auth: { uid, token: {} as any } } as any;
+  return { data, auth: { uid, token: VERIFIED_TOKEN as any } } as any;
 }
 
 describeIfEmulator('Onboarding -> Business Brain -> Campaign E2E (Phase 16, mocked AI)', () => {
@@ -69,7 +76,7 @@ describeIfEmulator('Onboarding -> Business Brain -> Campaign E2E (Phase 16, mock
         userId,
         periodStart: periodStart.toISOString(),
         periodEnd: new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString(),
-        planId: 'business', // 1200 monthly credits — comfortably covers one 140-credit generation
+        planId: 'business', // 1200 monthly credits — comfortably covers one campaign generation
         campaignsCreated: 0,
         creditsUsed: 0,
         imagesGenerated: 0,
@@ -192,11 +199,11 @@ describeIfEmulator('Onboarding -> Business Brain -> Campaign E2E (Phase 16, mock
     expect(campaign['userId']).toBe(userId);
     expect(campaign['businessId']).toBe(businessId);
     expect(campaign['status']).toBe('verified'); // Truth Check PASS
-    expect(campaign['creditsUsed']).toBe(140);
+    expect(campaign['creditsUsed']).toBe(CAMPAIGN_COST);
 
     const usageId = `${userId}_${new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split('T')[0]}`;
     const usageSnap = await db.collection('usage').doc(usageId).get();
-    expect(usageSnap.data()!['creditsUsed']).toBe(140);
+    expect(usageSnap.data()!['creditsUsed']).toBe(CAMPAIGN_COST);
 
     // 5. Retrieval — the same owner can read it back via the real callables.
     const getResult = await (getCampaign as any).run(

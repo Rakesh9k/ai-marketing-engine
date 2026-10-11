@@ -4,6 +4,7 @@ import { z } from 'zod';
 import { verifyBusinessAccess } from '../../middleware/auth';
 import { validatedCallable } from '../../middleware/validation';
 import { getReelProjectDoc } from '../../services/firestore';
+import { withFreshReelUrls } from '../../services/reelAssets';
 import { logFunctionStart, logFunctionComplete, logFunctionError } from '../../utils/logging';
 import { mapErrorToHttpsError } from '../../utils/errors';
 
@@ -33,7 +34,7 @@ export const getReel = onCall(
       }
 
       logFunctionComplete(logger, startTime, { success: true });
-      return { reel };
+      return { reel: await withFreshReelUrls(reel) };
     } catch (error) {
       logFunctionError(logger, startTime, error as Error);
       throw mapErrorToHttpsError(error);

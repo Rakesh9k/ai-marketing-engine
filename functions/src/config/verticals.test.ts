@@ -43,8 +43,11 @@ describe('VerticalConfig — restaurant is unchanged', () => {
     expect(ctx.campaignStrategistPersona).toBe(
       'You are a senior marketing strategist for Indian local restaurants. Create a campaign strategy that drives WhatsApp orders.'
     );
+    // Neutral on purpose: the restaurant rule used to be "a Hyderabadi marketing copywriter … Hyderabad
+    // restaurant … Telugu-English-Hinglish" for EVERY restaurant. The owner's language and place now come
+    // from the localisation contract (localizationContract.ts), never from this string.
     expect(ctx.copywriterSystemRules).toBe(
-      'You are a Hyderabadi marketing copywriter. Generate a complete campaign pack for a Hyderabad restaurant. Use the localization strategy to write NATURAL Telugu-English-Hinglish copy. Every piece must drive WhatsApp action. Preserve ALL business facts exactly.'
+      "You are a marketing copywriter for a local restaurant. Generate a complete campaign pack. Use the localization strategy and the language rule below to write NATURAL copy in the owner's own language. Every piece must drive WhatsApp action. Preserve ALL business facts exactly."
     );
     expect(ctx.creativeDirectorSystemRules).toBe(
       'You are a creative director for Instagram food marketing. Generate detailed, actionable image prompts for AI image generation. Each prompt must produce Instagram-ready vertical images (4:5 for posts, 9:16 for Stories/Reels). Include brand colors, logo placement, and offer text overlays.'
@@ -179,8 +182,9 @@ describe('Shared AI pipeline actually consumes VerticalConfig (not a parallel sy
   }
 
   it('produces the restaurant-flavored prompt when vertical is restaurant (or unset — default)', () => {
-    expect(buildCopyPrompt('restaurant')).toContain('Hyderabadi marketing copywriter');
-    expect(buildCopyPrompt(undefined)).toContain('Hyderabadi marketing copywriter');
+    expect(buildCopyPrompt('restaurant')).toContain('marketing copywriter for a local restaurant');
+    expect(buildCopyPrompt(undefined)).toContain('marketing copywriter for a local restaurant');
+    expect(buildCopyPrompt('restaurant')).not.toMatch(/hyderabad|telugu/i);
   });
 
   it('produces a DIFFERENT, salon-flavored prompt when vertical is salon — proving the pipeline reads VerticalConfig, not a hard-coded string', () => {

@@ -34,7 +34,7 @@ export class MetaPerformanceProvider {
       if (credentials.userAccessToken?.encryptedData) {
         return decryptToken(credentials.userAccessToken);
       }
-    } catch (err) {
+    } catch {
       throw new MetaGraphError('AUTH_REQUIRED', 'Failed to decrypt Meta access token');
     }
     throw new MetaGraphError('AUTH_REQUIRED', 'No valid access token found in credentials');
@@ -46,7 +46,7 @@ export class MetaPerformanceProvider {
     status: MetaPerformanceStatus;
   } {
     if (err instanceof MetaGraphError) {
-      const codeStr = String(err.code || '');
+      const _codeStr = String(err.code || '');
       const msg = err.message || '';
       const rawObj = (err.metaErrorDetails as any) || {};
       const codeNum = rawObj.code;

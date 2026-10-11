@@ -27,15 +27,16 @@ describe('mapErrorToHttpsError — secret redaction (Phase 14)', () => {
     const result = mapErrorToHttpsError(raw);
     expect(result).toBeInstanceOf(HttpsError);
     expect(result.message).not.toContain('AIzaSyB4faySp9fYnSjkGW0TFt4y_9eFzn28SNE');
-    expect(result.message).toContain('[REDACTED]');
-    expect(result.message).toContain('ETIMEDOUT'); // non-secret diagnostic detail preserved
+    // Technical provider text is no longer shown to customers at all (it stays in the server log).
+    // Never the raw text; either of the two customer-safe messages is fine.
+    expect(result.message).toMatch(/Please try again in a moment/);
   });
 
   it('redacts a bearer token embedded in an error message', () => {
     const raw = new Error('Upstream call failed — Authorization: Bearer abcdef123456.secret.token');
     const result = mapErrorToHttpsError(raw);
     expect(result.message).not.toContain('abcdef123456.secret.token');
-    expect(result.message).toContain('[REDACTED]');
+    expect(result.message).toBe('Something went wrong on our side. Please try again in a moment.');
   });
 
   it('leaves an ordinary, secret-free error message unchanged', () => {
@@ -116,5 +117,29 @@ describe('mapErrorToHttpsError — secret redaction (Phase 14)', () => {
     const result = mapErrorToHttpsError(new WeirdCustomError());
     expect(result.code).toBe('internal');
     expect(result.message).toBe('Custom internal failure');
+  });
+});
+
+describe('customerSafeInternalMessage', () => {
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const { customerSafeInternalMessage } = require('./errors') as typeof import('./errors');
+
+  it('masks technical text before it reaches a customer', () => {
+    for (const leaky of [
+      'Cannot sign data without `client_email`.',
+      'Renderer render failed (500): {"error":"x"}',
+      'Error: getaddrinfo ENOTFOUND firestore.googleapis.com',
+      'Cannot read properties of undefined (reading businessId)',
+    ]) {
+      expect(customerSafeInternalMessage(leaky)).toBe(
+        'Something went wrong on our side. Please try again in a moment.'
+      );
+    }
+  });
+
+  it('keeps deliberate customer-readable messages', () => {
+    const friendly =
+      "Mitra couldn't find enough usable footage. Try uploading 2-3 more clips with better lighting.";
+    expect(customerSafeInternalMessage(friendly)).toBe(friendly);
   });
 });

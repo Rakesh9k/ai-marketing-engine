@@ -1,16 +1,12 @@
 import { createCampaignFromCalendarItem } from './createCampaignFromCalendarItem';
+import { executeWithUsageControl } from '../../services/usageControl';
 import {
+  getProductDoc,
   getBusinessDoc,
   getCampaignDoc,
   getCampaignByIdempotencyKey,
   createCampaignDoc,
-  updateCampaignDoc,
-  getBrandKitDoc,
-  getProductDoc,
-  createCampaignAssets,
 } from '../../services/firestore';
-import { executeWithUsageControl } from '../../services/usageControl';
-import * as admin from 'firebase-admin';
 
 // Mock dependencies
 jest.mock('firebase-admin/firestore', () => ({
@@ -62,24 +58,26 @@ jest.mock('../../services/analyticsService', () => ({
   },
 }));
 
+const mockPipelineResult = {
+  campaignPack: {
+    truthCheck: { status: 'PASS', summary: 'Facts verified' },
+    assets: [
+      {
+        assetId: 'asset_1',
+        type: 'poster',
+        index: 0,
+        content: { headline: 'Test Poster' },
+        imageUrl: 'https://storage.example.com/poster.svg',
+        status: 'completed',
+        createdAt: new Date().toISOString(),
+      },
+    ],
+  },
+};
+const mockPipelineExecute = jest.fn();
 jest.mock('../../services/ai/pipeline', () => ({
   GenerationPipeline: jest.fn().mockImplementation(() => ({
-    execute: jest.fn().mockResolvedValue({
-      campaignPack: {
-        truthCheck: { status: 'PASS', summary: 'Facts verified' },
-        assets: [
-          {
-            assetId: 'asset_1',
-            type: 'poster',
-            index: 0,
-            content: { headline: 'Test Poster' },
-            imageUrl: 'https://storage.example.com/poster.svg',
-            status: 'completed',
-            createdAt: new Date().toISOString(),
-          },
-        ],
-      },
-    }),
+    execute: (...args: unknown[]) => mockPipelineExecute(...args),
   })),
 }));
 
@@ -88,7 +86,7 @@ const mockUpdate = jest.fn().mockResolvedValue(undefined);
 const mockItemDocGet = jest.fn();
 
 jest.mock('firebase-admin', () => {
-  const mockDoc = jest.fn((docId: string) => ({
+  const mockDoc = jest.fn((_docId: string) => ({
     get: mockItemDocGet,
     update: mockUpdate,
   }));
@@ -146,6 +144,7 @@ describe('createCampaignFromCalendarItem Cloud Function', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+    mockPipelineExecute.mockResolvedValue(mockPipelineResult);
 
     mockItemDocGet.mockResolvedValue({
       exists: true,
@@ -223,7 +222,146 @@ describe('createCampaignFromCalendarItem Cloud Function', () => {
     expect(res.alreadyExisted).toBe(true);
   });
 
+  const REAL_PRODUCT = {
+    productId: 'prod_real_1',
+    businessId: testBusinessId,
+    name: 'Chicken Biryani',
+    price: 349,
+  };
+
+  it('uses the real product price for the offer, never a made-up one', async () => {
+    mockItemDocGet.mockResolvedValue({
+      exists: true,
+      data: () => ({
+        ...mockItemData,
+        productId: REAL_PRODUCT.productId,
+        productName: REAL_PRODUCT.name,
+      }),
+    });
+    (getProductDoc as jest.Mock).mockResolvedValue(REAL_PRODUCT);
+    const wrapped = (createCampaignFromCalendarItem as any).run;
+    await wrapped({ data: { calendarItemId: testItemId }, auth: { uid: testUserId } });
+
+    const created = (createCampaignDoc as jest.Mock).mock.calls[0][0];
+    expect(created.offer.price).toBe(349);
+    expect(created.offer.type).toBe('fixed');
+  });
+
+  it.each([
+    ['has no product', { productId: null }, null],
+    [
+      'has a product with no usable price',
+      { productId: 'prod_real_1' },
+      { ...REAL_PRODUCT, price: 0 },
+    ],
+  ])(
+    'refuses, with nothing charged and nothing invented, when the item %s',
+    async (_label, itemOver, product) => {
+      mockItemDocGet.mockResolvedValue({
+        exists: true,
+        data: () => ({ ...mockItemData, ...itemOver }),
+      });
+      (getProductDoc as jest.Mock).mockResolvedValue(product);
+      const wrapped = (createCampaignFromCalendarItem as any).run;
+
+      await expect(
+        wrapped({ data: { calendarItemId: testItemId }, auth: { uid: testUserId } })
+      ).rejects.toMatchObject({
+        code: 'failed-precondition',
+        message: expect.stringMatching(/product/i),
+      });
+
+      expect(executeWithUsageControl).not.toHaveBeenCalled(); // no credits reserved
+      expect(createCampaignDoc).not.toHaveBeenCalled(); // no campaign, so no invented price anywhere
+    }
+  );
+
+  describe("the owner's localisation is what the pipeline receives (never an invented Hyderabad / Telugu)", () => {
+    const run = async (business: Record<string, unknown>) => {
+      mockItemDocGet.mockResolvedValue({
+        exists: true,
+        data: () => ({
+          ...mockItemData,
+          productId: REAL_PRODUCT.productId,
+          productName: REAL_PRODUCT.name,
+        }),
+      });
+      (getProductDoc as jest.Mock).mockResolvedValue(REAL_PRODUCT);
+      (getBusinessDoc as jest.Mock).mockResolvedValue({ ...mockBusinessData, ...business });
+      const wrapped = (createCampaignFromCalendarItem as any).run;
+      await wrapped({ data: { calendarItemId: testItemId }, auth: { uid: testUserId } });
+      return mockPipelineExecute.mock.calls[0][0].localizationProfile;
+    };
+
+    it('a Mumbai Hinglish business: Mumbai, Maharashtra, Hindi', async () => {
+      const profile = await run({
+        location: { city: 'Mumbai', state: 'Maharashtra', locality: 'Bandra' },
+        businessBrain: { localization: { primaryLanguage: 'hi_en', regionalStyle: 'mumbai' } },
+      });
+      expect(profile).toMatchObject({
+        city: 'Mumbai',
+        state: 'Maharashtra',
+        locality: 'Bandra',
+        primaryLanguage: 'hi_en',
+        secondaryLanguage: 'hi',
+        regionalStyle: 'mumbai',
+        languageMixing: 'natural',
+      });
+    });
+
+    it('a stale secondary language ("te") next to primary English does not survive', async () => {
+      const profile = await run({
+        location: { city: 'Pune', state: 'Maharashtra', locality: 'Kothrud' },
+        businessBrain: { localization: { primaryLanguage: 'en', secondaryLanguage: 'te' } },
+      });
+      expect(profile.primaryLanguage).toBe('en');
+      expect(profile.secondaryLanguage).toBe('en');
+      expect(profile.languageMixing).toBe('minimal');
+    });
+
+    it('a business with no stored localisation is English, not Telugu; and its place is its own', async () => {
+      const profile = await run({
+        location: { city: 'Pune', state: 'Maharashtra' },
+        businessBrain: {},
+      });
+      expect(profile).toMatchObject({
+        primaryLanguage: 'en',
+        secondaryLanguage: 'en',
+        regionalStyle: 'neutral',
+      });
+      expect(JSON.stringify(profile)).not.toMatch(/hyderabad|telangana|"te"/i);
+    });
+
+    it('missing location parts are left empty, never filled with Hyderabad / Telangana', async () => {
+      const profile = await run({ location: {}, businessBrain: {} });
+      expect(profile.city).toBe('');
+      expect(profile.state).toBe('');
+      expect(JSON.stringify(profile)).not.toMatch(/hyderabad|telangana/i);
+    });
+
+    it('a Telugu + English business keeps Telugu (it asked for it)', async () => {
+      const profile = await run({
+        location: { city: 'Hyderabad', state: 'Telangana', locality: 'Kondapur' },
+        businessBrain: { localization: { primaryLanguage: 'te_en', regionalStyle: 'hyderabadi' } },
+      });
+      expect(profile).toMatchObject({
+        primaryLanguage: 'te_en',
+        secondaryLanguage: 'te',
+        regionalStyle: 'hyderabadi',
+      });
+    });
+  });
+
   it('successfully generates campaign, links calendar item, and updates plan count', async () => {
+    mockItemDocGet.mockResolvedValue({
+      exists: true,
+      data: () => ({
+        ...mockItemData,
+        productId: REAL_PRODUCT.productId,
+        productName: REAL_PRODUCT.name,
+      }),
+    });
+    (getProductDoc as jest.Mock).mockResolvedValue(REAL_PRODUCT);
     const wrapped = (createCampaignFromCalendarItem as any).run;
     const res = await wrapped({ data: { calendarItemId: testItemId }, auth: { uid: testUserId } });
 

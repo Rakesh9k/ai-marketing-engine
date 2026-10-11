@@ -31,7 +31,7 @@ function callableRequest(data: unknown, uid: string) {
 }
 
 describeIfEmulator('cancelSubscription (Firestore emulator)', () => {
-  const db = admin.firestore();
+  const _db = admin.firestore();
 
   afterAll(async () => {
     await admin.app().delete();
@@ -126,9 +126,9 @@ describeIfEmulator('cancelSubscription (Firestore emulator)', () => {
       updatedAt: new Date().toISOString(),
     });
 
-    await expect(
-      (cancelSubscription as any).run(callableRequest({}, attackerId))
-    ).rejects.toThrow(/no subscription found/i);
+    await expect((cancelSubscription as any).run(callableRequest({}, attackerId))).rejects.toThrow(
+      /no subscription found/i
+    );
 
     const unchanged = await getSubscriptionDoc(subscription.subscriptionId);
     expect(unchanged!.cancelAtPeriodEnd).toBe(false);

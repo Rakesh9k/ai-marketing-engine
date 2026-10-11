@@ -15,6 +15,7 @@ import { v4 as uuid } from 'uuid';
 import * as admin from 'firebase-admin';
 import { analyzeReferenceStyle } from './analyzeReferenceStyle';
 import { createBusinessDoc } from '../../services/firestore';
+import { PRICING } from '../../config/pricing';
 import type { Business } from '../../types';
 
 jest.mock('../../services/ai/factory/aiProviderFactory', () => ({
@@ -77,7 +78,7 @@ describeIfEmulator('analyzeReferenceStyle — credit enforcement (Phase 8)', () 
     const ownerId = `user-${uuid()}`;
     const businessId = `biz-${uuid()}`;
     await createBusinessDoc(makeBusiness(businessId, ownerId));
-    await seedUsage(ownerId, 'free', 100); // free plan, fully used
+    await seedUsage(ownerId, 'free', PRICING.subscriptionTiers.free.monthlyCredits); // free plan, fully used
 
     const storagePath = `businesses/${businessId}/products/ref.jpg`;
     await admin

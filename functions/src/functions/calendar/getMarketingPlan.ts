@@ -9,7 +9,7 @@ const getPlanSchema = z.object({
 });
 
 export const getMarketingPlan = onCall(
-  { region: 'asia-south1' },
+  { region: 'asia-south1', enforceAppCheck: true },
   validatedCallable(getPlanSchema, async (data, context) => {
     const userId = context.userId;
     const db = admin.firestore();

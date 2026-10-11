@@ -1,11 +1,10 @@
-import { onCall, HttpsError } from 'firebase-functions/v2/https';
+import { onCall } from 'firebase-functions/v2/https';
 import { z } from 'zod';
 
 import { validatedCallable } from '../../middleware/validation';
 import { getBusinessesByUser } from '../../services/firestore';
 import { logFunctionStart, logFunctionComplete, logFunctionError } from '../../utils/logging';
 import { mapErrorToHttpsError } from '../../utils/errors';
-import type { Business } from '../../types';
 
 const listBusinessesSchema = z.object({
   limit: z.number().int().positive().max(50).default(20),

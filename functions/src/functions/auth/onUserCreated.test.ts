@@ -18,6 +18,7 @@ import { v4 as uuid } from 'uuid';
 import * as admin from 'firebase-admin';
 import { onUserCreatedHandler } from './onUserCreated';
 import { getUsageDocId } from '../../services/firestore';
+import { getGenerationCost, reserveCreditsForOperation } from '../../services/usageControl';
 
 function fakeUserRecord(uid: string, email: string) {
   return {
@@ -71,6 +72,30 @@ describeIfEmulator('onUserCreatedHandler — signup persistence (Phase 15)', () 
     expect(txnSnap.size).toBe(1);
     expect(txnSnap.docs[0]!.data()['type']).toBe('grant');
     expect(txnSnap.docs[0]!.data()['amount']).toBe(sub['creditsIncluded']);
+  });
+
+  it('a brand-new signup can afford exactly one full campaign through the real credit enforcement (first-run is not paywalled)', async () => {
+    const userId = `user-${uuid()}`;
+    await (onUserCreatedHandler as unknown as { run: (r: unknown) => Promise<void> }).run(
+      fakeUserRecord(userId, `${userId}@test.example`)
+    );
+
+    const campaignCost = getGenerationCost('campaign_generation');
+    const subSnap = await db.collection('subscriptions').where('userId', '==', userId).get();
+    expect(subSnap.docs[0]!.data()['creditsIncluded']).toBeGreaterThanOrEqual(campaignCost);
+
+    const reservation = await reserveCreditsForOperation(
+      userId,
+      `op-${uuid()}`,
+      'campaign_generation',
+      campaignCost
+    );
+    expect(reservation.creditsReserved).toBe(campaignCost);
+
+    // ...but not a second one: the gate still holds once the allowance is spent.
+    await expect(
+      reserveCreditsForOperation(userId, `op-${uuid()}`, 'campaign_generation', campaignCost)
+    ).rejects.toMatchObject({ code: 'INSUFFICIENT_CREDITS' });
   });
 
   it('persists correctly even when Auth profile fields are empty (no display name/photo/phone) — no crash on optional fields', async () => {

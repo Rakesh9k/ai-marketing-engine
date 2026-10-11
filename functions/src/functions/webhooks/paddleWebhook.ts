@@ -133,7 +133,10 @@ export async function processPaddleEvent(event: PaddleEvent): Promise<void> {
       break;
 
     case EventName.TransactionCompleted:
-      await handleTransactionCompleted(event.data as unknown as TransactionNotification);
+      await handleTransactionCompleted(
+        event.data as unknown as TransactionNotification,
+        event.occurredAt
+      );
       break;
 
     case EventName.TransactionPaymentFailed:
@@ -142,12 +145,7 @@ export async function processPaddleEvent(event: PaddleEvent): Promise<void> {
 
     case EventName.AdjustmentCreated:
     case EventName.AdjustmentUpdated:
-      // Refunds/credits: no refund policy is defined (docs/LEGAL_FOUNDER_DECISIONS_REQUIRED.md),
-      // so credits are NOT clawed back automatically. Surface it for manual review.
-      webhookLogger.warn('paddleWebhook: adjustment (refund/credit) needs manual review', {
-        eventType: event.eventType,
-        adjustmentId: (event.data as { id?: string }).id,
-      });
+      await handleAdjustment(event.data as unknown as AdjustmentNotificationLike, event.occurredAt);
       break;
 
     default:
@@ -372,7 +370,7 @@ async function flagGrant(txnId: string, reason: string, extra: Record<string, un
     );
 }
 
-async function handleTransactionCompleted(txn: TransactionNotification) {
+async function handleTransactionCompleted(txn: TransactionNotification, occurredAt: string) {
   // Card-update / zero-value transactions never carry an entitlement.
   if (txn.origin === 'subscription_payment_method_change') return;
 
@@ -401,7 +399,7 @@ async function handleTransactionCompleted(txn: TransactionNotification) {
       await flagGrant(txn.id, 'plan price completed without a subscription ID', { userId });
       return;
     }
-    await grantPlanEntitlement(txn, userId, meaning.planId, meaning.billingCycle);
+    await grantPlanEntitlement(txn, userId, meaning.planId, meaning.billingCycle, occurredAt);
   } else {
     await grantCreditPack(txn, userId, meaning.credits);
   }
@@ -417,7 +415,8 @@ async function grantPlanEntitlement(
   txn: TransactionNotification,
   userId: string,
   planId: PaidPlan,
-  billingCycle: 'monthly' | 'yearly'
+  billingCycle: 'monthly' | 'yearly',
+  occurredAt: string
 ) {
   const subscriptionId = txn.subscriptionId!;
   const grantRef = db.collection('paddle_grants').doc(txn.id);
@@ -434,6 +433,14 @@ async function grantPlanEntitlement(
 
     // Once-only guard for this Paddle transaction.
     if (grantSnap.exists && grantSnap.data()?.['status'] === 'granted') return { granted: false };
+
+    // A delivery that arrives after a NEWER subscription event (e.g. a retried payment event
+    // landing after subscription.canceled) is still a real payment, so the credits are applied,
+    // but it must not move the subscription status/pointer backwards (resurrecting a cancel).
+    const lastEventAt = subSnap.data()?.['lastPaddleEventAt'] as string | undefined;
+    const existingStatus = subSnap.data()?.['status'] as string | undefined;
+    const isStale = !!lastEventAt && lastEventAt > occurredAt;
+    const keepExistingState = isStale && !!existingStatus;
 
     const credits = applyPlanEntitlement(tx, userId, planId, usage.ref, usage.snap);
     const usedNow = (usage.snap.data()?.['creditsUsed'] as number | undefined) ?? 0;
@@ -454,9 +461,10 @@ async function grantPlanEntitlement(
         billingCycle,
         provider: 'paddle',
         paddleCustomerId: txn.customerId ?? undefined,
-        status: 'active',
-        currentPeriodStart: periodStart,
-        currentPeriodEnd: periodEnd,
+        ...(keepExistingState ? {} : { status: 'active' }),
+        ...(keepExistingState
+          ? {}
+          : { currentPeriodStart: periodStart, currentPeriodEnd: periodEnd }),
         creditsIncluded: credits,
         creditsUsed: subSnap.data()?.['creditsUsed'] ?? 0,
         cancelAtPeriodEnd: subSnap.data()?.['cancelAtPeriodEnd'] ?? false,
@@ -465,11 +473,13 @@ async function grantPlanEntitlement(
       },
       { merge: true }
     );
-    tx.set(
-      db.collection('users').doc(userId),
-      { subscriptionId, updatedAt: FieldValue.serverTimestamp() },
-      { merge: true }
-    );
+    if (!(keepExistingState && existingStatus === 'canceled')) {
+      tx.set(
+        db.collection('users').doc(userId),
+        { subscriptionId, updatedAt: FieldValue.serverTimestamp() },
+        { merge: true }
+      );
+    }
 
     // Auditable record. The pending one created at checkout is completed; renewals and
     // plan changes (no pending record) get one created here.
@@ -645,4 +655,115 @@ async function handlePaymentFailed(txn: TransactionNotification) {
       );
     }
   });
+}
+
+// ---------------------------------------------------------------------------
+// Provider-originated reversals (refund / chargeback)
+// ---------------------------------------------------------------------------
+
+interface AdjustmentNotificationLike {
+  id: string;
+  action?: string;
+  status?: string;
+  transactionId?: string | null;
+  subscriptionId?: string | null;
+  customerId?: string | null;
+  currencyCode?: string;
+  totals?: { total?: string } | null;
+}
+
+/**
+ * Records refunds, credits and chargebacks durably (adjustment ID is the document key, so
+ * replays and out-of-order updates are idempotent) and marks the original transaction.
+ *
+ * Deliberately does NOT revoke credits or the subscription. Whether and how a reversed
+ * payment removes entitlement is a business-policy decision that is not yet defined, so
+ * every approved refund/chargeback is flagged `needsManualReview` for an operator instead
+ * of guessing. See docs/BILLING_LIFECYCLE.md.
+ */
+async function handleAdjustment(adj: AdjustmentNotificationLike, occurredAt: string) {
+  const action = adj.action ?? 'unknown';
+  const status = adj.status ?? 'unknown';
+  const reverses = action === 'refund' || action === 'chargeback';
+
+  const txnId = adj.transactionId ?? undefined;
+  const { userId: resolvedUser } = await resolveUserId({
+    customData: null,
+    subscriptionId: adj.subscriptionId,
+    customerId: adj.customerId,
+  });
+
+  const adjRef = db.collection('paddle_adjustments').doc(adj.id);
+  const txnRef = txnId ? db.collection('transactions').doc(txnId) : undefined;
+
+  const needsManualReview = await db.runTransaction(async (tx) => {
+    const [adjSnap, txnSnap] = await Promise.all([tx.get(adjRef), txnRef ? tx.get(txnRef) : null]);
+    const last = adjSnap.data()?.['lastEventAt'] as string | undefined;
+    if (last && last > occurredAt) return false; // an older delivery of an already-newer state
+
+    const userId = (txnSnap?.data()?.['userId'] as string | undefined) ?? resolvedUser;
+    const review = reverses && status === 'approved';
+
+    tx.set(
+      adjRef,
+      {
+        adjustmentId: adj.id,
+        action,
+        status,
+        transactionId: txnId ?? null,
+        subscriptionId: adj.subscriptionId ?? null,
+        paddleCustomerId: adj.customerId ?? null,
+        ...(userId ? { userId } : {}),
+        total: adj.totals?.total ?? null,
+        currency: adj.currencyCode ?? null,
+        needsManualReview: review,
+        lastEventAt: occurredAt,
+        updatedAt: FieldValue.serverTimestamp(),
+      },
+      { merge: true }
+    );
+
+    if (txnRef && txnSnap?.exists && reverses) {
+      const current = txnSnap.data()?.['reconciliation'] as { adjustmentId?: string } | undefined;
+      if (review) {
+        tx.set(
+          txnRef,
+          {
+            reconciliation: {
+              state: action === 'refund' ? 'refunded' : 'chargeback',
+              adjustmentId: adj.id,
+              at: occurredAt,
+            },
+            updatedAt: FieldValue.serverTimestamp(),
+          },
+          { merge: true }
+        );
+      } else if (
+        current?.adjustmentId === adj.id &&
+        (status === 'rejected' || status === 'reversed')
+      ) {
+        tx.set(
+          txnRef,
+          { reconciliation: { state: 'none', adjustmentId: adj.id, at: occurredAt } },
+          { merge: true }
+        );
+      }
+    }
+    return review;
+  });
+
+  if (needsManualReview) {
+    webhookLogger.warn('paddleWebhook: approved refund/chargeback recorded, needs manual review', {
+      adjustmentId: adj.id,
+      action,
+      transactionId: txnId,
+      userId: resolvedUser,
+    });
+  } else {
+    webhookLogger.info('paddleWebhook: adjustment recorded', {
+      adjustmentId: adj.id,
+      action,
+      status,
+    });
+  }
 }

@@ -6,7 +6,6 @@ import { validatedCallable } from '../../middleware/validation';
 import { getBusinessDoc } from '../../services/firestore';
 import { logFunctionStart, logFunctionComplete, logFunctionError } from '../../utils/logging';
 import { mapErrorToHttpsError } from '../../utils/errors';
-import type { Business } from '../../types';
 
 const getBusinessSchema = z.object({
   businessId: z.string().min(1),

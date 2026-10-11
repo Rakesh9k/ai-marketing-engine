@@ -1,6 +1,6 @@
 import { classifyHookType, buildAndSavePerformanceObservation } from './observationBuilder';
 import * as firestoreModule from '../firestore';
-import type { PublishJob, Campaign, ScheduledPost } from '../../types';
+import type { PublishJob, Campaign } from '../../types';
 import type { PostPerformanceRecord } from '../../types/meta';
 
 jest.mock('../firestore');

@@ -7,7 +7,7 @@ const cancelPublishJobSchema = z.object({
   jobId: z.string().min(1),
 });
 
-export const cancelPublishJob = onCall(async (request) => {
+export const cancelPublishJob = onCall({ enforceAppCheck: true }, async (request) => {
   const { logger, startTime } = logFunctionStart('cancelPublishJob', {
     auth: request.auth?.uid,
   });

@@ -1,5 +1,15 @@
-const generateStructuredTextMock = jest.fn().mockResolvedValue({
-  headlines: [{ text: 'సన్ డే ఫ్రైడే బిర్యానీ ఫన్!', characterCount: 20, variant: 'v1' }],
+// The stub answers in the language the request asked for. It used to return a Telugu-script headline for
+// every case, including "Use Hinglish": exactly the leak Truth Check now catches in real output.
+const generateStructuredTextMock = jest.fn().mockImplementation(async (prompt: unknown) => ({
+  headlines: [
+    {
+      text: String(prompt).includes('Hindi and English')
+        ? 'Friday ka special biryani fun!'
+        : 'సన్ డే ఫ్రైడే బిర్యానీ ఫన్!',
+      characterCount: 20,
+      variant: 'v1',
+    },
+  ],
   adCopies: [
     {
       primaryText: 'ABC Biryani: Spicy Chicken Biryani at ₹299 only',
@@ -34,7 +44,7 @@ const generateStructuredTextMock = jest.fn().mockResolvedValue({
     attributionParams: { campaignId: 'c1', creativeId: 'cr1', source: 'wa' },
   },
   ctaVariations: [{ text: 'Order on WhatsApp', variant: 'primary' }],
-});
+}));
 const analyzeProductImagesMock = jest.fn();
 const generateImageMock = jest.fn().mockResolvedValue({
   success: true,

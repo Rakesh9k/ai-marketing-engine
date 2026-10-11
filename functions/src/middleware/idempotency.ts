@@ -1,7 +1,6 @@
 import { HttpsError } from 'firebase-functions/v2/https';
-import type { CallableRequest } from 'firebase-functions/v2/https';
 import * as admin from 'firebase-admin';
-import { FieldValue, Timestamp } from 'firebase-admin/firestore';
+import { FieldValue } from 'firebase-admin/firestore';
 
 const db = admin.firestore();
 
@@ -11,7 +10,7 @@ export interface IdempotencyOptions {
 
 export async function checkIdempotency(
   idempotencyKey: string,
-  options: IdempotencyOptions = {}
+  _options: IdempotencyOptions = {}
 ): Promise<{ exists: boolean; data?: any }> {
   const ref = db.collection('idempotency_keys').doc(idempotencyKey);
   const snap = await ref.get();

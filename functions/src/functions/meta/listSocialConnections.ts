@@ -12,6 +12,7 @@ const listSocialConnectionsSchema = z.object({
 
 export const listSocialConnections = onCall(
   {
+    enforceAppCheck: true,
     region: 'asia-south1',
     maxInstances: 20,
     timeoutSeconds: 30,

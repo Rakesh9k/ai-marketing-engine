@@ -81,6 +81,9 @@ describe('GeminiTextProvider.generateStructured — runtime structured output co
   it('actually sends the given prompt to the model (regression guard for the reported bug)', async () => {
     mockGeminiResponse(JSON.stringify({ headline: 'x', price: 1 }));
     await provider.generateStructured('THE EXACT PROMPT TEXT', schema);
-    expect(generateContentMock).toHaveBeenCalledWith('THE EXACT PROMPT TEXT');
+    // The original prompt is sent first, followed by the response-format contract.
+    expect(generateContentMock).toHaveBeenCalledWith(
+      expect.stringMatching(/^THE EXACT PROMPT TEXT[\s\S]*RESPONSE FORMAT \(mandatory\)/)
+    );
   });
 });

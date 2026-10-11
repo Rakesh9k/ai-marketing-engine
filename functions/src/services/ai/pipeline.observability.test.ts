@@ -121,6 +121,8 @@ describe('GenerationPipeline observability (Phase 14)', () => {
     generateStructuredTextMock
       .mockResolvedValueOnce({})
       .mockResolvedValueOnce({})
+      .mockResolvedValueOnce({})
+      .mockResolvedValueOnce({})
       .mockRejectedValueOnce(new Error('AI provider timed out'));
 
     const pipeline = new GenerationPipeline();
@@ -132,7 +134,7 @@ describe('GenerationPipeline observability (Phase 14)', () => {
     expect(context).toMatchObject({
       businessId: 'biz_obs_1',
       campaignId: 'camp_obs_1',
-      stage: 'campaign_strategy',
+      stage: 'localization_strategy',
     });
     expect(context.error.message).toMatch(/AI provider timed out/);
   });

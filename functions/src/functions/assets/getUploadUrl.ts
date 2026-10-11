@@ -1,4 +1,4 @@
-import { onCall, HttpsError } from 'firebase-functions/v2/https';
+import { onCall } from 'firebase-functions/v2/https';
 import { z } from 'zod';
 import * as admin from 'firebase-admin';
 import { v7 as uuidv7 } from 'uuid';
@@ -32,9 +32,9 @@ export const getUploadUrl = onCall(
       await verifyBusinessAccess(context.userId, data.businessId);
       await checkRateLimit(context.userId, 'getUploadUrl');
 
-      const { fileName, contentType, fileSize, assetType = 'product' } = data;
+      const { fileName, contentType, fileSize: _fileSize, assetType = 'product' } = data;
       const businessId = data.businessId;
-      const userId = context.userId;
+      const _userId = context.userId;
 
       // Generate unique asset ID and storage path
       const assetId = uuidv7();

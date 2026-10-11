@@ -7,7 +7,7 @@ const retryPublishJobSchema = z.object({
   jobId: z.string().min(1),
 });
 
-export const retryPublishJob = onCall(async (request) => {
+export const retryPublishJob = onCall({ enforceAppCheck: true }, async (request) => {
   const { logger, startTime } = logFunctionStart('retryPublishJob', {
     auth: request.auth?.uid,
   });

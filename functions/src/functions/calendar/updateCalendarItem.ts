@@ -15,7 +15,7 @@ const updateCalendarItemSchema = z.object({
 });
 
 export const updateCalendarItem = onCall(
-  { region: 'asia-south1' },
+  { region: 'asia-south1', enforceAppCheck: true },
   validatedCallable(updateCalendarItemSchema, async (data, context) => {
     const userId = context.userId;
     const db = admin.firestore();

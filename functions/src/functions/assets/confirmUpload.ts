@@ -6,7 +6,7 @@ import { v7 as uuidv7 } from 'uuid';
 import { verifyBusinessAccess } from '../../middleware/auth';
 import { validatedCallable } from '../../middleware/validation';
 import { checkRateLimit } from '../../middleware/rateLimit';
-import { createAssetDoc, getAssetDoc } from '../../services/firestore';
+import { createAssetDoc } from '../../services/firestore';
 import { getDurableDownloadUrl } from '../../services/storageUrls';
 import { logFunctionStart, logFunctionComplete, logFunctionError } from '../../utils/logging';
 import { mapErrorToHttpsError } from '../../utils/errors';

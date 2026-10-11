@@ -12,6 +12,7 @@ const getPendingMetaPagesSchema = z.object({
 
 export const getPendingMetaPages = onCall(
   {
+    enforceAppCheck: true,
     region: 'asia-south1',
     maxInstances: 20,
     timeoutSeconds: 30,

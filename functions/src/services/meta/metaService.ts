@@ -18,7 +18,7 @@ import {
   listSocialConnectionsByUser,
 } from '../firestore';
 import { encryptToken } from './crypto';
-import { metaGraphClient, MetaGraphError } from './graphClient';
+import { metaGraphClient } from './graphClient';
 import type {
   SocialConnection,
   PendingMetaPage,

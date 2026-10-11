@@ -12,6 +12,7 @@ const disconnectMetaConnectionSchema = z.object({
 
 export const disconnectMetaConnection = onCall(
   {
+    enforceAppCheck: true,
     region: 'asia-south1',
     maxInstances: 20,
     timeoutSeconds: 30,

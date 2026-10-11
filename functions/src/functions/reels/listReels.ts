@@ -4,6 +4,7 @@ import { z } from 'zod';
 import { verifyBusinessAccess } from '../../middleware/auth';
 import { validatedCallable } from '../../middleware/validation';
 import { getReelProjectsByBusiness } from '../../services/firestore';
+import { withFreshReelUrls } from '../../services/reelAssets';
 import { logFunctionStart, logFunctionComplete, logFunctionError } from '../../utils/logging';
 import { mapErrorToHttpsError } from '../../utils/errors';
 
@@ -25,7 +26,10 @@ export const listReels = onCall(
       const result = await getReelProjectsByBusiness(data.businessId, data.limit);
 
       logFunctionComplete(logger, startTime, { success: true, count: result.reels.length });
-      return { reels: result.reels, lastDoc: result.lastDoc?.id || null };
+      return {
+        reels: await Promise.all(result.reels.map((r) => withFreshReelUrls(r))),
+        lastDoc: result.lastDoc?.id || null,
+      };
     } catch (error) {
       logFunctionError(logger, startTime, error as Error);
       throw mapErrorToHttpsError(error);

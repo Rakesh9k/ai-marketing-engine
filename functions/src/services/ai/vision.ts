@@ -1,6 +1,7 @@
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { z } from 'zod';
 import { getEnvConfig } from '../../config/env';
+import { visionModel } from '../../config/geminiModels';
 import { getVerticalConfigOrDefault } from '../../config/verticals';
 import { createLogger } from '../../utils/logging';
 
@@ -13,62 +14,124 @@ const logger = createLogger({ function: 'vision' });
  * output would silently flow into image-prompt building with missing
  * fields instead of failing here where the problem originates.
  */
+/**
+ * What a model writes when a field simply does not apply to the photo (a salon interior has no
+ * "portion size", a building has no steam). A live benchmark showed gemini-3.1-flash-lite answering
+ * "N/A" for 2 of 5 non-food photos, which a strict food-shaped schema turned into a hard failure of
+ * the whole analysis — for exactly the salon / real-estate / general businesses Mitra now serves.
+ */
+const NONE_WORDS = [
+  '',
+  'n/a',
+  'na',
+  'none',
+  'null',
+  'nil',
+  'unknown',
+  'not applicable',
+  'not_applicable',
+  'not visible',
+  '-',
+];
+const isNoneWord = (v: string) => NONE_WORDS.includes(v.trim().toLowerCase());
+
+const stringList = z.preprocess((v) => (v == null ? [] : v), z.array(z.string()));
+
+const PORTION_SIZES = ['small', 'medium', 'large', 'family'] as const;
+
 const VisionAnalysisResultSchema = z.object({
   dishName: z.string(),
   confidence: z.number(),
   visualAttributes: z.object({
     platingStyle: z.string(),
     container: z.string(),
-    garnish: z.array(z.string()),
-    colorPalette: z.array(z.string()),
+    garnish: stringList,
+    colorPalette: stringList,
     lighting: z.string(),
     background: z.string(),
-    portionSize: z.enum(['small', 'medium', 'large', 'family']),
-    steamVisible: z.boolean(),
-    textureCues: z.array(z.string()),
+    // Not applicable to non-food subjects: said explicitly rather than rejected.
+    portionSize: z.preprocess(
+      (v) => {
+        if (v == null) return 'not_applicable';
+        if (typeof v !== 'string') return v;
+        const s = v.trim().toLowerCase();
+        if ((PORTION_SIZES as readonly string[]).includes(s)) return s;
+        return isNoneWord(s) ? 'not_applicable' : v; // anything else still fails (and is repaired)
+      },
+      z.enum([...PORTION_SIZES, 'not_applicable'])
+    ),
+    steamVisible: z.preprocess((v) => {
+      if (v == null) return false;
+      if (typeof v !== 'string') return v;
+      const s = v.trim().toLowerCase();
+      if (['true', 'yes', 'y'].includes(s)) return true;
+      if (['false', 'no', 'n'].includes(s) || isNoneWord(s)) return false;
+      return v;
+    }, z.boolean()),
+    textureCues: stringList,
   }),
-  ambianceCues: z.array(z.string()),
-  suggestedCompositions: z.array(z.string()),
-  qualityFlags: z.array(z.string()),
+  ambianceCues: stringList,
+  suggestedCompositions: stringList,
+  qualityFlags: stringList,
 });
 
+/** A required enum. A "none"-style answer maps to `fallback` when one makes sense; otherwise it is an error. */
+const strictEnum = <T extends readonly [string, ...string[]]>(values: T, fallback?: T[number]) =>
+  z.preprocess((v) => {
+    if (typeof v !== 'string') return v;
+    const s = v.trim().toLowerCase();
+    if ((values as readonly string[]).includes(s)) return s;
+    return fallback && isNoneWord(s) ? fallback : v;
+  }, z.enum(values));
+
+/** An optional enum. The prompt says "omit what you cannot determine": an unusable value is omitted. */
+const optionalEnum = <T extends readonly [string, ...string[]]>(values: T) =>
+  z.preprocess((v) => {
+    if (typeof v !== 'string') return v == null ? undefined : v;
+    const s = v.trim().toLowerCase();
+    return (values as readonly string[]).includes(s) ? s : undefined;
+  }, z.enum(values).optional());
+
+const HIERARCHY = ['product', 'headline', 'cta', 'brand', 'supporting-copy'] as const;
+
 export const ReferenceStyleAnalysisSchema = z.object({
-  tone: z.enum(['playful', 'serious', 'professional', 'warm', 'bold', 'premium', 'energetic']),
-  visualDensity: z.enum(['minimal', 'low', 'medium', 'high']),
-  productProminence: z.enum(['subtle', 'balanced', 'high', 'dominant']),
-  textDensity: z.enum(['minimal', 'concise', 'moderate', 'detailed']),
-  colorMode: z.enum(['brand', 'neutral', 'monochrome', 'vibrant']),
-  humor: z.enum(['none', 'light', 'moderate', 'high']),
-  ctaStyle: z.enum(['soft', 'direct', 'urgent', 'conversational']),
-  composition: z
-    .enum([
-      'centered',
-      'hero-focused',
-      'split-layout',
-      'editorial',
-      'grid',
-      'asymmetric',
-      'negative-space-heavy',
-      'left-aligned',
-      'right-aligned',
-    ])
-    .optional(),
-  visualHierarchy: z
-    .array(z.enum(['product', 'headline', 'cta', 'brand', 'supporting-copy']))
-    .optional(),
-  ctaPlacement: z.enum(['bottom', 'top', 'end-card', 'integrated', 'product-adjacent']).optional(),
-  hookStructure: z
-    .enum([
-      'question',
-      'bold-statement',
-      'visual-surprise',
-      'product-first',
-      'problem-first',
-      'offer-first',
-      'curiosity',
-    ])
-    .optional(),
-  shotPacing: z.enum(['slow', 'moderate', 'fast', 'dynamic', 'cinematic']).optional(),
+  tone: strictEnum(['playful', 'serious', 'professional', 'warm', 'bold', 'premium', 'energetic']),
+  visualDensity: strictEnum(['minimal', 'low', 'medium', 'high']),
+  // A photo with no product / no text / no call to action gets the least assertive value.
+  productProminence: strictEnum(['subtle', 'balanced', 'high', 'dominant'], 'subtle'),
+  textDensity: strictEnum(['minimal', 'concise', 'moderate', 'detailed'], 'minimal'),
+  colorMode: strictEnum(['brand', 'neutral', 'monochrome', 'vibrant']),
+  humor: strictEnum(['none', 'light', 'moderate', 'high']),
+  ctaStyle: strictEnum(['soft', 'direct', 'urgent', 'conversational'], 'soft'),
+  composition: optionalEnum([
+    'centered',
+    'hero-focused',
+    'split-layout',
+    'editorial',
+    'grid',
+    'asymmetric',
+    'negative-space-heavy',
+    'left-aligned',
+    'right-aligned',
+  ]),
+  visualHierarchy: z.preprocess(
+    (v) =>
+      Array.isArray(v)
+        ? v.filter((x) => typeof x === 'string' && (HIERARCHY as readonly string[]).includes(x))
+        : undefined,
+    z.array(z.enum(HIERARCHY)).optional()
+  ),
+  ctaPlacement: optionalEnum(['bottom', 'top', 'end-card', 'integrated', 'product-adjacent']),
+  hookStructure: optionalEnum([
+    'question',
+    'bold-statement',
+    'visual-surprise',
+    'product-first',
+    'problem-first',
+    'offer-first',
+    'curiosity',
+  ]),
+  shotPacing: optionalEnum(['slow', 'moderate', 'fast', 'dynamic', 'cinematic']),
 });
 export type ReferenceStyleAnalysisResult = z.infer<typeof ReferenceStyleAnalysisSchema>;
 
@@ -80,7 +143,45 @@ export class GeminiVisionProvider {
   protected getModel(): any {
     const key = this.apiKey;
     const client = new GoogleGenerativeAI(key);
-    return client.getGenerativeModel({ model: 'gemini-flash-latest' });
+    const modelName = visionModel();
+    // JSON mode, as the text provider already uses, so the answer is bare JSON and not a fenced block.
+    return client.getGenerativeModel({
+      model: modelName,
+      generationConfig: { responseMimeType: 'application/json' },
+    });
+  }
+
+  /**
+   * Calls the model and validates the answer with `parse`. If the answer fails validation the model
+   * is shown its own response and the exact errors and asked ONCE more for a corrected object (the
+   * images are re-sent, so this only ever costs extra on a failure). A second failure is an error —
+   * never an accepted bad answer — and it is the last error, so callers see why.
+   */
+  protected async generateValidated<T>(
+    prompt: string,
+    imageParts: any[],
+    parse: (raw: string) => T,
+    maxRepairs = 1
+  ): Promise<T> {
+    let current = prompt;
+    let lastError: Error = new Error('no response');
+    for (let attempt = 0; attempt <= maxRepairs; attempt++) {
+      const result = await this.getModel().generateContent([current, ...imageParts]);
+      const raw = result.response.text();
+      try {
+        return parse(raw);
+      } catch (error) {
+        lastError = error instanceof Error ? error : new Error(String(error));
+        current =
+          prompt +
+          '\n\nYOUR PREVIOUS RESPONSE FAILED VALIDATION.\nPrevious response:\n' +
+          raw.slice(0, 4000) +
+          '\n\nValidation errors:\n' +
+          lastError.message.slice(0, 1500) +
+          '\n\nReturn the corrected, COMPLETE JSON object only. Where an error lists allowed values, use only those. If a field does not apply to this image, use the closest allowed value or an empty list.';
+      }
+    }
+    throw lastError;
   }
 
   /**
@@ -111,16 +212,16 @@ Return a JSON object strictly matching this structure:
 Omit fields if you cannot confidently determine them. Output ONLY JSON.`;
 
     try {
-      const result = await this.getModel().generateContent([prompt, ...imageParts]);
-      const response = result.response.text();
-      const jsonMatch = response.match(/\{[\s\S]*\}/);
-      const jsonStr = jsonMatch ? jsonMatch[0] : response;
-      const parsed = JSON.parse(jsonStr);
-      const validation = ReferenceStyleAnalysisSchema.safeParse(parsed);
-      if (!validation.success) {
-        throw new Error(`Reference style schema validation failed: ${validation.error.message}`);
-      }
-      return validation.data;
+      return await this.generateValidated(prompt, imageParts, (response) => {
+        const jsonMatch = response.match(/\{[\s\S]*\}/);
+        const jsonStr = jsonMatch ? jsonMatch[0] : response;
+        const parsed = JSON.parse(jsonStr);
+        const validation = ReferenceStyleAnalysisSchema.safeParse(parsed);
+        if (!validation.success) {
+          throw new Error(`Reference style schema validation failed: ${validation.error.message}`);
+        }
+        return validation.data;
+      });
     } catch (error) {
       throw new Error(
         `Reference style analysis failed: ${error instanceof Error ? error.message : 'Unknown error'}`
@@ -165,10 +266,9 @@ Omit fields if you cannot confidently determine them. Output ONLY JSON.`;
     const prompt = this.buildAnalysisPrompt(productMetadata, businessContext);
 
     try {
-      const result = await this.getModel().generateContent([prompt, ...imageParts]);
-      const response = result.response.text();
-
-      return this.parseVisionResponse(response);
+      return await this.generateValidated(prompt, imageParts, (response) =>
+        this.parseVisionResponse(response)
+      );
     } catch (error) {
       throw new Error(
         `Vision analysis failed: ${error instanceof Error ? error.message : 'Unknown error'}`
@@ -259,7 +359,7 @@ Return a JSON object with the following structure:
     "colorPalette": ["string - Dominant colors"],
     "lighting": "string - natural/warm/studio/dim",
     "background": "string - kitchen/table/blurred/clean",
-    "portionSize": "small|medium|large|family",
+    "portionSize": "small|medium|large|family|not_applicable (use not_applicable when the subject is not food, e.g. a space or a building)",
     "steamVisible": "boolean",
     "textureCues": ["string - e.g., crispy, juicy, creamy, fluffy"]
   },

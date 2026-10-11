@@ -159,12 +159,29 @@ describeIfEmulator('generateCampaignStrategy — Truth Check gates persistence (
     });
 
     const request = callableRequest(makeRequestData(businessId, uuid()), userId);
-    const result = await (generateCampaignStrategy as any).run(request);
+    // A discarded campaign delivers nothing, so the call is rejected (and the credit refunded)
+    // instead of returning a charged-but-empty result.
+    await expect((generateCampaignStrategy as any).run(request)).rejects.toMatchObject({
+      code: 'failed-precondition',
+    });
+
+    const campaignSnap = await db
+      .collection('campaigns')
+      .where('businessId', '==', businessId)
+      .get();
+    expect(campaignSnap.size).toBe(1);
+    const result = { campaignId: campaignSnap.docs[0]!.id };
 
     // Campaign is rejected/failed, not just labeled — verify the actual
     // Firestore state, not the function's return value.
     const campaign = await getCampaignDoc(result.campaignId);
     expect(campaign!.status).toBe('failed');
+    expect(campaign!.creditsUsed).toBe(0);
+    expect(campaign!.error?.code).toBe('TRUTH_CHECK_FAILED');
+
+    // REFUND: the reservation was released, so the user's usage shows nothing consumed.
+    const usageAfter = await db.collection('usage').where('userId', '==', userId).get();
+    expect(usageAfter.docs[0]!.data()['creditsUsed']).toBe(0);
 
     // DISCARD: no CampaignAsset doc exists for this campaign at all — a
     // client can never obtain the asset's imageUrl via Firestore, whether

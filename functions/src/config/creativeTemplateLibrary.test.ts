@@ -227,8 +227,14 @@ describe('BUILTIN_CREATIVE_TEMPLATES — distinctiveness', () => {
   });
 
   it('at least one template is vertical-specific and at least one is broad (compatibleVerticals varies)', () => {
-    const vertSpecific = BUILTIN_CREATIVE_TEMPLATES.some((t) => t.compatibleVerticals.length < 3);
-    const broad = BUILTIN_CREATIVE_TEMPLATES.some((t) => t.compatibleVerticals.length === 3);
+    // "Broad" = compatible with every vertical (restaurant, salon, real_estate and general).
+    const ALL_VERTICALS = 4;
+    const vertSpecific = BUILTIN_CREATIVE_TEMPLATES.some(
+      (t) => t.compatibleVerticals.length < ALL_VERTICALS
+    );
+    const broad = BUILTIN_CREATIVE_TEMPLATES.some(
+      (t) => t.compatibleVerticals.length === ALL_VERTICALS
+    );
     expect(vertSpecific).toBe(true);
     expect(broad).toBe(true);
   });

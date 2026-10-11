@@ -144,11 +144,11 @@ describeIfEmulator(
       const campaign = campaignsSnap.docs[0]!.data();
       expect(campaign['status']).toBe('failed');
       expect(campaign['error']).toBeDefined();
-      expect(campaign['error'].message).toMatch(/AI provider timed out/);
+      expect(campaign['error'].message).toMatch(/taking longer than expected/);
       expect(campaign['error'].retryable).toBe(true);
     });
 
-    it('Truth Check FAIL: campaign reaches "failed" with error.code TRUTH_CHECK_FAILED, and credits are FINALIZED (charged), not refunded — consistent, documented, intentional behavior', async () => {
+    it('Truth Check FAIL: campaign reaches "failed" with error.code TRUTH_CHECK_FAILED and the credits are REFUNDED (nothing is delivered, so nothing is charged)', async () => {
       const userId = `user-${uuid()}`;
       const businessId = `biz-${uuid()}`;
       await createBusinessDoc(makeBusiness(businessId, userId));
@@ -176,19 +176,23 @@ describeIfEmulator(
       });
 
       const request = callableRequest(makeRequestData(businessId, uuid()), userId);
-      const result = await (generateCampaignStrategy as any).run(request);
+      await expect((generateCampaignStrategy as any).run(request)).rejects.toMatchObject({
+        code: 'failed-precondition',
+      });
+      const created = await db.collection('campaigns').where('businessId', '==', businessId).get();
+      expect(created.size).toBe(1);
 
-      const campaign = await getCampaignDoc(result.campaignId);
+      const campaign = await getCampaignDoc(created.docs[0]!.id);
       expect(campaign!.status).toBe('failed');
       expect(campaign!.error?.code).toBe('TRUTH_CHECK_FAILED');
       expect(campaign!.error?.message).toMatch(/Price mismatch/);
 
       const usageSnap = await db.collection('usage').doc(usageId).get();
-      // Credits were finalized (charged), NOT refunded — the generation
-      // attempt genuinely completed and consumed AI compute; only Truth
-      // Check rejected the output. This mirrors regenerateAsset's existing
-      // behavior (Phase 6/10) and must not silently change.
-      expect(usageSnap.data()!['creditsUsed']).toBeGreaterThan(0);
+      // Policy (Phase 5): a Truth Check FAIL discards the whole campaign, so the reservation is
+      // refunded. Charging for a campaign the customer never receives violates the launch rule that
+      // a failed generation must not consume credits. To restore the old charge-on-reject behaviour,
+      // stop throwing after the 'failed' write in generateCampaignStrategy.
+      expect(usageSnap.data()!['creditsUsed']).toBe(0);
     });
 
     it('a failed generation does not prevent a subsequent legitimate retry (fresh idempotencyKey) from succeeding', async () => {

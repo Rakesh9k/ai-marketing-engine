@@ -10,6 +10,10 @@
 import { v4 as uuid } from 'uuid';
 import * as admin from 'firebase-admin';
 import * as usageControl from './usageControl';
+import { PRICING } from '../config/pricing';
+
+const CAMPAIGN_COST = usageControl.getGenerationCost('campaign_generation');
+const FREE_ALLOWANCE = PRICING.subscriptionTiers.free.monthlyCredits;
 
 const emulatorHost = process.env['FIRESTORE_EMULATOR_HOST'];
 const describeIfEmulator = emulatorHost ? describe : describe.skip;
@@ -55,9 +59,9 @@ describeIfEmulator('usageControl credit safety (Firestore emulator)', () => {
       userId,
       operationId,
       'campaign_generation',
-      140
+      CAMPAIGN_COST
     );
-    expect(reservation.creditsReserved).toBe(140);
+    expect(reservation.creditsReserved).toBe(CAMPAIGN_COST);
 
     const finalize = await usageControl.finalizeReservation(operationId);
     expect(finalize.success).toBe(true);
@@ -113,7 +117,7 @@ describeIfEmulator('usageControl credit safety (Firestore emulator)', () => {
     );
 
     const usageSnap = await db.collection('usage').doc(usageId).get();
-    expect(usageSnap.data()!['creditsUsed']).toBe(140);
+    expect(usageSnap.data()!['creditsUsed']).toBe(CAMPAIGN_COST);
 
     const txSnap = await db.collection('transactions').doc(operationId).get();
     expect(txSnap.data()!['status']).toBe('completed');
@@ -124,18 +128,18 @@ describeIfEmulator('usageControl credit safety (Firestore emulator)', () => {
     const usageId = await seedActiveUsage(userId);
     const operationId = uuid();
 
-    await usageControl.reserveCreditsForOperation(userId, operationId, 'campaign_generation', 140);
+    await usageControl.reserveCreditsForOperation(userId, operationId, 'campaign_generation', CAMPAIGN_COST);
     const second = await usageControl.reserveCreditsForOperation(
       userId,
       operationId,
       'campaign_generation',
-      140
+      CAMPAIGN_COST
     );
     expect(second.transactionId).toBe(operationId);
 
     const usageSnap = await db.collection('usage').doc(usageId).get();
-    // Only one increment of 140 happened, not two.
-    expect(usageSnap.data()!['creditsUsed']).toBe(140);
+    // Only one increment of CAMPAIGN_COST happened, not two.
+    expect(usageSnap.data()!['creditsUsed']).toBe(CAMPAIGN_COST);
   });
 
   it('CASE 9: already-finalized reservation cannot be finalized again, and cannot be refunded', async () => {
@@ -143,7 +147,7 @@ describeIfEmulator('usageControl credit safety (Firestore emulator)', () => {
     await seedActiveUsage(userId);
     const operationId = uuid();
 
-    await usageControl.reserveCreditsForOperation(userId, operationId, 'campaign_generation', 140);
+    await usageControl.reserveCreditsForOperation(userId, operationId, 'campaign_generation', CAMPAIGN_COST);
     await usageControl.finalizeReservation(operationId);
 
     // Finalizing again is idempotent (no error, no double effect).
@@ -159,7 +163,7 @@ describeIfEmulator('usageControl credit safety (Firestore emulator)', () => {
     const usageId = await seedActiveUsage(userId);
     const operationId = uuid();
 
-    await usageControl.reserveCreditsForOperation(userId, operationId, 'campaign_generation', 140);
+    await usageControl.reserveCreditsForOperation(userId, operationId, 'campaign_generation', CAMPAIGN_COST);
     await usageControl.refundReservation(operationId, userId);
 
     await expect(usageControl.finalizeReservation(operationId)).rejects.toThrow(/refunded/i);
@@ -169,7 +173,7 @@ describeIfEmulator('usageControl credit safety (Firestore emulator)', () => {
     expect(secondRefund.success).toBe(true);
 
     const usageSnap = await db.collection('usage').doc(usageId).get();
-    expect(usageSnap.data()!['creditsUsed']).toBe(0); // reserved 140, refunded 140, never double-refunded below 0
+    expect(usageSnap.data()!['creditsUsed']).toBe(0); // reserved CAMPAIGN_COST, refunded CAMPAIGN_COST, never double-refunded below 0
   });
 
   it('no reservation -> finalize/refund fail with OPERATION_NOT_FOUND rather than fabricating success', async () => {
@@ -204,11 +208,11 @@ describeIfEmulator('usageControl credit safety (Firestore emulator)', () => {
 
   it('insufficient credits genuinely blocks reservation (credit gate is not bypassed)', async () => {
     const userId = testUserId();
-    await seedActiveUsage(userId, 'free'); // 100 monthly credits
+    await seedActiveUsage(userId, 'free'); // free monthly credits (free)
     const operationId = uuid();
 
     await expect(
-      usageControl.reserveCreditsForOperation(userId, operationId, 'campaign_generation', 140)
+      usageControl.reserveCreditsForOperation(userId, operationId, 'campaign_generation', 141)
     ).rejects.toMatchObject({ code: 'INSUFFICIENT_CREDITS' });
 
     const txSnap = await db.collection('transactions').doc(operationId).get();
@@ -220,8 +224,8 @@ describeIfEmulator('usageControl credit safety (Firestore emulator)', () => {
   // "insufficient" case above.
   it('ZERO BALANCE: a user who has already used their entire monthly allowance cannot reserve any further credits', async () => {
     const userId = testUserId();
-    const usageId = await seedActiveUsage(userId, 'free'); // 100 monthly credits
-    await db.collection('usage').doc(usageId).update({ creditsUsed: 100 });
+    const usageId = await seedActiveUsage(userId, 'free'); // free monthly credits (free)
+    await db.collection('usage').doc(usageId).update({ creditsUsed: FREE_ALLOWANCE });
     const operationId = uuid();
 
     await expect(
@@ -229,7 +233,7 @@ describeIfEmulator('usageControl credit safety (Firestore emulator)', () => {
     ).rejects.toMatchObject({ code: 'INSUFFICIENT_CREDITS' });
 
     const usageSnap = await db.collection('usage').doc(usageId).get();
-    expect(usageSnap.data()!['creditsUsed']).toBe(100); // unchanged, not pushed negative-available
+    expect(usageSnap.data()!['creditsUsed']).toBe(FREE_ALLOWANCE); // unchanged, not pushed negative-available
   });
 
   it('EXACT CREDITS: a request for precisely the remaining balance succeeds (off-by-one boundary is not rejected)', async () => {
@@ -264,14 +268,14 @@ describeIfEmulator('usageControl credit safety (Firestore emulator)', () => {
   // reading a stale "credits available" snapshot and both succeeding.
   it('CONCURRENCY: two different operations racing for the same limited balance cannot both succeed if their combined cost exceeds it', async () => {
     const userId = testUserId();
-    const usageId = await seedActiveUsage(userId, 'free'); // 100 monthly credits
+    const usageId = await seedActiveUsage(userId, 'free'); // free monthly credits (free)
     const operationIdA = uuid();
     const operationIdB = uuid();
 
-    // Each individually fits (60 <= 100), but together they do not (120 > 100).
+    // Each individually fits (100 <= CAMPAIGN_COST), but together they do not (200 > CAMPAIGN_COST).
     const results = await Promise.allSettled([
-      usageControl.reserveCreditsForOperation(userId, operationIdA, 'campaign_generation', 60),
-      usageControl.reserveCreditsForOperation(userId, operationIdB, 'campaign_generation', 60),
+      usageControl.reserveCreditsForOperation(userId, operationIdA, 'campaign_generation', 100),
+      usageControl.reserveCreditsForOperation(userId, operationIdB, 'campaign_generation', 100),
     ]);
 
     const fulfilled = results.filter((r) => r.status === 'fulfilled');
@@ -285,7 +289,7 @@ describeIfEmulator('usageControl credit safety (Firestore emulator)', () => {
     // Exactly one reservation actually landed — never both (200) and never
     // neither (0).
     const usageSnap = await db.collection('usage').doc(usageId).get();
-    expect(usageSnap.data()!['creditsUsed']).toBe(60);
+    expect(usageSnap.data()!['creditsUsed']).toBe(100);
   });
 
   // M3 (Pass 2) — a retry/duplicate call for the SAME operationId must never
@@ -302,7 +306,7 @@ describeIfEmulator('usageControl credit safety (Firestore emulator)', () => {
         userId,
         operationId,
         'campaign_generation',
-        140
+        CAMPAIGN_COST
       );
 
       const generationFn = jest.fn().mockResolvedValue('should never run');
@@ -318,10 +322,10 @@ describeIfEmulator('usageControl credit safety (Firestore emulator)', () => {
       expect(generationFn).not.toHaveBeenCalled();
 
       // Critically: the ORIGINAL (still in-flight) reservation must NOT have
-      // been refunded by this losing duplicate call — only 140 credits used,
+      // been refunded by this losing duplicate call — only CAMPAIGN_COST credits used,
       // still pending, not decremented back to 0.
       const usageSnap = await db.collection('usage').doc(usageId).get();
-      expect(usageSnap.data()!['creditsUsed']).toBe(140);
+      expect(usageSnap.data()!['creditsUsed']).toBe(CAMPAIGN_COST);
       const txSnap = await db.collection('transactions').doc(operationId).get();
       expect(txSnap.data()!['status']).toBe('pending');
     });
@@ -335,7 +339,7 @@ describeIfEmulator('usageControl credit safety (Firestore emulator)', () => {
         userId,
         operationId,
         'campaign_generation',
-        140
+        CAMPAIGN_COST
       );
 
       // Duplicate call — loses, does not disturb the original reservation.
@@ -349,7 +353,7 @@ describeIfEmulator('usageControl credit safety (Firestore emulator)', () => {
       const txSnap = await db.collection('transactions').doc(operationId).get();
       expect(txSnap.data()!['status']).toBe('completed');
       const usageSnap = await db.collection('usage').doc(usageId).get();
-      expect(usageSnap.data()!['creditsUsed']).toBe(140); // charged exactly once
+      expect(usageSnap.data()!['creditsUsed']).toBe(CAMPAIGN_COST); // charged exactly once
     });
 
     it('concurrent executeWithUsageControl calls for the SAME operationId: generationFn runs exactly once, credits charged exactly once', async () => {
@@ -392,7 +396,7 @@ describeIfEmulator('usageControl credit safety (Firestore emulator)', () => {
       expect(generationFn).toHaveBeenCalledTimes(1);
 
       const usageSnap = await db.collection('usage').doc(usageId).get();
-      expect(usageSnap.data()!['creditsUsed']).toBe(140); // charged exactly once, not 280
+      expect(usageSnap.data()!['creditsUsed']).toBe(CAMPAIGN_COST); // charged exactly once, not 280
     });
   });
 
@@ -546,7 +550,7 @@ describeIfEmulator('usageControl credit safety (Firestore emulator)', () => {
       expect(result.result).toBe('ok');
 
       usageSnap = await db.collection('usage').doc(usageId).get();
-      expect(usageSnap.data()!['creditsUsed']).toBe(140); // charged exactly once for the successful retry
+      expect(usageSnap.data()!['creditsUsed']).toBe(CAMPAIGN_COST); // charged exactly once for the successful retry
     });
   });
 });

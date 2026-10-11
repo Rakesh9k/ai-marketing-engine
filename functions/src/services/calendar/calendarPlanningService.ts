@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { getTextAI } from '../ai/factory/aiProviderFactory';
+import { textModel } from '../../config/geminiModels';
 import type {
   Business,
   GeneratePlanInput,
@@ -194,7 +195,7 @@ REQUIREMENTS:
       createdCount: 0,
       metadata: {
         promptVersion: 'v1.0',
-        aiModel: 'gemini-flash-latest',
+        aiModel: textModel(),
       },
       createdAt: nowIso,
       updatedAt: nowIso,

@@ -74,6 +74,15 @@ export interface VideoRenderer {
  * happens in that separately deployed, separately scaled service; this class
  * is just the authenticated HTTP client for it.
  */
+/**
+ * Client-side ceilings, deliberately below the callers' own limits (generateReel is killed at
+ * 540 s). A hung renderer must surface as an ordinary error so the usage reservation is
+ * refunded and the reel is marked failed, instead of the whole function dying mid-render and
+ * leaving the reel stuck in "rendering". The renderer's own ceiling is 5 minutes.
+ */
+export const RENDER_TIMEOUT_MS = 6 * 60 * 1000;
+export const ANALYZE_TIMEOUT_MS = 2 * 60 * 1000;
+
 export class CloudRunVideoRenderer implements VideoRenderer {
   private readonly baseUrl: string;
   private readonly auth: GoogleAuth;
@@ -103,6 +112,7 @@ export class CloudRunVideoRenderer implements VideoRenderer {
       method: 'POST',
       headers: { ...headers, 'Content-Type': 'application/json' },
       body: JSON.stringify(input),
+      signal: AbortSignal.timeout(ANALYZE_TIMEOUT_MS),
     });
     if (!response.ok) {
       throw new Error(
@@ -118,6 +128,7 @@ export class CloudRunVideoRenderer implements VideoRenderer {
       method: 'POST',
       headers: { ...headers, 'Content-Type': 'application/json' },
       body: JSON.stringify(input),
+      signal: AbortSignal.timeout(RENDER_TIMEOUT_MS),
     });
     if (!response.ok) {
       throw new Error(`Renderer render failed (${response.status}): ${await response.text()}`);
@@ -151,16 +162,20 @@ export class DevMockVideoRenderer implements VideoRenderer {
 
   async renderReel(input: ReelRenderInput): Promise<RenderedReel> {
     logger.info('devMock.renderReel', { reelId: input.reelId, clipCount: input.clips.length });
-    const bucket = admin.storage().bucket();
-    const placeholder = Buffer.from(
-      `MITRA_DEV_MOCK_REEL reelId=${input.reelId} clips=${input.clips.length}`
-    );
-    await bucket
-      .file(input.outputStoragePath)
-      .save(placeholder, { metadata: { contentType: 'video/mp4' }, resumable: false });
-    await bucket
-      .file(input.thumbnailStoragePath)
-      .save(placeholder, { metadata: { contentType: 'image/jpeg' }, resumable: false });
+    try {
+      const bucket = admin.storage().bucket();
+      const placeholder = Buffer.from(
+        `MITRA_DEV_MOCK_REEL reelId=${input.reelId} clips=${input.clips.length}`
+      );
+      await bucket
+        .file(input.outputStoragePath)
+        .save(placeholder, { metadata: { contentType: 'video/mp4' }, resumable: false });
+      await bucket
+        .file(input.thumbnailStoragePath)
+        .save(placeholder, { metadata: { contentType: 'image/jpeg' }, resumable: false });
+    } catch {
+      // In local Jest unit test environment without GCS auth, allow mock output
+    }
     return {
       outputStoragePath: input.outputStoragePath,
       thumbnailStoragePath: input.thumbnailStoragePath,
@@ -174,12 +189,18 @@ let cachedRenderer: VideoRenderer | null = null;
 export function getVideoRenderer(): VideoRenderer {
   if (cachedRenderer) return cachedRenderer;
   const config = getEnvConfig();
-  if (config.REEL_RENDERER_URL && config.NODE_ENV === 'production') {
+  if (config.REEL_RENDERER_URL) {
     cachedRenderer = new CloudRunVideoRenderer(config.REEL_RENDERER_URL);
-  } else if (config.REEL_RENDERER_URL && !config.FUNCTIONS_EMULATOR) {
-    cachedRenderer = new CloudRunVideoRenderer(config.REEL_RENDERER_URL);
-  } else {
-    cachedRenderer = new DevMockVideoRenderer();
+    return cachedRenderer;
   }
-  return cachedRenderer;
+  // The mock writes a placeholder file that is not a playable video, so it may only
+  // ever run in the emulator or under Jest. In any deployed environment a missing
+  // REEL_RENDERER_URL must fail the reel (and be refunded) rather than fake success.
+  if (config.FUNCTIONS_EMULATOR || process.env['JEST_WORKER_ID']) {
+    cachedRenderer = new DevMockVideoRenderer();
+    return cachedRenderer;
+  }
+  throw new Error(
+    'REEL_RENDERER_URL is not configured: reel rendering is unavailable. Refusing to fall back to the development mock renderer.'
+  );
 }

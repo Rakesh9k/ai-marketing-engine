@@ -59,14 +59,14 @@ describe('Phase 21 Real Business Beta Workflow Verification', () => {
 
   it('verifies campaign generation cost and credit balance calculations during beta operations', () => {
     const campaignCost = getGenerationCost('campaign_generation');
-    expect(campaignCost).toBe(140);
+    expect(campaignCost).toBe(100);
 
     const starterCredits = PRICING.subscriptionTiers.starter.monthlyCredits;
     expect(starterCredits).toBe(500);
 
-    // 2 campaigns = 280 credits, remaining = 220 credits
+    // 2 campaigns = 200 credits, remaining = 300 credits
     const remainingAfterTwo = starterCredits - 2 * campaignCost;
-    expect(remainingAfterTwo).toBe(220);
+    expect(remainingAfterTwo).toBe(300);
     expect(remainingAfterTwo).toBeGreaterThan(0);
   });
 });

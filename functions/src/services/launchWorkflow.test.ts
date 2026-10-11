@@ -24,19 +24,19 @@ describe('Phase 22 Public Launch Architecture & Workflow Verification', () => {
 
   it('verifies credit cost and reservation balance safety for launch tiers', () => {
     const campaignCost = getGenerationCost('campaign_generation');
-    expect(campaignCost).toBe(140);
+    expect(campaignCost).toBe(100);
 
     const freeCredits = PRICING.subscriptionTiers.free.monthlyCredits;
     const starterCredits = PRICING.subscriptionTiers.starter.monthlyCredits;
     const businessCredits = PRICING.subscriptionTiers.business.monthlyCredits;
 
-    expect(freeCredits).toBe(100);
+    expect(freeCredits).toBe(140);
     expect(starterCredits).toBe(500);
     expect(businessCredits).toBe(1200);
 
-    // Starter plan allows 3 campaign generations with 80 credits remaining
-    expect(starterCredits - 3 * campaignCost).toBe(80);
-    expect(businessCredits - 8 * campaignCost).toBe(80);
+    // Starter plan allows 5 campaign generations with 0 credits remaining (500 / 100 = 5)
+    expect(starterCredits - 5 * campaignCost).toBe(0);
+    expect(businessCredits - 12 * campaignCost).toBe(0);
   });
 
   it('verifies canonical data model mapping without secondary architectures', () => {

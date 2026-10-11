@@ -1,14 +1,8 @@
 import {
   getUserEntitlements,
-  requireFeature,
-  requirePlan,
-  requireCampaignAllowance,
   requireReelAllowance,
-  requireCreativeAllowance,
-  requireStoryAllowance,
   requireBusinessAllowance,
   ENTITLEMENT_ERROR_CODES,
-  PLAN_ENTITLEMENTS,
 } from './entitlements';
 import * as firestore from './firestore';
 
@@ -69,14 +63,20 @@ describe('Entitlements Service', () => {
     });
 
     it('allows Reel generation if within monthly quota on Pro plan', async () => {
-      (firestore.getCurrentUsage as jest.Mock).mockResolvedValue({ planId: 'pro', reelsCreated: 5 });
+      (firestore.getCurrentUsage as jest.Mock).mockResolvedValue({
+        planId: 'pro',
+        reelsCreated: 5,
+      });
       (firestore.getSubscriptionByUser as jest.Mock).mockResolvedValue({ planId: 'pro' });
 
       await expect(requireReelAllowance('user_pro')).resolves.not.toThrow();
     });
 
     it('throws REEL_QUOTA_EXCEEDED when monthly limit reached', async () => {
-      (firestore.getCurrentUsage as jest.Mock).mockResolvedValue({ planId: 'pro', reelsCreated: 20 });
+      (firestore.getCurrentUsage as jest.Mock).mockResolvedValue({
+        planId: 'pro',
+        reelsCreated: 20,
+      });
       (firestore.getSubscriptionByUser as jest.Mock).mockResolvedValue({ planId: 'pro' });
 
       await expect(requireReelAllowance('user_pro')).rejects.toThrow(

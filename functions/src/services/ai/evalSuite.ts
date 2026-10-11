@@ -124,7 +124,7 @@ export function GENERATE_100_EVAL_CASES(): AiEvalTestCase[] {
     const service = salonServices[(i - 31) % salonServices.length]!;
     const lang = i % 2 === 0 ? 'hi_en' : 'en';
     const tone = 'premium';
-    const channel = 'Instagram';
+    const _channel = 'Instagram';
 
     testCases.push({
       id: `CASE_${String(i).padStart(3, '0')}`,

@@ -177,7 +177,12 @@ describe('CreativeTemplate — canonical values', () => {
   });
 
   it('BUSINESS_CATEGORIES is derived from the existing vertical config, not a hand-duplicated list', () => {
-    expect([...BUSINESS_CATEGORIES].sort()).toEqual(['real_estate', 'restaurant', 'salon']);
+    expect([...BUSINESS_CATEGORIES].sort()).toEqual([
+      'general',
+      'real_estate',
+      'restaurant',
+      'salon',
+    ]);
   });
 });
 

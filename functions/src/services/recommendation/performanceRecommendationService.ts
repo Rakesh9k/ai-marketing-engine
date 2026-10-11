@@ -6,12 +6,7 @@ import type {
   GenerationRecommendationContext,
 } from '../../types/recommendation';
 import * as firestoreService from '../firestore';
-import {
-  createLogger,
-  logFunctionStart,
-  logFunctionComplete,
-  logFunctionError,
-} from '../../utils/logging';
+import { logFunctionStart, logFunctionComplete, logFunctionError } from '../../utils/logging';
 
 export class PerformanceRecommendationService {
   /**
@@ -106,7 +101,7 @@ export class PerformanceRecommendationService {
         if (typeof firestoreService.setPerformanceRecommendationDoc === 'function') {
           await firestoreService.setPerformanceRecommendationDoc(result);
         }
-      } catch (saveErr) {
+      } catch {
         // Safe fallback in test mocks or un-initialized environments
       }
 
@@ -136,7 +131,7 @@ export class PerformanceRecommendationService {
           return cached;
         }
       }
-    } catch (cacheErr) {
+    } catch {
       // Fall through to evaluation
     }
     return this.evaluateBusinessRecommendations(businessId);

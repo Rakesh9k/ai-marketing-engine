@@ -1,4 +1,4 @@
-import { onCall, HttpsError } from 'firebase-functions/v2/https';
+import { onCall } from 'firebase-functions/v2/https';
 import { z } from 'zod';
 
 import { verifyBusinessAccess } from '../../middleware/auth';
@@ -6,7 +6,6 @@ import { validatedCallable } from '../../middleware/validation';
 import { getCampaignsByBusiness } from '../../services/firestore';
 import { logFunctionStart, logFunctionComplete, logFunctionError } from '../../utils/logging';
 import { mapErrorToHttpsError } from '../../utils/errors';
-import type { Campaign, CampaignStatus } from '../../types';
 
 const listCampaignsSchema = z.object({
   businessId: z.string().min(1),

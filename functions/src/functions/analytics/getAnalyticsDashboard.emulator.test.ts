@@ -164,8 +164,15 @@ describeIfEmulator('getAnalyticsDashboard — authorization & business isolation
     expect(response.totals).toEqual({
       campaignsStarted: 0,
       campaignsGenerated: 0,
+      campaignsFailed: 0,
+      campaignsApproved: 0,
+      campaignsRegenerated: 0,
+      campaignsPublished: 0,
+      campaignsScheduled: 0,
       assetsDownloaded: 0,
       whatsappClicks: 0,
+      creativeLikes: 0,
+      creativeDislikes: 0,
     });
     expect(response.eventsAggregated).toBe(0);
   });

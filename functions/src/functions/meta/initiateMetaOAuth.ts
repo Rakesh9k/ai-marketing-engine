@@ -14,6 +14,7 @@ const initiateMetaOAuthSchema = z.object({
 
 export const initiateMetaOAuth = onCall(
   {
+    enforceAppCheck: true,
     region: 'asia-south1',
     maxInstances: 20,
     timeoutSeconds: 30,

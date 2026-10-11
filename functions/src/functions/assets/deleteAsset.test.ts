@@ -3,7 +3,7 @@ import * as admin from 'firebase-admin';
 
 // Mock dependencies for pure unit tests
 jest.mock('../../middleware/auth', () => ({
-  verifyBusinessAccess: jest.fn().mockImplementation((userId: string, businessId: string) => {
+  verifyBusinessAccess: jest.fn().mockImplementation((userId: string, _businessId: string) => {
     if (userId === 'unauthorized-user') {
       const { HttpsError } = require('firebase-functions/v2/https');
       throw new HttpsError('permission-denied', 'User does not have access to business');

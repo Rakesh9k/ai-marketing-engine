@@ -7,11 +7,9 @@ import {
   MAX_SEGMENT_MS,
   MAX_SEGMENT_TEXT_LENGTH,
   MIN_SEGMENT_MS,
-  REEL_MUSIC_LIBRARY,
   REEL_TEMPLATES,
   REEL_TRANSITIONS,
   STYLE_TRANSITION_DEFAULTS,
-  getMusicTrackById,
   pickDefaultMusicTrack,
 } from '../../config/reels';
 import type {
@@ -159,7 +157,7 @@ export function buildReelEditPlanPrompt(input: BuildPromptInput): string {
     additionalMessage,
     clipAnalyses,
     creativeTemplateContext,
-    adaptedCreativePlan,
+    adaptedCreativePlan: _adaptedCreativePlan,
   } = input;
   const defaultTemplate = GOAL_DEFAULT_TEMPLATE[goal];
   const defaultTransition = STYLE_TRANSITION_DEFAULTS[style];
@@ -327,7 +325,7 @@ export async function generateValidatedReelEditPlan(
 ): Promise<ReelEditPlan> {
   try {
     return await generateReelEditPlan(input);
-  } catch (firstError) {
+  } catch {
     try {
       return await generateReelEditPlan(input);
     } catch (secondError) {

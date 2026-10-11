@@ -7,7 +7,6 @@ import { getBusinessDoc, updateBusinessDoc } from '../../services/firestore';
 import { logFunctionStart, logFunctionComplete, logFunctionError } from '../../utils/logging';
 import { mapErrorToHttpsError } from '../../utils/errors';
 import { websiteUrlSchema } from '../../utils/zodHelpers';
-import type { Business, BusinessLocation, BusinessContact, BusinessSettings } from '../../types';
 
 const updateBusinessSchema = z.object({
   businessId: z.string().min(1),
@@ -71,6 +70,27 @@ export const updateBusiness = onCall(
         throw new HttpsError('not-found', 'Business not found');
       }
 
+      // A phone number the owner never typed (onboarding copied it from their WhatsApp number) is
+      // recorded as DERIVED_FROM_WHATSAPP. If they now enter a DIFFERENT phone, that explicit number
+      // replaces the derived one and is recorded as theirs. If they leave it alone and only change
+      // WhatsApp, the derived phone keeps following it. Businesses without that provenance (created
+      // before the conversational onboarding) are untouched.
+      let knowledge = existingBusiness.businessBrain?.knowledge;
+      if (
+        updateData.contact &&
+        knowledge?.facts?.['contact.phone']?.source === 'DERIVED_FROM_WHATSAPP'
+      ) {
+        const prior = existingBusiness.contact;
+        if (updateData.contact.phone !== prior.phone) {
+          knowledge = {
+            ...knowledge,
+            facts: { ...knowledge.facts, 'contact.phone': { source: 'USER_CONFIRMED' } },
+          };
+        } else if (updateData.contact.whatsapp !== prior.whatsapp) {
+          updateData.contact = { ...updateData.contact, phone: updateData.contact.whatsapp };
+        }
+      }
+
       const mergedSettings = {
         ...existingBusiness.settings,
         ...updateData.settings,
@@ -103,6 +123,7 @@ export const updateBusiness = onCall(
         businessBrain: {
           ...existingBusiness.businessBrain,
           identity: mergedIdentity,
+          ...(knowledge ? { knowledge } : {}),
           lastSyncedAt: new Date().toISOString(),
         },
         updatedAt: new Date().toISOString(),

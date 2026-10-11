@@ -6,7 +6,6 @@ import { validatedCallable } from '../../middleware/validation';
 import { getBrandKitDoc } from '../../services/firestore';
 import { logFunctionStart, logFunctionComplete, logFunctionError } from '../../utils/logging';
 import { mapErrorToHttpsError } from '../../utils/errors';
-import type { BrandKit } from '../../types';
 
 const getBrandKitSchema = z.object({
   businessId: z.string().min(1),

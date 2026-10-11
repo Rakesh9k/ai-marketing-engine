@@ -18,8 +18,11 @@ import * as admin from 'firebase-admin';
 import { createBusiness } from './createBusiness';
 import { getBusinessDoc } from '../../services/firestore';
 
+// createBusiness requires a verified email for password users (middleware/emailVerification.ts).
+const VERIFIED_TOKEN = { email_verified: true, firebase: { sign_in_provider: 'password' } };
+
 function callableRequest(data: unknown, uid: string) {
-  return { data, auth: { uid, token: {} as any } } as any;
+  return { data, auth: { uid, token: VERIFIED_TOKEN as any } } as any;
 }
 
 describeIfEmulator('createBusiness — onboarding persistence (Phase 15)', () => {
@@ -267,5 +270,31 @@ describeIfEmulator('createBusiness — onboarding persistence (Phase 15)', () =>
 
     const persisted = await getBusinessDoc(result.businessId);
     expect((persisted!.businessBrain as any).verticalProfile).toBeUndefined();
+  });
+});
+
+describe('createBusiness — email verification gate (always runs, no emulator)', () => {
+  // trackEventMock is shared with the emulator suite above; without this, a call made by an
+  // earlier test would leak in whenever the emulator is running.
+  beforeEach(() => jest.clearAllMocks());
+
+  it('rejects a password user with an unverified email before touching any data', async () => {
+    const request = {
+      data: {
+        name: 'Unverified Cafe',
+        category: 'restaurant',
+        location: { city: 'Hyderabad', state: 'Telangana' },
+        contact: { phone: '9876543210', whatsapp: '9876543210' },
+      },
+      auth: {
+        uid: 'unverified-user',
+        token: { email_verified: false, firebase: { sign_in_provider: 'password' } },
+      },
+    } as any;
+
+    await expect((createBusiness as any).run(request)).rejects.toMatchObject({
+      code: 'failed-precondition',
+    });
+    expect(trackEventMock).not.toHaveBeenCalled();
   });
 });

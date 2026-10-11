@@ -115,7 +115,6 @@ export const createPayUPayment = onCall(
         udf3: billingCycle,
         hash,
       };
-
     } catch (error) {
       logFunctionError(logger, startTime, error as Error);
       throw mapErrorToHttpsError(error);

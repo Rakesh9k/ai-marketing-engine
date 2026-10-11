@@ -7,7 +7,7 @@ const listCampaignPublishJobsSchema = z.object({
   campaignId: z.string().min(1),
 });
 
-export const listCampaignPublishJobs = onCall(async (request) => {
+export const listCampaignPublishJobs = onCall({ enforceAppCheck: true }, async (request) => {
   const { logger, startTime } = logFunctionStart('listCampaignPublishJobs', {
     auth: request.auth?.uid,
   });

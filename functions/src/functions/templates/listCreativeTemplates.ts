@@ -39,7 +39,7 @@ const listCreativeTemplatesSchema = z.object({
   objective: z
     .enum(['awareness', 'engagement', 'conversion', 'launch', 'promotion', 'retention'])
     .optional(),
-  vertical: z.enum(['restaurant', 'salon', 'real_estate']).optional(),
+  vertical: z.enum(['restaurant', 'salon', 'real_estate', 'general']).optional(),
   businessId: z.string().optional(),
 });
 

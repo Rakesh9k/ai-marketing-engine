@@ -1,6 +1,6 @@
 import * as admin from 'firebase-admin';
-import { FieldValue, Timestamp } from 'firebase-admin/firestore';
-import { getUsageDocId, getUsageDoc, createUsageDoc, getCurrentUsage } from './firestore';
+import { FieldValue } from 'firebase-admin/firestore';
+import { getUsageDocId, createUsageDoc, getCurrentUsage } from './firestore';
 import type {
   Usage,
   Transaction,

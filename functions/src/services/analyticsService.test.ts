@@ -12,13 +12,9 @@ import {
   trackEvent,
   trackAssetDownloaded,
   trackWhatsAppClicked,
-  trackCampaignApproved,
   trackCampaignScheduled,
   trackCampaignPublished,
   trackCampaignFailed,
-  trackCampaignRegenerated,
-  trackCreativeLiked,
-  trackCreativeDisliked,
   ANALYTICS_EVENTS,
 } from './analyticsService';
 

@@ -1,6 +1,6 @@
 import { HttpsError } from 'firebase-functions/v2/https';
 import * as admin from 'firebase-admin';
-import { FieldValue, Timestamp } from 'firebase-admin/firestore';
+import { FieldValue } from 'firebase-admin/firestore';
 import { createLogger } from '../utils/logging';
 
 const db = admin.firestore();
@@ -76,6 +76,14 @@ export const rateLimitConfigs: Record<string, RateLimitConfig> = {
   createPaddleCheckout: { maxRequests: 10, windowSeconds: 3600 },
   cancelPaddleSubscription: { maxRequests: 5, windowSeconds: 3600 },
   recordConsentAcceptance: { maxRequests: 10, windowSeconds: 3600 },
+  // Onboarding saves once per answered question (~15 per run) and costs nothing; sized so a user
+  // can redo the flow a few times, not so a script can hammer Firestore.
+  saveOnboardingDraft: { maxRequests: 120, windowSeconds: 3600 },
+  // Free (no credits) but it does call the text model: bounded tightly. Identical inputs are
+  // answered from the saved result, so a normal run makes one or two real calls.
+  discoverOnboardingFacts: { maxRequests: 20, windowSeconds: 3600 },
+  // Creates a business. Idempotent on retry, so a handful per hour is plenty.
+  confirmOnboardingBusiness: { maxRequests: 10, windowSeconds: 3600 },
   // analyzeReferenceStyle: real AI provider cost per call (Phase 8 Credits
   // & Usage Enforcement Audit) — same order of magnitude as a single
   // getUploadUrl/confirmUpload step in the same style-upload flow.

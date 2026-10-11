@@ -1,6 +1,5 @@
 import { onCall, HttpsError } from 'firebase-functions/v2/https';
 import { z } from 'zod';
-import * as admin from 'firebase-admin';
 
 import { verifyBusinessAccess } from '../../middleware/auth';
 import { validatedCallable } from '../../middleware/validation';
@@ -23,6 +22,7 @@ import { getVideoRenderer } from '../../services/videoRenderer';
 import { getMusicTrackById, MIN_REEL_CLIPS, pickDefaultMusicTrack } from '../../config/reels';
 import { toSavedStyleContext } from '../../services/savedStyle';
 import { requirePlan } from '../../services/entitlements';
+import { assertStoredObject, signReadUrl, MIN_REEL_BYTES } from '../../services/reelAssets';
 
 const generateReelSchema = z.object({
   businessId: z.string().min(1),
@@ -30,13 +30,15 @@ const generateReelSchema = z.object({
   idempotencyKey: z.string().uuid(),
 });
 
-async function getSignedReadUrl(storagePath: string): Promise<string> {
-  const [url] = await admin
-    .storage()
-    .bucket()
-    .file(storagePath)
-    .getSignedUrl({ version: 'v4', action: 'read', expires: Date.now() + 7 * 24 * 60 * 60 * 1000 });
-  return url;
+const getSignedReadUrl = (storagePath: string): Promise<string> => signReadUrl(storagePath);
+
+/** Renderer failures carry raw upstream text (URL, status, body); customers get a plain message. */
+function customerFacingReelError(error: unknown): string {
+  const message = error instanceof Error ? error.message : '';
+  if (/^Renderer |REEL_RENDERER_URL|storage after rendering|empty or truncated/.test(message)) {
+    return 'We could not finish rendering your reel. Please try again — you have not been charged for this attempt.';
+  }
+  return message || 'Reel generation failed.';
 }
 
 /**
@@ -261,14 +263,22 @@ export const generateReel = onCall(
             thumbnailStoragePath,
           });
 
-          const [outputUrl, thumbnailUrl] = await Promise.all([
-            getSignedReadUrl(rendered.outputStoragePath),
-            getSignedReadUrl(rendered.thumbnailStoragePath),
+          // "completed" must mean the MP4 really is in Storage: verify before signing anything.
+          await assertStoredObject(rendered.outputStoragePath, MIN_REEL_BYTES, 'Rendered reel');
+          await assertStoredObject(rendered.thumbnailStoragePath, 1, 'Reel thumbnail');
+
+          const [outputUrl, thumbnailUrl, downloadUrl] = await Promise.all([
+            signReadUrl(rendered.outputStoragePath),
+            signReadUrl(rendered.thumbnailStoragePath),
+            signReadUrl(rendered.outputStoragePath, {
+              downloadFileName: `mitra-reel-${reelId}.mp4`,
+            }),
           ]);
 
           await updateReelProjectDoc(reelId, {
             status: 'completed',
             outputUrl,
+            downloadUrl,
             outputStoragePath: rendered.outputStoragePath,
             thumbnailUrl,
             thumbnailStoragePath: rendered.thumbnailStoragePath,
@@ -285,7 +295,7 @@ export const generateReel = onCall(
             creativeType: 'reel',
           });
 
-          return { outputUrl, thumbnailUrl };
+          return { outputUrl, thumbnailUrl, downloadUrl };
         },
         { businessId: data.businessId }
       );
@@ -310,8 +320,7 @@ export const generateReel = onCall(
           status: 'failed',
           error: {
             code: error.code || 'GENERATION_FAILED',
-            message:
-              error instanceof Error && error.message ? error.message : 'Reel generation failed.',
+            message: customerFacingReelError(error),
             stage: 'generation',
             retryable: true,
           },

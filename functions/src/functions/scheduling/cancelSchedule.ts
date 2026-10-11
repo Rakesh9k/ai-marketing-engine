@@ -7,7 +7,7 @@ const cancelScheduleSchema = z.object({
   scheduledPostId: z.string().min(1),
 });
 
-export const cancelSchedule = onCall(async (request) => {
+export const cancelSchedule = onCall({ enforceAppCheck: true }, async (request) => {
   const logCtx = logFunctionStart('cancelSchedule', { authUid: request.auth?.uid });
 
   if (!request.auth) {

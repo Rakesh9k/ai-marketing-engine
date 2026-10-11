@@ -61,6 +61,10 @@ describe('calendarPlanningService', () => {
 
     expect(result.plan.totalItems).toBe(13);
     expect(result.plan.frequency).toBe('three_per_week');
+    // The plan records the model that really wrote it (the configured text model), not a stale alias.
+    expect(result.plan.metadata?.aiModel).toBe(
+      process.env['GEMINI_TEXT_MODEL'] || 'gemini-3.1-flash-lite'
+    );
     expect(result.items.length).toBe(13);
     expect(result.items[0]?.topic).toBe('Biryani Special Item #1');
     expect(result.items[0]?.scheduledDate).toBe('2026-10-01');

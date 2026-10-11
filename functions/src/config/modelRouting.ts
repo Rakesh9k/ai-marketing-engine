@@ -6,6 +6,8 @@
  * Actual model names are resolved at runtime via provider configuration.
  */
 
+import { DEFAULT_TEXT_MODEL, DEFAULT_VISION_MODEL } from './geminiModels';
+
 export interface ModelRoutingConfig {
   textPrimary: string;
   textFallback: string;
@@ -18,10 +20,10 @@ export interface ModelRoutingConfig {
 }
 
 export const MODEL_ROUTING_CONFIG: ModelRoutingConfig = {
-  textPrimary: process.env['TEXT_MODEL_PRIMARY'] || 'gemini-1.5-pro',
-  textFallback: process.env['TEXT_MODEL_FALLBACK'] || 'gemini-1.5-pro',
-  visionPrimary: process.env['VISION_MODEL_PRIMARY'] || 'gemini-1.5-pro',
-  visionFallback: process.env['VISION_MODEL_FALLBACK'] || 'gemini-1.5-pro',
+  textPrimary: process.env['TEXT_MODEL_PRIMARY'] || DEFAULT_TEXT_MODEL,
+  textFallback: process.env['TEXT_MODEL_FALLBACK'] || DEFAULT_TEXT_MODEL,
+  visionPrimary: process.env['VISION_MODEL_PRIMARY'] || DEFAULT_VISION_MODEL,
+  visionFallback: process.env['VISION_MODEL_FALLBACK'] || DEFAULT_VISION_MODEL,
   imagePrimary: process.env['IMAGE_MODEL_PRIMARY'] || 'dall-e-3',
   imageFallback: process.env['IMAGE_MODEL_FALLBACK'] || 'gemini-imagen',
   embeddingPrimary: process.env['EMBEDDING_MODEL_PRIMARY'] || 'text-embedding-3-small',

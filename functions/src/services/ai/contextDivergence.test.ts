@@ -3,7 +3,7 @@ import { resolveUserInstructionConflicts } from './conflictResolver';
 
 const generateStructuredTextMock = jest
   .fn()
-  .mockImplementation(async (prompt: string, schema: any) => {
+  .mockImplementation(async (prompt: string, _schema: any) => {
     if (
       prompt.includes('The Royal Nizam Palace') ||
       prompt.includes('Bandra') ||

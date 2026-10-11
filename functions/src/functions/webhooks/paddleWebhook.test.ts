@@ -29,6 +29,9 @@ import { paddleWebhook, processPaddleEvent } from './paddleWebhook';
 import { resolveEntitledPlan } from '../../services/billing';
 import { reserveCreditsForOperation } from '../../services/usageControl';
 import { getUsageDocId } from '../../services/firestore';
+import { PRICING } from '../../config/pricing';
+
+const FREE_CREDITS = PRICING.subscriptionTiers.free.monthlyCredits;
 
 const NOW = new Date();
 const periodStart = new Date(NOW.getFullYear(), NOW.getMonth(), 1);
@@ -119,7 +122,7 @@ describeIfEmulator('paddleWebhook (Firestore emulator)', () => {
         userId,
         planId: 'free',
         creditsUsed: 0,
-        creditsIncluded: 100,
+        creditsIncluded: FREE_CREDITS,
         campaignsCreated: 0,
       });
   }
@@ -153,11 +156,11 @@ describeIfEmulator('paddleWebhook (Firestore emulator)', () => {
 
       const usage = await usageOf(userId);
       expect(usage['bonusCredits']).toBe(500);
-      expect(usage['creditsIncluded']).toBe(600); // 100 free + 500 pack
+      expect(usage['creditsIncluded']).toBe(FREE_CREDITS + 500); // free allowance + 500 pack
 
       const txn = (await db.collection('transactions').doc(txnId).get()).data()!;
       expect(txn['status']).toBe('completed');
-      expect(txn['balanceAfter']).toBe(600);
+      expect(txn['balanceAfter']).toBe(FREE_CREDITS + 500);
       const grant = (await db.collection('paddle_grants').doc(txnId).get()).data()!;
       expect(grant['status']).toBe('granted');
       expect(grant['credits']).toBe(500);
@@ -230,7 +233,12 @@ describeIfEmulator('paddleWebhook (Firestore emulator)', () => {
     it('top-up credits are actually spendable by the existing credit enforcement', async () => {
       const userId = uniq('u');
       const txnId = uniq('txn');
-      await seedUser(userId); // free: 100 credits, a campaign costs 140
+      await seedUser(userId);
+      // Free user who has already spent 100 of 140: 40 left, a 140-credit campaign is rejected
+      await db
+        .collection('usage')
+        .doc(getUsageDocId(userId, periodStart))
+        .update({ creditsUsed: 100 });
       await expect(
         reserveCreditsForOperation(userId, uniq('op'), 'campaign_generation', 140)
       ).rejects.toMatchObject({ code: expect.any(String) });
@@ -245,7 +253,7 @@ describeIfEmulator('paddleWebhook (Firestore emulator)', () => {
         140
       );
       expect(reservation.creditsReserved).toBe(140);
-      expect(reservation.creditsRemaining).toBe(460); // 100 + 500 - 140
+      expect(reservation.creditsRemaining).toBe(FREE_CREDITS + 500 - 100 - 140);
     });
   });
 
@@ -440,6 +448,89 @@ describeIfEmulator('paddleWebhook (Firestore emulator)', () => {
       expect(
         (await db.collection('subscriptions').doc(subId).get()).data()!['cancelAtPeriodEnd']
       ).toBe(true);
+    });
+
+    it('a late (retried) payment event after cancellation never resurrects the subscription', async () => {
+      const userId = uniq('u');
+      const subId = uniq('sub');
+      await seedUser(userId);
+      await processPaddleEvent(
+        txnEvent({ id: uniq('txn'), priceId: 'pri_pro_m', userId, subscriptionId: subId })
+      );
+      await processPaddleEvent(
+        subEvent('subscription.canceled', {
+          id: subId,
+          priceId: 'pri_pro_m',
+          userId,
+          status: 'canceled',
+          occurredAt: new Date(Date.now() + 60_000).toISOString(),
+        })
+      );
+      // A renewal payment whose delivery failed earlier is retried by Paddle after the cancel.
+      await processPaddleEvent(
+        txnEvent({
+          id: uniq('txn'),
+          priceId: 'pri_pro_m',
+          userId,
+          subscriptionId: subId,
+          origin: 'subscription_recurring',
+          occurredAt: new Date(Date.now() + 1000).toISOString(),
+        })
+      );
+      expect((await db.collection('subscriptions').doc(subId).get()).data()!['status']).toBe(
+        'canceled'
+      );
+      expect((await db.collection('users').doc(userId).get()).data()!['subscriptionId']).toBeNull();
+    });
+
+    it('refund: recorded once, flagged for review, transaction marked, credits untouched, replay-safe', async () => {
+      const userId = uniq('u');
+      const subId = uniq('sub');
+      const txnId = uniq('txn');
+      await seedUser(userId);
+      await processPaddleEvent(
+        txnEvent({ id: txnId, priceId: 'pri_pro_m', userId, subscriptionId: subId })
+      );
+      const creditsBefore = (await usageOf(userId))['creditsIncluded'];
+
+      const adjustment = (status: string, occurredAt: string, id = 'adj_' + txnId) =>
+        ({
+          eventId: uniq('evt'),
+          notificationId: uniq('ntf'),
+          eventType: 'adjustment.updated',
+          occurredAt,
+          data: {
+            id,
+            action: 'refund',
+            status,
+            transactionId: txnId,
+            subscriptionId: subId,
+            customerId: 'ctm_default',
+            currencyCode: 'INR',
+            totals: { total: '99900' },
+          },
+        }) as any;
+
+      const t1 = new Date(Date.now() + 1000).toISOString();
+      const t2 = new Date(Date.now() + 2000).toISOString();
+      await processPaddleEvent(adjustment('pending_approval', t1));
+      const adjRef = db.collection('paddle_adjustments').doc('adj_' + txnId);
+      expect((await adjRef.get()).data()!['needsManualReview']).toBe(false);
+
+      await processPaddleEvent(adjustment('approved', t2));
+      await processPaddleEvent(adjustment('approved', t2)); // replay
+      await processPaddleEvent(adjustment('pending_approval', t1)); // stale, must not undo
+      const adj = (await adjRef.get()).data()!;
+      expect(adj['status']).toBe('approved');
+      expect(adj['needsManualReview']).toBe(true);
+      expect(adj['userId']).toBe(userId);
+      const txn = (await db.collection('transactions').doc(txnId).get()).data()!;
+      expect(txn['reconciliation']).toMatchObject({
+        state: 'refunded',
+        adjustmentId: adj['adjustmentId'],
+      });
+      // No policy exists for clawing back credits: nothing is silently revoked.
+      expect((await usageOf(userId))['creditsIncluded']).toBe(creditsBefore);
     });
 
     it('payment failure fails a pending record but never a completed one or the entitlement', async () => {

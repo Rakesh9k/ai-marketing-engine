@@ -9,7 +9,7 @@ const reschedulePostSchema = z.object({
   timezone: z.string().min(1),
 });
 
-export const reschedulePost = onCall(async (request) => {
+export const reschedulePost = onCall({ enforceAppCheck: true }, async (request) => {
   const logCtx = logFunctionStart('reschedulePost', { authUid: request.auth?.uid });
 
   if (!request.auth) {

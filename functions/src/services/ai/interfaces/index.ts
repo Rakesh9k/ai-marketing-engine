@@ -29,7 +29,7 @@ export interface TextAI {
   generateStructured<T>(
     prompt: string,
     schema: z.ZodType<T>,
-    options?: { temperature?: number; maxTokens?: number }
+    options?: { temperature?: number; maxTokens?: number; model?: string }
   ): Promise<T>;
 }
 

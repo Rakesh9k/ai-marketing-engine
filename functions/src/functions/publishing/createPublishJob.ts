@@ -13,7 +13,7 @@ const createPublishJobSchema = z.object({
   idempotencyKey: z.string().optional(),
 });
 
-export const createPublishJob = onCall(async (request) => {
+export const createPublishJob = onCall({ enforceAppCheck: true }, async (request) => {
   const { logger, startTime } = logFunctionStart('createPublishJob', {
     auth: request.auth?.uid,
   });

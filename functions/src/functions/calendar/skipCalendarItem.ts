@@ -9,7 +9,7 @@ const skipCalendarItemSchema = z.object({
 });
 
 export const skipCalendarItem = onCall(
-  { region: 'asia-south1' },
+  { region: 'asia-south1', enforceAppCheck: true },
   validatedCallable(skipCalendarItemSchema, async (data, context) => {
     const userId = context.userId;
     const db = admin.firestore();

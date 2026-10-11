@@ -16,7 +16,13 @@ const generatePlanSchema = z.object({
 });
 
 export const generateMarketingPlan = onCall(
-  { region: 'asia-south1' },
+  {
+    region: 'asia-south1',
+    enforceAppCheck: true,
+    // The plan is written by the text AI (calendarPlanningService). Without the secret bound the
+    // function runs with an empty Gemini key and fails every call; aiSecretBinding.test.ts guards this.
+    secrets: ['GEMINI_API_KEY'],
+  },
   validatedCallable(generatePlanSchema, async (data, context) => {
     const userId = context.userId;
     const db = admin.firestore();

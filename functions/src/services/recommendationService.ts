@@ -1,10 +1,4 @@
-import type {
-  CreativeTemplateType,
-  CreativeObjective,
-  CreativePreference,
-  CreativePreferenceState,
-  CreativePreferenceSource,
-} from '../types';
+import type { CreativeTemplateType, CreativeObjective, CreativePreference } from '../types';
 import { creativeTemplateRegistry } from './creativeTemplateRegistry';
 import { getCreativePreferencesByBusiness } from './firestore';
 

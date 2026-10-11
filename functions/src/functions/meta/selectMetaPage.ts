@@ -13,6 +13,7 @@ const selectMetaPageSchema = z.object({
 
 export const selectMetaPage = onCall(
   {
+    enforceAppCheck: true,
     region: 'asia-south1',
     maxInstances: 20,
     timeoutSeconds: 30,

@@ -4,7 +4,6 @@ import type { UserRecord } from 'firebase-functions/v1/auth';
 import * as admin from 'firebase-admin';
 import { FieldValue, Timestamp } from 'firebase-admin/firestore';
 import { v7 as uuidv7 } from 'uuid';
-import { getEnvConfig } from '../../config/env';
 import { PRICING } from '../../config/pricing';
 import { trackEvent, ANALYTICS_EVENTS } from '../../services/analyticsService';
 import { logFunctionStart, logFunctionComplete, logFunctionError } from '../../utils/logging';
@@ -143,6 +142,13 @@ export const onUserDeletedHandler: CloudFunction<UserRecord> = user().onDelete(
 
     try {
       const userId = userRecord.uid;
+
+      // Personal data that must not outlive the account: the onboarding draft holds the owner's
+      // name and what they told Mitra about their business. Deleted first and unconditionally
+      // (deleting a missing doc is a no-op), so a failure later in this handler cannot leave it
+      // behind, and it is covered whether deletion came from the self-service callable or from the
+      // Firebase console.
+      await db.collection('onboarding_drafts').doc(userId).delete();
 
       const userDoc = await db.collection('users').doc(userId).get();
       if (userDoc.exists) {

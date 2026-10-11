@@ -33,6 +33,8 @@ const BROAD_VERTICALS: CreativeTemplate['compatibleVerticals'] = [
   'restaurant',
   'salon',
   'real_estate',
+  // The generic vertical shares the broad, industry-agnostic templates.
+  'general',
 ];
 
 export const BUILTIN_CREATIVE_TEMPLATES: CreativeTemplate[] = [
