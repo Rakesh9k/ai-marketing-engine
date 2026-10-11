@@ -1,6 +1,7 @@
 import * as admin from 'firebase-admin';
 import { FieldValue } from 'firebase-admin/firestore';
 import { getUsageDocId } from './firestore';
+import { isTermLive } from './prepaidTerm';
 import { getMonthlyCredits, type SubscriptionPlan } from '../config/pricing';
 import type { Usage } from '../types';
 
@@ -198,4 +199,51 @@ export async function getCurrentUsageRefAndSnap(
   const ref = db.collection('usage').doc(usageId);
   const snap = await tx.get(ref);
   return { ref, snap };
+}
+
+/**
+ * Enforces the paid-through date on the CREDITS, at the moment they are about to be spent. The usage document
+ * keeps the plan it was given at purchase for the whole calendar month, so without this a 30-day term ending
+ * mid-month would keep paid credits until month end (and the daily expiry job could be up to a day late).
+ *
+ * If the current-month usage document carries a paid plan but the user's entitlement has lapsed, it drops to the
+ * Free allowance (credits already used and top-up credits are kept). Done in a transaction that also reads the
+ * user's subscription, so it cannot downgrade someone whose renewal webhook is committing at the same time.
+ * Returns true when a downgrade happened.
+ */
+export async function reconcileLapsedPlan(userId: string, now = new Date()): Promise<boolean> {
+  const usageRef = db
+    .collection('usage')
+    .doc(getUsageDocId(userId, new Date(now.getFullYear(), now.getMonth(), 1)));
+  const preview = await usageRef.get();
+  const previewPlan = preview.data()?.['planId'];
+  if (!preview.exists || !previewPlan || previewPlan === 'free') return false;
+
+  return db.runTransaction(async (tx) => {
+    const [usageSnap, userSnap] = await Promise.all([
+      tx.get(usageRef),
+      tx.get(db.collection('users').doc(userId)),
+    ]);
+    const usage = usageSnap.data();
+    if (!usageSnap.exists || !usage || !usage['planId'] || usage['planId'] === 'free') return false;
+
+    const subscriptionId = userSnap.data()?.['subscriptionId'] as string | undefined;
+    const sub = subscriptionId
+      ? (await tx.get(db.collection('subscriptions').doc(subscriptionId))).data()
+      : undefined;
+    // Only act on EVIDENCE of a lapsed term: a subscription record that exists and has ended. A paid usage
+    // document with no subscription pointer at all is left alone here (no evidence either way).
+    if (!sub || isTermLive(sub, now)) return false;
+
+    tx.update(usageRef, {
+      planId: 'free',
+      creditsIncluded: getPeriodCreditAllowance(
+        'free',
+        usage['bonusCredits'] as number | undefined
+      ),
+      lapsedAt: now.toISOString(),
+      updatedAt: serverTimestamp(),
+    });
+    return true;
+  });
 }

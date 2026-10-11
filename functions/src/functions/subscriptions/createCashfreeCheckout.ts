@@ -14,6 +14,7 @@ import { logFunctionStart, logFunctionComplete, logFunctionError } from '../../u
 import { mapErrorToHttpsError } from '../../utils/errors';
 import { assertProviderActive } from '../../services/activeProvider';
 import { isAllowedReturnUrl } from '../../services/cashfree';
+import { decidePurchase } from '../../services/prepaidTerm';
 
 const db = admin.firestore();
 
@@ -36,6 +37,13 @@ export interface CreateCashfreeCheckoutResponse {
   environment: 'sandbox' | 'production';
   amountINR: number;
   currency: 'INR';
+  /** Subscription purchases only: prepaid fixed term, never auto-renewing. */
+  termDays?: number;
+  /** The paid-through date this payment will result in (an estimate until the webhook confirms payment). */
+  accessEndsAt?: string;
+  /** True when this extends a term that is still live. */
+  renewal?: boolean;
+  autoRenew: false;
 }
 
 export const createCashfreeCheckout = onCall(
@@ -74,6 +82,9 @@ export const createCashfreeCheckout = onCall(
         );
       }
 
+      let renewal = false;
+      let accessEndsAt: string | undefined;
+      let termDays: number | undefined;
       // Resolve purchase details and canonical prices server-side.
       let purchase:
         | {
@@ -101,22 +112,29 @@ export const createCashfreeCheckout = onCall(
         const credits = getMonthlyCredits(planId);
         purchase = { kind: 'subscription', planId, billingCycle, priceINR, credits };
 
-        // Prevent duplicate active subscriptions
+        // Prepaid fixed-term rules (services/prepaidTerm.ts). A term that has ENDED never blocks a new purchase,
+        // whether or not a scheduler has marked it expired. The same plan + cycle may be bought again to EXTEND the
+        // live term; any other plan or cycle must wait for the current one to end (no proration / in-place switch).
         const userSnap = await db.collection('users').doc(context.userId).get();
         const existingSubId = userSnap.data()?.['subscriptionId'] as string | undefined;
-        if (existingSubId) {
-          const sub = (await db.collection('subscriptions').doc(existingSubId).get()).data();
-          const live =
-            sub &&
-            ['active', 'trialing', 'past_due'].includes(sub['status'] as string) &&
-            sub['cancelAtPeriodEnd'] !== true;
-          if (live) {
-            throw new HttpsError(
-              'failed-precondition',
-              'You already have an active subscription. Cancel it first to switch plans.'
-            );
-          }
+        const existingSub = existingSubId
+          ? (await db.collection('subscriptions').doc(existingSubId).get()).data()
+          : undefined;
+        const decision = decidePurchase(existingSub, planId, billingCycle);
+        if (!decision.allowed) {
+          const until = decision.liveEnd
+            ? new Date(decision.liveEnd).toDateString()
+            : 'the end of your current term';
+          throw new HttpsError(
+            'failed-precondition',
+            decision.reason === 'other_provider_live'
+              ? `You already have access until ${until} through another payment method. You can buy again after it ends.`
+              : `You already have access until ${until}. You can renew the same plan and billing period now; to switch to a different plan or billing period, buy it after your current access ends.`
+          );
         }
+        renewal = decision.kind === 'renewal';
+        accessEndsAt = decision.newEnd;
+        termDays = decision.termDays;
       }
 
       const description = describeCashfreePurchase(
@@ -194,6 +212,8 @@ export const createCashfreeCheckout = onCall(
         environment: result.environment,
         amountINR: result.amountINR,
         currency: 'INR',
+        autoRenew: false,
+        ...(termDays ? { termDays, accessEndsAt, renewal } : {}),
       } satisfies CreateCashfreeCheckoutResponse;
     } catch (error) {
       logFunctionError(logger, startTime, error as Error);

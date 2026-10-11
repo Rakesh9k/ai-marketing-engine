@@ -18,6 +18,7 @@ import {
 import { getMonthlyCredits, type SubscriptionPlan } from '../../config/pricing';
 import type { PaidPlan, BillingCycle } from '../../services/paymentProvider';
 import { isProviderActive, recordIgnoredProviderEvent } from '../../services/activeProvider';
+import { decidePurchase, isTermLive } from '../../services/prepaidTerm';
 
 const db = admin.firestore();
 const webhookLogger = createLogger({ function: 'cashfreeWebhook' });
@@ -262,14 +263,47 @@ async function handlePaymentSuccess(payload: CashfreeWebhookPayload) {
     let creditsGranted = 0;
 
     if (kind === 'subscription') {
-      creditsGranted = applyPlanEntitlement(tx, userId, planId, usage.ref, usage.snap);
-
       const subId = `sub_cf_${userId}_${planId}`;
       const subRef = db.collection('subscriptions').doc(subId);
+      const userRef = db.collection('users').doc(userId);
+      const [subSnap, userSnap] = await Promise.all([tx.get(subRef), tx.get(userRef)]);
+      const pointerId = userSnap.data()?.['subscriptionId'] as string | undefined;
+      const pointerSub =
+        pointerId && pointerId !== subId
+          ? (await tx.get(db.collection('subscriptions').doc(pointerId))).data()
+          : undefined;
+
+      // Prepaid fixed-term rule (services/prepaidTerm.ts): same plan + cycle extends from the current end date;
+      // a payment that cannot be applied (another plan/cycle, or another provider's term, still live) is NOT
+      // silently granted over it: it is flagged for an operator and the customer is refunded/served manually.
+      const decision = decidePurchase(subSnap.data(), planId, billingCycle);
+      const conflict = isTermLive(pointerSub)
+        ? 'the user already has a live term on another subscription'
+        : !decision.allowed
+          ? 'the user already has a live term on a different plan or billing cycle'
+          : undefined;
+      if (conflict || !decision.allowed) {
+        tx.set(
+          grantRef,
+          {
+            orderId,
+            userId,
+            kind,
+            planId,
+            status: 'flagged',
+            reason: conflict ?? 'term conflict',
+            needsManualReview: true,
+            flaggedAt: FieldValue.serverTimestamp(),
+          },
+          { merge: true }
+        );
+        return { granted: false, reason: 'conflict' };
+      }
+
+      creditsGranted = applyPlanEntitlement(tx, userId, planId, usage.ref, usage.snap);
       const nowIso = new Date().toISOString();
-      const periodEnd = new Date(
-        Date.now() + (billingCycle === 'yearly' ? 365 : 30) * 86400_000
-      ).toISOString();
+      const existing = subSnap.data();
+      const renewal = decision.kind === 'renewal';
 
       tx.set(
         subRef,
@@ -279,15 +313,21 @@ async function handlePaymentSuccess(payload: CashfreeWebhookPayload) {
           planId,
           billingCycle,
           status: 'active',
-          currentPeriodStart: nowIso,
-          currentPeriodEnd: periodEnd,
+          // A renewal keeps the original start and moves only the end (stacking the paid days).
+          currentPeriodStart: renewal ? (existing?.['currentPeriodStart'] ?? nowIso) : nowIso,
+          currentPeriodEnd: decision.newEnd,
+          termDays: decision.termDays,
+          renewals: renewal ? FieldValue.increment(1) : 0,
           creditsIncluded: creditsGranted,
           creditsUsed: 0,
+          // Prepaid, fixed term: nothing renews or charges automatically.
+          autoRenew: false,
           cancelAtPeriodEnd: false,
           provider: 'cashfree',
           cashfreeOrderId: orderId,
           cashfreePaymentId: cfPaymentId,
-          createdAt: nowIso,
+          lastOrderId: orderId,
+          createdAt: existing?.['createdAt'] ?? nowIso,
           updatedAt: nowIso,
         },
         { merge: true }
@@ -295,7 +335,7 @@ async function handlePaymentSuccess(payload: CashfreeWebhookPayload) {
 
       // Point user document at subscription
       tx.set(
-        db.collection('users').doc(userId),
+        userRef,
         { subscriptionId: subId, updatedAt: FieldValue.serverTimestamp() },
         { merge: true }
       );
@@ -336,6 +376,15 @@ async function handlePaymentSuccess(payload: CashfreeWebhookPayload) {
 
     return { granted: true };
   });
+
+  if (!result.granted && result.reason === 'conflict') {
+    webhookLogger.error(
+      'cashfreeWebhook: PAID order could not be applied (live term conflict); flagged for manual refund/review',
+      new Error('term conflict'),
+      { orderId, userId }
+    );
+    return;
+  }
 
   if (!result.granted) {
     webhookLogger.info('cashfreeWebhook: payment already fulfilled (duplicate webhook)', {

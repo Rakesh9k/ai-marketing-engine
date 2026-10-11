@@ -9,7 +9,7 @@ import type {
   SubscriptionPlan,
 } from '../types';
 import { PRICING } from '../config/pricing';
-import { getPeriodCreditAllowance, resolveEntitledPlan } from './billing';
+import { getPeriodCreditAllowance, resolveEntitledPlan, reconcileLapsedPlan } from './billing';
 import { logFunctionStart, logFunctionComplete, logFunctionError } from '../utils/logging';
 
 const db = new Proxy({} as admin.firestore.Firestore, {
@@ -231,6 +231,10 @@ export async function reserveCreditsForOperation(
       };
       await createUsageDoc(newUsage);
     }
+
+    // A prepaid term that has ended must stop granting paid credits NOW, not when the daily job or month end
+    // arrives (services/billing.ts reconcileLapsedPlan).
+    await reconcileLapsedPlan(userId);
 
     // Cheap non-transactional pre-check: avoids running a Firestore
     // transaction at all for the common "obviously not enough credits"
