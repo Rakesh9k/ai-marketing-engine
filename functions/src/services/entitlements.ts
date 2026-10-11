@@ -40,7 +40,7 @@ export const PLAN_ENTITLEMENTS: Record<SubscriptionPlan, PlanEntitlements> = {
     campaignsPerMonth: 1,
     reelsPerMonth: 0,
     creativesPerMonth: 5,
-    storiesPerMonth: 0,
+    storiesPerMonth: 3,
     maxBusinesses: 1,
     features: {
       watermark: true,

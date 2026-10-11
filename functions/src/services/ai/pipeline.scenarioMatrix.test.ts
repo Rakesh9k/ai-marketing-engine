@@ -792,6 +792,19 @@ describe('Pass 2C scenario matrix (mock mode)', () => {
       ok ? 'PASS' : 'FAIL',
       `visual assets: ${visual.join(',')}; total assets ${r.assets.length}`
     );
+    // Delivered creatives must equal the Free plan contract (services/freePlanContract.test.ts):
+    // 1 poster + 3 stories + 1 reel concept = 5 social creatives per campaign.
+    const count = (t: string) => r.assets.filter((a) => a.hasImage && a.type === t).length;
+    const contractOk =
+      count('poster') === 1 && count('story') === 3 && count('reel') === 1 && visual.length === 5;
+    record(
+      'All scenarios',
+      'output',
+      'delivered visuals match the Free plan promise: 1 poster, 3 stories, 1 reel concept (5 creatives)',
+      contractOk ? 'PASS' : 'FAIL',
+      `poster ${count('poster')}, story ${count('story')}, reel ${count('reel')}, total ${visual.length}`
+    );
+    expect(contractOk).toBe(true);
     record(
       'All scenarios',
       'output',

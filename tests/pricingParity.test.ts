@@ -117,4 +117,15 @@ describe('credit pack and credit-cost parity', () => {
       }
     }
   });
+
+  it('the Free plan card states what Free delivers: 1 campaign, 3 stories, 140 credits, no AI video', () => {
+    const free = PLAN_DETAILS.free;
+    expect(free.stories).toBe(3);
+    expect(free.reels).toBe(0);
+    expect(free.credits).toBe(140);
+    const copy = free.features.join(' | ');
+    expect(copy).toMatch(/1 campaign every month: 1 poster, 3 stories and 1 reel concept/);
+    expect(copy).toMatch(/AI video reels on paid plans/);
+    expect(copy).not.toMatch(/0 AI reels/);
+  });
 });

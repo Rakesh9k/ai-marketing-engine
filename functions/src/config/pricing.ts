@@ -41,7 +41,7 @@ export const PRICING = {
       yearlyPriceINR: 0,
       monthlyReels: 0,
       monthlyCreatives: 5,
-      monthlyStories: 0,
+      monthlyStories: 3,
       maxBusinesses: 1,
     },
     starter: {

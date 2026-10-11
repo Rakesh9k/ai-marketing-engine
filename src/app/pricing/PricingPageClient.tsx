@@ -48,7 +48,7 @@ const COMPARISON_MATRIX: FeatureCategory[] = [
       {
         name: 'Story Concepts / month',
         tooltip: 'Engagement-boosting daily story ideas, polls, and quick updates',
-        values: { free: '0', starter: '9', business: '30', pro: '60', agency: '120' },
+        values: { free: '3', starter: '9', business: '30', pro: '60', agency: '120' },
       },
       {
         name: 'Captions, Hooks & CTAs',
