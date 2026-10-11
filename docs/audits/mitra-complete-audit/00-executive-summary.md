@@ -78,3 +78,8 @@ config check). Method and denominators for those are defined in `12-prioritized-
 - `12-prioritized-remediation-plan.md` — P0–P3 plan and what Pass 2 must still verify
 
 Not yet written (no evidence gathered): 02, 03, 04, 05, 06, 09, 11, 13.
+
+## Pass 2A update (2026-10-11)
+
+- **Repo integrity (P0-1) addressed:** reviewed 1010 untracked paths; no credentials found (only fake test keys; env files are gitignored). Backups outside the repo in `../_mitra_checkpoints/` (source tarball, mascot tarball, tracked-changes patch). 966 source files committed on branch `checkpoint/untracked-source-2026-10-11` (commit 9d6d19e); Creative Brain is now 470 tracked files. Deliberately left uncommitted: `filelist.txt` (11 MB junk), `functions/nul` (junk), `public/brand/mascot/` (115 MB of PNGs; needs an optimise/LFS decision). The 560 modified tracked files are NOT committed and are unreviewed. The work is on a side branch and still needs merging into `consolidate/phases-and-paddle-billing`.
+- **Free tier vs campaign cost:** not a defect in current code. See 08 (B5): free is 140 credits, a campaign reserves 100.

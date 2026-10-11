@@ -31,7 +31,7 @@ Sweeper: reconcileStaleReservations (scheduled)
 | B2 | P1 | `transaction.completed` totals assumed minor-unit ÷100 (`minorToMajor`); wrong for zero-decimal currencies (JPY/KRW). Affects analytics/records only if non-USD/INR zero-decimal sold. |
 | B3 | P1 | Subscription canceled: credits already granted are kept until the period usage doc rolls; confirm this matches stated refund/cancellation policy in `LEGAL_BILLING_CREDIT_MATRIX.md`. |
 | B4 | P1 | Refund/chargeback (`adjustment.*`) behaviour (claw back credits?) not read. |
-| B5 | P1 | Free tier 100 credits < 140-credit campaign cost (project memory, 2026-10-04) — check whether fixed; directly affects first-campaign conversion. |
+| B5 | RESOLVED in code (Pass 2A) | Free tier = 140 credits (`pricing.ts` free.monthlyCredits, granted in `onUserCreated.ts:43`); `campaign_generation` reserves `campaignBaseCredits 60 + 2×imageGenerationCredits 20 = 100` (`usageControl.ts` `getGenerationCost`). A free user can complete 1 campaign with 40 left. `tests/pricingParity.test.ts:116` asserts every tier >= campaign cost. The earlier 100-vs-140 note is stale. Residual: `pricing.ts` comments still call campaign cost "140"; reservation assumes 2 images while `MAX_IMAGE_GENERATION_CALLS_PER_CAMPAIGN = 1` — check whether the unused 20 credits are returned at finalize. Not yet confirmed in-product. |
 | B6 | P2 | Cashfree still deployed: second billing surface needing the same guarantees; decide keep/remove. |
 | B7 | UNVERIFIED | `expireSubscriptions` scheduler semantics vs Paddle-driven status (possible double authority). |
 
