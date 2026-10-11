@@ -22,6 +22,13 @@ import {
 } from './usageMeter';
 import { GeminiTextProvider } from './text';
 import { GeminiImageProvider } from './image';
+import {
+  DEFAULT_TEXT_MODEL,
+  DEFAULT_VISION_MODEL,
+  DEFAULT_DISCOVERY_MODEL,
+  DEFAULT_IMAGE_MODEL,
+  imageModel,
+} from '../../config/geminiModels';
 
 const cfg = (over: Partial<MeterConfig> = {}): MeterConfig => ({
   budgetInr: 10,
@@ -337,6 +344,48 @@ describe('safety preconditions for a live run', () => {
   });
 });
 
+describe('the price table covers every model Mitra uses by default', () => {
+  it('each default model has an explicit price (none silently falls to the pessimistic default)', () => {
+    for (const model of [
+      DEFAULT_TEXT_MODEL,
+      DEFAULT_VISION_MODEL,
+      DEFAULT_DISCOVERY_MODEL,
+      DEFAULT_IMAGE_MODEL,
+    ]) {
+      expect(ASSUMED_LIVE_PRICES.prices[model]).toBeDefined();
+    }
+  });
+  it('the default image model is not the one Google shut down on 2026-10-02', () => {
+    expect(DEFAULT_IMAGE_MODEL).not.toBe('gemini-2.5-flash-image');
+    expect(imageModel()).toBe(process.env['GEMINI_IMAGE_MODEL'] || DEFAULT_IMAGE_MODEL);
+  });
+  it('matches the published prices read on 2026-10-11', () => {
+    const p = ASSUMED_LIVE_PRICES.prices;
+    expect(p['gemini-3.1-flash-lite']).toMatchObject({
+      inputPerMTokUsd: 0.25,
+      outputPerMTokUsd: 1.5,
+    });
+    expect(p['gemini-3.5-flash-lite']).toMatchObject({
+      inputPerMTokUsd: 0.3,
+      outputPerMTokUsd: 2.5,
+    });
+    expect(p['gemini-3.1-flash-lite-image']).toMatchObject({
+      inputPerMTokUsd: 0.25,
+      outputPerMTokUsd: 30,
+    });
+    // 1,120 output tokens (a 1K image) at $30/M = $0.0336 must fit inside the reserved worst case
+    expect(p['gemini-3.1-flash-lite-image']!.maxCallUsd).toBeGreaterThan(0.0336);
+    expect(p['gemini-3.1-flash-image']!.maxCallUsd).toBeGreaterThan(0.067);
+  });
+  it('a text call at the request limits cannot exceed its reserved worst case', () => {
+    for (const model of [DEFAULT_TEXT_MODEL, DEFAULT_VISION_MODEL]) {
+      const pr = ASSUMED_LIVE_PRICES.prices[model]!;
+      const worst = (30_000 * pr.inputPerMTokUsd + 8192 * pr.outputPerMTokUsd) / 1e6;
+      expect(worst).toBeLessThanOrEqual(pr.maxCallUsd);
+    }
+  });
+});
+
 describe('wired into the real providers', () => {
   const schema = z.object({ a: z.string() });
   beforeEach(() => {
@@ -391,7 +440,7 @@ describe('wired into the real providers', () => {
         cfg({
           budgetInr: 100,
           prices: {
-            'gemini-2.5-flash-image': {
+            [imageModel()]: {
               inputPerMTokUsd: 0.3,
               outputPerMTokUsd: 30,
               maxCallUsd: 0.08,

@@ -1,6 +1,7 @@
 import { getEnvConfig } from '../../config/env';
 import type { ImageGenerationRequest, ImageGenerationResponse } from '../../types';
 import { beginMeteredCall } from './usageMeter';
+import { DEFAULT_IMAGE_MODEL, imageModel } from '../../config/geminiModels';
 
 /**
  * Image AI provider backed by Google Gemini image generation, replacing the
@@ -17,7 +18,7 @@ import { beginMeteredCall } from './usageMeter';
  * sent with the request (a URL written into the prompt text is NOT).
  */
 const GEMINI_API_BASE = 'https://generativelanguage.googleapis.com/v1beta/models';
-export const DEFAULT_GEMINI_IMAGE_MODEL = 'gemini-2.5-flash-image';
+export const DEFAULT_GEMINI_IMAGE_MODEL = DEFAULT_IMAGE_MODEL;
 const MAX_REFERENCE_IMAGE_BYTES = 7 * 1024 * 1024;
 const SUPPORTED_REFERENCE_MIME = ['image/jpeg', 'image/png', 'image/webp'];
 
@@ -74,7 +75,7 @@ export class GeminiImageProvider {
   }
 
   private get model(): string {
-    return process.env['GEMINI_IMAGE_MODEL'] || DEFAULT_GEMINI_IMAGE_MODEL;
+    return imageModel();
   }
 
   /** Fetches the reference image server-side and validates type/size. */

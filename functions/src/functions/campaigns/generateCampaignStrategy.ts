@@ -1,5 +1,6 @@
 import { onCall } from 'firebase-functions/v2/https';
 import { z } from 'zod';
+import { imageModel } from '../../config/geminiModels';
 import { v7 as uuidv7 } from 'uuid';
 
 import { verifyBusinessAccess } from '../../middleware/auth';
@@ -581,7 +582,7 @@ export const generateCampaignStrategy = onCall(
               storagePath: asset.storagePath,
               status: asset.status,
               promptUsed: asset.content?.prompt,
-              modelUsed: 'dall-e-3',
+              modelUsed: imageModel(),
               createdAt: asset.createdAt,
             }));
             await createCampaignAssets(assetsToSave);

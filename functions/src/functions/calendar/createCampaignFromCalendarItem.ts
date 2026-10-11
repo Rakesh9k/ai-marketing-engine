@@ -1,5 +1,6 @@
 import * as admin from 'firebase-admin';
 import { FieldValue } from 'firebase-admin/firestore';
+import { imageModel } from '../../config/geminiModels';
 import { onCall, HttpsError } from 'firebase-functions/v2/https';
 import { z } from 'zod';
 import { v7 as uuidv7 } from 'uuid';
@@ -360,7 +361,7 @@ export const createCampaignFromCalendarItem = onCall(
               storagePath: asset.storagePath,
               status: asset.status,
               promptUsed: asset.content?.prompt,
-              modelUsed: 'dall-e-3',
+              modelUsed: imageModel(),
               createdAt: asset.createdAt,
             }));
             await createCampaignAssets(assetsToSave);

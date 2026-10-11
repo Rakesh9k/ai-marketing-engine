@@ -50,19 +50,41 @@ export interface MeterConfig {
   maxConsecutiveFailures: number;
 }
 
-/** ASSUMED prices (USD). Verify before approving a budget. USD->INR is set above today's rate on purpose. */
+/**
+ * Unit prices (USD per 1M tokens), taken from Google's Gemini API pricing page (PAID tier, Standard) on 2026-10-11
+ * (page "last updated 2026-10-09 UTC"): https://ai.google.dev/gemini-api/docs/pricing . Re-verify before every
+ * approved live run: prices and model lifecycles change (gemini-2.5-flash-image was shut down on 2026-10-02).
+ *
+ * maxCallUsd is the WORST-CASE cost of one call, derived from the request limits: text calls send at most
+ * maxOutputTokens = 8192 and are budgeted for up to ~30,000 input tokens (input$ + 8192 x output$). A call that
+ * actually reports MORE than this is still charged what it reports (the cap can then be overshot by the excess of a
+ * single call), so keep a safety margin between the approved cap and the number you are prepared to lose.
+ * USD->INR is set above the current rate on purpose.
+ */
+export const PRICES_VERIFIED_ON = '2026-10-11';
 export const ASSUMED_LIVE_PRICES: MeterConfig = {
   budgetInr: 300,
   usdToInr: 90,
   prices: {
-    'gemini-3.1-flash-lite': { inputPerMTokUsd: 0.3, outputPerMTokUsd: 2.5, maxCallUsd: 0.02 },
-    'gemini-3.5-flash-lite': { inputPerMTokUsd: 0.3, outputPerMTokUsd: 2.5, maxCallUsd: 0.02 },
-    'gemini-flash-lite-latest': { inputPerMTokUsd: 0.3, outputPerMTokUsd: 2.5, maxCallUsd: 0.02 },
-    // Image output is billed per output token (~1,290 tokens per image at about $30/M).
-    'gemini-2.5-flash-image': { inputPerMTokUsd: 0.3, outputPerMTokUsd: 30, maxCallUsd: 0.08 },
+    // $0.25 in / $1.50 out (output includes thinking). 30k x 0.25/1e6 + 8192 x 1.5/1e6 = $0.0198
+    'gemini-3.1-flash-lite': { inputPerMTokUsd: 0.25, outputPerMTokUsd: 1.5, maxCallUsd: 0.02 },
+    // $0.30 in / $2.50 out. 30k x 0.30/1e6 + 8192 x 2.5/1e6 = $0.0295
+    'gemini-3.5-flash-lite': { inputPerMTokUsd: 0.3, outputPerMTokUsd: 2.5, maxCallUsd: 0.03 },
+    // Alias NOT listed on the price page; the 2026-10-05 benchmark found it resolves to gemini-3.5-flash-lite.
+    'gemini-flash-lite-latest': { inputPerMTokUsd: 0.3, outputPerMTokUsd: 2.5, maxCallUsd: 0.03 },
+    // Image models: $30 (lite) / $60 (flash) per 1M image output tokens; a 1K image is 1,120 tokens = $0.0336 /
+    // $0.067. All reported output tokens are charged at the image rate (conservative: text tokens cost less).
+    'gemini-3.1-flash-lite-image': {
+      inputPerMTokUsd: 0.25,
+      outputPerMTokUsd: 30,
+      maxCallUsd: 0.05,
+    },
+    'gemini-3.1-flash-image': { inputPerMTokUsd: 0.5, outputPerMTokUsd: 60, maxCallUsd: 0.1 },
   },
+  // Anything not listed above (including a shut-down or unknown model) is priced pessimistically.
   defaultPrice: { inputPerMTokUsd: 1.25, outputPerMTokUsd: 10, maxCallUsd: 0.1 },
-  imageFallbackUsd: 0.04,
+  // Image call with no usage reported: at least the dearest listed 1K image.
+  imageFallbackUsd: 0.07,
   failedCallChargeFraction: 1,
   maxConsecutiveFailures: 2,
 };

@@ -3,7 +3,7 @@ import { getTextAI, getVisionAI, getReelVisionAI, getImageAI } from './factory/a
 import { runDeterministicTruthCheck, extractFacts } from './truthCheck';
 import { executeWithUsageControl, getGenerationCost, USAGE_ERROR_CODES } from '../usageControl';
 import { withTimeout, withRetry } from './retry';
-import { textModel } from '../../config/geminiModels';
+import { textModel, imageModel } from '../../config/geminiModels';
 import { createLogger } from '../../utils/logging';
 import type { VisionAnalysisResult, ReelClipClassificationResult } from './vision';
 import type { ImageGenerationRequest, ImageGenerationResponse } from '../../types';
@@ -214,7 +214,7 @@ export async function generateImage(
   const start = Date.now();
   const meta = {
     provider: 'gemini',
-    model: process.env['GEMINI_IMAGE_MODEL'] || 'gemini-2.5-flash-image',
+    model: imageModel(),
     stage: 'image.generateImage',
   };
   try {
@@ -238,7 +238,7 @@ export async function generateImage(
     return {
       success: false,
       provider: 'gemini',
-      model: process.env['GEMINI_IMAGE_MODEL'] || 'gemini-2.5-flash-image',
+      model: imageModel(),
       error: { code: 'TIMEOUT', message: errorMessage(error) },
     };
   }

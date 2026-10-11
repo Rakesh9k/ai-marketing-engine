@@ -1,5 +1,6 @@
 import { onCall } from 'firebase-functions/v2/https';
 import { z } from 'zod';
+import { imageModel } from '../../config/geminiModels';
 import { v7 as uuidv7 } from 'uuid';
 
 import { validatedCallable } from '../../middleware/validation';
@@ -236,7 +237,7 @@ export const regenerateAsset = onCall(
             storagePath: newAssetData.storagePath,
             status: regenerationPassed ? newAssetData.status : 'failed',
             promptUsed: newAssetData.promptUsed,
-            modelUsed: 'dall-e-3',
+            modelUsed: imageModel(),
             createdAt: new Date().toISOString(),
             metadata: {
               truthCheckStatus: regenerationTruthStatus,
