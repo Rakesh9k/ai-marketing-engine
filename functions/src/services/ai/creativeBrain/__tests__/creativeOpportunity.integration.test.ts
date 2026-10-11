@@ -4,7 +4,7 @@ import { creativeBrainSessionService } from '../session/creativeBrainSession.ser
 import type { CreativeBrainInput } from '../../creativeBrain.types';
 
 describe('Phase 8 — Creative Opportunity Integration & Session Persistence', () => {
-  jest.setTimeout(60000);
+  jest.setTimeout(120000);
 
   beforeEach(() => {
     creativeBrainSessionService.clearStore();

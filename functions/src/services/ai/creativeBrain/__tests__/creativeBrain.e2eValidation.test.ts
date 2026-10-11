@@ -6,6 +6,10 @@ import { DynamicQuestionEngine } from '../questions/creativeQuestion.engine';
 import type { CreativeBrainInput } from '../../creativeBrain.types';
 import type { BusinessBrain } from '../../../../types';
 
+// The first test pays the cold compile of the whole Creative Brain module graph (~470 files) on a fresh Jest
+// cache, which exceeded the 30 s default under load. Assertions are unchanged; only the allowed time is.
+jest.setTimeout(120000);
+
 describe('Phase 6: End-to-End Creative Brain Behavioral Validation & Decision Quality Audit', () => {
 
   const validLoc = {
@@ -211,7 +215,7 @@ describe('Phase 6: End-to-End Creative Brain Behavioral Validation & Decision Qu
     expect(run1.blueprint.winningConcept.angle).toEqual(run2.blueprint.winningConcept.angle);
     expect(run1.blueprint.winningConcept.visualPremise.emphasis).toEqual(run2.blueprint.winningConcept.visualPremise.emphasis);
     expect(run1.blueprint.strategyDirectives.ctaPrimary).toEqual(run2.blueprint.strategyDirectives.ctaPrimary);
-  }, 60000);
+  }, 120000);
 
   // SCENARIO 6: CONTEXTUAL GAIN VARIATION (DISCOUNT VS ANNIVERSARY)
   it('Scenario 6: Question value changes dynamically based on campaign intent context', async () => {
