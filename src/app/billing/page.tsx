@@ -11,11 +11,7 @@ import {
 import type { Subscription, SubscriptionPlan, Usage, Transaction, BillingCycle } from '@/types';
 import { PLAN_DETAILS } from '@/features/billing/planDetails';
 import { callFunction } from '@/services/api';
-import { getTierPriceId, intervalOf } from '@/lib/paddle/catalog';
-import { usePaddlePrices } from '@/features/billing/usePaddlePrices';
-import { usePaddleCheckout } from '@/features/billing/usePaddleCheckout';
-import { useSyncPaddleCustomer } from '@/features/billing/useSyncPaddleCustomer';
-import { PaddlePrice, PriceStatusBanner } from '@/features/billing/components/PaddlePrice';
+import { useCashfreeCheckout } from '@/features/billing/useCashfreeCheckout';
 import { CreditPackCards } from '@/features/billing/components/CreditPackCards';
 import { isVisibleTransaction } from '@/features/billing/visibleTransactions';
 import { settleRead } from '@/features/billing/readState';
@@ -31,22 +27,17 @@ interface CancelSubscriptionResponse {
 export default function BillingPage() {
   const { user, logout } = useAuth();
   const { showToast } = useToast();
-  useSyncPaddleCustomer(user?.uid);
   const [subscription, setSubscription] = useState<Subscription | null>(null);
   const [usage, setUsage] = useState<Usage | null>(null);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [businessCount, setBusinessCount] = useState<number>(1);
   const [loading, setLoading] = useState(true);
-  // Names of reads that FAILED (distinct from "document does not exist"). While the subscription or
-  // usage read has failed we do not know the user's entitlement, so we must not show any plan.
   const [failedReads, setFailedReads] = useState<string[]>([]);
   const [billingCycle, setBillingCycle] = useState<BillingCycle>('yearly');
-  // Plan requested via /billing?plan=...&cycle=... (e.g. right after signup); started once prices load.
   const [autoPlan, setAutoPlan] = useState<{ plan: SubscriptionPlan; cycle: BillingCycle } | null>(
     null
   );
-  const { state: priceState, catalog, retry: retryPrices } = usePaddlePrices();
-  const { pendingKey, start: startCheckout } = usePaddleCheckout((message) =>
+  const { pendingKey, start: startCheckout } = useCashfreeCheckout((message) =>
     showToast(message, 'error')
   );
   const [canceling, setCanceling] = useState(false);
@@ -63,8 +54,6 @@ export default function BillingPage() {
     ]);
 
     const failed: string[] = [];
-    // A missing document is `null` on a SUCCESSFUL read (documented default: Free). A failed read is
-    // not: keep whatever we last knew, and flag it so the UI says "can't load" instead of "Free".
     if (subscriptionRead.ok) setSubscription(subscriptionRead.value);
     else failed.push('subscription');
     if (usageRead.ok) setUsage(usageRead.value);
@@ -93,19 +82,14 @@ export default function BillingPage() {
   const handleUpgrade = useCallback(
     (plan: SubscriptionPlan, cycle: BillingCycle = billingCycle) => {
       if (plan === 'free' || plan === subscription?.planId) return;
-      const expectedPriceId = getTierPriceId(catalog, plan, intervalOf(cycle));
-      if (!expectedPriceId) {
-        showToast('This plan is not available for checkout right now.', 'error');
-        return;
-      }
-      void startCheckout({ kind: 'plan', planId: plan, billingCycle: cycle, expectedPriceId });
+      void startCheckout({ kind: 'plan', planId: plan, billingCycle: cycle });
     },
-    [subscription, billingCycle, catalog, showToast, startCheckout]
+    [subscription, billingCycle, startCheckout]
   );
 
   const handleBuyTopUp = useCallback(
-    (credits: number, expectedPriceId: string) => {
-      void startCheckout({ kind: 'pack', credits, expectedPriceId });
+    (credits: number) => {
+      void startCheckout({ kind: 'pack', credits });
     },
     [startCheckout]
   );
@@ -114,8 +98,7 @@ export default function BillingPage() {
     if (typeof window === 'undefined') return;
     const params = new URLSearchParams(window.location.search);
 
-    // PayU return params (?payu=) are no longer produced - its callback is not deployed.
-    const status = params.get('paddle');
+    const cashfreeOrderId = params.get('cashfree_order_id');
     const requestedPlan = params.get('plan') as SubscriptionPlan | null;
     const requestedCycle = params.get('cycle') as BillingCycle | null;
 
@@ -123,19 +106,13 @@ export default function BillingPage() {
       setBillingCycle(requestedCycle);
     }
 
-    if (status === 'success') {
+    if (cashfreeOrderId) {
       showToast(
-        'Payment received! Your limits and credits will reflect within a few moments.',
-        'success'
+        "We're confirming your payment with Cashfree. If you completed it, your plan and credits update within a minute; if you cancelled, you have not been charged.",
+        'info'
       );
-    } else if (status === 'pending') {
-      showToast('Your payment is being processed. This page will update shortly.', 'info');
-    } else if (status === 'failure' || status === 'usercancel') {
-      showToast('Payment was not completed.', 'warning');
-    }
-
-    if (status) {
       void refreshBillingData();
+      [3000, 7000, 15000].forEach((ms) => window.setTimeout(() => void refreshBillingData(), ms));
       window.history.replaceState({}, '', '/billing');
     } else if (requestedPlan && requestedPlan !== 'free') {
       setAutoPlan({ plan: requestedPlan, cycle: requestedCycle || 'yearly' });
@@ -143,13 +120,11 @@ export default function BillingPage() {
     }
   }, [showToast, refreshBillingData]);
 
-  // Start the requested checkout only once Paddle's prices are on screen, so the customer
-  // never lands in an overlay for a price they were not shown.
   useEffect(() => {
-    if (!autoPlan || loading || priceState.status !== 'ready') return;
+    if (!autoPlan || loading) return;
     handleUpgrade(autoPlan.plan, autoPlan.cycle);
     setAutoPlan(null);
-  }, [autoPlan, loading, priceState.status, handleUpgrade]);
+  }, [autoPlan, loading, handleUpgrade]);
 
   const handleCancelSubscription = useCallback(async () => {
     if (!subscription || subscription.planId === 'free') return;
@@ -163,7 +138,7 @@ export default function BillingPage() {
     setCanceling(true);
     try {
       const result = await callFunction<Record<string, never>, CancelSubscriptionResponse>({
-        functionName: 'cancelPaddleSubscription',
+        functionName: 'cancelCashfreeSubscription',
         data: {},
       });
       showToast(
@@ -312,14 +287,9 @@ export default function BillingPage() {
                     {billingCycle === 'yearly' ? 'Yearly Billing' : 'Monthly Billing'}
                   </p>
                   <p className="text-2xl font-black text-neutral-900">
-                    {currentPlan === 'free' ? (
-                      'Free'
-                    ) : (
-                      <PaddlePrice
-                        state={priceState}
-                        priceId={getTierPriceId(catalog, currentPlan, intervalOf(billingCycle))}
-                      />
-                    )}
+                    {currentPlan === 'free'
+                      ? 'Free'
+                      : `₹${(billingCycle === 'yearly' ? Math.round(planDetails.yearlyPrice / 12) : planDetails.price).toLocaleString('en-IN')}`}
                     <span className="text-xs font-medium text-neutral-500">
                       /{billingCycle === 'yearly' ? 'yr' : 'mo'}
                     </span>
@@ -424,8 +394,6 @@ export default function BillingPage() {
               Need extra generations without changing your main plan? Add instant credit packs.
             </p>
             <CreditPackCards
-              catalog={catalog}
-              prices={priceState}
               pendingKey={pendingKey}
               onBuy={handleBuyTopUp}
               disabled={entitlementUnknown}
@@ -435,7 +403,6 @@ export default function BillingPage() {
           {/* Available Subscription Plans */}
           <div>
             <h2 className="mb-4 text-xl font-black text-neutral-900">Subscription Plans</h2>
-            <PriceStatusBanner state={priceState} onRetry={retryPrices} />
             {subscription && subscription.planId !== 'free' && !subscription.cancelAtPeriodEnd && (
               <p className="mb-4 text-xs text-neutral-500">
                 Switching plans in place isn&apos;t available yet. To move to a different plan,
@@ -449,11 +416,8 @@ export default function BillingPage() {
                 const isFree = planKey === 'free';
                 const isPro = planKey === 'pro';
                 const period = billingCycle === 'yearly' ? '/yr' : '/mo';
-                const tierPriceId = getTierPriceId(catalog, planKey, intervalOf(billingCycle));
-                const priceShown =
-                  priceState.status === 'ready' &&
-                  !!tierPriceId &&
-                  priceState.prices[tierPriceId] !== undefined;
+                const displayPrice =
+                  billingCycle === 'yearly' ? Math.round(plan.yearlyPrice / 12) : plan.price;
 
                 return (
                   <div
@@ -482,11 +446,7 @@ export default function BillingPage() {
                       <h3 className="text-lg font-extrabold text-neutral-900">{plan.name}</h3>
                       <div className="mt-2">
                         <span className="text-2xl font-black text-neutral-900">
-                          {isFree ? (
-                            'Free'
-                          ) : (
-                            <PaddlePrice state={priceState} priceId={tierPriceId} />
-                          )}
+                          {isFree ? 'Free' : `₹${displayPrice.toLocaleString('en-IN')}`}
                         </span>
                         {!isFree && <span className="text-xs text-neutral-500">{period}</span>}
                       </div>
@@ -523,13 +483,7 @@ export default function BillingPage() {
 
                     <button
                       onClick={() => handleUpgrade(planKey, billingCycle)}
-                      disabled={
-                        isCurrent ||
-                        isFree ||
-                        pendingKey !== null ||
-                        !priceShown ||
-                        entitlementUnknown
-                      }
+                      disabled={isCurrent || isFree || pendingKey !== null || entitlementUnknown}
                       className={`mt-6 w-full rounded-xl py-2.5 text-xs font-bold transition-all ${
                         isCurrent || isFree
                           ? 'cursor-not-allowed bg-neutral-100 text-neutral-500'

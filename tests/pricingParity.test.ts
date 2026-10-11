@@ -14,6 +14,7 @@ import {
   CREDIT_COSTS,
   ENTITLEMENT_COSTS,
   CAMPAIGN_GENERATION_COST,
+  CREDIT_PACKS,
 } from '@/lib/config/pricing';
 import { PLAN_DETAILS } from '@/features/billing/planDetails';
 import { CREDIT_PACK_SIZES } from '@/lib/paddle/catalog';
@@ -81,6 +82,12 @@ describe('plan catalog parity (frontend mirrors vs backend pricing.ts)', () => {
 });
 
 describe('credit pack and credit-cost parity', () => {
+  it('the Cashfree pack cards show exactly the backend packs: credits AND rupee price (the server prices the order)', () => {
+    expect(CREDIT_PACKS.map((p) => ({ credits: p.credits, priceINR: p.priceINR }))).toEqual(
+      PRICING.topUpPacks.map((p) => ({ credits: p.credits, priceINR: p.priceINR }))
+    );
+  });
+
   it('frontend pack sizes equal backend topUpPacks (the three Paddle pack prices)', () => {
     expect([...CREDIT_PACK_SIZES]).toEqual(PRICING.topUpPacks.map((p) => p.credits));
   });

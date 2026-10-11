@@ -191,3 +191,13 @@ export const ENTITLEMENT_COSTS: Record<EntitlementType, { credits: number }> = {
     credits: 10,
   },
 };
+
+/**
+ * One-time credit packs. Mirrors PRICING.topUpPacks in functions/src/config/pricing.ts (the server prices the
+ * Cashfree order from that config; tests/pricingParity.test.ts pins the two together).
+ */
+export const CREDIT_PACKS = [
+  { credits: 500, label: 'Small Pack', priceINR: 499 },
+  { credits: 1200, label: 'Medium Pack', priceINR: 999 },
+  { credits: 3000, label: 'Large Pack', priceINR: 1999 },
+] as const;

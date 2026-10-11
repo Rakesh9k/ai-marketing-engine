@@ -3,7 +3,6 @@
 import { useState, useEffect, Fragment } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/Button';
-import { MitraLogo } from '@/components/ui/MitraLogo';
 import { LandingNav } from '@/features/landing/components/LandingNav';
 import { LandingFooter } from '@/features/landing/components/LandingFooter';
 import { Reveal } from '@/components/motion/Reveal';
@@ -11,11 +10,7 @@ import { useAuth } from '@/features/auth/hooks/useAuth';
 import { doc, getDoc } from 'firebase/firestore';
 import { getFirebaseDb } from '@/lib/firebase/client';
 import { PLANS, type SubscriptionPlan, type PlanDefinition } from '@/lib/config/pricing';
-import { getTierPriceId, intervalOf } from '@/lib/paddle/catalog';
-import { setPaddleCustomer } from '@/lib/paddle/initPaddle';
-import { usePaddlePrices } from '@/features/billing/usePaddlePrices';
-import { usePaddleCheckout } from '@/features/billing/usePaddleCheckout';
-import { PaddlePrice, PriceStatusBanner } from '@/features/billing/components/PaddlePrice';
+import { useCashfreeCheckout } from '@/features/billing/useCashfreeCheckout';
 import { CreditPackCards } from '@/features/billing/components/CreditPackCards';
 import { useToast } from '@/hooks/useToast';
 
@@ -48,7 +43,7 @@ const COMPARISON_MATRIX: FeatureCategory[] = [
       {
         name: 'Story Concepts / month',
         tooltip: 'Engagement-boosting daily story ideas, polls, and quick updates',
-        values: { free: '3', starter: '9', business: '30', pro: '60', agency: '120' },
+        values: { free: '0', starter: '9', business: '30', pro: '60', agency: '120' },
       },
       {
         name: 'Captions, Hooks & CTAs',
@@ -169,13 +164,12 @@ const FAQS = [
   },
 ];
 
-export default function PricingPageClient({ countryCode }: { countryCode?: string }) {
+export default function PricingPageClient({ countryCode: _countryCode }: { countryCode?: string }) {
   const router = useRouter();
   const { showToast } = useToast();
   // Paddle's localized, pre-formatted prices. countryCode is undefined when the CDN gave us no
   // usable country - Paddle then auto-detects from the visitor's IP.
-  const { state: priceState, catalog, retry: retryPrices } = usePaddlePrices(countryCode);
-  const { pendingKey, start: startCheckout } = usePaddleCheckout((message) =>
+  const { pendingKey, start: startCheckout } = useCashfreeCheckout((message) =>
     showToast(message, 'error')
   );
 
@@ -193,7 +187,6 @@ export default function PricingPageClient({ countryCode }: { countryCode?: strin
     if (authStatus !== 'authenticated' || !user) {
       setActivePlanId(null);
       setHasLiveSubscription(false);
-      setPaddleCustomer(undefined);
       return;
     }
 
@@ -207,13 +200,6 @@ export default function PricingPageClient({ countryCode }: { countryCode?: strin
 
         const userSnap = await getDoc(doc(db, 'users', user.uid));
         if (cancelled) return;
-
-        // Paddle Retain: tell Paddle.js which Paddle customer this is (no-op if none yet).
-        setPaddleCustomer(
-          userSnap.exists()
-            ? (userSnap.data()['paddleCustomerId'] as string | undefined)
-            : undefined
-        );
 
         const subscriptionId = userSnap.exists()
           ? (userSnap.data()['subscriptionId'] as string | undefined)
@@ -275,12 +261,8 @@ export default function PricingPageClient({ countryCode }: { countryCode?: strin
     if (authStatus === 'authenticated' && subLoading) return true;
     if (planId === 'free') return authStatus === 'authenticated';
     if (activePlanId === planId) return true;
-    if (hasLiveSubscription) return false; // routes to /billing
-    // Checkout needs a Paddle price shown on screen and no other checkout in flight.
-    const priceId = getTierPriceId(catalog, planId, intervalOf(billingCycle));
-    const priceShown =
-      priceState.status === 'ready' && !!priceId && priceState.prices[priceId] !== undefined;
-    return !priceShown || pendingKey !== null;
+    if (hasLiveSubscription) return false;
+    return pendingKey !== null;
   }
 
   function handleCtaClick(planId: SubscriptionPlan) {
@@ -294,24 +276,21 @@ export default function PricingPageClient({ countryCode }: { countryCode?: strin
     }
     if (activePlanId === planId) return;
     if (hasLiveSubscription) {
-      // In-place plan changes are not supported yet and a second subscription would double-bill.
       router.push('/billing');
       return;
     }
-    const expectedPriceId = getTierPriceId(catalog, planId, intervalOf(billingCycle));
-    if (!expectedPriceId) return;
-    void startCheckout({ kind: 'plan', planId, billingCycle, expectedPriceId });
+    void startCheckout({ kind: 'plan', planId, billingCycle });
   }
 
   return (
     <div className="bg-bg-primary text-text-primary min-h-screen">
       <LandingNav />
 
-      <main className="mx-auto max-w-7xl px-4 py-12 sm:px-6 lg:py-16">
+      {/* pt-28: the landing nav is position:fixed, so content must start below it */}
+      <main className="mx-auto max-w-7xl px-4 pt-28 pb-12 sm:px-6 lg:pt-32 lg:pb-16">
         {/* ── Hero Header ────────────────────────────────────────────────────── */}
         <div className="text-center">
           <div className="border-brand-200 bg-brand-50/80 mb-3 inline-flex items-center gap-2 rounded-full border px-3.5 py-1">
-            <MitraLogo size="sm" />
             <span className="text-brand-700 text-xs font-bold tracking-wider uppercase">
               SIMPLE, CLEAR, BUILT FOR YOUR GROWTH
             </span>
@@ -365,8 +344,6 @@ export default function PricingPageClient({ countryCode }: { countryCode?: strin
             </div>
           </div>
         </div>
-
-        <PriceStatusBanner state={priceState} onRetry={retryPrices} />
 
         {hasLiveSubscription && (
           <p className="text-text-secondary mx-auto mt-6 max-w-xl text-center text-xs">
@@ -422,7 +399,7 @@ export default function PricingPageClient({ countryCode }: { countryCode?: strin
                       {plan.tagline}
                     </p>
 
-                    {/* Price display - Paddle's own formatted total, shown verbatim */}
+                    {/* Price display - Canonical INR prices */}
                     <div className="border-border-light mt-5 border-t pt-4">
                       {plan.id === 'free' ? (
                         <div className="flex items-baseline gap-1">
@@ -432,15 +409,18 @@ export default function PricingPageClient({ countryCode }: { countryCode?: strin
                       ) : (
                         <div>
                           <div className="flex items-baseline gap-1">
-                            <PaddlePrice
-                              state={priceState}
-                              priceId={getTierPriceId(catalog, plan.id, intervalOf(billingCycle))}
-                              className="text-text-primary text-3xl font-black"
-                            />
+                            <span className="text-text-primary text-3xl font-black">
+                              ₹
+                              {(isYearly ? plan.monthlyIfYearly : plan.monthlyPrice).toLocaleString(
+                                'en-IN'
+                              )}
+                            </span>
                             <span className="text-text-tertiary text-xs">{period}</span>
                           </div>
                           <p className="text-text-tertiary mt-1 text-[11px]">
-                            {isYearly ? 'Billed once a year' : 'Billed monthly'}
+                            {isYearly
+                              ? `₹${plan.yearlyPrice.toLocaleString('en-IN')} billed annually`
+                              : 'Billed monthly'}
                           </p>
                         </div>
                       )}
@@ -551,12 +531,8 @@ export default function PricingPageClient({ countryCode }: { countryCode?: strin
           <div className="mt-6">
             {authStatus === 'authenticated' ? (
               <CreditPackCards
-                catalog={catalog}
-                prices={priceState}
                 pendingKey={pendingKey}
-                onBuy={(credits, expectedPriceId) =>
-                  void startCheckout({ kind: 'pack', credits, expectedPriceId })
-                }
+                onBuy={(credits) => void startCheckout({ kind: 'pack', credits })}
               />
             ) : (
               <div className="text-center">
