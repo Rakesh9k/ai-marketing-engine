@@ -140,11 +140,11 @@ const FAQS = [
   },
   {
     q: 'How does annual billing saving work?',
-    a: 'When you choose annual billing you pay once a year instead of every month. The exact yearly and monthly prices for your country are always shown on the plan cards above, straight from our payment partner.',
+    a: 'The yearly option is a single payment for 365 days of access, instead of buying a 30-day term each month. The price you pay for each option is shown on the plan cards above.',
   },
   {
-    q: 'Do plans renew automatically? How do I cancel or switch plans?',
-    a: 'Paid plans renew automatically at the end of each billing period until you cancel, and there is no free trial. You can cancel from the Billing page at any time: cancelling stops the next renewal, and you keep your plan until the end of the period you have already paid for. Switching plans inside an active subscription is not available yet — to move to a different plan, cancel and subscribe to the new plan once your current period ends.',
+    q: 'Do plans renew automatically? How do I renew or switch plans?',
+    a: 'No. Paid plans are prepaid for a fixed term: 30 days for monthly plans and 365 days for yearly plans. They never renew automatically and you are not charged again unless you choose to buy another term. There is no free trial. When your term ends you return to the Free plan and can buy again from the Billing page. Renewing the same plan and billing period before it ends adds the new term after your current end date. To switch to a different plan or billing period, buy it after your current access ends.',
   },
   {
     q: 'Do unused credits roll over?',
@@ -160,7 +160,7 @@ const FAQS = [
   },
   {
     q: 'Are my payments secure?',
-    a: 'Yes. All payment transactions are securely processed over encrypted channels by our payment partner, Paddle. We never store raw payment details on our servers.',
+    a: 'Yes. All payment transactions are securely processed over encrypted channels by our payment partner, Cashfree Payments. We never store raw payment details on our servers.',
   },
 ];
 
@@ -179,7 +179,7 @@ export default function PricingPageClient({ countryCode: _countryCode }: { count
   // ─── Auth & subscription state ──────────────────────────────────────────────
   const { status: authStatus, user } = useAuth();
   const [activePlanId, setActivePlanId] = useState<SubscriptionPlan | null>(null);
-  // A paid, still-renewing subscription: buying another plan would double-bill.
+  // A paid term that has not ended yet: another plan cannot be bought until it does (no proration).
   const [hasLiveSubscription, setHasLiveSubscription] = useState(false);
   const [subLoading, setSubLoading] = useState(false);
 
@@ -215,11 +215,12 @@ export default function PricingPageClient({ countryCode: _countryCode }: { count
 
         if (subSnap.exists()) {
           const subData = subSnap.data();
-          const isActive = subData['status'] === 'active';
+          // Prepaid fixed term: entitled only while the paid-through date is in the future.
+          const endRaw = subData['currentPeriodEnd'];
+          const notEnded = !endRaw || new Date(endRaw as string).getTime() > Date.now();
+          const isActive = subData['status'] === 'active' && notEnded;
           setActivePlanId(isActive ? (subData['planId'] as SubscriptionPlan) : 'free');
-          setHasLiveSubscription(
-            isActive && subData['planId'] !== 'free' && subData['cancelAtPeriodEnd'] !== true
-          );
+          setHasLiveSubscription(isActive && subData['planId'] !== 'free');
         } else {
           setActivePlanId('free');
         }
@@ -242,12 +243,13 @@ export default function PricingPageClient({ countryCode: _countryCode }: { count
       if (authStatus !== 'authenticated') return 'Get Started Free';
       return activePlanId === 'free' ? 'Current Plan' : 'Included';
     }
-    if (authStatus !== 'authenticated') return `Subscribe to ${planName}`;
+    const termWord = billingCycle === 'yearly' ? '365 days' : '30 days';
+    if (authStatus !== 'authenticated') return `Buy ${termWord} of ${planName}`;
     if (subLoading) return 'Loading…';
     if (activePlanId === planId) return 'Current Plan';
     if (hasLiveSubscription) return 'Manage in Billing';
     if (pendingKey === `plan:${planId}:${billingCycle}`) return 'Opening checkout…';
-    return `Subscribe to ${planName}`;
+    return `Buy ${termWord} of ${planName}`;
   }
 
   function getCtaVariant(planId: SubscriptionPlan): 'primary' | 'outline' | 'ghost' {
@@ -319,7 +321,7 @@ export default function PricingPageClient({ countryCode: _countryCode }: { count
                     : 'text-text-tertiary hover:text-text-primary'
                 }`}
               >
-                Monthly Billing
+                Monthly · 30 days
               </button>
               <button
                 type="button"
@@ -330,7 +332,7 @@ export default function PricingPageClient({ countryCode: _countryCode }: { count
                     : 'text-text-tertiary hover:text-text-primary'
                 }`}
               >
-                <span>Yearly Billing</span>
+                <span>Yearly · 365 days</span>
                 <span
                   className={`rounded-full px-2 py-0.5 text-[11px] font-extrabold uppercase ${
                     billingCycle === 'yearly'
@@ -347,8 +349,8 @@ export default function PricingPageClient({ countryCode: _countryCode }: { count
 
         {hasLiveSubscription && (
           <p className="text-text-secondary mx-auto mt-6 max-w-xl text-center text-xs">
-            You already have an active subscription. Changing plans from here isn&apos;t available
-            yet - open Billing to manage it.
+            You already have access to a paid plan. Open Billing to see when it ends and to renew
+            it; to switch plans, buy the new one after your access ends.
           </p>
         )}
 
@@ -356,7 +358,7 @@ export default function PricingPageClient({ countryCode: _countryCode }: { count
         <div className="mt-12 grid gap-6 sm:grid-cols-2 lg:grid-cols-5 lg:items-stretch">
           {PLANS.map((plan: PlanDefinition, planIdx: number) => {
             const isYearly = billingCycle === 'yearly';
-            const period = isYearly ? '/year' : '/month';
+            const period = isYearly ? '/ 365 days' : '/ 30 days';
             const isCurrent =
               authStatus === 'authenticated' && !subLoading && activePlanId === plan.id;
             const isPro = plan.id === 'pro';
@@ -411,16 +413,14 @@ export default function PricingPageClient({ countryCode: _countryCode }: { count
                           <div className="flex items-baseline gap-1">
                             <span className="text-text-primary text-3xl font-black">
                               ₹
-                              {(isYearly ? plan.monthlyIfYearly : plan.monthlyPrice).toLocaleString(
+                              {(isYearly ? plan.yearlyPrice : plan.monthlyPrice).toLocaleString(
                                 'en-IN'
                               )}
                             </span>
                             <span className="text-text-tertiary text-xs">{period}</span>
                           </div>
                           <p className="text-text-tertiary mt-1 text-[11px]">
-                            {isYearly
-                              ? `₹${plan.yearlyPrice.toLocaleString('en-IN')} billed annually`
-                              : 'Billed monthly'}
+                            One-time payment. Does not renew automatically.
                           </p>
                         </div>
                       )}
@@ -507,7 +507,7 @@ export default function PricingPageClient({ countryCode: _countryCode }: { count
                     </Button>
                     {plan.id !== 'free' && (
                       <p className="text-text-tertiary mt-2 text-center text-[11px]">
-                        Renews automatically until you cancel.
+                        You choose whether to buy another term when it ends.
                       </p>
                     )}
                   </div>
@@ -655,13 +655,13 @@ export default function PricingPageClient({ countryCode: _countryCode }: { count
             Trusted &amp; Secure Payment Guarantee
           </h2>
           <p className="text-text-secondary mx-auto mt-2 max-w-2xl text-xs sm:text-sm">
-            Payments are processed securely by our payment partner, Paddle. Subscriptions renew
-            automatically until you cancel. You can cancel from your Billing page at any time and
-            keep your plan until the end of the period you have paid for.
+            Payments are processed securely by Cashfree Payments. Plans are prepaid for a fixed term
+            (30 days or 365 days) and do not renew automatically: you are not charged again unless
+            you choose to buy another term.
           </p>
           <div className="text-text-tertiary mt-6 flex flex-wrap justify-center gap-6 text-xs font-semibold">
             <span>✓ Instant Output Entitlement</span>
-            <span>✓ Cancel anytime in Billing</span>
+            <span>✓ No automatic renewals</span>
             <span>✓ Encrypted Checkout</span>
           </div>
         </div>

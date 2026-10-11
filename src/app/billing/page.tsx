@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useAuth } from '@/features/auth/hooks/useAuth';
 import {
   subscriptionService,
@@ -14,15 +14,17 @@ import { callFunction } from '@/services/api';
 import { useCashfreeCheckout } from '@/features/billing/useCashfreeCheckout';
 import { CreditPackCards } from '@/features/billing/components/CreditPackCards';
 import { isVisibleTransaction } from '@/features/billing/visibleTransactions';
+import {
+  isTermLive,
+  termEnd,
+  termLabel,
+  termPriceINR,
+  formatAccessDate,
+  NO_AUTO_RENEW_NOTE,
+} from '@/features/billing/prepaidTermUi';
 import { settleRead } from '@/features/billing/readState';
 import { useToast } from '@/hooks/useToast';
 import { PageSkeleton } from '@/components/motion/PageSkeleton';
-
-interface CancelSubscriptionResponse {
-  success: boolean;
-  alreadyCanceled: boolean;
-  currentPeriodEnd: string;
-}
 
 export default function BillingPage() {
   const { user, logout } = useAuth();
@@ -40,7 +42,10 @@ export default function BillingPage() {
   const { pendingKey, start: startCheckout } = useCashfreeCheckout((message) =>
     showToast(message, 'error')
   );
-  const [canceling, setCanceling] = useState(false);
+  const subscriptionRef = useRef<Subscription | null>(null);
+  subscriptionRef.current = subscription;
+  // Set when the customer returns from Cashfree: the access end date they had BEFORE paying (0 if none).
+  const awaitingPaymentRef = useRef<number | null>(null);
   const [deleteConfirmEmail, setDeleteConfirmEmail] = useState('');
   const [deleting, setDeleting] = useState(false);
 
@@ -81,7 +86,16 @@ export default function BillingPage() {
 
   const handleUpgrade = useCallback(
     (plan: SubscriptionPlan, cycle: BillingCycle = billingCycle) => {
-      if (plan === 'free' || plan === subscription?.planId) return;
+      if (plan === 'free') return;
+      // Renewing the same plan + billing period extends the term. Anything else must wait for the live term to
+      // end (the server refuses it too).
+      if (
+        isTermLive(subscription) &&
+        (plan !== subscription?.planId ||
+          cycle !== ((subscription as { billingCycle?: BillingCycle }).billingCycle ?? 'monthly'))
+      ) {
+        return;
+      }
       void startCheckout({ kind: 'plan', planId: plan, billingCycle: cycle });
     },
     [subscription, billingCycle, startCheckout]
@@ -107,6 +121,7 @@ export default function BillingPage() {
     }
 
     if (cashfreeOrderId) {
+      awaitingPaymentRef.current = termEnd(subscriptionRef.current)?.getTime() ?? 0;
       showToast(
         "We're confirming your payment with Cashfree. If you completed it, your plan and credits update within a minute; if you cancelled, you have not been charged.",
         'info'
@@ -120,44 +135,25 @@ export default function BillingPage() {
     }
   }, [showToast, refreshBillingData]);
 
+  // Confirm the new paid-through date only once the signed webhook has actually extended access.
+  useEffect(() => {
+    const before = awaitingPaymentRef.current;
+    if (before === null || !subscription || !isTermLive(subscription)) return;
+    const end = termEnd(subscription);
+    if (end && end.getTime() > before) {
+      awaitingPaymentRef.current = null;
+      showToast(
+        `Payment confirmed. Your ${PLAN_DETAILS[subscription.planId]?.name ?? 'plan'} access is active until ${formatAccessDate(end)}.`,
+        'success'
+      );
+    }
+  }, [subscription, showToast]);
+
   useEffect(() => {
     if (!autoPlan || loading) return;
     handleUpgrade(autoPlan.plan, autoPlan.cycle);
     setAutoPlan(null);
   }, [autoPlan, loading, handleUpgrade]);
-
-  const handleCancelSubscription = useCallback(async () => {
-    if (!subscription || subscription.planId === 'free') return;
-    if (
-      !window.confirm(
-        'Cancel your subscription? You will keep access and remaining outputs until the end of your current billing period, then your account reverts to the Free plan. This does not issue a refund.'
-      )
-    ) {
-      return;
-    }
-    setCanceling(true);
-    try {
-      const result = await callFunction<Record<string, never>, CancelSubscriptionResponse>({
-        functionName: 'cancelCashfreeSubscription',
-        data: {},
-      });
-      showToast(
-        result.alreadyCanceled
-          ? 'Your subscription is already set to cancel at the end of the current period.'
-          : 'Subscription canceled. You keep access until the end of your current billing period.',
-        'success'
-      );
-      await refreshBillingData();
-    } catch (err) {
-      console.error(err);
-      showToast(
-        err instanceof Error ? err.message : 'Could not cancel subscription. Please try again.',
-        'error'
-      );
-    } finally {
-      setCanceling(false);
-    }
-  }, [subscription, showToast, refreshBillingData]);
 
   const handleDeleteAccount = useCallback(async () => {
     if (!user?.email || deleteConfirmEmail.trim().toLowerCase() !== user.email.toLowerCase()) {
@@ -202,7 +198,13 @@ export default function BillingPage() {
 
   const entitlementUnknown = failedReads.includes('subscription') || failedReads.includes('usage');
   const visibleTransactions = transactions.filter(isVisibleTransaction);
-  const currentPlan: SubscriptionPlan = subscription?.planId || 'free';
+  const live = isTermLive(subscription);
+  // The plan in force is the paid one only while its term is live; afterwards the customer is on Free.
+  const currentPlan: SubscriptionPlan = live ? (subscription?.planId ?? 'free') : 'free';
+  const lapsed = Boolean(subscription && subscription.planId !== 'free' && !live);
+  const termCycle: BillingCycle =
+    (subscription as { billingCycle?: BillingCycle } | null)?.billingCycle ?? 'monthly';
+  const accessEnd = termEnd(subscription);
   const planDetails = PLAN_DETAILS[currentPlan] ?? PLAN_DETAILS.free;
   const creditsIncluded = usage?.creditsIncluded ?? planDetails.credits;
   const creditsUsed = usage?.creditsUsed ?? 0;
@@ -229,7 +231,7 @@ export default function BillingPage() {
                   : 'text-neutral-500'
               }`}
             >
-              Monthly
+              Monthly · 30 days
             </button>
             <button
               onClick={() => setBillingCycle('yearly')}
@@ -237,7 +239,7 @@ export default function BillingPage() {
                 billingCycle === 'yearly' ? 'bg-brand-600 text-white shadow-xs' : 'text-neutral-500'
               }`}
             >
-              <span>Yearly</span>
+              <span>Yearly · 365 days</span>
               <span className="rounded-full bg-amber-400 px-1.5 py-0.5 text-[10px] font-black text-neutral-900 uppercase">
                 Best value
               </span>
@@ -270,37 +272,51 @@ export default function BillingPage() {
               <div className="flex flex-col justify-between gap-4 border-b border-neutral-100 pb-6 sm:flex-row sm:items-center">
                 <div>
                   <span className="text-brand-600 text-xs font-bold tracking-wider uppercase">
-                    Current Active Subscription
+                    Current plan
                   </span>
                   <h2 className="mt-1 text-3xl font-black text-neutral-900">
                     {planDetails.name} Plan
                   </h2>
-                  {subscription?.cancelAtPeriodEnd && (
+                  {live && subscription && currentPlan !== 'free' && (
+                    <p className="mt-1 text-xs font-semibold text-emerald-700">
+                      Access until {formatAccessDate(accessEnd)}. Does not renew automatically.
+                    </p>
+                  )}
+                  {lapsed && subscription && (
                     <p className="text-warning-600 mt-1 text-xs font-semibold">
-                      Cancels at period end (
-                      {new Date(subscription.currentPeriodEnd).toLocaleDateString('en-IN')})
+                      Your {PLAN_DETAILS[subscription.planId]?.name ?? 'paid'} access ended on{' '}
+                      {formatAccessDate(accessEnd)}. You are on the Free plan. Renew to continue.
                     </p>
                   )}
                 </div>
                 <div className="text-left sm:text-right">
-                  <p className="text-xs text-neutral-500">
-                    {billingCycle === 'yearly' ? 'Yearly Billing' : 'Monthly Billing'}
-                  </p>
-                  <p className="text-2xl font-black text-neutral-900">
-                    {currentPlan === 'free'
-                      ? 'Free'
-                      : `₹${(billingCycle === 'yearly' ? Math.round(planDetails.yearlyPrice / 12) : planDetails.price).toLocaleString('en-IN')}`}
-                    <span className="text-xs font-medium text-neutral-500">
-                      /{billingCycle === 'yearly' ? 'yr' : 'mo'}
-                    </span>
-                  </p>
-                  {currentPlan !== 'free' && !subscription?.cancelAtPeriodEnd && (
+                  {live && currentPlan !== 'free' ? (
+                    <>
+                      <p className="text-xs text-neutral-500">
+                        {termLabel(termCycle)} of access · paid in advance
+                      </p>
+                      <p className="text-2xl font-black text-neutral-900">
+                        ₹{termPriceINR(planDetails, termCycle).toLocaleString('en-IN')}
+                        <span className="text-xs font-medium text-neutral-500">
+                          {' '}
+                          / {termLabel(termCycle)}
+                        </span>
+                      </p>
+                    </>
+                  ) : (
+                    <p className="text-2xl font-black text-neutral-900">Free</p>
+                  )}
+                  {subscription && subscription.planId !== 'free' && (live || lapsed) && (
                     <button
-                      onClick={() => void handleCancelSubscription()}
-                      disabled={canceling}
-                      className="text-error-600 hover:text-error-700 mt-2 text-xs font-medium underline disabled:opacity-60"
+                      onClick={() => handleUpgrade(subscription.planId, termCycle)}
+                      disabled={pendingKey !== null || entitlementUnknown}
+                      className="bg-brand-600 hover:bg-brand-700 mt-2 rounded-lg px-3 py-1.5 text-xs font-bold text-white disabled:opacity-60"
                     >
-                      {canceling ? 'Canceling…' : 'Cancel subscription'}
+                      {pendingKey === `plan:${subscription.planId}:${termCycle}`
+                        ? 'Opening checkout…'
+                        : live
+                          ? `Renew ${PLAN_DETAILS[subscription.planId]?.name} (+${termLabel(termCycle)})`
+                          : `Renew ${PLAN_DETAILS[subscription.planId]?.name}`}
                     </button>
                   )}
                 </div>
@@ -403,10 +419,11 @@ export default function BillingPage() {
           {/* Available Subscription Plans */}
           <div>
             <h2 className="mb-4 text-xl font-black text-neutral-900">Subscription Plans</h2>
-            {subscription && subscription.planId !== 'free' && !subscription.cancelAtPeriodEnd && (
+            {live && currentPlan !== 'free' && (
               <p className="mb-4 text-xs text-neutral-500">
-                Switching plans in place isn&apos;t available yet. To move to a different plan,
-                cancel at period end and subscribe again afterwards.
+                You have access until {formatAccessDate(accessEnd)}. You can renew your current plan
+                and billing period at any time: the new days are added after your current end date.
+                To switch to a different plan or billing period, buy it after your access ends.
               </p>
             )}
             <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-5">
@@ -415,9 +432,9 @@ export default function BillingPage() {
                 const isCurrent = planKey === currentPlan;
                 const isFree = planKey === 'free';
                 const isPro = planKey === 'pro';
-                const period = billingCycle === 'yearly' ? '/yr' : '/mo';
-                const displayPrice =
-                  billingCycle === 'yearly' ? Math.round(plan.yearlyPrice / 12) : plan.price;
+                const termPrice = termPriceINR(plan, billingCycle);
+                const sameTerm = isCurrent && termCycle === billingCycle;
+                const blockedByLiveTerm = live && currentPlan !== 'free' && !sameTerm;
 
                 return (
                   <div
@@ -446,9 +463,19 @@ export default function BillingPage() {
                       <h3 className="text-lg font-extrabold text-neutral-900">{plan.name}</h3>
                       <div className="mt-2">
                         <span className="text-2xl font-black text-neutral-900">
-                          {isFree ? 'Free' : `₹${displayPrice.toLocaleString('en-IN')}`}
+                          {isFree ? 'Free' : `₹${termPrice.toLocaleString('en-IN')}`}
                         </span>
-                        {!isFree && <span className="text-xs text-neutral-500">{period}</span>}
+                        {!isFree && (
+                          <span className="text-xs text-neutral-500">
+                            {' '}
+                            / {termLabel(billingCycle)}
+                          </span>
+                        )}
+                        {!isFree && (
+                          <p className="mt-0.5 text-[11px] text-neutral-500">
+                            {NO_AUTO_RENEW_NOTE}
+                          </p>
+                        )}
                       </div>
 
                       {/* Output Highlights */}
@@ -483,20 +510,28 @@ export default function BillingPage() {
 
                     <button
                       onClick={() => handleUpgrade(planKey, billingCycle)}
-                      disabled={isCurrent || isFree || pendingKey !== null || entitlementUnknown}
+                      disabled={
+                        isFree || blockedByLiveTerm || pendingKey !== null || entitlementUnknown
+                      }
                       className={`mt-6 w-full rounded-xl py-2.5 text-xs font-bold transition-all ${
-                        isCurrent || isFree
+                        isFree || blockedByLiveTerm
                           ? 'cursor-not-allowed bg-neutral-100 text-neutral-500'
                           : 'bg-brand-600 hover:bg-brand-700 text-white shadow-xs disabled:opacity-60'
                       }`}
                     >
-                      {isCurrent
-                        ? 'Current Plan'
-                        : isFree
-                          ? 'Free Plan'
-                          : pendingKey === `plan:${planKey}:${billingCycle}`
-                            ? 'Opening checkout…'
-                            : `Upgrade to ${plan.name}`}
+                      {isFree
+                        ? isCurrent
+                          ? 'Current Plan'
+                          : 'Free Plan'
+                        : pendingKey === `plan:${planKey}:${billingCycle}`
+                          ? 'Opening checkout…'
+                          : blockedByLiveTerm
+                            ? isCurrent
+                              ? 'Current Plan'
+                              : `Available after ${formatAccessDate(accessEnd)}`
+                            : sameTerm
+                              ? `Renew ${plan.name} (+${termLabel(billingCycle)})`
+                              : `Buy ${termLabel(billingCycle)} of ${plan.name}`}
                     </button>
                   </div>
                 );

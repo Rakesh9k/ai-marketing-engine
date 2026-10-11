@@ -57,9 +57,9 @@ const FAQS: FAQItem[] = [
   {
     id: '7',
     category: 'billing',
-    question: 'Do paid plans renew automatically, and how do I cancel?',
+    question: 'Do paid plans renew automatically, and how do I renew?',
     answer:
-      'Yes. Paid plans renew automatically at the end of each billing period until you cancel, and there is no free trial. You can cancel from the Billing & Plans page (/billing). Cancelling stops the next renewal; you keep your plan until the end of the period you have already paid for, then your account moves to the Free plan. See our Cancellation Policy (/cancellation) for details.',
+      'No. Paid plans are prepaid for a fixed term (30 days for monthly plans, 365 days for yearly plans) and never renew automatically, so you are never charged again unless you choose to buy another term. There is no free trial. Your Billing & Plans page (/billing) shows the date your access ends and has a Renew button; renewing the same plan and billing period before it ends adds the new term after your current end date. When a term ends your account moves to the Free plan. To switch to a different plan or billing period, buy it after your current access ends.',
   },
 ];
 

@@ -40,6 +40,18 @@ jest.mock('@/lib/cashfree/initCashfree', () => ({
 }));
 
 import BillingPage from './page';
+import { formatAccessDate } from '@/features/billing/prepaidTermUi';
+
+const DAY = 86_400_000;
+/** A live prepaid term: ends `days` from now. */
+const liveSub = (over: Record<string, unknown> = {}, days = 10) =>
+  ({
+    planId: 'starter',
+    billingCycle: 'monthly',
+    status: 'active',
+    currentPeriodEnd: new Date(Date.now() + days * DAY).toISOString(),
+    ...over,
+  }) as unknown as Subscription;
 
 function cashfreeServerResponse(orderId = 'ord_123', paymentSessionId = 'session_123') {
   return {
@@ -62,13 +74,17 @@ describe('BillingPage — Cashfree pricing & checkout', () => {
     window.history.replaceState({}, '', '/billing');
   });
 
-  it('shows prices in INR for every paid plan and credit pack', async () => {
+  it('shows the price you actually pay for the whole term, in INR, with the no-auto-renewal note', async () => {
     render(<BillingPage />);
     expect(await screen.findByRole('heading', { level: 3, name: 'Business' })).toBeInTheDocument();
-    expect(screen.getByText(/₹1,416/)).toBeInTheDocument(); // Business yearly rate
-    expect(screen.getByText(/₹833/)).toBeInTheDocument(); // Starter yearly rate
-    expect(screen.getByText(/₹2,083/)).toBeInTheDocument(); // Pro yearly rate
-    expect(screen.getByText(/₹4,166/)).toBeInTheDocument(); // Agency yearly rate
+    // Yearly is the default view: these are TOTALS for 365 days, not per-month equivalents.
+    expect(screen.getByText('₹16,990')).toBeInTheDocument(); // Business
+    expect(screen.getByText('₹9,990')).toBeInTheDocument(); // Starter
+    expect(screen.getByText('₹24,990')).toBeInTheDocument(); // Pro
+    expect(screen.getByText('₹49,990')).toBeInTheDocument(); // Agency
+    expect(screen.queryByText(/₹1,416/)).not.toBeInTheDocument(); // the old monthly-equivalent display
+    expect(screen.getAllByText(/one-time payment\. does not renew automatically/i)).toHaveLength(4);
+    expect(screen.getAllByText(/\/ 365 days/)).toHaveLength(4);
   });
 
   it('upgrade: creates Cashfree checkout session and launches SDK checkout', async () => {
@@ -76,7 +92,7 @@ describe('BillingPage — Cashfree pricing & checkout', () => {
 
     render(<BillingPage />);
     await screen.findByRole('heading', { level: 3, name: 'Business' });
-    await userEvent.click(await screen.findByRole('button', { name: /upgrade to business/i }));
+    await userEvent.click(await screen.findByRole('button', { name: /buy 365 days of business/i }));
 
     await waitFor(() => expect(callFunctionMock).toHaveBeenCalledTimes(1));
     expect(callFunctionMock).toHaveBeenCalledWith({
@@ -99,11 +115,11 @@ describe('BillingPage — Cashfree pricing & checkout', () => {
 
     render(<BillingPage />);
     await screen.findByRole('heading', { level: 3, name: 'Pro' });
-    await userEvent.click(screen.getByRole('button', { name: /^monthly$/i }));
+    await userEvent.click(screen.getByRole('button', { name: /^monthly · 30 days$/i }));
 
-    expect(await screen.findByText(/₹2,999/)).toBeInTheDocument(); // Pro monthly price
+    expect(await screen.findByText('₹2,999')).toBeInTheDocument(); // Pro, 30 days
 
-    await userEvent.click(screen.getByRole('button', { name: /upgrade to pro/i }));
+    await userEvent.click(screen.getByRole('button', { name: /buy 30 days of pro/i }));
     await waitFor(() =>
       expect(callFunctionMock).toHaveBeenCalledWith({
         functionName: 'createCashfreeCheckout',
@@ -155,16 +171,20 @@ describe('BillingPage — Cashfree pricing & checkout', () => {
     await waitFor(() => expect(button).not.toBeDisabled());
   });
 
-  it('the free plan and current plan buttons are disabled', async () => {
-    getByUserIdMock.mockResolvedValue({ planId: 'starter' } as Subscription);
+  it('with a live term: Free is disabled, other plans wait for the term to end, the current plan can be renewed', async () => {
+    getByUserIdMock.mockResolvedValue(liveSub({ planId: 'starter', billingCycle: 'yearly' }));
 
     render(<BillingPage />);
 
-    const freeButton = await screen.findByRole('button', { name: /free plan/i });
-    expect(freeButton).toBeDisabled();
-
-    const currentPlanButton = await screen.findByRole('button', { name: /current plan/i });
-    expect(currentPlanButton).toBeDisabled();
+    expect(await screen.findByRole('button', { name: /free plan/i })).toBeDisabled();
+    const waiting = await screen.findAllByRole('button', { name: /available after/i });
+    expect(waiting).toHaveLength(3); // business, pro, agency
+    waiting.forEach((b) => expect(b).toBeDisabled());
+    // same plan + same billing period (the default yearly view): renewal is offered, not blocked
+    const renewals = await screen.findAllByRole('button', {
+      name: /renew starter \(\+365 days\)/i,
+    });
+    renewals.forEach((b) => expect(b).toBeEnabled());
 
     expect(callFunctionMock).not.toHaveBeenCalled();
     expect(openCashfreeCheckoutMock).not.toHaveBeenCalled();
@@ -174,7 +194,9 @@ describe('BillingPage — Cashfree pricing & checkout', () => {
     callFunctionMock.mockRejectedValueOnce(new Error('Cashfree error'));
 
     render(<BillingPage />);
-    const businessButton = await screen.findByRole('button', { name: /upgrade to business/i });
+    const businessButton = await screen.findByRole('button', {
+      name: /buy 365 days of business/i,
+    });
     await userEvent.click(businessButton);
 
     await waitFor(() => expect(showToastMock).toHaveBeenCalledWith('Cashfree error', 'error'));
@@ -182,12 +204,10 @@ describe('BillingPage — Cashfree pricing & checkout', () => {
     await waitFor(() => expect(businessButton).not.toBeDisabled());
   });
 
-  it('?cashfree_order_id= confirms payment and re-fetches the subscription', async () => {
+  it('?cashfree_order_id= re-fetches, and states the NEW access date only once the webhook has extended access', async () => {
     window.history.replaceState({}, '', '/billing?cashfree_order_id=ord_123');
-    getByUserIdMock.mockResolvedValueOnce(null).mockResolvedValueOnce({
-      planId: 'business',
-      creditsIncluded: 1200,
-    } as Subscription);
+    const paidUntil = liveSub({ planId: 'business', billingCycle: 'monthly' }, 30);
+    getByUserIdMock.mockResolvedValueOnce(null).mockResolvedValue(paidUntil);
 
     render(<BillingPage />);
 
@@ -199,13 +219,44 @@ describe('BillingPage — Cashfree pricing & checkout', () => {
         'info'
       )
     );
-    await waitFor(() => expect(getByUserIdMock).toHaveBeenCalledTimes(2));
-    // The return redirect must never claim the payment succeeded: only the webhook grants.
-    expect(showToastMock).not.toHaveBeenCalledWith(
-      expect.stringMatching(/payment received|success/i),
-      'success'
+    await waitFor(() => expect(getByUserIdMock.mock.calls.length).toBeGreaterThanOrEqual(2));
+    const end = new Date((paidUntil as unknown as { currentPeriodEnd: string }).currentPeriodEnd);
+    await waitFor(() =>
+      expect(showToastMock).toHaveBeenCalledWith(
+        `Payment confirmed. Your Business access is active until ${formatAccessDate(end)}.`,
+        'success'
+      )
     );
     expect(window.location.search).toBe('');
+  });
+
+  it('?cashfree_order_id= with NO change (abandoned / failed payment) never claims success', async () => {
+    window.history.replaceState({}, '', '/billing?cashfree_order_id=ord_abandoned');
+    getByUserIdMock.mockResolvedValue(null);
+    render(<BillingPage />);
+    await waitFor(() =>
+      expect(showToastMock).toHaveBeenCalledWith(
+        expect.stringMatching(/confirming your payment/i),
+        'info'
+      )
+    );
+    await waitFor(() => expect(getByUserIdMock.mock.calls.length).toBeGreaterThanOrEqual(2));
+    expect(showToastMock).not.toHaveBeenCalledWith(expect.anything(), 'success');
+  });
+
+  it('a renewal return states the extended date, not the old one', async () => {
+    window.history.replaceState({}, '', '/billing?cashfree_order_id=ord_renew');
+    const before = liveSub({}, 10);
+    const after = liveSub({}, 40); // +30 days stacked after the current end
+    getByUserIdMock.mockResolvedValueOnce(before).mockResolvedValue(after);
+    render(<BillingPage />);
+    const end = new Date((after as unknown as { currentPeriodEnd: string }).currentPeriodEnd);
+    await waitFor(() =>
+      expect(showToastMock).toHaveBeenCalledWith(
+        `Payment confirmed. Your Starter access is active until ${formatAccessDate(end)}.`,
+        'success'
+      )
+    );
   });
 
   it('history shows paid purchases but hides unpaid / abandoned checkouts', async () => {
@@ -257,7 +308,9 @@ describe('BillingPage — Cashfree pricing & checkout', () => {
       expect(screen.queryByText(/starter plan/i)).not.toBeInTheDocument();
       expect(screen.queryByText(/available of/i)).not.toBeInTheDocument();
       // Entitlement unknown => no purchase may be started (it could double-buy).
-      expect(await screen.findByRole('button', { name: /upgrade to business/i })).toBeDisabled();
+      expect(
+        await screen.findByRole('button', { name: /buy 365 days of business/i })
+      ).toBeDisabled();
       expect(screen.getByRole('button', { name: /buy 500 credits/i })).toBeDisabled();
       expect(console.error).toHaveBeenCalledWith(
         '[billing] subscription read failed',
@@ -307,15 +360,83 @@ describe('BillingPage — Cashfree pricing & checkout', () => {
     });
   });
 
-  it('active paid subscription: explains that in-place plan switching is unavailable', async () => {
-    getByUserIdMock.mockResolvedValue({
-      planId: 'starter',
-      cancelAtPeriodEnd: false,
-    } as Subscription);
-    render(<BillingPage />);
-    const note = await screen.findByText(/switching plans in place isn.t available/i);
-    expect(
-      within(note.parentElement as HTMLElement).getByText(/subscription plans/i)
-    ).toBeInTheDocument();
+  describe('fixed-term prepaid access (no automatic renewal)', () => {
+    it('a live term shows the paid-through date, says it does not renew, and has NO cancel button (nothing recurring to cancel)', async () => {
+      const sub = liveSub({}, 12);
+      getByUserIdMock.mockResolvedValue(sub);
+      render(<BillingPage />);
+      const end = new Date((sub as unknown as { currentPeriodEnd: string }).currentPeriodEnd);
+      expect(
+        await screen.findByText(
+          `Access until ${formatAccessDate(end)}. Does not renew automatically.`
+        )
+      ).toBeInTheDocument();
+      expect(
+        screen.queryByRole('button', { name: /cancel subscription/i })
+      ).not.toBeInTheDocument();
+      expect(screen.queryByText(/cancels at period end/i)).not.toBeInTheDocument();
+      expect(screen.getByText(/30 days of access · paid in advance/i)).toBeInTheDocument();
+    });
+
+    it('the Renew button buys the SAME plan and billing period as the live term, whatever the view toggle shows', async () => {
+      getByUserIdMock.mockResolvedValue(liveSub({ planId: 'starter', billingCycle: 'monthly' }));
+      callFunctionMock.mockResolvedValueOnce(cashfreeServerResponse('ord_renew'));
+      render(<BillingPage />); // the view defaults to Yearly, the term is monthly
+      await userEvent.click(
+        await screen.findByRole('button', { name: /^renew starter \(\+30 days\)$/i })
+      );
+      await waitFor(() =>
+        expect(callFunctionMock).toHaveBeenCalledWith({
+          functionName: 'createCashfreeCheckout',
+          data: expect.objectContaining({ planId: 'starter', billingCycle: 'monthly' }),
+        })
+      );
+    });
+
+    it('a different plan is not sold while a term is live (and clicking nothing calls the backend)', async () => {
+      getByUserIdMock.mockResolvedValue(liveSub({ planId: 'starter', billingCycle: 'monthly' }));
+      render(<BillingPage />);
+      const blocked = await screen.findAllByRole('button', { name: /available after/i });
+      expect(blocked.length).toBeGreaterThanOrEqual(3);
+      for (const b of blocked) {
+        expect(b).toBeDisabled();
+        await userEvent.click(b);
+      }
+      expect(callFunctionMock).not.toHaveBeenCalled();
+    });
+
+    it('an ENDED term: shown as Free with when it ended, any plan can be bought again, and Renew is offered', async () => {
+      const ended = liveSub({ planId: 'business', billingCycle: 'monthly' }, -3); // status still "active" in the record
+      getByUserIdMock.mockResolvedValue(ended);
+      render(<BillingPage />);
+      const end = new Date((ended as unknown as { currentPeriodEnd: string }).currentPeriodEnd);
+      expect(
+        await screen.findByRole('heading', { level: 2, name: /free plan/i })
+      ).toBeInTheDocument();
+      expect(
+        screen.getByText(
+          `Your Business access ended on ${formatAccessDate(end)}. You are on the Free plan. Renew to continue.`
+        )
+      ).toBeInTheDocument();
+      expect(screen.queryByText(/access until/i)).not.toBeInTheDocument();
+      expect(screen.getByRole('button', { name: /^renew business$/i })).toBeEnabled();
+      expect(screen.getByRole('button', { name: /buy 365 days of starter/i })).toBeEnabled();
+      expect(screen.queryByText(/switching|available after/i)).not.toBeInTheDocument();
+    });
+
+    it('a live term explains how renewal and switching work', async () => {
+      getByUserIdMock.mockResolvedValue(liveSub({}, 20));
+      render(<BillingPage />);
+      const note = await screen.findByText(
+        /you can renew your current plan and billing period at any time/i
+      );
+      expect(note).toHaveTextContent(/new days are added after your current end date/i);
+      expect(note).toHaveTextContent(
+        /to switch to a different plan or billing period, buy it after your access ends/i
+      );
+      expect(
+        within(note.parentElement as HTMLElement).getByText(/subscription plans/i)
+      ).toBeInTheDocument();
+    });
   });
 });

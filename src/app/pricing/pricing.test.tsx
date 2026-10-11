@@ -42,7 +42,12 @@ jest.mock('@/lib/cashfree/initCashfree', () => ({
 import PricingPageClient from './PricingPageClient';
 
 function setSubscription(
-  sub: { planId: string; status?: string; cancelAtPeriodEnd?: boolean } | null
+  sub: {
+    planId: string;
+    status?: string;
+    cancelAtPeriodEnd?: boolean;
+    currentPeriodEnd?: string;
+  } | null
 ) {
   getDocMock.mockImplementation((ref: { col: string; id: string }) => {
     if (ref.col === 'users') {
@@ -55,7 +60,12 @@ function setSubscription(
       sub
         ? {
             exists: () => true,
-            data: () => ({ status: 'active', cancelAtPeriodEnd: false, ...sub }),
+            data: () => ({
+              status: 'active',
+              cancelAtPeriodEnd: false,
+              currentPeriodEnd: new Date(Date.now() + 10 * 86_400_000).toISOString(),
+              ...sub,
+            }),
           }
         : { exists: () => false, data: () => undefined }
     );
@@ -81,29 +91,45 @@ describe('PricingPageClient — Cashfree prices & checkout', () => {
     openCashfreeCheckoutMock.mockResolvedValue(undefined);
   });
 
-  it('shows all five tiers with INR prices', async () => {
+  it('shows all five tiers with the INR price of the whole term and the no-auto-renewal note', async () => {
     render(<PricingPageClient />);
     for (const name of ['Free', 'Starter', 'Business', 'Pro', 'Agency']) {
       expect(await screen.findByRole('heading', { level: 3, name })).toBeInTheDocument();
     }
-    expect(screen.getByText(/₹9,990 billed/)).toBeInTheDocument();
-    expect(screen.getByText(/₹16,990 billed/)).toBeInTheDocument();
-    expect(screen.getByText(/₹24,990 billed/)).toBeInTheDocument();
-    expect(screen.getByText(/₹49,990 billed/)).toBeInTheDocument();
+    // Yearly is the default view: these are the TOTALS payable for 365 days.
+    for (const total of ['₹9,990', '₹16,990', '₹24,990', '₹49,990']) {
+      expect(screen.getByText(total)).toBeInTheDocument();
+    }
+    expect(screen.getAllByText('/ 365 days')).toHaveLength(4);
+    expect(screen.getAllByText(/one-time payment\. does not renew automatically/i)).toHaveLength(4);
   });
 
-  it('monthly / yearly toggle changes the displayed price and savings label', async () => {
-    render(<PricingPageClient />);
-    expect(await screen.findByText(/₹9,990 billed/)).toBeInTheDocument(); // Starter yearly
+  it('never claims automatic renewal, and no longer names Paddle', async () => {
+    const { container } = render(<PricingPageClient />);
+    await screen.findByRole('heading', { level: 3, name: 'Starter' });
+    const text = container.textContent ?? '';
+    expect(text).not.toMatch(/renews automatically until you cancel/i);
+    expect(text).not.toMatch(/subscriptions renew automatically/i);
+    expect(text).not.toMatch(/cancel anytime/i);
+    expect(text).not.toMatch(/paddle/i);
+    expect(text).toMatch(/they never renew automatically/i);
+    expect(text).toMatch(/30 days for monthly plans and 365 days for yearly plans/i);
+    expect(text).toMatch(/Cashfree Payments/);
+  });
 
-    await userEvent.click(screen.getByRole('button', { name: /monthly billing/i }));
-    expect(await screen.findByText(/₹999/)).toBeInTheDocument(); // Starter monthly
+  it('monthly / yearly toggle changes the displayed term and price', async () => {
+    render(<PricingPageClient />);
+    expect(await screen.findByText('₹9,990')).toBeInTheDocument(); // Starter, 365 days
+
+    await userEvent.click(screen.getByRole('button', { name: /^monthly · 30 days$/i }));
+    expect(await screen.findByText('₹999')).toBeInTheDocument(); // Starter, 30 days
+    expect(screen.getAllByText('/ 30 days')).toHaveLength(4);
   });
 
   describe('signed out', () => {
-    it('Subscribe sends the visitor to sign up with the plan and cycle', async () => {
+    it('Buy sends the visitor to sign up with the plan and cycle', async () => {
       render(<PricingPageClient />);
-      await userEvent.click(screen.getByRole('button', { name: /subscribe to starter/i }));
+      await userEvent.click(screen.getByRole('button', { name: /buy 365 days of starter/i }));
       expect(pushMock).toHaveBeenCalledWith('/signup?plan=starter&cycle=yearly');
       expect(callFunctionMock).not.toHaveBeenCalled();
       expect(openCashfreeCheckoutMock).not.toHaveBeenCalled();
@@ -133,12 +159,12 @@ describe('PricingPageClient — Cashfree prices & checkout', () => {
       ['pro', 'Pro', 'yearly'],
       ['agency', 'Agency', 'yearly'],
     ])(
-      'Subscribe to %s opens Cashfree checkout for the selected plan',
+      'Buy 365 days of %s opens Cashfree checkout for the selected plan',
       async (planId, label, cycle) => {
         callFunctionMock.mockResolvedValueOnce(cashfreeServerResponse('ord_sub'));
         render(<PricingPageClient />);
         await userEvent.click(
-          await screen.findByRole('button', { name: new RegExp(`subscribe to ${label}`, 'i') })
+          await screen.findByRole('button', { name: new RegExp(`buy 365 days of ${label}`, 'i') })
         );
 
         await waitFor(() =>
@@ -164,8 +190,8 @@ describe('PricingPageClient — Cashfree prices & checkout', () => {
     it('monthly selection checks out with monthly billing cycle', async () => {
       callFunctionMock.mockResolvedValueOnce(cashfreeServerResponse('ord_sub_m'));
       render(<PricingPageClient />);
-      await userEvent.click(await screen.findByRole('button', { name: /monthly billing/i }));
-      await userEvent.click(await screen.findByRole('button', { name: /subscribe to starter/i }));
+      await userEvent.click(await screen.findByRole('button', { name: /^monthly · 30 days$/i }));
+      await userEvent.click(await screen.findByRole('button', { name: /buy 30 days of starter/i }));
       await waitFor(() =>
         expect(callFunctionMock).toHaveBeenCalledWith({
           functionName: 'createCashfreeCheckout',
@@ -221,20 +247,24 @@ describe('PricingPageClient — Cashfree prices & checkout', () => {
       expect(pushMock).toHaveBeenCalledWith('/billing');
       expect(callFunctionMock).not.toHaveBeenCalled();
       expect(openCashfreeCheckoutMock).not.toHaveBeenCalled();
-      expect(screen.getByText(/already have an active subscription/i)).toBeInTheDocument();
+      expect(screen.getByText(/already have access to a paid plan/i)).toBeInTheDocument();
     });
 
-    it('a subscription set to cancel at period end can subscribe again', async () => {
-      setSubscription({ planId: 'business', cancelAtPeriodEnd: true });
+    it('an ENDED term (record still says active) is treated as no subscription: any plan can be bought again', async () => {
+      setSubscription({
+        planId: 'business',
+        currentPeriodEnd: new Date(Date.now() - 2 * 86_400_000).toISOString(),
+      });
       callFunctionMock.mockResolvedValueOnce(cashfreeServerResponse());
       render(<PricingPageClient />);
       const starterCard = (
         await screen.findByRole('heading', { level: 3, name: 'Starter' })
       ).closest('div.card-interactive') as HTMLElement;
       await userEvent.click(
-        await within(starterCard).findByRole('button', { name: /subscribe to starter/i })
+        await within(starterCard).findByRole('button', { name: /buy 365 days of starter/i })
       );
       await waitFor(() => expect(callFunctionMock).toHaveBeenCalledTimes(1));
+      expect(screen.queryByText(/already have access to a paid plan/i)).not.toBeInTheDocument();
     });
   });
 });

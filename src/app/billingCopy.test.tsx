@@ -81,14 +81,33 @@ describe('Help page', () => {
     expect(screen.queryByText(/roll over every billing cycle/i)).not.toBeInTheDocument();
   });
 
-  it('describes automatic renewal, cancellation keeping access, and no trial', async () => {
+  it('says plans are prepaid fixed terms that never renew automatically, with a Renew action and no trial', async () => {
     render(<HelpPage />);
-    await userEvent.click(screen.getByText(/renew automatically, and how do i cancel/i));
+    await userEvent.click(screen.getByText(/renew automatically, and how do i renew/i));
     expect(await screen.findByText(/no free trial/i)).toBeInTheDocument();
+    expect(screen.getByText(/never renew automatically/i)).toBeInTheDocument();
     expect(
-      screen.getByText(/keep your plan until the end of the period you have already paid for/i)
+      screen.getByText(/30 days for monthly plans, 365 days for yearly plans/i)
     ).toBeInTheDocument();
+    expect(screen.getByText(/has a Renew button/i)).toBeInTheDocument();
+    expect(
+      screen.queryByText(/renew automatically at the end of each billing period/i)
+    ).not.toBeInTheDocument();
   });
+});
+
+// LEGAL REVIEW PENDING (docs/audits/mitra-complete-audit/17-cashfree-legal-fact-sheet.md): the pages below were
+// written for Paddle (Merchant of Record) and automatic renewal. They are NOT changed by engineering because their
+// wording needs an India-qualified adviser. These markers keep the gap visible in every test run.
+describe('legal pages awaiting review for fixed-term prepaid access via Cashfree', () => {
+  it.todo(
+    'Terms: seller identity, Cashfree as payment processor, 30/365-day prepaid terms, no automatic renewal'
+  );
+  it.todo('Cancellation Policy: nothing recurring to cancel; expiry and renewal instead');
+  it.todo(
+    'Refund Policy: BrainWise (not Paddle) handles refunds; effect of a refund on access and credits'
+  );
+  it.todo('Privacy Policy: Cashfree as payment processor instead of Paddle as Merchant of Record');
 });
 
 describe('/cancellation', () => {

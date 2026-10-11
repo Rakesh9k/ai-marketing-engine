@@ -27,7 +27,8 @@ export default function SupportPage() {
         <ul className="text-body text-text-secondary list-disc space-y-1 pl-6">
           <li>Subscribe to a plan or buy a credit pack (Billing page)</li>
           <li>
-            Cancel your subscription — stops future renewal; see our{' '}
+            See when your plan ends and renew it (Billing page). Plans do not renew automatically;
+            see our{' '}
             <Link href="/cancellation" className="text-brand-600 hover:underline">
               Cancellation Policy
             </Link>
