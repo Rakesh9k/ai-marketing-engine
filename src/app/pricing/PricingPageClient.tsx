@@ -10,7 +10,7 @@ import { Reveal } from '@/components/motion/Reveal';
 import { useAuth } from '@/features/auth/hooks/useAuth';
 import { doc, getDoc } from 'firebase/firestore';
 import { getFirebaseDb } from '@/lib/firebase/client';
-import { PLANS, PLAN_RANK, type SubscriptionPlan, type PlanDefinition } from '@/lib/config/pricing';
+import { PLANS, type SubscriptionPlan, type PlanDefinition } from '@/lib/config/pricing';
 import { getTierPriceId, intervalOf } from '@/lib/paddle/catalog';
 import { setPaddleCustomer } from '@/lib/paddle/initPaddle';
 import { usePaddlePrices } from '@/features/billing/usePaddlePrices';
@@ -68,12 +68,24 @@ const COMPARISON_MATRIX: FeatureCategory[] = [
       {
         name: 'Business Brain & Persona',
         tooltip: 'Remembers your brand tone, offerings, location, and audience preferences',
-        values: { free: 'Standard', starter: 'Standard', business: 'Enhanced', pro: 'Full Intelligence', agency: 'Full + Agency Custom' },
+        values: {
+          free: 'Standard',
+          starter: 'Standard',
+          business: 'Enhanced',
+          pro: 'Full Intelligence',
+          agency: 'Full + Agency Custom',
+        },
       },
       {
         name: 'Multi-Business Profiles',
         tooltip: 'Manage separate business entities under a single subscription account',
-        values: { free: '1 Business', starter: '1 Business', business: '1 Business', pro: '3 Businesses', agency: '10 Businesses' },
+        values: {
+          free: '1 Business',
+          starter: '1 Business',
+          business: '1 Business',
+          pro: '3 Businesses',
+          agency: '10 Businesses',
+        },
       },
       {
         name: 'Regional Languages (Telugu, Hindi, etc.)',
@@ -113,7 +125,13 @@ const COMPARISON_MATRIX: FeatureCategory[] = [
       {
         name: 'Priority Generation Queue',
         tooltip: 'Faster processing times during high-volume server demand',
-        values: { free: 'Standard', starter: 'Standard', business: 'Priority', pro: 'High Priority', agency: 'VIP Immediate' },
+        values: {
+          free: 'Standard',
+          starter: 'Standard',
+          business: 'Priority',
+          pro: 'High Priority',
+          agency: 'VIP Immediate',
+        },
       },
     ],
   },
@@ -192,7 +210,9 @@ export default function PricingPageClient({ countryCode }: { countryCode?: strin
 
         // Paddle Retain: tell Paddle.js which Paddle customer this is (no-op if none yet).
         setPaddleCustomer(
-          userSnap.exists() ? (userSnap.data()['paddleCustomerId'] as string | undefined) : undefined
+          userSnap.exists()
+            ? (userSnap.data()['paddleCustomerId'] as string | undefined)
+            : undefined
         );
 
         const subscriptionId = userSnap.exists()
@@ -290,32 +310,33 @@ export default function PricingPageClient({ countryCode }: { countryCode?: strin
       <main className="mx-auto max-w-7xl px-4 py-12 sm:px-6 lg:py-16">
         {/* ── Hero Header ────────────────────────────────────────────────────── */}
         <div className="text-center">
-          <div className="mb-3 inline-flex items-center gap-2 rounded-full border border-brand-200 bg-brand-50/80 px-3.5 py-1">
+          <div className="border-brand-200 bg-brand-50/80 mb-3 inline-flex items-center gap-2 rounded-full border px-3.5 py-1">
             <MitraLogo size="sm" />
-            <span className="text-xs font-bold tracking-wider text-brand-700 uppercase">
+            <span className="text-brand-700 text-xs font-bold tracking-wider uppercase">
               SIMPLE, CLEAR, BUILT FOR YOUR GROWTH
             </span>
           </div>
 
           <h1 className="text-text-primary text-4xl font-black tracking-tight sm:text-5xl lg:text-6xl">
             Choose how much marketing you want <br className="hidden sm:inline" />
-            <span className="bg-gradient-to-r from-brand-600 to-amber-600 bg-clip-text text-transparent">
+            <span className="from-brand-600 bg-gradient-to-r to-amber-600 bg-clip-text text-transparent">
               Mitra to handle.
             </span>
           </h1>
           <p className="text-text-secondary mx-auto mt-4 max-w-2xl text-base sm:text-lg">
-            From your first campaign to a complete content engine. Scale up or down seamlessly as your business grows.
+            From your first campaign to a complete content engine. Scale up or down seamlessly as
+            your business grows.
           </p>
 
           {/* ── Billing Cycle Toggle ────────────────────────────────────────── */}
           <div className="mt-8 flex flex-wrap items-center justify-center gap-4">
-            <div className="inline-flex items-center rounded-2xl border border-border-medium bg-bg-secondary p-1.5 shadow-xs">
+            <div className="border-border-medium bg-bg-secondary inline-flex items-center rounded-2xl border p-1.5 shadow-xs">
               <button
                 type="button"
                 onClick={() => setBillingCycle('monthly')}
                 className={`rounded-xl px-5 py-2 text-sm font-bold transition-all ${
                   billingCycle === 'monthly'
-                    ? 'bg-white text-text-primary shadow-xs'
+                    ? 'text-text-primary bg-white shadow-xs'
                     : 'text-text-tertiary hover:text-text-primary'
                 }`}
               >
@@ -359,23 +380,24 @@ export default function PricingPageClient({ countryCode }: { countryCode?: strin
           {PLANS.map((plan: PlanDefinition, planIdx: number) => {
             const isYearly = billingCycle === 'yearly';
             const period = isYearly ? '/year' : '/month';
-            const isCurrent = authStatus === 'authenticated' && !subLoading && activePlanId === plan.id;
+            const isCurrent =
+              authStatus === 'authenticated' && !subLoading && activePlanId === plan.id;
             const isPro = plan.id === 'pro';
 
             return (
               <Reveal key={plan.id} index={planIdx} className="flex">
                 <div
-                  className={`card-interactive relative flex w-full flex-col justify-between rounded-2xl border p-6 transition-all duration-200 shadow-xs ${
+                  className={`card-interactive relative flex w-full flex-col justify-between rounded-2xl border p-6 shadow-xs transition-all duration-200 ${
                     isPro
-                      ? 'border-brand-500 bg-gradient-to-b from-amber-50/40 via-white to-orange-50/30 ring-2 ring-brand-500 shadow-xl'
+                      ? 'border-brand-500 ring-brand-500 bg-gradient-to-b from-amber-50/40 via-white to-orange-50/30 shadow-xl ring-2'
                       : plan.popular
-                      ? 'border-brand-300 bg-bg-primary ring-1 ring-brand-300'
-                      : 'border-border-light bg-bg-primary hover:border-border-medium'
+                        ? 'border-brand-300 bg-bg-primary ring-brand-300 ring-1'
+                        : 'border-border-light bg-bg-primary hover:border-border-medium'
                   } ${isCurrent ? 'ring-2 ring-emerald-500' : ''}`}
                 >
                   {/* Badge header */}
                   {isPro && (
-                    <div className="absolute -top-3.5 left-1/2 -translate-x-1/2 rounded-full bg-gradient-to-r from-brand-600 to-amber-600 px-3.5 py-1 text-[11px] font-black tracking-wider text-white uppercase shadow-sm">
+                    <div className="from-brand-600 absolute -top-3.5 left-1/2 -translate-x-1/2 rounded-full bg-gradient-to-r to-amber-600 px-3.5 py-1 text-[11px] font-black tracking-wider text-white uppercase shadow-sm">
                       MOST POPULAR
                     </div>
                   )}
@@ -391,21 +413,21 @@ export default function PricingPageClient({ countryCode }: { countryCode?: strin
                     <div className="flex items-center justify-between">
                       <h3 className="text-text-primary text-xl font-bold">{plan.name}</h3>
                       {plan.maxBusinesses > 1 && (
-                        <span className="rounded-md bg-brand-100 px-2 py-0.5 text-[10px] font-bold text-brand-800">
+                        <span className="bg-brand-100 text-brand-800 rounded-md px-2 py-0.5 text-[10px] font-bold">
                           {plan.maxBusinesses} Brands
                         </span>
                       )}
                     </div>
-                    <p className="mt-1 text-xs font-medium text-text-tertiary min-h-[32px]">
+                    <p className="text-text-tertiary mt-1 min-h-[32px] text-xs font-medium">
                       {plan.tagline}
                     </p>
 
                     {/* Price display - Paddle's own formatted total, shown verbatim */}
-                    <div className="mt-5 border-t border-border-light pt-4">
+                    <div className="border-border-light mt-5 border-t pt-4">
                       {plan.id === 'free' ? (
                         <div className="flex items-baseline gap-1">
                           <span className="text-text-primary text-3xl font-black">Free</span>
-                          <span className="text-xs text-text-tertiary">forever</span>
+                          <span className="text-text-tertiary text-xs">forever</span>
                         </div>
                       ) : (
                         <div>
@@ -415,9 +437,9 @@ export default function PricingPageClient({ countryCode }: { countryCode?: strin
                               priceId={getTierPriceId(catalog, plan.id, intervalOf(billingCycle))}
                               className="text-text-primary text-3xl font-black"
                             />
-                            <span className="text-xs text-text-tertiary">{period}</span>
+                            <span className="text-text-tertiary text-xs">{period}</span>
                           </div>
-                          <p className="mt-1 text-[11px] text-text-tertiary">
+                          <p className="text-text-tertiary mt-1 text-[11px]">
                             {isYearly ? 'Billed once a year' : 'Billed monthly'}
                           </p>
                         </div>
@@ -434,20 +456,28 @@ export default function PricingPageClient({ countryCode }: { countryCode?: strin
                     )}
 
                     {/* Output allowances pill group */}
-                    <div className="mt-5 space-y-2 rounded-xl bg-bg-secondary p-3 text-xs">
-                      <div className="flex items-center justify-between font-bold text-text-primary">
+                    <div className="bg-bg-secondary mt-5 space-y-2 rounded-xl p-3 text-xs">
+                      <div className="text-text-primary flex items-center justify-between font-bold">
                         <span>🎬 AI Reels</span>
-                        <span className={plan.monthlyReels > 0 ? 'text-brand-600' : 'text-text-tertiary'}>
+                        <span
+                          className={
+                            plan.monthlyReels > 0 ? 'text-brand-600' : 'text-text-tertiary'
+                          }
+                        >
                           {plan.monthlyReels}/mo
                         </span>
                       </div>
-                      <div className="flex items-center justify-between font-bold text-text-primary">
+                      <div className="text-text-primary flex items-center justify-between font-bold">
                         <span>🎨 Social Creatives</span>
                         <span className="text-brand-600">{plan.monthlyCreatives}/mo</span>
                       </div>
-                      <div className="flex items-center justify-between font-bold text-text-primary">
+                      <div className="text-text-primary flex items-center justify-between font-bold">
                         <span>📲 Story Concepts</span>
-                        <span className={plan.monthlyStories > 0 ? 'text-brand-600' : 'text-text-tertiary'}>
+                        <span
+                          className={
+                            plan.monthlyStories > 0 ? 'text-brand-600' : 'text-text-tertiary'
+                          }
+                        >
                           {plan.monthlyStories}/mo
                         </span>
                       </div>
@@ -456,9 +486,12 @@ export default function PricingPageClient({ countryCode }: { countryCode?: strin
                     {/* Feature check list */}
                     <ul className="mt-5 space-y-2.5">
                       {plan.features.map((feature: string) => (
-                        <li key={feature} className="flex items-start gap-2 text-xs text-text-secondary">
+                        <li
+                          key={feature}
+                          className="text-text-secondary flex items-start gap-2 text-xs"
+                        >
                           <svg
-                            className="h-4 w-4 shrink-0 text-emerald-600 mt-0.5"
+                            className="mt-0.5 h-4 w-4 shrink-0 text-emerald-600"
                             fill="none"
                             viewBox="0 0 24 24"
                             stroke="currentColor"
@@ -477,14 +510,18 @@ export default function PricingPageClient({ countryCode }: { countryCode?: strin
                   </div>
 
                   {/* CTA button */}
-                  <div className="mt-6 border-t border-border-light pt-4">
+                  <div className="border-border-light mt-6 border-t pt-4">
                     <Button
                       fullWidth
                       size="md"
                       variant={getCtaVariant(plan.id)}
                       disabled={isCtaDisabled(plan.id)}
                       onClick={() => handleCtaClick(plan.id)}
-                      className={isPro ? 'bg-brand-600 hover:bg-brand-700 text-white font-bold shadow-sm' : ''}
+                      className={
+                        isPro
+                          ? 'bg-brand-600 hover:bg-brand-700 font-bold text-white shadow-sm'
+                          : ''
+                      }
                     >
                       {getCtaLabel(plan.id, plan.name)}
                     </Button>
@@ -507,7 +544,8 @@ export default function PricingPageClient({ countryCode }: { countryCode?: strin
               Need a little extra? Top up credits.
             </h2>
             <p className="text-text-secondary mt-2 text-sm">
-              One-time packs that work alongside any plan, including Free. No subscription. Pack credits are valid for the calendar month you buy them in.
+              One-time packs that work alongside any plan, including Free. No subscription. Pack
+              credits are valid for the calendar month you buy them in.
             </p>
           </div>
           <div className="mt-6">
@@ -531,61 +569,66 @@ export default function PricingPageClient({ countryCode }: { countryCode?: strin
         </section>
 
         {/* ── Feature Comparison Table ────────────────────────────────────────── */}
-        <section className="mt-20 border-t border-border-medium pt-12">
+        <section className="border-border-medium mt-20 border-t pt-12">
           <div className="text-center">
-            <h2 className="text-2xl font-extrabold text-text-primary sm:text-3xl">
+            <h2 className="text-text-primary text-2xl font-extrabold sm:text-3xl">
               Compare All Features &amp; Entitlements Side-by-Side
             </h2>
-            <p className="mt-2 text-sm text-text-secondary">
+            <p className="text-text-secondary mt-2 text-sm">
               Everything you need to know about what each plan includes.
             </p>
           </div>
 
-          <div className="mt-8 overflow-x-auto rounded-2xl border border-border-light bg-bg-primary shadow-xs">
+          <div className="border-border-light bg-bg-primary mt-8 overflow-x-auto rounded-2xl border shadow-xs">
             <table className="w-full text-left text-xs sm:text-sm">
               <thead>
-                <tr className="border-b border-border-medium bg-bg-secondary text-text-primary">
-                  <th className="p-4 font-bold min-w-[200px]">Features</th>
+                <tr className="border-border-medium bg-bg-secondary text-text-primary border-b">
+                  <th className="min-w-[200px] p-4 font-bold">Features</th>
                   <th className="p-4 text-center font-bold">Free</th>
                   <th className="p-4 text-center font-bold">Starter</th>
                   <th className="p-4 text-center font-bold">Business</th>
-                  <th className="p-4 text-center font-bold text-brand-600 bg-amber-50/50">Pro</th>
+                  <th className="text-brand-600 bg-amber-50/50 p-4 text-center font-bold">Pro</th>
                   <th className="p-4 text-center font-bold">Agency</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-border-light">
+              <tbody className="divide-border-light divide-y">
                 {COMPARISON_MATRIX.map((cat) => (
                   <Fragment key={cat.category}>
                     <tr className="bg-bg-secondary/60">
-                      <td colSpan={6} className="p-3 font-extrabold text-brand-700 uppercase tracking-wider text-[11px]">
+                      <td
+                        colSpan={6}
+                        className="text-brand-700 p-3 text-[11px] font-extrabold tracking-wider uppercase"
+                      >
                         {cat.category}
                       </td>
                     </tr>
                     {cat.features.map((feat) => (
                       <tr key={feat.name} className="hover:bg-bg-secondary/30 transition-colors">
-                        <td className="p-4 font-medium text-text-primary">
+                        <td className="text-text-primary p-4 font-medium">
                           <div>
                             {feat.name}
                             {feat.tooltip && (
-                              <p className="text-[11px] font-normal text-text-tertiary mt-0.5">
+                              <p className="text-text-tertiary mt-0.5 text-[11px] font-normal">
                                 {feat.tooltip}
                               </p>
                             )}
                           </div>
                         </td>
-                        {(['free', 'starter', 'business', 'pro', 'agency'] as SubscriptionPlan[]).map((planKey) => {
+                        {(
+                          ['free', 'starter', 'business', 'pro', 'agency'] as SubscriptionPlan[]
+                        ).map((planKey) => {
                           const val = feat.values[planKey];
                           const isProCol = planKey === 'pro';
                           return (
                             <td
                               key={planKey}
                               className={`p-4 text-center font-semibold ${
-                                isProCol ? 'bg-amber-50/20 text-brand-900' : 'text-text-secondary'
+                                isProCol ? 'text-brand-900 bg-amber-50/20' : 'text-text-secondary'
                               }`}
                             >
                               {typeof val === 'boolean' ? (
                                 val ? (
-                                  <span className="text-emerald-600 font-bold text-base">✓</span>
+                                  <span className="text-base font-bold text-emerald-600">✓</span>
                                 ) : (
                                   <span className="text-text-tertiary">—</span>
                                 )
@@ -605,12 +648,12 @@ export default function PricingPageClient({ countryCode }: { countryCode?: strin
         </section>
 
         {/* ── FAQ Section ────────────────────────────────────────────────────── */}
-        <section className="mt-20 border-t border-border-medium pt-12">
+        <section className="border-border-medium mt-20 border-t pt-12">
           <div className="text-center">
-            <h2 className="text-2xl font-extrabold text-text-primary sm:text-3xl">
+            <h2 className="text-text-primary text-2xl font-extrabold sm:text-3xl">
               Frequently Asked Questions
             </h2>
-            <p className="mt-2 text-sm text-text-secondary">
+            <p className="text-text-secondary mt-2 text-sm">
               Got questions about billing, outputs, or plan limits? We have answers.
             </p>
           </div>
@@ -619,10 +662,10 @@ export default function PricingPageClient({ countryCode }: { countryCode?: strin
             {FAQS.map((faq) => (
               <div
                 key={faq.q}
-                className="rounded-2xl border border-border-light bg-bg-primary p-6 shadow-2xs"
+                className="border-border-light bg-bg-primary rounded-2xl border p-6 shadow-2xs"
               >
-                <h3 className="text-base font-bold text-text-primary">{faq.q}</h3>
-                <p className="mt-2.5 text-xs sm:text-sm text-text-secondary leading-relaxed">
+                <h3 className="text-text-primary text-base font-bold">{faq.q}</h3>
+                <p className="text-text-secondary mt-2.5 text-xs leading-relaxed sm:text-sm">
                   {faq.a}
                 </p>
               </div>
@@ -631,12 +674,16 @@ export default function PricingPageClient({ countryCode }: { countryCode?: strin
         </section>
 
         {/* ── Guarantee & Security section ──────────────────────────────────── */}
-        <div className="mt-16 rounded-2xl border border-border-light bg-bg-secondary p-8 text-center shadow-xs">
-          <h2 className="text-xl font-bold text-text-primary">Trusted &amp; Secure Payment Guarantee</h2>
-          <p className="mx-auto mt-2 max-w-2xl text-xs sm:text-sm text-text-secondary">
-            Payments are processed securely by our payment partner, Paddle. Subscriptions renew automatically until you cancel. You can cancel from your Billing page at any time and keep your plan until the end of the period you have paid for.
+        <div className="border-border-light bg-bg-secondary mt-16 rounded-2xl border p-8 text-center shadow-xs">
+          <h2 className="text-text-primary text-xl font-bold">
+            Trusted &amp; Secure Payment Guarantee
+          </h2>
+          <p className="text-text-secondary mx-auto mt-2 max-w-2xl text-xs sm:text-sm">
+            Payments are processed securely by our payment partner, Paddle. Subscriptions renew
+            automatically until you cancel. You can cancel from your Billing page at any time and
+            keep your plan until the end of the period you have paid for.
           </p>
-          <div className="mt-6 flex flex-wrap justify-center gap-6 text-xs font-semibold text-text-tertiary">
+          <div className="text-text-tertiary mt-6 flex flex-wrap justify-center gap-6 text-xs font-semibold">
             <span>✓ Instant Output Entitlement</span>
             <span>✓ Cancel anytime in Billing</span>
             <span>✓ Encrypted Checkout</span>

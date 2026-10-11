@@ -47,8 +47,14 @@ describeIfEmulator('Firestore rules coverage gaps and re-pointing attacks', () =
       await db.collection('businesses').doc('biz_B').set({ userId: 'userB', name: 'B' });
       await db.collection('whatsapp_leads').doc('leadA').set({ businessId: 'biz_A', phone: 'x' });
       await db.collection('whatsapp_leads').doc('leadB').set({ businessId: 'biz_B', phone: 'y' });
-      await db.collection('marketingPlans').doc('planA').set({ userId: 'userA', businessId: 'biz_A' });
-      await db.collection('marketingPlans').doc('planB').set({ userId: 'userB', businessId: 'biz_B' });
+      await db
+        .collection('marketingPlans')
+        .doc('planA')
+        .set({ userId: 'userA', businessId: 'biz_A' });
+      await db
+        .collection('marketingPlans')
+        .doc('planB')
+        .set({ userId: 'userB', businessId: 'biz_B' });
       await db.collection('marketingCalendarItems').doc('itemA').set({ userId: 'userA', day: 1 });
       await db.collection('marketingCalendarItems').doc('itemB').set({ userId: 'userB', day: 1 });
       await db.collection('partners').doc('partA').set({ userId: 'userA', tier: 'gold' });
@@ -66,16 +72,13 @@ describeIfEmulator('Firestore rules coverage gaps and re-pointing attacks', () =
           subscriptionId: 'sub_A',
           displayName: 'A',
         });
-      await db
-        .collection('campaigns')
-        .doc('cA')
-        .set({
-          userId: 'userA',
-          businessId: 'biz_A',
-          status: 'draft',
-          creditsReserved: 100,
-          title: 'old',
-        });
+      await db.collection('campaigns').doc('cA').set({
+        userId: 'userA',
+        businessId: 'biz_A',
+        status: 'draft',
+        creditsReserved: 100,
+        title: 'old',
+      });
       await db
         .collection('assets')
         .doc('aA')
@@ -136,9 +139,15 @@ describeIfEmulator('Firestore rules coverage gaps and re-pointing attacks', () =
       await assertFails(anon().firestore().collection('partners').doc('partA').get());
     });
     test('clients cannot grant themselves a tier or inflate referral amounts', async () => {
-      await assertFails(userA().firestore().collection('partners').doc('partA').update({ tier: 'platinum' }));
-      await assertFails(userA().firestore().collection('partners').doc('new').set({ userId: 'userA' }));
-      await assertFails(userA().firestore().collection('partner_referrals').doc('refA').update({ amount: 1e6 }));
+      await assertFails(
+        userA().firestore().collection('partners').doc('partA').update({ tier: 'platinum' })
+      );
+      await assertFails(
+        userA().firestore().collection('partners').doc('new').set({ userId: 'userA' })
+      );
+      await assertFails(
+        userA().firestore().collection('partner_referrals').doc('refA').update({ amount: 1e6 })
+      );
       await assertFails(userA().firestore().collection('partner_referrals').doc('refA').delete());
     });
   });
@@ -149,7 +158,7 @@ describeIfEmulator('Firestore rules coverage gaps and re-pointing attacks', () =
         userA().firestore().collection('users').doc('userA').update({ displayName: 'Renamed' })
       );
     });
-    test('pointing at someone else\'s or an invented subscription is denied', async () => {
+    test("pointing at someone else's or an invented subscription is denied", async () => {
       const ref = userA().firestore().collection('users').doc('userA');
       await assertFails(ref.update({ subscriptionId: 'sub_B_premium' }));
       await assertFails(ref.update({ subscriptionId: null }));
@@ -163,7 +172,11 @@ describeIfEmulator('Firestore rules coverage gaps and re-pointing attacks', () =
           .set({ userId: 'userA', role: 'user', businessIds: ['biz_A'], agencyId: null });
       });
       await assertFails(
-        userA().firestore().collection('users').doc('userA').update({ subscriptionId: 'sub_stolen' })
+        userA()
+          .firestore()
+          .collection('users')
+          .doc('userA')
+          .update({ subscriptionId: 'sub_stolen' })
       );
     });
     test('role, businessIds and agencyId escalation remains denied', async () => {
@@ -173,14 +186,18 @@ describeIfEmulator('Firestore rules coverage gaps and re-pointing attacks', () =
       await assertFails(ref.update({ agencyId: 'agency_victim' }));
     });
     test('another user cannot write to this user doc, and cannot read it', async () => {
-      await assertFails(userB().firestore().collection('users').doc('userA').update({ displayName: 'x' }));
+      await assertFails(
+        userB().firestore().collection('users').doc('userA').update({ displayName: 'x' })
+      );
       await assertFails(userB().firestore().collection('users').doc('userA').get());
     });
   });
 
   describe('re-pointing a resource into another tenant', () => {
     test('owner can edit a non-protected campaign field (positive control)', async () => {
-      await assertSucceeds(userA().firestore().collection('campaigns').doc('cA').update({ title: 'new' }));
+      await assertSucceeds(
+        userA().firestore().collection('campaigns').doc('cA').update({ title: 'new' })
+      );
     });
     test('campaign cannot be re-pointed to another business or user', async () => {
       const ref = userA().firestore().collection('campaigns').doc('cA');
@@ -193,7 +210,9 @@ describeIfEmulator('Firestore rules coverage gaps and re-pointing attacks', () =
       await assertFails(ref.update({ status: 'verified' }));
     });
     test('another tenant cannot touch the campaign', async () => {
-      await assertFails(userB().firestore().collection('campaigns').doc('cA').update({ title: 'pwned' }));
+      await assertFails(
+        userB().firestore().collection('campaigns').doc('cA').update({ title: 'pwned' })
+      );
       await assertFails(userB().firestore().collection('campaigns').doc('cA').get());
     });
     test('clients cannot create a campaign (cannot forge a verified one)', async () => {
