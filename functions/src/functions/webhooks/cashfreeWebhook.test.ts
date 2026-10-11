@@ -196,6 +196,55 @@ describeIfEmulator('cashfreeWebhook (Firestore emulator)', () => {
       expect(usage['bonusCredits']).toBe(500);
     });
 
+    it.each([
+      ['shorter than expected', (s: string) => s.slice(0, s.length - 4)],
+      ['longer than expected', (s: string) => s + 'AAAA'],
+      ['correct length but wrong', (s: string) => 'A'.repeat(s.length)],
+    ])('rejects a signature %s with 400 and changes no state', async (_label, mutate) => {
+      const userId = uniq('u');
+      const orderId = uniq('ord');
+      await seedUser(userId);
+      await seedPendingTxn(orderId, userId, 'credit_pack', undefined, 500);
+      const before = await usageOf(userId);
+
+      const payload = {
+        type: 'PAYMENT_SUCCESS_WEBHOOK',
+        data: {
+          order: { order_id: orderId, order_amount: 999, order_currency: 'INR' },
+          payment: { cf_payment_id: 'cf_pay_bad', payment_status: 'SUCCESS', payment_amount: 999, payment_currency: 'INR' },
+          customer_details: { customer_id: userId },
+        },
+      };
+      const rawBody = JSON.stringify(payload);
+      const timestamp = String(Math.floor(Date.now() / 1000));
+      const req: any = {
+        method: 'POST',
+        headers: {
+          'x-webhook-signature': mutate(signWebhook(rawBody, timestamp)),
+          'x-webhook-timestamp': timestamp,
+        },
+        rawBody: Buffer.from(rawBody),
+        body: payload,
+      };
+      const res: any = {
+        _status: 0,
+        status(c: number) {
+          this._status = c;
+          return this;
+        },
+        send() {
+          return this;
+        },
+      };
+
+      await (cashfreeWebhook as any)(req, res);
+      expect(res._status).toBe(400);
+      expect(await usageOf(userId)).toEqual(before);
+      const txn = (await db.collection('transactions').doc(orderId).get()).data()!;
+      expect(txn['status']).toBe('pending');
+      expect((await db.collection('cashfree_grants').get()).docs.some((d) => d.id.includes('cf_pay_bad'))).toBe(false);
+    });
+
     it('rejects request with invalid signature', async () => {
       const payload = { type: 'PAYMENT_SUCCESS_WEBHOOK' };
       const rawBody = JSON.stringify(payload);

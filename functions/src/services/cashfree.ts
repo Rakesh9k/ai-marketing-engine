@@ -59,7 +59,14 @@ export function verifyCashfreeWebhookSignature(
     .update(signedPayload)
     .digest('base64');
 
-  return crypto.timingSafeEqual(Buffer.from(signature), Buffer.from(expectedSignature));
+  // timingSafeEqual throws a RangeError on unequal lengths, which the webhook handler would
+  // turn into a 500 (and a provider retry). A wrong-length signature is simply invalid.
+  const received = Buffer.from(signature);
+  const expected = Buffer.from(expectedSignature);
+  if (received.length !== expected.length) {
+    return false;
+  }
+  return crypto.timingSafeEqual(received, expected);
 }
 
 /**

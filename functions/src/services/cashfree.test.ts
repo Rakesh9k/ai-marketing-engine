@@ -36,6 +36,24 @@ describe('Cashfree Webhook Signature Verification', () => {
   it('rejects an empty or missing signature', () => {
     expect(verifyCashfreeWebhookSignature(rawBody, '', timestamp, secretKey)).toBe(false);
   });
+
+  it('rejects a signature shorter than expected without throwing', () => {
+    const shorter = validSignature.slice(0, validSignature.length - 4);
+    expect(() => verifyCashfreeWebhookSignature(rawBody, shorter, timestamp, secretKey)).not.toThrow();
+    expect(verifyCashfreeWebhookSignature(rawBody, shorter, timestamp, secretKey)).toBe(false);
+  });
+
+  it('rejects a signature longer than expected without throwing', () => {
+    const longer = validSignature + 'AAAA';
+    expect(() => verifyCashfreeWebhookSignature(rawBody, longer, timestamp, secretKey)).not.toThrow();
+    expect(verifyCashfreeWebhookSignature(rawBody, longer, timestamp, secretKey)).toBe(false);
+  });
+
+  it('rejects a wrong signature of the correct length', () => {
+    const sameLength = 'A'.repeat(validSignature.length);
+    expect(sameLength).not.toBe(validSignature);
+    expect(verifyCashfreeWebhookSignature(rawBody, sameLength, timestamp, secretKey)).toBe(false);
+  });
 });
 
 describe('Cashfree Purchase Description Helper', () => {
