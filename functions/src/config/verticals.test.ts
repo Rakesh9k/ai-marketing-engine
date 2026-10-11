@@ -289,7 +289,10 @@ describe('Shared deterministic Truth Check receives correct vertical context', (
       c.reason?.includes('Unsupported claims detected')
     );
     expect(unsupportedCheck).toBeDefined();
-    expect(unsupportedCheck!.status).toBe('REVIEW_REQUIRED');
+    // Risk policy: a legal/regulatory approval nobody recorded is a material false claim, so it blocks delivery.
+    expect(unsupportedCheck!.status).toBe('FAIL');
+    expect(unsupportedCheck!.basis).toBe('invalid_claim');
+    expect(result.status).toBe('FAIL');
   });
 
   it('does NOT flag "RERA approved" for restaurant or salon — that keyword belongs only to real_estate', () => {
