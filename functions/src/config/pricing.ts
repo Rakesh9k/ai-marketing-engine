@@ -16,7 +16,7 @@ export const MAX_IMAGE_GENERATION_CALLS_PER_CAMPAIGN = 1;
 
 export const PRICING = {
   creditValueINR: 1,
-  campaignBaseCredits: 100,
+  campaignBaseCredits: 60,
   regenerationCredits: 10,
   imageGenerationCredits: 20,
   calendarPlanningCredits: 10,
@@ -35,11 +35,51 @@ export const PRICING = {
   // previously-uncosted operation, not a change to any existing one.
   styleAnalysisCredits: 15,
   subscriptionTiers: {
-    free: { monthlyCredits: 100, priceINR: 0, yearlyPriceINR: 0, monthlyReels: 0, monthlyCreatives: 5, monthlyStories: 0, maxBusinesses: 1 },
-    starter: { monthlyCredits: 500, priceINR: 999, yearlyPriceINR: 9990, monthlyReels: 3, monthlyCreatives: 15, monthlyStories: 9, maxBusinesses: 1 },
-    business: { monthlyCredits: 1200, priceINR: 1699, yearlyPriceINR: 16990, monthlyReels: 10, monthlyCreatives: 30, monthlyStories: 30, maxBusinesses: 1 },
-    pro: { monthlyCredits: 2500, priceINR: 2999, yearlyPriceINR: 24990, monthlyReels: 20, monthlyCreatives: 60, monthlyStories: 60, maxBusinesses: 3 },
-    agency: { monthlyCredits: 6000, priceINR: 4999, yearlyPriceINR: 49990, monthlyReels: 40, monthlyCreatives: 120, monthlyStories: 120, maxBusinesses: 10 },
+    free: {
+      monthlyCredits: 140,
+      priceINR: 0,
+      yearlyPriceINR: 0,
+      monthlyReels: 0,
+      monthlyCreatives: 5,
+      monthlyStories: 0,
+      maxBusinesses: 1,
+    },
+    starter: {
+      monthlyCredits: 500,
+      priceINR: 999,
+      yearlyPriceINR: 9990,
+      monthlyReels: 3,
+      monthlyCreatives: 15,
+      monthlyStories: 9,
+      maxBusinesses: 1,
+    },
+    business: {
+      monthlyCredits: 1200,
+      priceINR: 1699,
+      yearlyPriceINR: 16990,
+      monthlyReels: 10,
+      monthlyCreatives: 30,
+      monthlyStories: 30,
+      maxBusinesses: 1,
+    },
+    pro: {
+      monthlyCredits: 2500,
+      priceINR: 2999,
+      yearlyPriceINR: 24990,
+      monthlyReels: 20,
+      monthlyCreatives: 60,
+      monthlyStories: 60,
+      maxBusinesses: 3,
+    },
+    agency: {
+      monthlyCredits: 6000,
+      priceINR: 4999,
+      yearlyPriceINR: 49990,
+      monthlyReels: 40,
+      monthlyCreatives: 120,
+      monthlyStories: 120,
+      maxBusinesses: 10,
+    },
   },
   topUpPacks: [
     { credits: 500, priceINR: 499 },
@@ -69,7 +109,10 @@ export function getMonthlyCredits(plan: SubscriptionPlan): number {
   return PRICING.subscriptionTiers[plan]?.monthlyCredits ?? 100;
 }
 
-export function getPlanPrice(plan: SubscriptionPlan, billingCycle: 'monthly' | 'yearly' = 'monthly'): number {
+export function getPlanPrice(
+  plan: SubscriptionPlan,
+  billingCycle: 'monthly' | 'yearly' = 'monthly'
+): number {
   const tier = PRICING.subscriptionTiers[plan];
   if (!tier) return 0;
   return billingCycle === 'yearly' ? tier.yearlyPriceINR : tier.priceINR;

@@ -32,7 +32,7 @@ export const PLAN_DETAILS: Record<
     creatives: 5,
     stories: 0,
     maxBusinesses: 1,
-    credits: 100,
+    credits: 140,
     features: [
       '5 social creatives',
       '0 AI reels',
@@ -119,4 +119,3 @@ export const PLAN_DETAILS: Record<
     ],
   },
 };
-

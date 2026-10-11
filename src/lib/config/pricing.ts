@@ -47,7 +47,7 @@ export const PLANS: PlanDefinition[] = [
     monthlyCreatives: 5,
     monthlyStories: 0,
     maxBusinesses: 1,
-    credits: 100,
+    credits: 140,
     popular: false,
     ctaText: 'Start Free',
     features: [
@@ -162,7 +162,7 @@ export const PLANS: PlanDefinition[] = [
 ];
 
 export const CREDIT_COSTS = {
-  BASE_CAMPAIGN: 100,
+  BASE_CAMPAIGN: 60,
   REGENERATION: 10,
   IMAGE_GENERATION: 20,
   STYLE_ANALYSIS: 15,
@@ -171,7 +171,8 @@ export const CREDIT_COSTS = {
 
 /**
  * Credits for one campaign generation: the base campaign plus up to 2 AI images (MVP limit).
- * Mirrors functions/src/services/usageControl.ts getGenerationCost('campaign_generation') = 140.
+ * Mirrors functions/src/services/usageControl.ts getGenerationCost('campaign_generation') = 100
+ * (60 base + 2 x 20). The backend config is authoritative; tests/pricingParity.test.ts pins this.
  */
 export const CAMPAIGN_GENERATION_COST =
   CREDIT_COSTS.BASE_CAMPAIGN + 2 * CREDIT_COSTS.IMAGE_GENERATION;
@@ -189,5 +190,3 @@ export const ENTITLEMENT_COSTS: Record<EntitlementType, { credits: number }> = {
     credits: 10,
   },
 };
-
-
