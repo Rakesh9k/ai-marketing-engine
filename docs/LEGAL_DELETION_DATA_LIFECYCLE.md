@@ -96,3 +96,13 @@ assets, Storage objects, usage history, and analytics events _should_ be deleted
 fixed period, or anonymized is explicitly **FOUNDER DECISION REQUIRED** (data-retention schedule) —
 see `docs/LEGAL_FOUNDER_DECISIONS_REQUIRED.md`. This document states only what the code currently
 does.
+
+## Addendum — `onboarding_drafts/{uid}` (added with the conversational onboarding)
+
+| Data | Contains | On account deletion |
+|---|---|---|
+| `onboarding_drafts/{uid}` | Owner's name and role, industry/subcategory, and (in later phases) location, offering, audience, positioning, AI-detected/inferred guesses with provenance | **Deleted** by `onUserDeletedHandler` (first step, unconditional; deleting a missing draft is a no-op). Covered for both self-service (`requestAccountDeletion`) and console deletion, because it is the Auth `onDelete` trigger. Tested in `onUserDeleted.test.ts`. |
+| Browser `localStorage` key `mitra-onboarding-pending:<uid>` | A not-yet-sent answer, if the last save failed | Not reachable from the server. It is per-uid and only exists while a save is unsent; it is cleared on the next successful save. Signing out on a shared device does not remove it. |
+
+Retention for the drafts of users who never finish onboarding and never delete their account is
+**undecided** (founder/legal): they are personal data kept indefinitely until a retention window is set.

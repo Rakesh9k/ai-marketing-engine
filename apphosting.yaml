@@ -1,11 +1,11 @@
 # Firebase App Hosting configuration for the Mitra Next.js frontend.
 #
 # Every variable below is a browser-safe NEXT_PUBLIC_* value (Firebase web config,
-# App Check site key, Razorpay publishable key id). NEXT_PUBLIC_* values are inlined
+# App Check site key, Paddle environment). NEXT_PUBLIC_* values are inlined
 # into the client bundle at build time, so they need BUILD availability.
 #
 # NOT here, by design: NEXT_PUBLIC_APPCHECK_DEBUG_TOKEN and every server secret
-# (Razorpay secret/webhook secret, AI provider keys, Firebase Admin credentials).
+# (Paddle API/webhook secrets, AI provider keys, Meta secrets).
 # Those stay in Firebase Cloud Functions secrets.
 runConfig:
   cpu: 1

@@ -138,54 +138,62 @@ Visit `http://localhost:3000` to see the application.
 
 ## Environment Variables
 
-### Client-Side (Public) — `.env.local`
+`.env.example` is the authoritative inventory (names only, safe placeholders, per-variable notes on
+where each is set). Summary:
 
-| Variable                                   | Description                             | Required |
-| ------------------------------------------ | --------------------------------------- | -------- |
-| `NEXT_PUBLIC_FIREBASE_API_KEY`             | Firebase Web API Key                    | ✅       |
-| `NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN`         | Firebase Auth Domain                    | ✅       |
-| `NEXT_PUBLIC_FIREBASE_PROJECT_ID`          | Firebase Project ID                     | ✅       |
-| `NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET`      | Firebase Storage Bucket                 | ✅       |
-| `NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID` | Firebase Messaging Sender ID            | ✅       |
-| `NEXT_PUBLIC_FIREBASE_APP_ID`              | Firebase App ID                         | ✅       |
-| `NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID`      | Firebase Analytics Measurement ID       | ❌       |
-| `NEXT_PUBLIC_RAZORPAY_KEY_ID`              | Razorpay Public Key                     | ✅       |
-| `NEXT_PUBLIC_APP_URL`                      | Application URL                         | ✅       |
-| `NEXT_PUBLIC_APP_NAME`                     | Application Name                        | ✅       |
-| `NEXT_PUBLIC_USE_EMULATORS`                | Use Firebase Emulators (`true`/`false`) | ❌       |
+### Frontend — public `NEXT_PUBLIC_*` (`.env.local` / `apphosting.yaml` / Vercel)
 
-### Server-Side (Secrets) — Firebase Functions Secrets
+Inlined into the browser bundle at **build** time; public by design. Never put a secret here.
 
-**NEVER put these in `.env.local` or any client-accessible location.**
+| Group      | Variables                                                                                                         | Dev | Prod |
+| ---------- | ----------------------------------------------------------------------------------------------------------------- | --- | ---- |
+| Firebase   | `NEXT_PUBLIC_FIREBASE_{API_KEY,AUTH_DOMAIN,PROJECT_ID,STORAGE_BUCKET,MESSAGING_SENDER_ID,APP_ID}`                 | ✅  | ✅   |
+| Firebase   | `NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID` (Analytics)                                                                 | ❌  | ❌   |
+| App Check  | `NEXT_PUBLIC_RECAPTCHA_SITE_KEY`                                                                                  | ❌  | ✅   |
+| App Check  | `NEXT_PUBLIC_APPCHECK_DEBUG_TOKEN` (emulator mode only; never in `apphosting.yaml`)                               | ❌  | ❌   |
+| Emulators  | `NEXT_PUBLIC_USE_EMULATORS` (`false` in production)                                                               | ❌  | ✅   |
+| Paddle     | `NEXT_PUBLIC_PADDLE_ENVIRONMENT`, `NEXT_PUBLIC_PADDLE_CLIENT_TOKEN`                                               | ✅  | ✅   |
+| Paddle     | `NEXT_PUBLIC_PADDLE_PRICE_ID_{STARTER,BUSINESS,PRO,AGENCY}_{MONTHLY,YEARLY}`, `..._PACK_{500,1200,3000}` (11 IDs) | ✅  | ✅   |
+| Monitoring | `NEXT_PUBLIC_SENTRY_DSN`, `NEXT_PUBLIC_SENTRY_RELEASE`, `NEXT_PUBLIC_VERCEL_ENV`                                  | ❌  | ❌   |
 
-Set via: `firebase functions:secrets:set SECRET_NAME`
+### Frontend — server/build only (not `NEXT_PUBLIC_`)
 
-| Secret                        | Description                  |
-| ----------------------------- | ---------------------------- |
-| `FIREBASE_ADMIN_PROJECT_ID`   | Firebase Admin Project ID    |
-| `FIREBASE_ADMIN_CLIENT_EMAIL` | Service Account Client Email |
-| `FIREBASE_ADMIN_PRIVATE_KEY`  | Service Account Private Key  |
-| `GEMINI_API_KEY`              | Google Gemini API Key        |
-| `OPENAI_API_KEY`              | OpenAI API Key               |
-| `NVIDIA_API_KEY`              | NVIDIA API Key               |
-| `RAZORPAY_KEY_SECRET`         | Razorpay Secret Key          |
-| `RAZORPAY_WEBHOOK_SECRET`     | Razorpay Webhook Secret      |
+| Variable                       | Purpose                                        | Secret |
+| ------------------------------ | ---------------------------------------------- | ------ |
+| `SENTRY_DSN`                   | Server/edge error reporting                    | ❌     |
+| `SENTRY_ORG`, `SENTRY_PROJECT` | Source-map upload (build)                      | ❌     |
+| `SENTRY_AUTH_TOKEN`            | Source-map upload (build)                      | ✅     |
+| `E2E_BASE_URL`                 | Playwright base URL (default `localhost:3000`) | ❌     |
 
-### Feature Flags
+### Cloud Functions
 
-**As of Phase 36, none of the flags below are read anywhere in `src/` or `functions/src/`**
-(confirmed by repo-wide search) — they were Phase 1 planning placeholders. Salon and real estate
-verticals are fully implemented and always-on (Phases 29–31), not flag-gated. WhatsApp Business
-API integration and a dedicated agency workspace UI remain genuinely not implemented (see
-`docs/PHASE_36_FINAL_MITRA_READINESS_REPORT.md`), but not because a flag disables them — the code
-simply doesn't exist yet. Kept here only as a historical record; setting these has no effect.
+**NEVER put these in the frontend `.env.local` or any client-accessible location.** Secrets:
+`firebase functions:secrets:set NAME`. Non-secret params: gitignored `functions/.env.<project-id>`
+(emulator: `functions/.env.local`).
 
-| Variable                                  | Default | Description (Phase 1 plan — not wired to any code)    |
-| ----------------------------------------- | ------- | ----------------------------------------------------- |
-| `NEXT_PUBLIC_ENABLE_SALON_VERTICAL`       | `false` | Superseded — salon is implemented and always-on       |
-| `NEXT_PUBLIC_ENABLE_REAL_ESTATE_VERTICAL` | `false` | Superseded — real estate is implemented and always-on |
-| `NEXT_PUBLIC_ENABLE_WHATSAPP_API`         | `false` | Still accurate — not implemented                      |
-| `NEXT_PUBLIC_ENABLE_AGENCY_WORKSPACE`     | `false` | Still accurate — no dedicated agency UI exists        |
+| Variable                                                                | Kind   | Used by                                                             |
+| ----------------------------------------------------------------------- | ------ | ------------------------------------------------------------------- |
+| `GEMINI_API_KEY`                                                        | secret | campaign, calendar, regenerate, reel and style functions            |
+| `GEMINI_IMAGE_MODEL`, `*_MODEL_PRIMARY` / `*_MODEL_FALLBACK`            | param  | model routing (optional)                                            |
+| `PADDLE_API_KEY`, `PADDLE_WEBHOOK_SECRET`                               | secret | `createPaddleCheckout`, `cancelPaddleSubscription`, `paddleWebhook` |
+| `PADDLE_ENVIRONMENT`, `PADDLE_PRICE_ID_*` (11)                          | param  | Paddle services (no default; must match the API key)                |
+| `META_APP_SECRET`, `META_TOKEN_ENCRYPTION_KEY`                          | secret | Meta OAuth / token storage                                          |
+| `META_APP_ID`, `META_REDIRECT_URI`, `META_GRAPH_API_VERSION`, `APP_URL` | param  | Meta OAuth                                                          |
+| `REEL_RENDERER_URL`                                                     | param  | reel generation (mock renderer when unset)                          |
+| `REEL_RENDERER_API_KEY`                                                 | secret | Functions and `services/reel-renderer` (shared)                     |
+
+Platform-provided (do not set): `FIREBASE_PROJECT_ID` / `GCLOUD_PROJECT`, `FUNCTIONS_EMULATOR`,
+`K_REVISION`.
+
+### Obsolete / unused
+
+- Legacy providers whose functions are **not exported** (rollback only): PayU (`PAYU_*`) and Razorpay
+  (`RAZORPAY_*`).
+- Declared in `functions/src/config/env.ts` but read by no code: `NVIDIA_API_KEY`, `VEO_API_KEY`,
+  `ELEVENLABS_API_KEY`, `PHOTOROOM_API_KEY`, `ADMIN_EMAILS`, `FIREBASE_REGION`.
+- Previously documented, read by no code (remove from any `.env.local`): `NEXT_PUBLIC_APP_URL`,
+  `NEXT_PUBLIC_APP_NAME`, `NEXT_PUBLIC_RAZORPAY_KEY_ID`, the four `NEXT_PUBLIC_ENABLE_*` feature flags
+  (Phase 1 placeholders), `FIREBASE_ADMIN_*`, `OPENAI_API_KEY`.
 
 ---
 

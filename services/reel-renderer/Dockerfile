@@ -12,7 +12,7 @@
 FROM node:20-slim
 
 RUN apt-get update && \
-    apt-get install -y --no-install-recommends ca-certificates && \
+    apt-get install -y --no-install-recommends ca-certificates ffmpeg && \
     rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
@@ -30,6 +30,8 @@ RUN useradd --uid 1001 --create-home appuser && chown -R appuser:appuser /app
 USER appuser
 
 ENV NODE_ENV=production
+ENV FFMPEG_PATH=/usr/bin/ffmpeg
+ENV FFPROBE_PATH=/usr/bin/ffprobe
 EXPOSE 8080
 
 CMD ["node", "lib/index.js"]

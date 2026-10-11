@@ -86,6 +86,21 @@ const nextConfig: NextConfig = {
             key: 'Referrer-Policy',
             value: 'origin-when-cross-origin',
           },
+          {
+            key: 'Strict-Transport-Security',
+            value: 'max-age=63072000; includeSubDomains',
+          },
+          {
+            key: 'Content-Security-Policy',
+            value:
+              "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.paddle.com https://checkout.razorpay.com https://sdk.cashfree.com https://www.google.com https://www.gstatic.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; img-src 'self' data: blob: https://firebasestorage.googleapis.com https://storage.googleapis.com https://lh3.googleusercontent.com https://images.unsplash.com https://plus.unsplash.com; font-src 'self' https://fonts.gstatic.com data:; connect-src 'self' https://*.firebaseio.com https://*.googleapis.com https://identitytoolkit.googleapis.com https://securetoken.googleapis.com https://api.paddle.com https://*.cashfree.com https://api.razorpay.com https://*.sentry.io wss://*.firebaseio.com; frame-src 'self' https://*.paddle.com https://*.cashfree.com https://api.razorpay.com https://*.firebaseapp.com; frame-ancestors 'none'; object-src 'none'; base-uri 'self';",
+          },
+          {
+            // Camera/microphone/geolocation are never used by Mitra; payment stays allowed for
+            // the Paddle checkout overlay.
+            key: 'Permissions-Policy',
+            value: 'camera=(), microphone=(), geolocation=(), payment=(self "https://*.paddle.com")',
+          },
         ],
       },
     ];

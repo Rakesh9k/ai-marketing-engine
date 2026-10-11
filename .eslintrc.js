@@ -29,13 +29,19 @@ module.exports = {
   rules: {
     'prettier/prettier': 'error',
     '@typescript-eslint/no-explicit-any': 'off',
-    '@typescript-eslint/no-unused-vars': ['error', { argsIgnorePattern: '^_' }],
+    '@typescript-eslint/no-unused-vars': [
+      'error',
+      { argsIgnorePattern: '^_', varsIgnorePattern: '^_', caughtErrorsIgnorePattern: '^_' },
+    ],
     '@typescript-eslint/consistent-type-imports': 'error',
     '@typescript-eslint/no-floating-promises': 'warn',
     '@typescript-eslint/require-await': 'warn',
     'react-hooks/exhaustive-deps': 'warn',
     'react/no-unescaped-entities': 'off',
     '@next/next/no-html-link-for-pages': 'off',
+    // Marketing imagery uses plain <img> for external/decorative assets; this is a perf hint,
+    // not a correctness or security rule.
+    '@next/next/no-img-element': 'off',
   },
   ignorePatterns: [
     'node_modules/',
@@ -65,6 +71,11 @@ module.exports = {
     'next-env.d.ts',
   ],
   overrides: [
+    {
+      // Async test doubles legitimately return promises without awaiting.
+      files: ['**/*.test.ts', '**/*.test.tsx'],
+      rules: { '@typescript-eslint/require-await': 'off' },
+    },
     {
       files: ['*.js', '*.cjs', '*.mjs'],
       parser: 'espree',

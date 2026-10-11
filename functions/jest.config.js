@@ -17,11 +17,15 @@ module.exports = {
     '^(\\.{1,2}/.*)\\.js$': '$1',
   },
   transform: {
-    '^.+\\.ts$': ['ts-jest', { tsconfig: '<rootDir>/tsconfig.json' }],
+    '^.+\\.ts$': ['ts-jest', { tsconfig: '<rootDir>/tsconfig.json', diagnostics: { ignoreCodes: [151002] } }],
   },
   setupFiles: ['<rootDir>/src/testSetup.ts'],
   // The emulator-backed usageControl test leaves an open Firestore gRPC
   // handle after admin.app().delete(); force the process to exit rather
   // than hang in CI.
   forceExit: true,
+  // The emulator-backed concurrency tests (rate limit, usage reservations, webhook duplicate
+  // delivery) contend on one shared Firestore emulator across parallel workers; the 5s default
+  // made them time out under load (never fail on a wrong value). Hang detection stays at 30s.
+  testTimeout: 30000,
 };

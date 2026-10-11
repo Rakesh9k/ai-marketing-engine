@@ -2,9 +2,9 @@ name: CI/CD Pipeline
 
 on:
   push:
-    branches: [master, develop]
+    branches: [main, master, develop]
   pull_request:
-    branches: [master, develop]
+    branches: [main, master, develop]
   # Production Functions are deployed deliberately (see docs/PRODUCTION_PADDLE_DEPLOYMENT_RUNBOOK.md),
   # never as a side effect of a push to master.
   workflow_dispatch:
@@ -126,8 +126,11 @@ jobs:
       # fully locally regardless. Previously this step set
       # FIRESTORE_EMULATOR_HOST without ever starting an emulator, so every
       # test hit a connection refused error.
+      # Runs the whole root suite (not only files named "security"): the rules tests in
+      # tests/security*.test.ts, tests/storage.test.ts and tests/phase27-*.test.ts are SKIPPED,
+      # not failed, when no emulator is running, so the plain frontend job cannot prove them.
       - name: Run security rules tests against Firebase emulators
-        run: firebase emulators:exec --only firestore,auth,storage --project demo-mitra "npm run test -- --testPathPattern=\"security\" --coverage=false"
+        run: firebase emulators:exec --only firestore,auth,storage --project demo-mitra "npm run test -- --coverage=false"
         working-directory: .
 
   # Unit and integration tests

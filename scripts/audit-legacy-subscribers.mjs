@@ -35,7 +35,8 @@ console.log(`Project: ${projectId}   (read-only, counts only)\n`);
 
 const LIVE_STATUSES = ['active', 'trialing', 'past_due'];
 const now = Date.now();
-const toMs = (v) => (v && typeof v.toMillis === 'function' ? v.toMillis() : v ? Date.parse(v) : NaN);
+const toMs = (v) =>
+  v && typeof v.toMillis === 'function' ? v.toMillis() : v ? Date.parse(v) : NaN;
 
 function providerOf(d) {
   if (d.provider) return d.provider; // 'paddle' | 'payu' | …
@@ -64,11 +65,23 @@ const legacyPaid = Object.entries(table)
   .reduce((n, [, v]) => n + v, 0);
 
 for (const provider of ['payu']) {
-  const tx = await db.collection('transactions').where('provider', '==', provider).where('status', '==', 'completed').count().get();
+  const tx = await db
+    .collection('transactions')
+    .where('provider', '==', provider)
+    .where('status', '==', 'completed')
+    .count()
+    .get();
   console.log(`\nCompleted ${provider} transactions (all time): ${tx.data().count}`);
 }
-const rzpTx = await db.collection('transactions').where('status', '==', 'completed').where('type', '==', 'subscription').limit(500).get();
-const rzp = rzpTx.docs.filter((d) => d.data().razorpayPaymentId || d.data().razorpaySubscriptionId).length;
+const rzpTx = await db
+  .collection('transactions')
+  .where('status', '==', 'completed')
+  .where('type', '==', 'subscription')
+  .limit(500)
+  .get();
+const rzp = rzpTx.docs.filter(
+  (d) => d.data().razorpayPaymentId || d.data().razorpaySubscriptionId
+).length;
 console.log(`Completed Razorpay-linked subscription transactions (first 500 scanned): ${rzp}`);
 
 console.log('\nRESULT:');
