@@ -26,6 +26,7 @@
     "noUncheckedIndexedAccess": true,
     "noImplicitOverride": true,
     "noPropertyAccessFromIndexSignature": true,
+    "noImplicitReturns": true,
     "types": ["jest", "@testing-library/jest-dom"]
   },
   "include": [
@@ -34,13 +35,11 @@
     "**/*.tsx",
     ".next/types/**/*.ts",
     ".next/dev/types/**/*.ts",
-    "functions/src/**/*.ts",
     "tests/**/*.ts"
   ],
   "exclude": [
     "node_modules",
-    "functions/lib",
-    "functions/node_modules",
+    "functions",
     // services/reel-renderer is a separately deployed Cloud Run service with
     // its own package.json/tsconfig.json/build — it deliberately does not
     // share types with the main app (see its src/types.ts), so it has no

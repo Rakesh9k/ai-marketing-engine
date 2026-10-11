@@ -17,8 +17,34 @@ import {
 } from './generatedAssetStorage';
 import { MAX_IMAGE_GENERATION_CALLS_PER_CAMPAIGN } from '../../config/pricing';
 import { getVerticalConfigOrDefault } from '../../config/verticals';
+import { brainForGeneration } from './brainForGeneration';
+import {
+  aiCallsSoFar,
+  inAiCallStage,
+  setAiCallStage,
+  summarizeAiCalls,
+  withAiCallLog,
+} from './aiCallLog';
+import { buildFactSources } from './factSources';
+import type { CreativeBrainInput, CreativeBlueprint } from './creativeBrain.types';
+import {
+  buildOfferContractPrompt,
+  contactNumbersOnFile,
+  hasDefinedOpeningHours,
+} from './offerContract';
+import { buildVerticalContractPrompt } from './verticalContract';
+import {
+  languageCheckFor,
+  languageGuardrail,
+  languageMode,
+  localeFromInput,
+  localizationSystemRules,
+  localizationTask,
+  regionalInsightsLine,
+} from './localizationContract';
 import { z } from 'zod';
 import type {
+  BusinessCategory,
   BusinessRules,
   BrandCreativeContext,
   PipelineTrace,
@@ -36,6 +62,7 @@ import type {
   TruthCheckResult,
 } from '../../types';
 import { createLogger, logFunctionStage } from '../../utils/logging';
+import { IndustryKnowledgeResolver } from './creativeBrain/industry/industryKnowledge.resolver';
 
 /**
  * businessBrain.businessRules (as stored in Firestore) only carries operational
@@ -44,7 +71,10 @@ import { createLogger, logFunctionStage } from '../../utils/logging';
  * missing businessRules entirely. This always returns a well-formed BusinessRules
  * object so downstream prompt-building never dereferences undefined fields.
  */
-function toCreativeBriefBusinessRules(stored?: { deliveryRadiusKm?: number }): BusinessRules {
+function toCreativeBriefBusinessRules(stored?: {
+  deliveryRadiusKm?: number;
+  minimumOrder?: number;
+}): BusinessRules {
   return {
     factuality: {
       allowCreativeFraming: true,
@@ -54,8 +84,14 @@ function toCreativeBriefBusinessRules(stored?: { deliveryRadiusKm?: number }): B
     },
     availability: {
       displayUnavailableItems: false,
-      minimumOrderRequired: false,
-      deliveryRadiusKm: stored?.deliveryRadiusKm ?? 5,
+      // Only what the owner gave. An unknown radius or minimum is left out, never filled with 5 km or
+      // "no minimum order": the model would state it as a fact.
+      ...(stored?.minimumOrder !== undefined
+        ? { minimumOrderRequired: stored.minimumOrder > 0 }
+        : {}),
+      ...(stored?.deliveryRadiusKm !== undefined
+        ? { deliveryRadiusKm: stored.deliveryRadiusKm }
+        : {}),
     },
     communication: {
       contactInformationAllowed: true,
@@ -94,7 +130,9 @@ export const BusinessUnderstandingSchema = z.object({
         criticality: z.enum(['high', 'medium', 'low']),
       })
     )
-    .min(10),
+    // At least one (the business itself). Was min(10), which a small Business Brain cannot honestly
+    // satisfy under this stage's own "NEVER invent facts" rule, so generation failed for new users.
+    .min(1),
   missingInformation: z.array(z.string()).default([]),
   constraints: z
     .array(
@@ -199,7 +237,8 @@ export const LocalizationStrategySchema = z.object({
     officeWorkers: z.array(z.string()),
     families: z.array(z.string()),
     students: z.array(z.string()),
-    foodies: z.array(z.string()),
+    // (no vertical-specific segment such as "foodies": this schema is asked of every kind of business, and a
+    // restaurant-only key made the model invent food language for a saree shop)
   }),
 });
 
@@ -454,14 +493,30 @@ export class GenerationPipeline {
   /**
    * Execute the full 13-stage generation pipeline
    */
-  async execute(input: GenerationPipelineInput): Promise<GenerationPipelineOutput> {
+  async execute(rawInput: GenerationPipelineInput): Promise<GenerationPipelineOutput> {
+    return withAiCallLog(() => this.executeCampaign(rawInput));
+  }
+
+  private async executeCampaign(rawInput: GenerationPipelineInput): Promise<GenerationPipelineOutput> {
+    // Provenance lives on the raw Brain; the model-facing copy below has it removed.
+    const brainFacts =
+      (rawInput.businessBrain as { knowledge?: { facts?: Record<string, { source?: string }> } } | undefined)
+        ?.knowledge?.facts ?? {};
+    // The model (and the stored trace) see the Business Brain without the owner's personal details and
+    // provenance bookkeeping — see brainForGeneration.
+    const input: GenerationPipelineInput = {
+      ...rawInput,
+      businessBrain: brainForGeneration(rawInput.businessBrain),
+    };
     const conflictPlan = resolveUserInstructionConflicts(input);
-    const resolvedInput = conflictPlan.resolvedInput;
+    const _resolvedInput = conflictPlan.resolvedInput;
 
     const stageResults: {
       conflictPlan?: any;
       businessUnderstanding?: any;
       productUnderstanding?: any;
+      creativeBlueprint?: any;
+      creativeBrainStatus?: { status: 'success' | 'fallback' | 'failed'; reason?: string; detail?: string };
       campaignStrategy?: any;
       localizationStrategy?: any;
       copyPack?: any;
@@ -490,6 +545,21 @@ export class GenerationPipeline {
     // exactly which stage was running when the pipeline failed.
     const logger = createLogger({ businessId: input.businessId, campaignId: input.campaignId });
     let currentStage = 'business_understanding';
+
+    // Wall-clock time of each stage, so "where does the latency go?" is answered from data, not guesses.
+    // Stored with the campaign (metadata.stageTimingsMs) and logged once at the end.
+    const stageTimingsMs: Record<string, number> = {};
+    let openStage: { name: string; startedAt: number } | undefined;
+    const closeOpenStage = () => {
+      if (openStage) stageTimingsMs[openStage.name] = Date.now() - openStage.startedAt;
+      openStage = undefined;
+    };
+    const startStage = (name: string) => {
+      closeOpenStage();
+      openStage = { name, startedAt: Date.now() };
+      setAiCallStage(name);
+      logFunctionStage(logger, name);
+    };
 
     let creativeTemplateContext = undefined;
     let adaptedCreativePlan = undefined;
@@ -541,66 +611,134 @@ export class GenerationPipeline {
     try {
       // Stage 1: Business Understanding
       currentStage = 'business_understanding';
-      logFunctionStage(logger, currentStage);
+      startStage(currentStage);
       stageResults.businessUnderstanding = await this.runStage1(input);
 
       // Stage 2: Product/Image Understanding
       currentStage = 'product_understanding';
-      logFunctionStage(logger, currentStage);
+      startStage(currentStage);
       stageResults.productUnderstanding = await this.runStage2(
         input,
         stageResults['businessUnderstanding']
       );
 
+      // Creative Brain Reasoning Stage (Adaptive State Machine - Phase 2.5 / 3A)
+      currentStage = 'creative_brain';
+      startStage(currentStage);
+      let creativeBlueprint: CreativeBlueprint | undefined = undefined;
+      let creativeBrainStatus: NonNullable<typeof stageResults.creativeBrainStatus> = {
+        status: 'failed',
+        reason: 'no blueprint was produced',
+      };
+      try {
+        const { AdaptiveCreativeBrainStateMachine } =
+          await import('./creativeBrain/adaptiveStateMachine.js');
+        const cbInput = this.buildCreativeBrainInput(input, stageResults, conflictPlan);
+        const adaptiveMachine = new AdaptiveCreativeBrainStateMachine(cbInput);
+        const { result: cbResult, context: stateContext } =
+          await adaptiveMachine.executeAdaptiveFlow(cbInput);
+
+        if (cbResult.success && cbResult.blueprint) {
+          creativeBlueprint = cbResult.blueprint;
+          if (cbResult.fallbackTriggered) {
+            // The Creative Brain's model calls failed and a generic blueprint was used. The campaign still
+            // finishes (that is the design), but it must be visible, with the reason, to operators and in the
+            // stored trace: a swallowed failure cannot be diagnosed or counted.
+            logger.warn('CreativeBrain fell back to a generic blueprint', {
+              reason: cbResult.error?.code ?? 'UNKNOWN',
+              message: cbResult.error?.message,
+            });
+            (creativeBlueprint.trace as any).fallbackTriggered = true;
+            (creativeBlueprint.trace as any).fallbackReason =
+              cbResult.error?.code ?? cbResult.error?.message ?? 'UNKNOWN';
+            creativeBrainStatus = {
+              status: 'fallback',
+              reason: cbResult.error?.code ?? cbResult.error?.message ?? 'UNKNOWN',
+              ...(cbResult.error?.message ? { detail: cbResult.error.message } : {}),
+            };
+          } else {
+            creativeBrainStatus = { status: 'success' };
+          }
+          (creativeBlueprint.trace as any).status = creativeBrainStatus.status;
+          // Attach state transition traces to blueprint metadata for transparent observability
+          if (creativeBlueprint.trace) {
+            (creativeBlueprint.trace as any).stateTransitions = stateContext.transitionTraces;
+            (creativeBlueprint.trace as any).finalState = stateContext.currentState;
+          }
+        }
+      } catch (cbErr: any) {
+        logger.warn('CreativeBrain reasoning exception in pipeline. Proceeding without a blueprint.', {
+          error: cbErr instanceof Error ? cbErr.message : String(cbErr),
+        });
+        creativeBrainStatus = {
+          status: 'failed',
+          reason: cbErr instanceof Error ? cbErr.message : String(cbErr),
+        };
+      }
+      stageResults.creativeBlueprint = creativeBlueprint;
+      stageResults.creativeBrainStatus = creativeBrainStatus;
+
       // Stage 3: Campaign Strategy
       currentStage = 'campaign_strategy';
-      logFunctionStage(logger, currentStage);
+      startStage(currentStage);
       stageResults.campaignStrategy = await this.runStage3(input, stageResults);
 
       // Stage 4: Localization Strategy
       currentStage = 'localization_strategy';
-      logFunctionStage(logger, currentStage);
+      startStage(currentStage);
       stageResults.localizationStrategy = await this.runStage4(input, stageResults);
 
       // Stage 5: Copy Generation
       currentStage = 'copy_generation';
-      logFunctionStage(logger, currentStage);
+      startStage(currentStage);
       stageResults.copyPack = await this.runStage5(input, stageResults);
 
       // Stage 6: Creative Direction / Image Prompts
       currentStage = 'creative_direction';
-      logFunctionStage(logger, currentStage);
+      startStage(currentStage);
       stageResults.imagePrompts = await this.runStage6(input, stageResults);
 
       // Stage 7: Image Generation (AI provider)
       currentStage = 'image_generation';
-      logFunctionStage(logger, currentStage);
+      startStage(currentStage);
       stageResults.generatedImages = await this.runStage7(input, stageResults);
 
-      // Stage 8: Truth Validation (AI-based)
-      currentStage = 'truth_validation';
-      logFunctionStage(logger, currentStage);
-      stageResults.truthValidation = await this.runStage8(input, stageResults);
-
-      // Stage 9: Quality Validation (AI-based)
-      currentStage = 'quality_validation';
-      logFunctionStage(logger, currentStage);
-      stageResults.qualityValidation = await this.runStage9(input, stageResults);
-
-      // Stage 10: Safety Validation (AI-based)
-      currentStage = 'safety_validation';
-      logFunctionStage(logger, currentStage);
-      stageResults.safetyValidation = await this.runStage10(input, stageResults);
+      // Stages 8-10: the three AI validations (truth, quality, safety). Each reads the generated campaign and
+      // nothing from the others, so they run together instead of one after another: measured live, they were
+      // ~25% of a campaign's wall-clock time (7 s + 4 s + 11 s in sequence; now the slowest one). A failure in
+      // any of them still fails the campaign exactly as before, attributed to the stage that failed.
+      closeOpenStage();
+      const validationStart = Date.now();
+      const validate = async <T>(name: string, run: () => Promise<T>): Promise<T> => {
+        logFunctionStage(logger, name);
+        try {
+          return await inAiCallStage(name, run);
+        } catch (err) {
+          currentStage = name;
+          throw err;
+        } finally {
+          stageTimingsMs[name] = Date.now() - validationStart;
+        }
+      };
+      [stageResults.truthValidation, stageResults.qualityValidation, stageResults.safetyValidation] =
+        await Promise.all([
+          validate('truth_validation', () => this.runStage8(input, stageResults)),
+          validate('quality_validation', () => this.runStage9(input, stageResults)),
+          validate('safety_validation', () => this.runStage10(input, stageResults)),
+        ]);
 
       // Stage 11: Truth Check (Deterministic - Phase 16)
       currentStage = 'truth_check';
-      logFunctionStage(logger, currentStage);
+      startStage(currentStage);
       stageResults.truthCheck = await this.runStage11(input, stageResults);
 
       // Stage 12: Campaign Assembly
       currentStage = 'campaign_assembly';
-      logFunctionStage(logger, currentStage);
+      startStage(currentStage);
       stageResults.campaignPack = await this.runStage12(input, stageResults);
+
+      closeOpenStage();
+      logger.info('pipeline.timings', { stageTimingsMs });
 
       // Stage 13: Build 11-stage transparent pipeline execution trace
       const pipelineTrace = this.buildPipelineTrace(input, stageResults);
@@ -608,6 +746,14 @@ export class GenerationPipeline {
         stageResults.campaignPack.metadata = {
           ...(stageResults.campaignPack.metadata || {}),
           pipelineTrace,
+          stageTimingsMs,
+          // Did the Creative Brain really run with the model, or fall back (and why)?
+          creativeBrain: stageResults.creativeBrainStatus,
+          // Every model call: stage, model, attempt, repair, outcome, duration, reason for rejection.
+          aiCalls: [...aiCallsSoFar()],
+          aiCallSummary: summarizeAiCalls(aiCallsSoFar()),
+          // Where each important fact came from.
+          factSources: buildFactSources(input, brainFacts),
         };
       }
 
@@ -663,7 +809,251 @@ export class GenerationPipeline {
     return generateStructuredText(prompt, ProductUnderstandingSchema);
   }
 
+  private buildCreativeBrainInput(
+    input: GenerationPipelineInput,
+    stageResults: any,
+    conflictPlan: any
+  ): CreativeBrainInput {
+    const rawCategory =
+      input.vertical ||
+      input.businessCategory ||
+      input.businessBrain?.identity?.category ||
+      'restaurant';
+    const validVerticals = [
+      'general',
+      'restaurant',
+      'salon',
+      'real_estate',
+      'retail',
+      'services',
+      'healthcare',
+      'education',
+      'fitness',
+    ];
+    const vertical = (validVerticals.includes(rawCategory) ? rawCategory : 'general') as any;
+
+    return {
+      businessBrain: input.businessBrain,
+      vertical,
+      intent: {
+        campaignId: input.campaignId,
+        businessId: input.businessId,
+        objective: input.creativeObjective || input.objective || 'promotion',
+        offer: {
+          headline: input.offerHeadline || input.productName || 'Special Offer',
+          price: input.offerPrice || 0,
+          originalPrice: input.offerOriginalPrice,
+          type: (input.offerType || 'fixed') as any,
+          validityStart: input.offerValidityStart,
+          validityEnd: input.offerValidityEnd,
+          terms: input.offerTerms,
+        },
+        duration: {
+          start: input.duration?.start ?? '',
+          end: input.duration?.end ?? '',
+        },
+        audience: {
+          localities: input.audience?.localities || [],
+          ageRange: input.audience?.ageRange,
+          occasion: input.audience?.occasion,
+        },
+        cta: (input.cta || 'call_now') as any,
+        localization: {
+          country: input.localizationProfile?.country || 'IN',
+          state: input.localizationProfile?.state || input.businessLocation?.state || '',
+          city: input.localizationProfile?.city || input.businessLocation?.city || '',
+          locality: input.localizationProfile?.locality || input.businessLocation?.locality || '',
+          primaryLanguage: input.localizationProfile?.primaryLanguage || 'en',
+          secondaryLanguage: input.localizationProfile?.secondaryLanguage,
+          languageMixing: input.localizationProfile?.languageMixing || 'natural',
+          regionalStyle: input.localizationProfile?.regionalStyle || 'neutral',
+          slangPreference: input.localizationProfile?.slangPreference || 'moderate',
+          audienceDescription: input.localizationProfile?.audienceDescription || '',
+          brandTone: (input.brandProfile?.tone ||
+            input.businessBrain?.brand?.tone ||
+            'friendly') as any,
+          campaignStyle: (input.campaignStyle || 'funny') as any,
+          contentFormat: ((input as any).contentFormat || 'poster') as any,
+        },
+        templateId: input.templateId,
+      },
+      businessUnderstanding: stageResults.businessUnderstanding,
+      productUnderstanding: stageResults.productUnderstanding,
+      productContext:
+        input.productId || input.productName
+          ? {
+              productId: input.productId || 'p1',
+              name: input.productName || 'Product',
+              description: input.newProduct?.description,
+              price: input.offerPrice || 0,
+              category: input.newProduct?.category,
+              images: input.newProduct?.images || [],
+            }
+          : undefined,
+      industryCreativeContext: IndustryKnowledgeResolver.resolve({
+        businessBrain: input.businessBrain,
+        productContext: input.productId || input.productName ? {
+          productId: input.productId || 'p1',
+          name: input.productName || 'Product',
+          description: input.newProduct?.description,
+          price: input.offerPrice || 0,
+          category: input.newProduct?.category,
+        } : undefined,
+        campaignIntent: {
+          businessId: input.businessId,
+          objective: input.creativeObjective || input.objective || 'promotion',
+          offer: {
+            headline: input.offerHeadline || input.productName || 'Special Offer',
+            price: input.offerPrice || 0,
+            originalPrice: input.offerOriginalPrice,
+            type: (input.offerType || 'fixed') as any,
+            validityStart: input.offerValidityStart,
+            validityEnd: input.offerValidityEnd,
+            terms: input.offerTerms,
+          },
+          duration: {
+            start: input.offerValidityStart || new Date().toISOString(),
+            end: input.offerValidityEnd || new Date().toISOString(),
+          },
+          audience: {
+            localities: input.audience?.localities || [],
+            ageRange: input.audience?.ageRange,
+            occasion: input.audience?.occasion,
+          },
+          cta: (input.cta || 'call_now') as any,
+          localization: input.localizationProfile || ({} as any),
+        } as any,
+        vertical,
+      }),
+      memory: {
+        preferences: Array.isArray(input.creativePreferences)
+          ? input.creativePreferences
+          : (input.creativePreferences as any)?.preferences || [],
+        feedback: [],
+        activeSavedStyle: input.savedStyleContext,
+      },
+      conflictConstraints: {
+        nonNegotiableRules: conflictPlan?.nonNegotiables || conflictPlan?.nonNegotiableRules || {},
+        directives: conflictPlan?.directives || [],
+        detectedConflictsCount: conflictPlan?.detectedConflictsCount || 0,
+      },
+    };
+  }
+
   private async runStage3(input: GenerationPipelineInput, previousResults: any): Promise<any> {
+    const blueprint: CreativeBlueprint | undefined = previousResults?.creativeBlueprint;
+    // A fallback blueprint is generic by construction, so it never stands in for the AI strategy stage: the
+    // strategy is only derived from a blueprint the Creative Brain really produced.
+    if (
+      blueprint &&
+      blueprint.strategyDirectives &&
+      (blueprint.trace as { fallbackTriggered?: boolean } | undefined)?.fallbackTriggered !== true
+    ) {
+      const dir = blueprint.strategyDirectives;
+
+      // Ensure keyMessages length === 5 (CampaignStrategySchema requirement)
+      let keyMessages = [...(dir.keyMessages || [])];
+      while (keyMessages.length < 5) {
+        if (keyMessages.length === 1) keyMessages.push(input.offerHeadline || input.productName);
+        else if (keyMessages.length === 2)
+          keyMessages.push(input.offerPrice ? `Price: ₹${input.offerPrice}` : input.productName);
+        else if (keyMessages.length === 3) keyMessages.push(`Available at ${input.businessName}`);
+        else keyMessages.push(`Contact: ${input.whatsappNumber || 'Call / WhatsApp'}`);
+      }
+      if (keyMessages.length > 5) {
+        keyMessages = keyMessages.slice(0, 5);
+      }
+
+      // Ensure differentiators count between 3 and 5. The schema needs at least 3, but a differentiator is a
+      // CLAIM, so padding uses only what the business actually told us (never "guaranteed", "authentic", "zero
+      // hidden charges"): its own USP, its name and place, the product, the price it gave.
+      let differentiators = [...(dir.differentiators || [])];
+      const knownFacts = [
+        (input.businessBrain as { positioning?: { usp?: string } } | undefined)?.positioning?.usp,
+        input.productName ? `${input.productName} at ${input.businessName}` : undefined,
+        input.businessLocation?.city
+          ? `${input.businessName}, ${input.businessLocation.locality ? input.businessLocation.locality + ', ' : ''}${input.businessLocation.city}`
+          : undefined,
+        input.offerPrice ? `${input.productName} at ₹${input.offerPrice}` : undefined,
+      ];
+      for (const fact of knownFacts) {
+        if (differentiators.length >= 3) break;
+        if (fact && !differentiators.includes(fact)) differentiators.push(fact);
+      }
+      if (differentiators.length > 5) {
+        differentiators = differentiators.slice(0, 5);
+      }
+
+      // Format angle (min 20, max 300)
+      let angle = dir.angle || input.offerHeadline || 'Strategic campaign angle';
+      if (angle.length < 20) {
+        angle = `${angle} — Strategic campaign angle tailored for ${input.businessName}.`;
+      }
+      if (angle.length > 300) {
+        angle = angle.substring(0, 297) + '...';
+      }
+
+      // Format hook (min 10, max 100)
+      let hook = dir.hook || 'Special Offer';
+      if (hook.length < 10) {
+        hook = `${hook} — ${input.productName}`;
+      }
+      if (hook.length > 100) {
+        hook = hook.substring(0, 97) + '...';
+      }
+
+      // Format offerFraming (min 20, max 500)
+      let offerFraming = dir.offerFraming || input.offerHeadline;
+      if (offerFraming.length < 20) {
+        offerFraming = `${offerFraming} at ${input.businessName}.`;
+      }
+      if (offerFraming.length > 500) {
+        offerFraming = offerFraming.substring(0, 497) + '...';
+      }
+
+      // Format audienceInsight (min 20, max 500)
+      let audienceInsight = dir.audienceInsight || 'Local target customer segment';
+      if (audienceInsight.length < 20) {
+        audienceInsight = `${audienceInsight} in ${input.businessLocation?.city || 'local area'}.`;
+      }
+      if (audienceInsight.length > 500) {
+        audienceInsight = audienceInsight.substring(0, 497) + '...';
+      }
+
+      const strategy: CampaignStrategyOutput = {
+        angle,
+        hook,
+        offerFraming,
+        audienceInsight,
+        keyMessages: keyMessages as [string, string, string, string, string],
+        ctaStrategy: {
+          primary: dir.ctaPrimary || input.cta || 'call_now',
+          // Urgency exists only if the owner gave the OFFER dates. The campaign's run dates are not an offer deadline.
+          urgency:
+            input.offerValidityStart && input.offerValidityEnd
+              ? `Offer valid ${input.offerValidityStart.slice(0, 10)} to ${input.offerValidityEnd.slice(0, 10)}`
+              : 'No offer end date was given: do not imply urgency or a deadline',
+          valueProposition: offerFraming,
+        },
+        differentiators,
+        creativeDirection: {
+          visualStyle: `${blueprint.visualDirectives.emphasis} visual style with ${blueprint.visualDirectives.composition} composition`,
+          mood: blueprint.visualDirectives.visualMood || 'engaging and authentic',
+          compositionHints: [
+            blueprint.visualDirectives.heroPromptGuidance || 'Hero product shot',
+            'High contrast background for clear text readability',
+            'Clean layout with prominent price badge',
+          ],
+        },
+        riskFlags: [],
+      };
+
+      const parseResult = CampaignStrategySchema.safeParse(strategy);
+      if (parseResult.success) {
+        return parseResult.data;
+      }
+    }
+
     const prompt = this.buildCampaignStrategyPrompt(input, previousResults);
     return generateStructuredText(prompt, CampaignStrategySchema);
   }
@@ -1361,7 +1751,7 @@ export class GenerationPipeline {
     const businessId = input.businessId;
 
     const copyPack = previousResults?.copyPack;
-    const strategy = previousResults?.campaignStrategy;
+    const _strategy = previousResults?.campaignStrategy;
     const truthCheck: TruthCheckResult | undefined = previousResults?.truthCheck;
     const genImages = previousResults?.generatedImages;
 
@@ -1370,7 +1760,7 @@ export class GenerationPipeline {
       request:
         input.offerHeadline ||
         `Create a ${input.campaignStyle || 'friendly'} ad for ${input.productName}`,
-      language: input.localizationProfile?.primaryLanguage || 'te',
+      language: input.localizationProfile?.primaryLanguage || 'en',
       style: input.campaignStyle || 'funny',
       objective: input.objective || 'promotion',
       targetProduct: input.productName,
@@ -1477,7 +1867,7 @@ export class GenerationPipeline {
     const geminiResponseData: GeminiResponseStageData = {
       headline: copyPack?.headlines?.[0]?.text || input.offerHeadline || '',
       caption: copyPack?.captions?.[0]?.text || '',
-      language: input.localizationProfile?.primaryLanguage || 'te',
+      language: input.localizationProfile?.primaryLanguage || 'en',
       tone: input.campaignStyle || 'funny',
       cta: input.cta,
       rawOutput: copyPack || {},
@@ -1504,10 +1894,10 @@ export class GenerationPipeline {
         actual: `₹${input.offerPrice}`,
       },
       {
-        name: 'Telugu requested',
-        status: 'PASS',
-        expected: input.localizationProfile?.primaryLanguage || 'te',
-        actual: input.localizationProfile?.primaryLanguage || 'te',
+        // A real check of the language the owner asked for. It used to be a fixed PASS named
+        // "Telugu requested" whose expected and actual were the same value.
+        name: 'Requested language only',
+        ...languageCheckFor(JSON.stringify(copyPack ?? {}), localeFromInput(input)),
       },
       {
         name: 'Funny requested',
@@ -1705,8 +2095,8 @@ TASK:
 Analyze the Business Brain and output structured JSON with:
 1. businessSummary: 2-3 sentence summary for campaign context
 2. businessFacts: Array of verified facts with category, fact, source, criticality
-3. missingInformation: Critical facts not provided (e.g., "No delivery radius defined", "No opening hours")
-4. constraints: Business rules that limit creative freedom (e.g., "Minimum order ₹200", "Delivery only within 5km")
+3. missingInformation: Critical facts not provided (e.g., "No opening hours", "No contact number")
+4. constraints: Business rules the owner actually gave that limit creative freedom (use only the rules provided; add none of your own)
 5. verticalContext: ${vertical.promptContext.businessUnderstandingVerticalContext}
 
 OUTPUT FORMAT: Must match the provided JSON schema exactly.`;
@@ -1758,7 +2148,7 @@ Output structured JSON with:
 2. productFacts: Verified facts from metadata + vision
 3. visualAttributes: Detailed visual analysis for creative prompts
 4. missingInformation: What's needed for accurate marketing
-5. marketingAngles: 3-5 angles (e.g., "Authentic Hyderabadi dum process", "Value-for-money portion", "Late-night craving solution")
+5. marketingAngles: 3-5 angles grounded ONLY in the verified product facts and the owner's own words (do not borrow angles from other businesses)
 
 OUTPUT FORMAT: Must match the provided JSON schema exactly.`;
   }
@@ -1806,7 +2196,7 @@ ${templateContextSection}
 ${performanceRecSection}
 CAMPAIGN INPUT:
 - Objective: ${input.objective}
-- Offer: ${input.offerHeadline} - ₹${input.offerPrice} (${input.offerType})
+- Offer: ${input.offerHeadline}${input.offerPrice ? ` - ₹${input.offerPrice}` : ''} (${input.offerType})
 - Audience: ${input.audience.localities.join(', ')} - ${input.audience.occasion || 'general'}
 - CTA: ${input.cta}
 - Duration: ${input.duration.start} to ${input.duration.end}
@@ -1815,7 +2205,7 @@ TASK:
 Create a campaign strategy that:
 - Addresses the specific objective
 - Frames the offer compellingly for the audience
-- Uses regional insights for Hyderabad
+- ${regionalInsightsLine(localeFromInput(input))}
 - Differentiates from generic marketing
 - Drives WhatsApp action
 ${previousResults.creativeTemplateContext ? '- Closely follows the provided TEMPLATE CONTEXT grammar and structure.' : ''}
@@ -1827,8 +2217,11 @@ OUTPUT FORMAT: Must match the provided JSON schema exactly.`;
     input: GenerationPipelineInput,
     previousResults: any
   ): string {
+    // Built from the owner's own language and region (localizationContract). This used to be a fixed
+    // "Hyderabadi localization expert … Telugu-English" persona for every business.
+    const locale = localeFromInput(input);
     return `SYSTEM RULES:
-You are a Hyderabadi localization expert. Create marketing language rules — NOT translation rules. The output must enable natural, culturally resonant Telugu-English marketing that sounds like a local recommending to a friend.
+${localizationSystemRules(locale)}
 
 LOCALIZATION PROFILE:
 ${JSON.stringify(input.localizationProfile, null, 2)}
@@ -1840,15 +2233,7 @@ CAMPAIGN CONTEXT:
 ${JSON.stringify(previousResults.campaignStrategy, null, 2)}
 
 TASK:
-Generate localization rules for:
-1. VOCABULARY: 20+ generic→Hyderabadi mappings (e.g., "delicious"→"dum lagake", "visit"→"aao", "order"→"WhatsApp cheyyandi")
-2. PHRASING RULES: 5+ sentence patterns (short, punchy, conversational, question-led)
-3. HUMOR STYLE: Self-deprecating, food-obsessed, local pride — with examples
-4. CTA PATTERNS: 5+ WhatsApp CTAs ("WhatsApp cheyyandi!", "Order madi!", "Link lo undi")
-5. SLANG GUIDE: Approved slang with usage levels and context
-6. CULTURAL REFERENCES: Ramzan, Sunday family lunch, Kondapur techies, biryani culture
-7. LANGUAGE MIXING: Natural code-switching rules with examples
-8. AUDIENCE ADAPTATION: How tone shifts for office workers vs families vs students
+${localizationTask(locale)}
 
 CRITICAL: Avoid forced slang, stereotypes, offensive references, unnatural phrasing, excessive slang, fake cultural claims.
 
@@ -1857,6 +2242,13 @@ OUTPUT FORMAT: Must match the provided JSON schema exactly.`;
 
   private buildCopyGenerationPrompt(input: GenerationPipelineInput, previousResults: any): string {
     const vertical = getVerticalConfigOrDefault(input.vertical ?? input.businessCategory);
+    // Salon services / real-estate listing facts: the same record Truth Check verifies against.
+    const verticalContract = buildVerticalContractPrompt({
+      vertical: input.vertical ?? input.businessCategory,
+      businessName: input.businessName,
+      productName: input.productName,
+      businessBrain: input.businessBrain as never,
+    });
 
     const templateContextSection = previousResults.creativeTemplateContext
       ? `
@@ -1891,7 +2283,16 @@ CONTEXT HIERARCHY:
 ${templateContextSection}
 
 MANDATORY REQUIREMENTS:
-  ${input.offerPrice ? `- Prices: ALWAYS use exact offer price (₹${input.offerPrice})` : `- Prices: No specific discount price provided, focus on value/benefits.`}
+  ${buildOfferContractPrompt({
+    offerPrice: input.offerPrice,
+    offerOriginalPrice: input.offerOriginalPrice,
+    offerType: input.offerType,
+    validityStart: input.offerValidityStart,
+    validityEnd: input.offerValidityEnd,
+    vertical: input.vertical ?? input.businessCategory,
+    hoursOnFile: hasDefinedOpeningHours(input.businessBrain?.businessRules),
+    contactNumbers: contactNumbersOnFile(input),
+  })}${verticalContract ? `\n${verticalContract}` : ''}
   ${input.businessName ? `- Business name: ${input.businessName}` : ``}
   ${input.whatsappNumber ? `- WhatsApp number: ${input.whatsappNumber}` : ``}
   ${input.businessLocation?.locality || input.businessLocation?.city ? `- Location: ${input.businessLocation?.locality || input.businessLocation?.city}` : ``}
@@ -1900,9 +2301,10 @@ MANDATORY REQUIREMENTS:
   ${input.businessBrain?.businessRules?.pricingRules ? `- Pricing rules the owner set (MUST follow, never contradict — e.g. do not claim to be the cheapest/lowest price unless this explicitly says so): ${input.businessBrain.businessRules.pricingRules}` : ``}
   ${input.businessBrain?.brand?.visualPreferences ? `- Brand preferences (MUST follow): ${input.businessBrain.brand.visualPreferences}` : ``}
   ${input.businessBrain?.audience?.preferences ? `- Audience preferences (MUST follow): ${input.businessBrain.audience.preferences}` : ``}
-  - NO invented dishes, hours, reviews, guarantees, medical claims
-- Language: ${input.localizationProfile?.primaryLanguage} + ${input.localizationProfile?.secondaryLanguage} with ${input.localizationProfile?.languageMixing} mixing
-- Regional style: ${input.localizationProfile?.regionalStyle}
+  - NO invented ${vertical.terminology.itemNounPlural}, hours, reviews, guarantees, medical claims
+- Language: ${languageMode(localeFromInput(input))}${input.localizationProfile?.primaryLanguage?.includes('_') ? ` with ${input.localizationProfile?.languageMixing ?? 'natural'} mixing` : ''}
+- Regional style: ${input.localizationProfile?.regionalStyle || 'neutral'}
+- ${languageGuardrail(localeFromInput(input))}
 - Campaign style: ${input.campaignStyle}
 ${previousResults.creativeTemplateContext ? '- The copy MUST follow the semantic roles and structure defined in the TEMPLATE CONTEXT Grammar Structure.' : ''}
 
@@ -1954,12 +2356,10 @@ GENERATE:
 3. 3 REEL CONCEPTS × 4-6 FRAMES (9:16): Matching reel scenes + product reveal
 
 STYLE REQUIREMENTS:
-- Professional food photography quality
-- Indian kitchen/restaurant authenticity
+${vertical.promptContext.imageStyleRequirements.map((r) => `- ${r}`).join('\n')}
 - Brand colors in background/accents
 - Offer price prominently displayed
 - WhatsApp CTA visible
-- Warm, appetizing lighting
 - Vertical composition for mobile
 
 OUTPUT FORMAT: Must match the provided JSON schema exactly.`;
@@ -1967,7 +2367,7 @@ OUTPUT FORMAT: Must match the provided JSON schema exactly.`;
 
   private buildTruthValidationPrompt(input: GenerationPipelineInput, previousResults: any): string {
     return `SYSTEM RULES:
-You are a fact-checker for restaurant marketing. Verify EVERY claim in the generated campaign against known business facts. Be strict — any invented fact is a violation.
+You are ${getVerticalConfigOrDefault(input.vertical ?? input.businessCategory).promptContext.factCheckerPersona}. Verify EVERY claim in the generated campaign against known business facts. Be strict — any invented fact is a violation.
 
 KNOWN BUSINESS FACTS (GROUND TRUTH):
 ${JSON.stringify(previousResults.businessUnderstanding?.businessFacts || [], null, 2)}
@@ -1995,7 +2395,7 @@ ${JSON.stringify(previousResults.copyPack, null, 2)}
 GENERATED IMAGES: ${previousResults.generatedImages ? 'Available' : 'Not available'}
 
 CHECK FOR VIOLATIONS:
-1. PRICES: Every price mention must match ₹${input.offerPrice} exactly
+1. PRICES: ${input.offerPrice ? `Every price mention must match ₹${input.offerPrice} exactly` : 'No price was provided, so the copy must not state any price'}
 2. PRODUCT NAMES: Must match ${input.productName} exactly
 3. BUSINESS NAME: Must match exactly
 4. LOCATION: Must match ${input.businessLocation?.locality || input.businessLocation?.city}
@@ -2035,7 +2435,7 @@ CHECK:
 1. BRAND TONE: Consistent with ${input.brandProfile?.tone || 'friendly'} across all assets
 2. CHARACTER LIMITS: Instagram caption ≤2200, ad copy limits, headline ≤100
 3. CTA PRESENCE: Every asset has clear CTA
-4. HASHTAGS: Relevant (Hyderabad, category, offer, locality)
+4. HASHTAGS: Relevant (${localeFromInput(input).city || "the business's city"}, category, offer, locality)
 5. READABILITY: Short sentences, conversational, scannable
 6. IMAGE PROMPTS: Specific, actionable, include brand colors, text overlays
 7. FORMAT COMPLIANCE: Story frames 3-5, Reel scenes 3-4, all required fields
@@ -2101,8 +2501,11 @@ export interface GenerationPipelineInput {
   offerPrice: number;
   offerOriginalPrice?: number;
   offerType: string;
-  offerValidityStart: string;
-  offerValidityEnd: string;
+  /** The OFFER's own dates; absent when the owner gave none. Not the campaign duration below. */
+  offerValidityStart?: string;
+  offerValidityEnd?: string;
+  /** How the offer dates came to be: typed by the owner, or the owner chose "the whole campaign". */
+  offerValiditySource?: 'owner_dates' | 'whole_campaign';
   offerTerms?: string;
   duration: { start: string; end: string };
   audience: { localities: string[]; ageRange?: { min: number; max: number }; occasion?: string };
@@ -2110,7 +2513,7 @@ export interface GenerationPipelineInput {
   localizationProfile: import('../../types').LocalizationProfile;
   campaignStyle: string;
   savedStyleContext?: import('../../types').SavedStyleContext;
-  vertical?: 'restaurant' | 'salon' | 'real_estate';
+  vertical?: BusinessCategory;
 
   // New product (if applicable)
   newProduct?: {

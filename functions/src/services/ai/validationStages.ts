@@ -1,14 +1,4 @@
-import {
-  TruthValidationSchema,
-  QualityValidationSchema,
-  SafetyValidationSchema,
-  type TruthValidationOutput,
-  type QualityValidationOutput,
-  type SafetyValidationOutput,
-  type TruthViolation,
-  type QualityIssue,
-  type SafetyViolation,
-} from './validation';
+import { type TruthValidationOutput } from './validation';
 import { generateStructuredText } from './index';
 import { z } from 'zod';
 
@@ -151,7 +141,7 @@ CHECK:
 1. BRAND TONE: Consistent with ${brandKit?.tone || 'friendly'} across all assets
 2. CHARACTER LIMITS: Instagram caption ≤2200, ad copy limits, headline ≤100
 3. CTA PRESENCE: Every asset has clear CTA
-4. HASHTAGS: Relevant (Hyderabad, category, offer, locality)
+4. HASHTAGS: Relevant (the business's city, category, offer, locality)
 5. READABILITY: Short sentences, conversational, scannable
 6. IMAGE PROMPTS: Specific, actionable, include brand colors, text overlays
 7. FORMAT COMPLIANCE: Story frames 3-5, Reel scenes 3-4, all required fields
@@ -193,7 +183,7 @@ export async function runSafetyValidation(copyPack: any, generatedImages: any): 
   );
 }
 
-function buildSafetyValidationPrompt(copyPack: any, generatedImages: any): string {
+function buildSafetyValidationPrompt(copyPack: any, _generatedImages: any): string {
   return `SAFETY CHECKLIST — FLAG ANY VIOLATION:
 
 1. MEDICAL CLAIMS: Treatment, cure, health benefit, "doctor recommended", "clinically proven"

@@ -197,6 +197,16 @@ export const createCampaignFromCalendarItem = onCall(
         );
       }
 
+      // An offer needs a real price. A calendar item carries none of its own, only a product, so
+      // without a product with a price there is nothing true to put in the ad. This used to fall back
+      // to a made-up ₹499, which would have been published as the customer's price.
+      if (!existingProduct || !(existingProduct.price > 0)) {
+        throw new HttpsError(
+          'failed-precondition',
+          'This calendar item has no product with a price, so there is no real price to build the offer from. Choose a product when you create the plan, then try again.'
+        );
+      }
+
       const objective = mapToAllowedObjective(item.strategy, verticalConfig.allowedObjectives);
       const cta = mapToAllowedCTA(item.callToAction, verticalConfig.allowedCTAs);
 
@@ -209,20 +219,28 @@ export const createCampaignFromCalendarItem = onCall(
         : new Date(scheduledTimeMs + 7 * 86400000).toISOString();
 
       const offerHeadline = item.offerHeadline || item.topic;
-      const offerPrice = existingProduct ? existingProduct.price : 499;
+      const offerPrice = existingProduct.price;
 
+      // The owner's own language and place. Nothing is defaulted to Hyderabad, Telangana or Telugu: a
+      // business with no stored language is English, and the secondary language follows the primary (a
+      // legacy record can carry a stale "te" next to primary "en").
+      const storedLocalization = business.businessBrain?.localization;
+      const primaryLanguage = storedLocalization?.primaryLanguage || 'en';
       const localization: LocalizationProfile = {
         country: 'India',
-        state: business.location.state || 'Telangana',
-        city: business.location.city || 'Hyderabad',
-        locality: business.location.locality || business.location.city || 'Local',
-        primaryLanguage: business.businessBrain?.localization?.primaryLanguage || 'en',
-        secondaryLanguage: business.businessBrain?.localization?.secondaryLanguage || 'te',
-        languageMixing: business.businessBrain?.localization?.languageMixing || 'natural',
-        regionalStyle: business.businessBrain?.localization?.regionalStyle || 'neutral',
+        state: business.location.state || '',
+        city: business.location.city || '',
+        locality: business.location.locality || business.location.city || '',
+        primaryLanguage,
+        secondaryLanguage:
+          primaryLanguage === 'te_en' ? 'te' : primaryLanguage === 'hi_en' ? 'hi' : 'en',
+        languageMixing: primaryLanguage.includes('_')
+          ? storedLocalization?.languageMixing || 'natural'
+          : 'minimal',
+        regionalStyle: storedLocalization?.regionalStyle || 'neutral',
         slangPreference:
-          (business.businessBrain?.localization as any)?.slangPreference ||
-          business.businessBrain?.localization?.slangIntensity ||
+          (storedLocalization as any)?.slangPreference ||
+          storedLocalization?.slangIntensity ||
           'none',
         audienceDescription: business.businessBrain?.audience?.targetCustomer || 'Local customers',
         brandTone: business.businessBrain?.brand?.tone || 'professional',
@@ -252,8 +270,7 @@ export const createCampaignFromCalendarItem = onCall(
               description: item.hook,
               price: offerPrice,
               type: 'fixed',
-              validityStart: validScheduledDate,
-              validityEnd: validEndDate,
+              // No offer dates: the calendar item says WHEN to post, not when an offer is valid.
             },
             duration: {
               start: validScheduledDate,

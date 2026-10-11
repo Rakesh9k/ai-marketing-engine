@@ -159,8 +159,8 @@ export interface CreativeBriefInput {
     readonly price: number;
     readonly originalPrice?: number;
     readonly type: OfferType;
-    readonly validityStart: string;
-    readonly validityEnd: string;
+    readonly validityStart?: string;
+    readonly validityEnd?: string;
     readonly terms?: string;
   };
   /** Campaign strategy output */
@@ -189,7 +189,7 @@ export function buildCreativeBrief(input: CreativeBriefInput): CreativeBrief {
     offer,
     localizationProfile,
     brandProfile,
-    businessProfile,
+    businessProfile: _businessProfile,
     campaignStrategy,
     copyPack,
     visualDirection,
@@ -236,7 +236,11 @@ export function buildCreativeBrief(input: CreativeBriefInput): CreativeBrief {
         ? `${Math.round(((offer.originalPrice - offer.price) / offer.originalPrice) * 100)}%`
         : undefined,
       type: offer.type,
-      validity: `${new Date(offer.validityStart).toLocaleDateString()} - ${new Date(offer.validityEnd).toLocaleDateString()}`,
+      // Only when the owner gave the offer dates: "Invalid Date" or the campaign's own dates must not stand in.
+      validity:
+        offer.validityStart && offer.validityEnd
+          ? `${new Date(offer.validityStart).toLocaleDateString()} - ${new Date(offer.validityEnd).toLocaleDateString()}`
+          : undefined,
       terms: offer.terms,
     },
     brand: {

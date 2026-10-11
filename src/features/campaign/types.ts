@@ -15,6 +15,21 @@ import type {
  * UI-only bookkeeping (step, selectedProductId, uploadedPhotos) plus the exact
  * fields the backend accepts.
  */
+/**
+ * Whether the OFFER has dates of its own. Separate from the campaign's duration: running a campaign from the 10th
+ * to the 15th does not make the offer valid from the 10th to the 15th. Nothing is assumed:
+ *   none            the owner gave no offer dates (the default)
+ *   whole_campaign  the owner said the offer is valid for exactly the campaign's dates
+ *   custom          the owner gave the offer its own start and end
+ */
+export type OfferValidityMode = 'none' | 'whole_campaign' | 'custom';
+
+export interface WizardOfferValidity {
+  mode: OfferValidityMode;
+  start: string; // yyyy-mm-dd, used when mode is 'custom'
+  end: string; // yyyy-mm-dd, used when mode is 'custom'
+}
+
 export interface WizardOffer {
   headline: string;
   description: string;
@@ -22,6 +37,8 @@ export interface WizardOffer {
   originalPrice: string;
   type: OfferType | null;
   terms: string;
+  /** Missing means 'none'. */
+  validity?: WizardOfferValidity;
 }
 
 export interface WizardDuration {
@@ -74,6 +91,7 @@ export const createInitialWizardState = (): CampaignWizardState => ({
     originalPrice: '',
     type: null,
     terms: '',
+    validity: { mode: 'none', start: '', end: '' },
   },
   duration: {
     start: '',

@@ -3,20 +3,18 @@ import { getTextAI, getVisionAI, getReelVisionAI, getImageAI } from './factory/a
 import { runDeterministicTruthCheck, extractFacts } from './truthCheck';
 import { executeWithUsageControl, getGenerationCost, USAGE_ERROR_CODES } from '../usageControl';
 import { withTimeout, withRetry } from './retry';
+import { textModel } from '../../config/geminiModels';
 import { createLogger } from '../../utils/logging';
 import type { VisionAnalysisResult, ReelClipClassificationResult } from './vision';
-import type {
-  ImageGenerationRequest,
-  ImageGenerationResponse,
-  GenerationPipelineInput,
-  TruthCheckResult,
-} from '../../types';
+import type { ImageGenerationRequest, ImageGenerationResponse } from '../../types';
 
 const aiLogger = createLogger({ component: 'ai-provider' });
 
 // Bounded per-call timeouts. None existed before this fix — a hung provider
 // call could previously block a generation indefinitely.
-const TEXT_TIMEOUT_MS = 30_000;
+// Structured calls can include up to MAX_SCHEMA_REPAIRS corrective round-trips and the largest stages emit
+// several thousand tokens, so 30 s timed out (and was then retried 3x) on real generations.
+const TEXT_TIMEOUT_MS = 90_000;
 const VISION_TIMEOUT_MS = 45_000;
 const IMAGE_TIMEOUT_MS = 60_000;
 
@@ -60,7 +58,7 @@ export async function analyzeProductImages(
   const start = Date.now();
   const meta = {
     provider: 'gemini',
-    model: 'gemini-flash-latest',
+    model: textModel(),
     stage: 'vision.analyzeProductImages',
     imageCount: imageUrls.length,
   };
@@ -97,7 +95,7 @@ export async function classifyReelClipThumbnails(
   const start = Date.now();
   const meta = {
     provider: 'gemini',
-    model: 'gemini-flash-latest',
+    model: textModel(),
     stage: 'reelVision.classifyReelClipThumbnails',
     clipCount: clips.length,
   };
@@ -133,12 +131,12 @@ export async function classifyReelClipThumbnails(
 export async function generateStructuredText<T>(
   prompt: string,
   schema: z.ZodType<T>,
-  options?: { temperature?: number; maxTokens?: number }
+  options?: { temperature?: number; maxTokens?: number; model?: string }
 ): Promise<T> {
   const start = Date.now();
   const meta = {
     provider: 'gemini',
-    model: 'gemini-flash-latest',
+    model: options?.model || textModel(),
     stage: 'text.generateStructured',
     promptLength: prompt.length,
   };
@@ -173,7 +171,7 @@ export async function generateText(
   const start = Date.now();
   const meta = {
     provider: 'gemini',
-    model: 'gemini-flash-latest',
+    model: textModel(),
     stage: 'text.generateText',
     promptLength: prompt.length,
   };

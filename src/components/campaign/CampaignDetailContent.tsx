@@ -6,33 +6,15 @@ import Image from 'next/image';
 import { format } from 'date-fns';
 import { motion, useReducedMotion } from 'motion/react';
 import { staggerContainerVariants } from '@/lib/motion';
-import type {
-  Business,
-  Campaign,
-  CampaignAsset,
-  CampaignStatus,
-  SocialConnection,
-  PublishJob,
-  PostPerformanceRecord,
-} from '@/types';
+import type { Business, Campaign, CampaignAsset, CampaignStatus } from '@/types';
 import { DetailedChecks } from './DetailedChecks';
-import { PipelineTraceInspector } from './PipelineTraceInspector';
 import { useRegenerateAsset } from '@/hooks/useRegenerateAsset';
 import { useCopyToClipboard } from '@/hooks/useCopyToClipboard';
 import { useToast } from '@/hooks/useToast';
 import { buildWhatsAppShareUrl } from '@/lib/utils/whatsapp';
+import { rasterizeSvgToPng } from '@/lib/rasterizeSvg';
 import { trackEvent, recordWhatsAppClick } from '@/lib/analytics/trackEvent';
-import { callFunction } from '@/services/api';
 import { CreativeFeedbackControls } from './CreativeFeedbackControls';
-import { metaService } from '@/features/meta/services/metaService';
-import { publishingService } from '@/features/publishing/services/publishingService';
-import { PublishingModal } from '@/features/publishing/components/PublishingModal';
-import { PublishingJobsList } from '@/features/publishing/components/PublishingJobsList';
-import { listCampaignScheduledPosts } from '@/features/scheduling/services/schedulingService';
-import { SchedulingModal } from '@/features/scheduling/components/SchedulingModal';
-import { ScheduledPostsList } from '@/features/scheduling/components/ScheduledPostsList';
-import { CampaignSchedulingSection } from '@/features/scheduling/components/CampaignSchedulingSection';
-import type { ScheduledPost } from '@/types';
 
 /**
  * Phase 8: this used to render every non-poster asset as
@@ -63,7 +45,7 @@ const STATUS_LABELS: Record<CampaignStatus, string> = {
 };
 
 const STATUS_COLORS: Record<CampaignStatus, string> = {
-  draft: 'bg-neutral-100 text-neutral-700',
+  draft: 'bg-bg-secondary text-text-secondary',
   validating: 'bg-brand-100 text-brand-700',
   queued: 'bg-brand-100 text-brand-700',
   analyzing: 'bg-brand-100 text-brand-700',
@@ -177,8 +159,8 @@ function SectionCard({
   children: React.ReactNode;
 }) {
   return (
-    <section className="rounded-lg border border-neutral-200 bg-white p-5 sm:p-6">
-      <h2 className="mb-4 flex items-center gap-2 text-lg font-semibold text-neutral-900">
+    <section className="border-border-light bg-surface rounded-lg border p-5 sm:p-6">
+      <h2 className="text-text-primary mb-4 flex items-center gap-2 text-lg font-semibold">
         {icon}
         {title}
       </h2>
@@ -188,7 +170,7 @@ function SectionCard({
 }
 
 function EmptyHint({ text }: { text: string }) {
-  return <p className="text-sm text-neutral-400 italic">{text}</p>;
+  return <p className="text-text-tertiary text-sm italic">{text}</p>;
 }
 
 export function CampaignDetailContent({
@@ -211,94 +193,6 @@ export function CampaignDetailContent({
       if (whatsappShareLockRef.current) clearTimeout(whatsappShareLockRef.current);
     };
   }, []);
-
-  // Phase 34 & Phase 17 — server-authoritative performance record.
-  const [performance, setPerformance] = useState<{
-    whatsappClicks: number;
-    inquiries: number | null;
-    inquiriesAvailable: boolean;
-    postsPerformance?: PostPerformanceRecord[];
-  } | null>(null);
-  const [isSyncingPerformance, setIsSyncingPerformance] = useState<boolean>(false);
-
-  useEffect(() => {
-    let cancelled = false;
-    callFunction<
-      { businessId: string; campaignId: string },
-      {
-        whatsappClicks: number;
-        inquiries: number | null;
-        inquiriesAvailable: boolean;
-        postsPerformance?: PostPerformanceRecord[];
-      }
-    >({
-      functionName: 'getCampaignPerformance',
-      data: { businessId: campaign.businessId, campaignId: campaign.campaignId },
-    })
-      .then((result) => {
-        if (!cancelled) setPerformance(result);
-      })
-      .catch((err) => {
-        console.error('Failed to load campaign performance:', err);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [campaign.businessId, campaign.campaignId]);
-
-  const handleRefreshPerformance = async () => {
-    setIsSyncingPerformance(true);
-    try {
-      const res = await callFunction<
-        { businessId: string; campaignId: string },
-        { success: boolean; postsPerformance: PostPerformanceRecord[] }
-      >({
-        functionName: 'syncCampaignPerformance',
-        data: { businessId: campaign.businessId, campaignId: campaign.campaignId },
-      });
-      if (res?.postsPerformance) {
-        setPerformance((prev) =>
-          prev
-            ? { ...prev, postsPerformance: res.postsPerformance }
-            : {
-                whatsappClicks: 0,
-                inquiries: null,
-                inquiriesAvailable: false,
-                postsPerformance: res.postsPerformance,
-              }
-        );
-      }
-    } catch (err) {
-      console.error('Failed to sync performance:', err);
-    } finally {
-      setIsSyncingPerformance(false);
-    }
-  };
-  const [socialConnections, setSocialConnections] = useState<SocialConnection[]>([]);
-  const [publishJobs, setPublishJobs] = useState<PublishJob[]>([]);
-  const [scheduledPosts, setScheduledPosts] = useState<ScheduledPost[]>([]);
-  const [isPublishModalOpen, setIsPublishModalOpen] = useState<boolean>(false);
-  const [isScheduleModalOpen, setIsScheduleModalOpen] = useState<boolean>(false);
-
-  const fetchPublishData = React.useCallback(() => {
-    metaService
-      .listSocialConnections(campaign.businessId)
-      .then((res) => setSocialConnections(res.connections || []))
-      .catch((err) => console.error('Failed to load social connections:', err));
-
-    publishingService
-      .listCampaignPublishJobs(campaign.campaignId)
-      .then((res) => setPublishJobs(res.jobs || []))
-      .catch((err) => console.error('Failed to load publish jobs:', err));
-
-    listCampaignScheduledPosts(campaign.campaignId)
-      .then((posts) => setScheduledPosts(posts || []))
-      .catch((err) => console.error('Failed to load scheduled posts:', err));
-  }, [campaign.businessId, campaign.campaignId]);
-
-  useEffect(() => {
-    fetchPublishData();
-  }, [fetchPublishData]);
 
   const copyButtonLabel = (key: string) =>
     isItemCopied(key) ? 'Copied!' : isItemCopying(key) ? 'Copying...' : 'Copy';
@@ -397,7 +291,11 @@ export function CampaignDetailContent({
     setDownloadingAsset(asset.assetId);
     try {
       const response = await fetch(asset.imageUrl);
-      const blob = await response.blob();
+      const fetched = await response.blob();
+      // SVG posters are rasterised to a PNG so they can actually be posted/shared; if that fails the
+      // original SVG is still downloaded (better than nothing, and its extension tells the truth).
+      const png = fetched.type.includes('svg') ? await rasterizeSvgToPng(fetched) : null;
+      const blob = png ?? fetched;
       const url = window.URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;
@@ -562,17 +460,6 @@ export function CampaignDetailContent({
             >
               &larr; Back to campaigns
             </Link>
-            {campaign.sourceCalendarItemId && (
-              <>
-                <span className="text-text-tertiary">|</span>
-                <Link
-                  href="/calendar"
-                  className="text-brand-600 hover:text-brand-700 flex items-center gap-1 text-sm font-medium"
-                >
-                  📆 &larr; Back to Marketing Calendar
-                </Link>
-              </>
-            )}
           </div>
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div className="min-w-0">
@@ -615,24 +502,6 @@ export function CampaignDetailContent({
                   May be outdated
                 </span>
               )}
-              {['generated', 'verified', 'completed', 'approved', 'active'].includes(
-                campaign.status
-              ) && (
-                <div className="flex items-center space-x-2">
-                  <button
-                    onClick={() => setIsPublishModalOpen(true)}
-                    className="bg-brand-600 hover:bg-brand-700 flex cursor-pointer items-center space-x-1 rounded-full px-3.5 py-1 text-sm font-semibold text-white shadow-xs transition-all duration-150 hover:-translate-y-[0.5px]"
-                  >
-                    <span>🚀 Publish Now</span>
-                  </button>
-                  <button
-                    onClick={() => setIsScheduleModalOpen(true)}
-                    className="border-border-medium text-text-primary hover:bg-bg-secondary flex cursor-pointer items-center space-x-1 rounded-full border px-3.5 py-1 text-sm font-semibold shadow-xs transition-all duration-150 hover:-translate-y-[0.5px]"
-                  >
-                    <span>📅 Schedule</span>
-                  </button>
-                </div>
-              )}
             </div>
           </div>
         </div>
@@ -644,39 +513,6 @@ export function CampaignDetailContent({
         animate={reduceMotion ? undefined : 'visible'}
         className="mx-auto max-w-4xl space-y-6 px-4 py-8 sm:px-6 lg:px-8"
       >
-        <CampaignSchedulingSection
-          campaign={campaign}
-          connections={socialConnections}
-          scheduledPosts={scheduledPosts}
-          publishJobs={publishJobs}
-          onRefresh={fetchPublishData}
-        />
-
-        <PublishingJobsList jobs={publishJobs} onRefresh={fetchPublishData} />
-
-        <PublishingModal
-          isOpen={isPublishModalOpen}
-          onClose={() => setIsPublishModalOpen(false)}
-          campaignId={campaign.campaignId}
-          connections={socialConnections}
-          onJobCreated={(job) => {
-            setPublishJobs((prev) => [job, ...prev]);
-            showToast('Publish job created', 'success');
-          }}
-        />
-
-        <ScheduledPostsList posts={scheduledPosts} onRefresh={fetchPublishData} />
-
-        <SchedulingModal
-          isOpen={isScheduleModalOpen}
-          onClose={() => setIsScheduleModalOpen(false)}
-          campaignId={campaign.campaignId}
-          connections={socialConnections}
-          onSuccess={() => {
-            fetchPublishData();
-            showToast('Post scheduled successfully', 'success');
-          }}
-        />
         <SectionCard title="Creative Feedback">
           <CreativeFeedbackControls
             businessId={campaign.businessId}
@@ -685,133 +521,6 @@ export function CampaignDetailContent({
             creativeType="post"
           />
         </SectionCard>
-        {/* PERFORMANCE — Phase 34: only the metric with a real, observable
-            source (whatsappClicks) shows a number. Inquiries has no
-            integrated source anywhere in this system, so it always shows
-            "Not available," never a fabricated 0 — see
-            docs/PERFORMANCE_DATA_READINESS.md. */}
-        {performance && (
-          <SectionCard title="Performance">
-            <div className="flex items-center justify-between pb-2">
-              <span className="text-xs text-neutral-500">
-                {performance.postsPerformance && performance.postsPerformance.length > 0
-                  ? `Last updated ${format(new Date(performance.postsPerformance[0]?.fetchedAt || Date.now()), 'd MMM yyyy, h:mm a')}`
-                  : 'Real performance data from Mitra and Meta'}
-              </span>
-              <button
-                type="button"
-                onClick={handleRefreshPerformance}
-                disabled={isSyncingPerformance}
-                className="rounded-md border border-neutral-300 bg-white px-3 py-1 text-xs font-medium text-neutral-700 hover:bg-neutral-50 disabled:opacity-50"
-              >
-                {isSyncingPerformance ? 'Refreshing...' : 'Refresh Performance'}
-              </button>
-            </div>
-
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-              <div>
-                <p className="text-sm text-neutral-500">WhatsApp clicks</p>
-                <p className="mt-1 text-2xl font-bold text-neutral-900">
-                  {performance.whatsappClicks}
-                </p>
-              </div>
-              <div>
-                <p className="text-sm text-neutral-500">Inquiries</p>
-                <p className="mt-1 text-2xl font-bold text-neutral-400">Not available</p>
-                <p className="mt-1 text-xs text-neutral-400">
-                  Mitra doesn't yet have a way to reliably track inquiries.
-                </p>
-              </div>
-            </div>
-
-            {performance.postsPerformance && performance.postsPerformance.length > 0 && (
-              <div className="mt-6 space-y-4">
-                <h4 className="text-sm font-semibold text-neutral-900">Meta Published Posts</h4>
-                <div className="space-y-3">
-                  {performance.postsPerformance.map((postPerf) => (
-                    <div
-                      key={postPerf.performanceId}
-                      className="rounded-lg border border-neutral-200 bg-neutral-50 p-4"
-                    >
-                      <div className="flex items-center justify-between pb-3">
-                        <div className="flex items-center gap-2">
-                          <span
-                            className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${
-                              postPerf.platform === 'instagram'
-                                ? 'bg-pink-100 text-pink-800'
-                                : 'bg-blue-100 text-blue-800'
-                            }`}
-                          >
-                            {postPerf.platform === 'instagram' ? 'Instagram' : 'Facebook'}{' '}
-                            {postPerf.contentType}
-                          </span>
-                          <span className="font-mono text-xs text-neutral-400">
-                            ID: {postPerf.externalPostId}
-                          </span>
-                        </div>
-                        <span
-                          className={`text-xs font-medium ${
-                            postPerf.status === 'available'
-                              ? 'text-green-600'
-                              : postPerf.status === 'error'
-                                ? 'text-red-600'
-                                : 'text-amber-600'
-                          }`}
-                        >
-                          {postPerf.status === 'available'
-                            ? 'Synced ✓'
-                            : postPerf.errorMessage || postPerf.status}
-                        </span>
-                      </div>
-
-                      <div className="grid grid-cols-2 gap-3 border-t border-neutral-200 pt-2 sm:grid-cols-4">
-                        <div>
-                          <p className="text-xs text-neutral-500">Reach</p>
-                          <p className="text-sm font-semibold text-neutral-900">
-                            {postPerf.metrics.reach != null
-                              ? postPerf.metrics.reach.toLocaleString()
-                              : 'Not available'}
-                          </p>
-                        </div>
-                        <div>
-                          <p className="text-xs text-neutral-500">Likes</p>
-                          <p className="text-sm font-semibold text-neutral-900">
-                            {postPerf.metrics.likes != null
-                              ? postPerf.metrics.likes.toLocaleString()
-                              : 'Not available'}
-                          </p>
-                        </div>
-                        <div>
-                          <p className="text-xs text-neutral-500">Comments</p>
-                          <p className="text-sm font-semibold text-neutral-900">
-                            {postPerf.metrics.comments != null
-                              ? postPerf.metrics.comments.toLocaleString()
-                              : 'Not available'}
-                          </p>
-                        </div>
-                        <div>
-                          <p className="text-xs text-neutral-500">
-                            {postPerf.contentType === 'reel' ? 'Video Views' : 'Clicks'}
-                          </p>
-                          <p className="text-sm font-semibold text-neutral-900">
-                            {postPerf.contentType === 'reel'
-                              ? postPerf.metrics.videoViews != null
-                                ? postPerf.metrics.videoViews.toLocaleString()
-                                : 'Not available'
-                              : postPerf.metrics.clicks != null
-                                ? postPerf.metrics.clicks.toLocaleString()
-                                : 'Not available'}
-                          </p>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-          </SectionCard>
-        )}
-
         {/* CREATIVE */}
         <SectionCard title="Creative">
           {creativeAssets.length === 0 ? (
@@ -828,9 +537,9 @@ export function CampaignDetailContent({
                 return (
                   <div
                     key={asset.assetId}
-                    className="group relative overflow-hidden rounded-lg border border-neutral-200"
+                    className="group border-border-light relative overflow-hidden rounded-lg border"
                   >
-                    <div className="relative aspect-[4/5] w-full bg-neutral-100">
+                    <div className="bg-bg-secondary relative aspect-[4/5] w-full">
                       {asset.imageUrl ? (
                         <Image
                           src={asset.imageUrl}
@@ -842,7 +551,7 @@ export function CampaignDetailContent({
                         />
                       ) : (
                         <div className="flex h-full w-full items-center justify-center">
-                          <span className="text-sm text-neutral-400">Image not available</span>
+                          <span className="text-text-tertiary text-sm">Image not available</span>
                         </div>
                       )}
                       <div className="absolute right-0 bottom-0 left-0 bg-gradient-to-t from-black/70 to-transparent p-3 text-white">
@@ -863,7 +572,7 @@ export function CampaignDetailContent({
                         type="button"
                         onClick={() => handleRegenerate(asset, label)}
                         disabled={isAssetRegenerating(asset.assetId, asset.type)}
-                        className="flex-1 rounded-lg bg-neutral-100 px-3 py-1.5 text-sm font-medium text-neutral-700 hover:bg-neutral-200 disabled:cursor-not-allowed disabled:opacity-50"
+                        className="bg-bg-secondary text-text-secondary flex-1 rounded-lg px-3 py-1.5 text-sm font-medium hover:bg-neutral-200 disabled:cursor-not-allowed disabled:opacity-50"
                         aria-label={`Regenerate ${label}`}
                       >
                         {isAssetRegenerating(asset.assetId, asset.type)
@@ -888,7 +597,7 @@ export function CampaignDetailContent({
                 <span aria-hidden="true">{truthDisplay.emoji}</span>
                 {truthDisplay.label}
               </div>
-              <p className="mt-3 text-sm text-neutral-600">
+              <p className="text-text-secondary mt-3 text-sm">
                 {campaign.metadata?.truthCheckSummary || truthDisplay.description}
               </p>
               {isVerificationStale && (
@@ -905,12 +614,6 @@ export function CampaignDetailContent({
           )}
         </SectionCard>
 
-        {/* AI PIPELINE EXECUTION TRACE & INSPECTOR */}
-        <PipelineTraceInspector
-          trace={campaign.metadata?.pipelineTrace}
-          truthCheckResult={campaign.metadata?.truthCheckResult}
-        />
-
         {/* HEADLINES */}
         <SectionCard title="Headlines">
           {headlineAssets.length === 0 ? (
@@ -923,12 +626,12 @@ export function CampaignDetailContent({
                   <div
                     key={asset.assetId}
                     className={`flex items-start justify-between gap-4 rounded-lg border p-4 ${
-                      i === 0 ? 'border-brand-200 bg-brand-50' : 'border-neutral-200'
+                      i === 0 ? 'border-brand-200 bg-brand-50' : 'border-border-light'
                     }`}
                   >
                     <p
                       className={
-                        i === 0 ? 'text-lg font-semibold text-neutral-900' : 'text-neutral-800'
+                        i === 0 ? 'text-text-primary text-lg font-semibold' : 'text-text-primary'
                       }
                     >
                       {content?.text || <EmptyHint text="No text" />}
@@ -945,7 +648,7 @@ export function CampaignDetailContent({
                         type="button"
                         onClick={() => handleRegenerate(asset, 'Headline')}
                         disabled={isAssetRegenerating(asset.assetId, 'headline')}
-                        className="rounded-lg bg-neutral-100 px-3 py-1.5 text-sm font-medium text-neutral-700 hover:bg-neutral-200 disabled:opacity-50"
+                        className="bg-bg-secondary text-text-secondary rounded-lg px-3 py-1.5 text-sm font-medium hover:bg-neutral-200 disabled:opacity-50"
                       >
                         {isAssetRegenerating(asset.assetId, 'headline')
                           ? 'Regenerating...'
@@ -962,26 +665,28 @@ export function CampaignDetailContent({
         {/* OFFER — from campaign.offer directly, never AI copy text */}
         <SectionCard title="Offer">
           <div className="space-y-2">
-            <p className="text-lg font-semibold text-neutral-900">{campaign.offer.headline}</p>
+            <p className="text-text-primary text-lg font-semibold">{campaign.offer.headline}</p>
             <div className="flex flex-wrap items-baseline gap-2">
               <span className="text-brand-600 text-2xl font-bold">₹{campaign.offer.price}</span>
               {campaign.offer.originalPrice && (
-                <span className="text-neutral-400 line-through">
+                <span className="text-text-tertiary line-through">
                   ₹{campaign.offer.originalPrice}
                 </span>
               )}
             </div>
             {campaign.offer.description && (
-              <p className="text-neutral-600">{campaign.offer.description}</p>
+              <p className="text-text-secondary">{campaign.offer.description}</p>
             )}
             {campaign.offer.terms && (
-              <p className="text-sm text-neutral-500">Terms: {campaign.offer.terms}</p>
+              <p className="text-text-tertiary text-sm">Terms: {campaign.offer.terms}</p>
             )}
-            <p className="text-sm text-neutral-500">
-              Valid {format(new Date(campaign.offer.validityStart), 'PPP')} &ndash;{' '}
-              {format(new Date(campaign.offer.validityEnd), 'PPP')}
-            </p>
-            <p className="text-sm text-neutral-500">
+            {campaign.offer.validityStart && campaign.offer.validityEnd && (
+              <p className="text-text-tertiary text-sm">
+                Offer valid {format(new Date(campaign.offer.validityStart), 'PPP')} &ndash;{' '}
+                {format(new Date(campaign.offer.validityEnd), 'PPP')}
+              </p>
+            )}
+            <p className="text-text-tertiary text-sm">
               Call to action: {CTA_LABELS[campaign.cta] || campaign.cta}
             </p>
           </div>
@@ -996,8 +701,8 @@ export function CampaignDetailContent({
               {captionAssets.map((asset) => {
                 const content = asset.content as CaptionContent;
                 return (
-                  <div key={asset.assetId} className="rounded-lg border border-neutral-200 p-4">
-                    <p className="whitespace-pre-wrap text-neutral-800">{content?.text}</p>
+                  <div key={asset.assetId} className="border-border-light rounded-lg border p-4">
+                    <p className="text-text-primary whitespace-pre-wrap">{content?.text}</p>
                     {content?.hashtags && content.hashtags.length > 0 && (
                       <p className="text-brand-600 mt-2 text-sm">{content.hashtags.join(' ')}</p>
                     )}
@@ -1013,7 +718,7 @@ export function CampaignDetailContent({
                         type="button"
                         onClick={() => handleRegenerate(asset, 'Caption')}
                         disabled={isAssetRegenerating(asset.assetId, 'caption')}
-                        className="rounded-lg bg-neutral-100 px-3 py-1.5 text-sm font-medium text-neutral-700 hover:bg-neutral-200 disabled:opacity-50"
+                        className="bg-bg-secondary text-text-secondary rounded-lg px-3 py-1.5 text-sm font-medium hover:bg-neutral-200 disabled:opacity-50"
                       >
                         {isAssetRegenerating(asset.assetId, 'caption')
                           ? 'Regenerating...'
@@ -1036,15 +741,15 @@ export function CampaignDetailContent({
               {adCopyAssets.map((asset) => {
                 const content = asset.content as AdCopyContent;
                 return (
-                  <div key={asset.assetId} className="rounded-lg border border-neutral-200 p-4">
+                  <div key={asset.assetId} className="border-border-light rounded-lg border p-4">
                     {content?.headline && (
-                      <p className="font-semibold text-neutral-900">{content.headline}</p>
+                      <p className="text-text-primary font-semibold">{content.headline}</p>
                     )}
                     {content?.primaryText && (
-                      <p className="mt-1 text-neutral-700">{content.primaryText}</p>
+                      <p className="text-text-secondary mt-1">{content.primaryText}</p>
                     )}
                     {content?.description && (
-                      <p className="mt-1 text-sm text-neutral-500">{content.description}</p>
+                      <p className="text-text-tertiary mt-1 text-sm">{content.description}</p>
                     )}
                     {content?.cta && (
                       <p className="text-brand-600 mt-2 text-sm font-medium">{content.cta}</p>
@@ -1061,7 +766,7 @@ export function CampaignDetailContent({
                         type="button"
                         onClick={() => handleRegenerate(asset, 'Ad Copy')}
                         disabled={isAssetRegenerating(asset.assetId, 'ad_copy')}
-                        className="rounded-lg bg-neutral-100 px-3 py-1.5 text-sm font-medium text-neutral-700 hover:bg-neutral-200 disabled:opacity-50"
+                        className="bg-bg-secondary text-text-secondary rounded-lg px-3 py-1.5 text-sm font-medium hover:bg-neutral-200 disabled:opacity-50"
                       >
                         {isAssetRegenerating(asset.assetId, 'ad_copy')
                           ? 'Regenerating...'
@@ -1084,7 +789,7 @@ export function CampaignDetailContent({
               const content = whatsappAsset.content as WhatsAppContent;
               return (
                 <div>
-                  <p className="rounded-lg bg-neutral-50 p-4 whitespace-pre-wrap text-neutral-800">
+                  <p className="bg-bg-secondary text-text-primary rounded-lg p-4 whitespace-pre-wrap">
                     {content?.message}
                   </p>
                   <div className="mt-3 flex flex-wrap gap-2">
@@ -1107,7 +812,7 @@ export function CampaignDetailContent({
                       type="button"
                       onClick={() => handleRegenerate(whatsappAsset, 'WhatsApp Message')}
                       disabled={isAssetRegenerating(whatsappAsset.assetId, 'whatsapp')}
-                      className="rounded-lg bg-neutral-100 px-3 py-1.5 text-sm font-medium text-neutral-700 hover:bg-neutral-200 disabled:opacity-50"
+                      className="bg-bg-secondary text-text-secondary rounded-lg px-3 py-1.5 text-sm font-medium hover:bg-neutral-200 disabled:opacity-50"
                     >
                       {isAssetRegenerating(whatsappAsset.assetId, 'whatsapp')
                         ? 'Regenerating...'
@@ -1129,19 +834,19 @@ export function CampaignDetailContent({
               {storyConceptAssets.map((asset) => {
                 const content = asset.content as StoryConceptContent;
                 return (
-                  <div key={asset.assetId} className="rounded-lg border border-neutral-200 p-4">
+                  <div key={asset.assetId} className="border-border-light rounded-lg border p-4">
                     {content.overallTheme && (
-                      <p className="mb-3 text-sm font-medium text-neutral-500">
+                      <p className="text-text-tertiary mb-3 text-sm font-medium">
                         Theme: {content.overallTheme}
                       </p>
                     )}
                     <div className="space-y-3">
                       {(content.frames || []).map((frame, i) => (
                         <div key={i} className="border-brand-200 border-l-2 pl-3">
-                          <p className="text-xs font-medium text-neutral-400">Frame {i + 1}</p>
-                          <p className="text-neutral-800">{frame.copy}</p>
+                          <p className="text-text-tertiary text-xs font-medium">Frame {i + 1}</p>
+                          <p className="text-text-primary">{frame.copy}</p>
                           {frame.visualCue && (
-                            <p className="text-sm text-neutral-500">Visual: {frame.visualCue}</p>
+                            <p className="text-text-tertiary text-sm">Visual: {frame.visualCue}</p>
                           )}
                           {frame.cta && (
                             <p className="text-brand-600 text-sm font-medium">{frame.cta}</p>
@@ -1161,7 +866,7 @@ export function CampaignDetailContent({
                         type="button"
                         onClick={() => handleRegenerate(asset, 'Story')}
                         disabled={isAssetRegenerating(asset.assetId, 'story')}
-                        className="rounded-lg bg-neutral-100 px-3 py-1.5 text-sm font-medium text-neutral-700 hover:bg-neutral-200 disabled:opacity-50"
+                        className="bg-bg-secondary text-text-secondary rounded-lg px-3 py-1.5 text-sm font-medium hover:bg-neutral-200 disabled:opacity-50"
                       >
                         {isAssetRegenerating(asset.assetId, 'story')
                           ? 'Regenerating...'
@@ -1172,7 +877,7 @@ export function CampaignDetailContent({
                 );
               })}
               {storyFrameImageAssets.length > 0 && (
-                <p className="text-sm text-neutral-500">
+                <p className="text-text-tertiary text-sm">
                   {storyFrameImageAssets.length} story frame image
                   {storyFrameImageAssets.length === 1 ? '' : 's'} available in the Creative section
                   above.
@@ -1191,21 +896,21 @@ export function CampaignDetailContent({
               {reelConceptAssets.map((asset) => {
                 const content = asset.content as ReelConceptContent;
                 return (
-                  <div key={asset.assetId} className="rounded-lg border border-neutral-200 p-4">
+                  <div key={asset.assetId} className="border-border-light rounded-lg border p-4">
                     {content.hook && (
-                      <p className="font-semibold text-neutral-900">Hook: {content.hook}</p>
+                      <p className="text-text-primary font-semibold">Hook: {content.hook}</p>
                     )}
                     {content.scenes && content.scenes.length > 0 && (
                       <div className="mt-2 space-y-2">
                         {content.scenes.map((scene, i) => (
                           <div key={i} className="border-brand-200 border-l-2 pl-3">
-                            <p className="text-xs font-medium text-neutral-400">
+                            <p className="text-text-tertiary text-xs font-medium">
                               Scene {i + 1}
                               {scene.duration ? ` · ${scene.duration}` : ''}
                             </p>
-                            <p className="text-neutral-800">{scene.description}</p>
+                            <p className="text-text-primary">{scene.description}</p>
                             {scene.visualDirection && (
-                              <p className="text-sm text-neutral-500">
+                              <p className="text-text-tertiary text-sm">
                                 Visual: {scene.visualDirection}
                               </p>
                             )}
@@ -1214,7 +919,7 @@ export function CampaignDetailContent({
                       </div>
                     )}
                     {content.productReveal && (
-                      <p className="mt-2 text-sm text-neutral-600">
+                      <p className="text-text-secondary mt-2 text-sm">
                         Product reveal: {content.productReveal}
                       </p>
                     )}
@@ -1222,7 +927,7 @@ export function CampaignDetailContent({
                       <p className="text-brand-600 mt-2 text-sm font-medium">{content.cta}</p>
                     )}
                     {content.caption && (
-                      <p className="mt-2 text-sm text-neutral-500">Caption: {content.caption}</p>
+                      <p className="text-text-tertiary mt-2 text-sm">Caption: {content.caption}</p>
                     )}
                     <div className="mt-3 flex gap-2">
                       <button
@@ -1236,7 +941,7 @@ export function CampaignDetailContent({
                         type="button"
                         onClick={() => handleRegenerate(asset, 'Reel Concept')}
                         disabled={isAssetRegenerating(asset.assetId, 'reel')}
-                        className="rounded-lg bg-neutral-100 px-3 py-1.5 text-sm font-medium text-neutral-700 hover:bg-neutral-200 disabled:opacity-50"
+                        className="bg-bg-secondary text-text-secondary rounded-lg px-3 py-1.5 text-sm font-medium hover:bg-neutral-200 disabled:opacity-50"
                       >
                         {isAssetRegenerating(asset.assetId, 'reel')
                           ? 'Regenerating...'
@@ -1247,7 +952,7 @@ export function CampaignDetailContent({
                 );
               })}
               {reelStoryboardAsset && (
-                <p className="text-sm text-neutral-500">
+                <p className="text-text-tertiary text-sm">
                   A reel cover image is available in the Creative section above.
                 </p>
               )}
@@ -1278,28 +983,35 @@ export function CampaignDetailContent({
         </div>
 
         {/* PHASE 8: CONTINUATION LOOP - "WANT TO CREATE ANOTHER CAMPAIGN?" */}
-        <div className="mt-10 rounded-2xl border border-brand-500/20 bg-gradient-to-r from-brand-50 via-amber-50 to-orange-50 p-6 sm:p-8 shadow-md">
-          <div className="flex flex-col md:flex-row items-center justify-between gap-6">
+        <div className="border-brand-500/20 from-brand-50 mt-10 rounded-2xl border bg-gradient-to-r via-amber-50 to-orange-50 p-6 shadow-md sm:p-8">
+          <div className="flex flex-col items-center justify-between gap-6 md:flex-row">
             <div className="space-y-2 text-center md:text-left">
-              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-brand-500/10 text-brand-600 text-xs font-bold">
+              <span className="bg-brand-500/10 text-brand-600 inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-bold">
                 <span>🚀</span> Keep Your Business Moving
               </span>
-              <h3 className="text-xl sm:text-2xl font-extrabold text-neutral-900">
+              <h3 className="text-text-primary text-xl font-extrabold sm:text-2xl">
                 Want to create another campaign?
               </h3>
-              <p className="text-sm text-neutral-600 max-w-xl">
-                Mitra now understands your business. Turn your next offer, event, or product into a complete campaign in under 2 minutes.
+              <p className="text-text-secondary max-w-xl text-sm">
+                Mitra now understands your business. Turn your next offer, event, or product into a
+                complete campaign in under 2 minutes.
               </p>
-              <div className="flex flex-wrap justify-center md:justify-start gap-2 pt-2">
-                <span className="text-xs bg-white/80 border border-neutral-200 px-3 py-1 rounded-full text-neutral-700 font-semibold">🍱 Weekend Offer</span>
-                <span className="text-xs bg-white/80 border border-neutral-200 px-3 py-1 rounded-full text-neutral-700 font-semibold">🎉 Festival Special</span>
-                <span className="text-xs bg-white/80 border border-neutral-200 px-3 py-1 rounded-full text-neutral-700 font-semibold">🆕 New Product</span>
+              <div className="flex flex-wrap justify-center gap-2 pt-2 md:justify-start">
+                <span className="border-border-light bg-surface/80 text-text-secondary rounded-full border px-3 py-1 text-xs font-semibold">
+                  🍱 Weekend Offer
+                </span>
+                <span className="border-border-light bg-surface/80 text-text-secondary rounded-full border px-3 py-1 text-xs font-semibold">
+                  🎉 Festival Special
+                </span>
+                <span className="border-border-light bg-surface/80 text-text-secondary rounded-full border px-3 py-1 text-xs font-semibold">
+                  🆕 New Product
+                </span>
               </div>
             </div>
             <Link href="/campaigns/new">
               <button
                 type="button"
-                className="px-8 py-4 rounded-xl bg-brand-500 hover:bg-brand-600 text-white font-extrabold text-sm shadow-lg shadow-brand-500/25 transition-all hover:scale-105 cursor-pointer whitespace-nowrap"
+                className="bg-brand-500 hover:bg-brand-600 shadow-brand-500/25 cursor-pointer rounded-xl px-8 py-4 text-sm font-extrabold whitespace-nowrap text-white shadow-lg transition-all hover:scale-105"
               >
                 Create Next Campaign →
               </button>

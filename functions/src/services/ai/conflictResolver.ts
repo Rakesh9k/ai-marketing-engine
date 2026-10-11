@@ -266,7 +266,8 @@ export function resolveUserInstructionConflicts(
     rawUserText.includes('ignore language setting');
 
   if (mentionsIgnoreLanguage) {
-    const configuredLang = input.localizationProfile?.primaryLanguage || 'te';
+    // No configured language is English, never another language.
+    const configuredLang = input.localizationProfile?.primaryLanguage || 'en';
     conflicts.push({
       id: 'conflict_adversarial_ignore_language',
       category: 'non_negotiables_lock',
@@ -310,7 +311,8 @@ export function resolveUserInstructionConflicts(
     mentionsCompetitorPhone ||
     (phonePatternMatch && phonePatternMatch[0] !== (input.whatsappNumber || input.businessPhone))
   ) {
-    const storedPhone = input.whatsappNumber || input.businessPhone || '9876543210';
+    // No registered phone is a real state (never a made-up number): the lock then forbids any phone.
+    const storedPhone = input.whatsappNumber || input.businessPhone || '';
     conflicts.push({
       id: 'conflict_adversarial_phone_forgery',
       category: 'non_negotiables_lock',
@@ -318,11 +320,15 @@ export function resolveUserInstructionConflicts(
         'Adversarial attempt detected: User requested unverified or competitor phone number override.',
       conflictingElements: [
         'User Phone Override Attempt',
-        `Registered Business Phone: ${storedPhone}`,
+        `Registered Business Phone: ${storedPhone || 'none on file'}`,
       ],
       appliedHierarchy: 'application_constraint',
-      winningResolution: `Phone number locked to registered business number ${storedPhone}.`,
-      geminiDirective: `SECURITY LOCK: Phone number and WhatsApp link are strictly locked to ${storedPhone}. Do NOT use any other phone numbers.`,
+      winningResolution: storedPhone
+        ? `Phone number locked to registered business number ${storedPhone}.`
+        : 'No registered phone number: no phone number is used.',
+      geminiDirective: storedPhone
+        ? `SECURITY LOCK: Phone number and WhatsApp link are strictly locked to ${storedPhone}. Do NOT use any other phone numbers.`
+        : 'SECURITY LOCK: This business has no phone number on file. Do NOT write any phone number or WhatsApp link.',
     });
   }
 
@@ -362,9 +368,18 @@ export function resolveUserInstructionConflicts(
   // ----------------------------------------------------
   // 6. LOCK NON-NEGOTIABLE FACTS (Never Hallucinate)
   // ----------------------------------------------------
-  const locationStr = `${input.businessLocation?.locality ? input.businessLocation.locality + ', ' : ''}${input.businessLocation?.city || 'Hyderabad'}`;
-  const phoneStr = input.whatsappNumber || input.businessPhone || '9876543210';
+  // Only facts the business actually has. Missing ones stay empty: they used to be filled with a made-up
+  // city, phone number and dates, which were then recorded as "locked truth" in the owner-visible trace.
+  const locationStr = [input.businessLocation?.locality, input.businessLocation?.city]
+    .filter(Boolean)
+    .join(', ');
+  const phoneStr = input.whatsappNumber || input.businessPhone || '';
   const priceStr = `₹${resolvedInput.offerPrice}`;
+  // The OFFER's own dates only. The campaign's run dates (input.duration) are not offer validity.
+  const validityStart = input.offerValidityStart;
+  const validityEnd = input.offerValidityEnd;
+  const openingHours = (input.businessBrain?.businessRules as any)?.openingHours;
+  const phoneDigits = phoneStr.replace(/\D/g, '').slice(-10);
 
   const nonNegotiables: LockedNonNegotiables = {
     businessName: input.businessName,
@@ -373,14 +388,11 @@ export function resolveUserInstructionConflicts(
     phoneNumber: phoneStr,
     location: locationStr,
     offerType: resolvedInput.offerType || 'fixed',
-    validityDates: {
-      start: input.offerValidityStart || input.duration?.start || '2026-03-10',
-      end: input.offerValidityEnd || input.duration?.end || '2026-03-15',
-    },
-    hoursSummary: (input.businessBrain?.businessRules as any)?.openingHours
-      ? JSON.stringify((input.businessBrain?.businessRules as any).openingHours)
-      : 'Standard operating hours',
-    urlPlaceholder: `https://wa.me/91${phoneStr.replace(/\D/g, '').slice(-10)}`,
+    ...(validityStart && validityEnd
+      ? { validityDates: { start: validityStart, end: validityEnd } }
+      : {}),
+    ...(openingHours ? { hoursSummary: JSON.stringify(openingHours) } : {}),
+    ...(phoneDigits ? { urlPlaceholder: `https://wa.me/91${phoneDigits}` } : {}),
   };
 
   return {

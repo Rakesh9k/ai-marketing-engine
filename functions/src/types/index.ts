@@ -1,6 +1,14 @@
 export type UserRole = 'user' | 'agency_admin' | 'agency_member';
 
-export type BusinessCategory = 'restaurant' | 'salon' | 'real_estate';
+/**
+ * The campaign-generation vertical a business is served by. `general` is a real, fully supported
+ * vertical for every business that is not a restaurant, salon or real-estate agency (retail,
+ * fitness, clinics, coaching, boutiques…): it has its own generic marketing context, objectives
+ * and Truth Check rules. A business's actual line of work is kept separately in
+ * `businessBrain.identity.industry` / `subcategory`, so a trade can later get a specialised
+ * vertical without migrating the Business Brain.
+ */
+export type BusinessCategory = 'restaurant' | 'salon' | 'real_estate' | 'general';
 
 export type BusinessStatus = 'active' | 'archived';
 
@@ -17,7 +25,9 @@ export type CampaignObjective =
   | 'property_promotion'
   | 'new_listing'
   | 'open_house'
-  | 'project_promotion';
+  | 'project_promotion'
+  | 'product_promotion'
+  | 'new_product';
 
 export type OfferType = 'percentage' | 'fixed' | 'bogo' | 'combo' | 'free_delivery' | 'loyalty';
 
@@ -62,6 +72,13 @@ export interface TruthCheckItem {
   generatedValue?: string;
   expectedValue?: string;
   reason?: string;
+  /**
+   * Why a check did not simply pass, so a missing required statement is never confused with a wrong
+   * claim: 'missing_input' = the campaign lacks the fact needed to verify; 'required_mention_missing' =
+   * the copy was asked to state something and did not; 'invalid_claim' = the copy states something
+   * wrong; 'not_applicable' = nothing to verify for this campaign.
+   */
+  basis?: 'missing_input' | 'required_mention_missing' | 'invalid_claim' | 'not_applicable';
 }
 
 export interface TruthCheckResult {
@@ -117,8 +134,8 @@ export interface GenerationPipelineInput {
   offerPrice: number;
   offerOriginalPrice?: number;
   offerType: string;
-  offerValidityStart: string;
-  offerValidityEnd: string;
+  offerValidityStart?: string;
+  offerValidityEnd?: string;
   offerTerms?: string;
   duration: { start: string; end: string };
   audience: { localities: string[]; ageRange?: { min: number; max: number }; occasion?: string };
@@ -133,7 +150,7 @@ export interface GenerationPipelineInput {
     images: string[];
     category: string;
   };
-  vertical?: 'restaurant' | 'salon' | 'real_estate';
+  vertical?: BusinessCategory;
   performanceRecommendations?: import('./recommendation').GenerationRecommendationContext;
 }
 
@@ -308,8 +325,9 @@ export interface BusinessRules {
   };
   availability: {
     displayUnavailableItems: boolean;
-    minimumOrderRequired: boolean;
-    deliveryRadiusKm: number;
+    // Only facts the owner gave; absent means unknown.
+    minimumOrderRequired?: boolean;
+    deliveryRadiusKm?: number;
   };
   communication: {
     contactInformationAllowed: boolean;
@@ -379,6 +397,27 @@ export interface ImageValidationResult {
   readonly errors?: readonly string[];
 }
 
+/**
+ * How a Business Brain fact was established. Only owner-confirmed information ever reaches the
+ * Brain, so every entry is one of these. A value the owner never typed is never recorded as
+ * something they explicitly supplied: a phone number copied from their WhatsApp number is
+ * DERIVED_FROM_WHATSAPP, and an operating mode that follows from the business type they chose is
+ * DERIVED_FROM_SUBCATEGORY. An explicit value later replaces a derived one.
+ */
+export type BrainFactSource =
+  | 'USER_CONFIRMED'
+  | 'DERIVED_FROM_WHATSAPP'
+  | 'DERIVED_FROM_SUBCATEGORY'
+  /** A value Mitra filled in so the Brain is complete. The owner never said it; it is not a business fact. */
+  | 'SYSTEM_DEFAULT';
+
+export interface BrainKnowledge {
+  origin: 'conversational_onboarding';
+  confirmedAt: string;
+  /** Keyed by field path, e.g. 'contact.phone', 'identity.industry'. */
+  facts: Record<string, { source: BrainFactSource }>;
+}
+
 export interface BusinessBrain {
   identity: {
     name: string;
@@ -386,6 +425,14 @@ export interface BusinessBrain {
     description: string;
     location: BusinessLocation;
     contact: BusinessContact;
+    /**
+     * The owner's actual line of work (a taxonomy id such as 'fitness'), distinct from `category`,
+     * which is only the campaign-generation vertical. Absent on businesses created before the
+     * conversational onboarding.
+     */
+    industry?: string;
+    /** A taxonomy id, or the owner's own words. */
+    subcategory?: string;
   };
   products: Array<{
     productId: string;
@@ -419,7 +466,17 @@ export interface BusinessBrain {
     ageRange: { min: number; max: number };
     localities: string[];
     preferences: string;
+    /** Who the owner most wants to reach, as they chose it (also joined into `targetCustomer`). */
+    primary?: string[];
   };
+  /** Who is behind the business. Only set by the conversational onboarding. */
+  owner?: { name?: string; role?: string };
+  /** What the business is known for, in the owner's words. Not a product catalogue. */
+  offerings?: { signature: string[] };
+  /** Why customers choose this business, stored as the owner said it (never rewritten). */
+  positioning?: { usp?: string };
+  /** Where each onboarding-supplied fact came from. Only owner-confirmed facts are ever stored. */
+  knowledge?: BrainKnowledge;
   localization: {
     primaryLanguage: LanguageCode;
     secondaryLanguage: LanguageCode;
@@ -429,14 +486,15 @@ export interface BusinessBrain {
   };
   businessRules: {
     openingHours: Record<string, { open: string; close: string; closed?: boolean }>;
-    deliveryRadiusKm: number;
-    minimumOrder: number;
+    // Absent means the owner never said. Unknown is not zero and not a default.
+    deliveryRadiusKm?: number;
+    minimumOrder?: number;
     offerValidityRules: string;
     pricingRules: string;
     operatingMode?: 'dine-in' | 'takeaway' | 'delivery';
   };
   verticalProfile?: {
-    vertical?: 'restaurant' | 'salon' | 'real_estate';
+    vertical?: BusinessCategory;
     // Salon-specific fields
     services?: Array<{
       id: string;
@@ -759,8 +817,10 @@ export interface Campaign {
     price: number;
     originalPrice?: number;
     type: OfferType;
-    validityStart: string;
-    validityEnd: string;
+    /** The OFFER's own dates; absent when the owner gave none (campaign duration is not offer validity). */
+    validityStart?: string;
+    validityEnd?: string;
+    validitySource?: 'owner_dates' | 'whole_campaign';
     terms?: string;
   };
   duration: {
@@ -937,7 +997,7 @@ export interface Agency {
   agencyId: string;
   name: string;
   ownerUserId: string;
-  vertical: 'restaurant' | 'salon' | 'real_estate';
+  vertical: BusinessCategory;
   members: string[];
   createdAt: string;
   updatedAt: string;
@@ -1119,6 +1179,8 @@ export interface ReelProject {
   clipAnalyses?: ReelClipAnalysis[];
   editPlan?: ReelEditPlan;
   outputUrl?: string;
+  /** Same file with Content-Disposition: attachment, for the Download button. */
+  downloadUrl?: string;
   outputStoragePath?: string;
   thumbnailUrl?: string;
   thumbnailStoragePath?: string;

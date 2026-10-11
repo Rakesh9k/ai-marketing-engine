@@ -46,6 +46,27 @@ export const AdaptedCreativePlanSchema = z.object({
 });
 export type AdaptedCreativePlan = z.infer<typeof AdaptedCreativePlanSchema>;
 
+/**
+ * The model is only constrained by this text (generateStructured sends no response schema), so the
+ * exact top-level keys must be spelled out. Without it the model chose its own key names and
+ * every generation failed schema validation ("hook", "messaging", "visualDirection" ... undefined)
+ * before any copy or image was produced. tests assert every schema key appears here.
+ */
+export const ADAPTED_PLAN_OUTPUT_FORMAT = `OUTPUT FORMAT:
+Return ONLY one JSON object (no markdown, no commentary) with EXACTLY these top-level keys:
+- "hook": string, the strategic intent of the opening (5+ characters)
+- "messaging": array of strings, one strategic message intent per line (at least 1, each 5+ characters)
+- "visualDirection": string, the overall visual intent (5+ characters)
+- "composition": string, how the frame is composed (5+ characters)
+- "productTreatment": string, how the product is shown (5+ characters)
+- "brandTreatment": string, how the brand/business identity appears (5+ characters)
+- "coveredRoles": array of semantic roles taken ONLY from the Grammar Structure (at least 1)
+- "localizationApproach": optional string
+- "cta": optional string, how the call to action is represented (required when the grammar requires a CTA)
+- "reelSequence": optional array, REQUIRED for reel templates and omitted for posts, each item an object with
+  "role" (a Grammar Structure role), "purpose", "visualIntent", "productTreatment", "messagingPurpose" (all strings)
+  and optional "ctaPlacement" (string)`;
+
 export interface TemplateAdaptationInput {
   template: CreativeTemplate;
   selectedContext: SelectedCreativeContext;
@@ -168,7 +189,9 @@ INSTRUCTIONS:
 5. For each reelSequence shot, populate 'role' with the semantic role that shot fulfills.
 6. Keep the plan business-specific based on the Selected Context, but do NOT mutate the template's core grammar.
 7. Respect any localization constraints if provided in the context.
-8. If a 'savedStyle' is provided in the Selected Context, heavily adapt the creative expression (tone, density, product prominence, humor, CTA style) according to those preferences, without omitting required template elements.`;
+8. If a 'savedStyle' is provided in the Selected Context, heavily adapt the creative expression (tone, density, product prominence, humor, CTA style) according to those preferences, without omitting required template elements.
+
+${ADAPTED_PLAN_OUTPUT_FORMAT}`;
   }
 
   private validate(plan: AdaptedCreativePlan, input: TemplateAdaptationInput) {

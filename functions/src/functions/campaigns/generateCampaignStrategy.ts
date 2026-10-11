@@ -17,7 +17,7 @@ import {
   getCampaignByIdempotencyKey,
 } from '../../services/firestore';
 import { logFunctionStart, logFunctionComplete, logFunctionError } from '../../utils/logging';
-import { mapErrorToHttpsError } from '../../utils/errors';
+import { mapErrorToHttpsError, customerSafeInternalMessage } from '../../utils/errors';
 import { InsufficientCreditsError } from '../../utils/errors';
 import type { Campaign, LocalizationProfile, CampaignAsset } from '../../types';
 import { GenerationPipeline } from '../../services/ai/pipeline';
@@ -62,6 +62,8 @@ const CAMPAIGN_TO_CREATIVE_OBJECTIVE: Record<CampaignObjective, CreativeObjectiv
   new_listing: 'launch',
   open_house: 'engagement',
   project_promotion: 'promotion',
+  product_promotion: 'promotion',
+  new_product: 'launch',
 };
 
 /**
@@ -123,6 +125,8 @@ const generateCampaignStrategySchema = z.object({
     'new_listing',
     'open_house',
     'project_promotion',
+    'product_promotion',
+    'new_product',
   ]),
   productId: z.string().optional(),
   newProduct: z
@@ -139,8 +143,11 @@ const generateCampaignStrategySchema = z.object({
     price: z.number().positive(),
     originalPrice: z.number().positive().optional(),
     type: z.enum(['percentage', 'fixed', 'bogo', 'combo', 'free_delivery', 'loyalty']),
-    validityStart: z.string().datetime(),
-    validityEnd: z.string().datetime(),
+    // The OFFER's own dates, optional: the campaign's duration below is when Mitra runs the campaign, not the
+    // period in which the offer is valid. validitySource records how the dates came to be.
+    validityStart: z.string().datetime().optional(),
+    validityEnd: z.string().datetime().optional(),
+    validitySource: z.enum(['owner_dates', 'whole_campaign']).optional(),
     terms: z.string().max(1000).optional(),
   }),
   duration: z.object({
@@ -461,10 +468,14 @@ export const generateCampaignStrategy = onCall(
             productName: pipelineProduct?.name || '',
             offerHeadline: data.offer.headline,
             offerPrice: data.offer.price,
+            // The owner's original price is what makes a discount a fact the copy can state and Truth
+            // Check can verify; regenerateAsset already passed it, generation did not.
+            offerOriginalPrice: data.offer.originalPrice,
             offerType: data.offer.type,
             offerDescription: data.offer.description,
             offerValidityStart: data.offer.validityStart,
             offerValidityEnd: data.offer.validityEnd,
+            offerValiditySource: data.offer.validitySource,
             offerTerms: data.offer.terms,
             objective: data.objective,
             audience: data.audience,
@@ -591,7 +602,8 @@ export const generateCampaignStrategy = onCall(
             // Same fix as creditsReserved above — creditsRequired is the
             // correct, already-in-scope value; the outer `creditsUsed`
             // isn't assigned until after this callback returns.
-            creditsUsed: creditsRequired,
+            // A discarded (Truth Check FAIL) campaign delivers nothing, so nothing is charged.
+            creditsUsed: finalStatus === 'failed' ? 0 : creditsRequired,
             ...(truthCheckFailureError ? { error: truthCheckFailureError } : {}),
             metadata: {
               idempotencyKey: data.idempotencyKey,
@@ -612,6 +624,20 @@ export const generateCampaignStrategy = onCall(
             updatedAt: new Date().toISOString(),
             completedAt: new Date().toISOString(),
           });
+
+          // The campaign was discarded: throw so executeWithUsageControl REFUNDS the reservation. The
+          // customer receives no copy, image or reel, so keeping their credits (the old behaviour) charged
+          // them for nothing. The failed state and its reason were persisted just above; the catch
+          // block below re-writes the same code/message rather than a raw error.
+          if (finalStatus === 'failed') {
+            throw Object.assign(
+              new Error(
+                truthCheckFailureError?.message ??
+                  'Some details in this campaign could not be verified against your business information.'
+              ),
+              { code: 'TRUTH_CHECK_FAILED' }
+            );
+          }
 
           // Track campaign_generated - campaign successfully persisted
           await trackEvent(
@@ -680,9 +706,12 @@ export const generateCampaignStrategy = onCall(
           status: 'failed',
           error: {
             code: error.code || 'GENERATION_FAILED',
+            // Customer-safe: raw provider/schema text must not be stored on a document the client reads.
             message:
               error instanceof Error && error.message
-                ? error.message
+                ? (error as { code?: string }).code === 'TRUTH_CHECK_FAILED'
+                  ? error.message
+                  : customerSafeInternalMessage(error.message)
                 : 'Campaign generation failed.',
             stage: 'generation',
             retryable: true,

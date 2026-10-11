@@ -1,8 +1,9 @@
 import type { BusinessCategory, CampaignObjective, CTAType, OfferType } from '../types';
 
 /**
- * Phase 29 (foundation) / Phase 30 (salon) / Phase 31 (real_estate) — all
- * three verticals are now fully implemented.
+ * Phase 29 (foundation) / Phase 30 (salon) / Phase 31 (real_estate) / `general` — all
+ * four verticals are now fully implemented. `general` is the catch-all for every business that is
+ * not a restaurant, salon or real-estate agency.
  *
  * This is the ONE place vertical-specific differences live. Everything else
  * — the AI pipeline, Truth Check, credits, analytics, campaign persistence —
@@ -46,6 +47,10 @@ export interface VerticalPromptContext {
   copywriterSystemRules: string;
   /** Stage 7 (creative direction) system-rules opening sentence. */
   creativeDirectorSystemRules: string;
+  /** Stage 7 (creative direction) STYLE REQUIREMENTS that belong to this kind of business (photography, setting, lighting). */
+  imageStyleRequirements: string[];
+  /** Stage 8 (AI truth validation) persona line: which kind of marketing is being fact-checked. */
+  factCheckerPersona: string;
 }
 
 export interface TruthCheckClaimKeyword {
@@ -104,9 +109,15 @@ const RESTAURANT_CONFIG: VerticalConfig = {
     campaignStrategistPersona:
       'You are a senior marketing strategist for Indian local restaurants. Create a campaign strategy that drives WhatsApp orders.',
     copywriterSystemRules:
-      'You are a Hyderabadi marketing copywriter. Generate a complete campaign pack for a Hyderabad restaurant. Use the localization strategy to write NATURAL Telugu-English-Hinglish copy. Every piece must drive WhatsApp action. Preserve ALL business facts exactly.',
+      "You are a marketing copywriter for a local restaurant. Generate a complete campaign pack. Use the localization strategy and the language rule below to write NATURAL copy in the owner's own language. Every piece must drive WhatsApp action. Preserve ALL business facts exactly.",
     creativeDirectorSystemRules:
       'You are a creative director for Instagram food marketing. Generate detailed, actionable image prompts for AI image generation. Each prompt must produce Instagram-ready vertical images (4:5 for posts, 9:16 for Stories/Reels). Include brand colors, logo placement, and offer text overlays.',
+    imageStyleRequirements: [
+      'Professional food photography quality',
+      'Indian kitchen/restaurant authenticity',
+      'Warm, appetizing lighting',
+    ],
+    factCheckerPersona: 'a fact-checker for restaurant marketing',
   },
   // Copied verbatim from truthCheck.ts's previously-inline `claimChecks` array.
   truthCheckClaimKeywords: [
@@ -172,6 +183,12 @@ const SALON_CONFIG: VerticalConfig = {
       'You are a marketing copywriter for a local salon. Generate a complete campaign pack that drives appointment bookings. Preserve ALL business facts exactly.',
     creativeDirectorSystemRules:
       'You are a creative director for salon/beauty marketing. Generate detailed, actionable image prompts for AI image generation.',
+    imageStyleRequirements: [
+      'Professional beauty and lifestyle photography quality',
+      'A clean, welcoming salon or studio setting',
+      'Soft, flattering lighting',
+    ],
+    factCheckerPersona: 'a fact-checker for salon marketing',
   },
   // Phase 30: unlike restaurant's table (moved verbatim from prior
   // hard-coded logic), these are new — modeled the same way, on the same
@@ -220,6 +237,12 @@ const REAL_ESTATE_CONFIG: VerticalConfig = {
       'You are a marketing copywriter for a local real estate business. Generate a complete campaign pack that drives inquiries. Preserve ALL business facts exactly. Clearly separate factual property details (area, bedrooms, price, possession status) from marketing language and opinion — never state an unverified fact as though it were confirmed.',
     creativeDirectorSystemRules:
       'You are a creative director for real estate marketing. Generate detailed, actionable image prompts for AI image generation.',
+    imageStyleRequirements: [
+      'Professional real-estate photography quality',
+      'Depict only what the listing states: no amenities, views or finishes it does not list',
+      'Natural daylight',
+    ],
+    factCheckerPersona: 'a fact-checker for real estate marketing',
   },
   // Phase 31: modeled on the same "unsupported unless backed by a business
   // fact" mechanism as restaurant/salon. Covers financial/legal claims that
@@ -238,10 +261,97 @@ const REAL_ESTATE_CONFIG: VerticalConfig = {
   ],
 };
 
+const GENERAL_CONFIG: VerticalConfig = {
+  id: 'general',
+  label: 'Local Business',
+  // A real vertical, not a "not supported yet" placeholder: it serves every business that is not a
+  // restaurant, salon or real-estate agency (retail, fitness, clinics, coaching, boutiques, home
+  // services, hospitality...). What the business actually does lives in
+  // businessBrain.identity.industry / subcategory / offerings, which the pipeline already receives as
+  // part of the Business Brain, so this one config stays honest for all of them. A trade that needs
+  // more can get its own vertical later without migrating any Business Brain.
+  implemented: true,
+  allowedObjectives: [
+    'product_promotion',
+    'new_product',
+    'service_promotion',
+    'new_service',
+    'discount',
+    'festival',
+    'weekend_offer',
+    'brand_awareness',
+  ],
+  allowedCTAs: ['order_whatsapp', 'book_appointment', 'call_now', 'get_directions'],
+  allowedOfferTypes: ['percentage', 'fixed', 'bogo', 'combo', 'loyalty'],
+  requiredBusinessFields: ['name', 'location', 'contact.whatsapp'],
+  optionalBusinessFields: [
+    'description',
+    'businessBrain.identity.industry',
+    'businessBrain.offerings',
+    'businessBrain.audience.primary',
+    'businessBrain.positioning.usp',
+  ],
+  terminology: { itemNoun: 'product or service', itemNounPlural: 'products and services' },
+  promptContext: {
+    businessUnderstandingVerticalContext:
+      'General local-business context (what the business sells or offers, who it serves and why they choose it, how customers reach it, local occasions, offer types). Use the business industry, subcategory, offerings, audience and positioning exactly as the owner stated them.',
+    productAnalystPersona: 'a product and service analyst for local business marketing',
+    imageAnalystPersona:
+      'You are an expert marketing analyst for Indian local businesses. Analyze the provided product or service images and return a detailed structured analysis. Describe only what is visible.',
+    campaignStrategistPersona:
+      'You are a senior marketing strategist for local Indian businesses. Create a campaign strategy that drives WhatsApp enquiries and visits, built only on what the owner has told you about their business.',
+    copywriterSystemRules:
+      "You are a marketing copywriter for a local business. Generate a complete campaign pack that drives WhatsApp enquiries. Preserve ALL business facts exactly. Never invent offers, prices, guarantees, certifications, awards or credentials. Describe only what the owner has told you, in the owner's own terms where they gave them.",
+    creativeDirectorSystemRules:
+      "You are a creative director for local-business social media marketing. Generate detailed, actionable image prompts for AI image generation. Each prompt must produce Instagram-ready vertical images (4:5 for posts, 9:16 for Stories/Reels) that fit the business's own industry, with brand colors, logo placement and offer text overlays.",
+    imageStyleRequirements: [
+      "Professional photography quality that fits the business's own industry",
+      'An authentic look for the business exactly as the owner described it',
+      'Natural, flattering lighting',
+    ],
+    factCheckerPersona: 'a fact-checker for local business marketing',
+  },
+  // Same "unsupported unless backed by a business fact" mechanism as the other verticals. These are
+  // the claims a generic business is most tempted to invent. None has a supporting fact in the
+  // Business Brain today, so any copy containing one is routed to REVIEW_REQUIRED for the owner to
+  // confirm, rather than published as if it were true.
+  truthCheckClaimKeywords: [
+    { keyword: 'free delivery', category: 'delivery', factCategory: 'delivery' },
+    { keyword: 'home delivery', category: 'delivery', factCategory: 'delivery' },
+    { keyword: 'free installation', category: 'service', factCategory: 'service' },
+    { keyword: 'cash on delivery', category: 'payment', factCategory: 'payment' },
+    { keyword: 'emi available', category: 'payment', factCategory: 'payment' },
+    { keyword: 'no cost emi', category: 'payment', factCategory: 'payment' },
+    { keyword: 'warranty', category: 'guarantee', factCategory: 'guarantee' },
+    { keyword: 'guarantee', category: 'guarantee', factCategory: 'guarantee' },
+    { keyword: 'money back', category: 'guarantee', factCategory: 'guarantee' },
+    { keyword: 'money-back', category: 'guarantee', factCategory: 'guarantee' },
+    { keyword: 'easy returns', category: 'returns', factCategory: 'returns' },
+    { keyword: 'free exchange', category: 'returns', factCategory: 'returns' },
+    { keyword: 'free consultation', category: 'service', factCategory: 'service' },
+    { keyword: 'free trial', category: 'service', factCategory: 'service' },
+    { keyword: 'free demo', category: 'service', factCategory: 'service' },
+    { keyword: 'walk-in', category: 'appointment', factCategory: 'appointment' },
+    { keyword: 'home service', category: 'appointment', factCategory: 'appointment' },
+    { keyword: 'doorstep', category: 'appointment', factCategory: 'appointment' },
+    { keyword: 'open 24', category: 'hours', factCategory: 'hours' },
+    { keyword: '24/7', category: 'hours', factCategory: 'hours' },
+    { keyword: '24x7', category: 'hours', factCategory: 'hours' },
+    { keyword: 'certified', category: 'credential', factCategory: 'credential' },
+    { keyword: 'licensed', category: 'credential', factCategory: 'credential' },
+    { keyword: 'award-winning', category: 'credential', factCategory: 'credential' },
+    { keyword: 'award winning', category: 'credential', factCategory: 'credential' },
+    { keyword: 'number one', category: 'superlative', factCategory: 'superlative' },
+    { keyword: '#1', category: 'superlative', factCategory: 'superlative' },
+    { keyword: 'best in', category: 'superlative', factCategory: 'superlative' },
+  ],
+};
+
 export const VERTICAL_CONFIGS: Record<BusinessCategory, VerticalConfig> = {
   restaurant: RESTAURANT_CONFIG,
   salon: SALON_CONFIG,
   real_estate: REAL_ESTATE_CONFIG,
+  general: GENERAL_CONFIG,
 };
 
 /**

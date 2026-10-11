@@ -65,6 +65,25 @@ export const envSchema = z.object({
   PADDLE_PRICE_ID_PACK_500: z.string().optional(),
   PADDLE_PRICE_ID_PACK_1200: z.string().optional(),
   PADDLE_PRICE_ID_PACK_3000: z.string().optional(),
+  // Cashfree (INR gateway; present in code and exported, NOT the primary provider: Paddle is live).
+  // CASHFREE_* are server-side only, never logged or sent to the client. CASHFREE_WEBHOOK_SECRET verifies
+  // the HMAC-SHA256 signature in cashfreeWebhook.ts. Production status of this gateway: see docs/audits.
+  CASHFREE_APP_ID: z.string().optional(),
+  CASHFREE_SECRET_KEY: z.string().optional(),
+  CASHFREE_WEBHOOK_SECRET: z.string().optional(),
+  CASHFREE_ENVIRONMENT: z.enum(['sandbox', 'production']).default('sandbox'),
+  CASHFREE_API_VERSION: z.string().default('2023-08-01'),
+  CASHFREE_PLAN_ID_STARTER_MONTHLY: z.string().optional(),
+  CASHFREE_PLAN_ID_STARTER_YEARLY: z.string().optional(),
+  CASHFREE_PLAN_ID_BUSINESS_MONTHLY: z.string().optional(),
+  CASHFREE_PLAN_ID_BUSINESS_YEARLY: z.string().optional(),
+  CASHFREE_PLAN_ID_PRO_MONTHLY: z.string().optional(),
+  CASHFREE_PLAN_ID_PRO_YEARLY: z.string().optional(),
+  CASHFREE_PLAN_ID_AGENCY_MONTHLY: z.string().optional(),
+  CASHFREE_PLAN_ID_AGENCY_YEARLY: z.string().optional(),
+  CASHFREE_PACK_500_ID: z.string().optional(),
+  CASHFREE_PACK_1200_ID: z.string().optional(),
+  CASHFREE_PACK_3000_ID: z.string().optional(),
   APP_URL: z.string().url().optional(),
   ADMIN_EMAILS: z.string().optional(),
   // "Create a Reel" video renderer (Cloud Run service running ffmpeg — see

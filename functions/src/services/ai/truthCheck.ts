@@ -1,12 +1,35 @@
 import type {
   TruthCheckResult,
   TruthCheckItem,
-  ExtractedFacts,
   ExtractedPrice,
   TruthCheckStatus,
   GenerationPipelineInput,
 } from '../../types';
 import { getVerticalConfigOrDefault } from '../../config/verticals';
+import {
+  findListing,
+  knownSalonOfferings,
+  possessionDateClaim,
+  unsupportedSalonServices,
+} from './verticalContract';
+import { languageLeaks, localeFromInput } from './localizationContract';
+import {
+  dateMentionInWindow,
+  discountPercentFor,
+  extractDateMentions,
+  extractQualifiedPrices,
+  formatDateForCopy,
+  contactNumbersOnFile,
+  extractPresentedContactNumbers,
+  deliverySupportedBy,
+  hasDefinedOpeningHours,
+  mentionsHoursClaim,
+  offerConceptPresent,
+  priceAppears,
+  prohibitedPhrasesFor,
+  unescapeJson,
+  OFFER_TYPE_CONCEPTS,
+} from './offerContract';
 
 /**
  * Normalize price strings to a standard format for comparison
@@ -355,7 +378,7 @@ export function extractFacts(
   operationalClaims: string[];
   marketingClaims: string[];
 } {
-  const allText = JSON.stringify(copyPack).toLowerCase();
+  const _allText = JSON.stringify(copyPack).toLowerCase();
 
   const knownBusinessNames: string[] = [];
   if (businessContext?.businessFacts) {
@@ -428,8 +451,8 @@ export function runDeterministicTruthCheck(
   const checks: TruthCheckItem[] = [];
   let overallStatus: TruthCheckStatus = 'PASS';
 
-  const businessFacts = previousResults.businessUnderstanding?.businessFacts || [];
-  const productFacts = previousResults.productUnderstanding?.productFacts || [];
+  const _businessFacts = previousResults.businessUnderstanding?.businessFacts || [];
+  const _productFacts = previousResults.productUnderstanding?.productFacts || [];
   const copyPack = previousResults.copyPack;
 
   const allText = JSON.stringify(copyPack).toLowerCase();
@@ -437,11 +460,11 @@ export function runDeterministicTruthCheck(
   const expectedBusinessName = input.businessName ?? '';
   const expectedProductName = input.productName ?? '';
   const expectedOfferPrice = input.offerPrice ?? 0;
-  const expectedOriginalPrice = input.offerOriginalPrice ?? 0;
-  const expectedOfferType = input.offerType ?? '';
+  const _expectedOriginalPrice = input.offerOriginalPrice ?? 0;
+  const _expectedOfferType = input.offerType ?? '';
   const expectedLocation = input.businessLocation?.locality ?? input.businessLocation?.city ?? '';
   const expectedWhatsApp = input.whatsappNumber ?? '';
-  const expectedOfferHeadline = input.offerHeadline ?? '';
+  const _expectedOfferHeadline = input.offerHeadline ?? '';
 
   // 1. Business Name Check
   const businessNameCheck = checkBusinessName(allText, expectedBusinessName);
@@ -501,6 +524,11 @@ export function runDeterministicTruthCheck(
   checks.push(phoneCheck);
   if (phoneCheck.status === 'FAIL') overallStatus = 'FAIL';
 
+  // 7b. Contact-number claims: any number presented as the contact must be the business's own.
+  const contactClaimCheck = checkContactNumberClaims(allText, contactNumbersOnFile(input));
+  checks.push(contactClaimCheck);
+  if (contactClaimCheck.status === 'FAIL') overallStatus = 'FAIL';
+
   // 8. Offer Type/Discount Check
   const offerCheck = checkOffer(
     allText,
@@ -543,9 +571,17 @@ export function runDeterministicTruthCheck(
   if (validityCheck.status === 'FAIL') overallStatus = 'FAIL';
 
   // 10. Claims Check - Prohibited Claims
-  const claimsCheck = checkProhibitedClaims(allText);
+  const claimsCheck = checkProhibitedClaims(allText, input.offerType);
   checks.push(claimsCheck);
   if (claimsCheck.status === 'FAIL') overallStatus = 'FAIL';
+
+  // 10b. Language: the copy stays in the languages the owner asked for.
+  const languageCheck = checkLanguageLeaks(allText, input);
+  if (languageCheck) {
+    checks.push(languageCheck);
+    if (languageCheck.status === 'FAIL') overallStatus = 'FAIL';
+    else if (overallStatus === 'PASS') overallStatus = 'REVIEW_REQUIRED';
+  }
 
   // 11. Unsupported Claims Check
   const unsupportedClaimsCheck = checkUnsupportedClaims(
@@ -628,6 +664,11 @@ export function runDeterministicTruthCheck(
       else if (catalogCheck.status === 'REVIEW_REQUIRED' && overallStatus === 'PASS') {
         overallStatus = 'REVIEW_REQUIRED';
       }
+    }
+    const serviceClaimCheck = checkSalonServiceClaims(allText, input);
+    if (serviceClaimCheck) {
+      checks.push(serviceClaimCheck);
+      if (overallStatus === 'PASS') overallStatus = 'REVIEW_REQUIRED';
     }
   }
 
@@ -788,29 +829,35 @@ function checkPrice(allText: string, expectedPrice: number): TruthCheckItem {
     return {
       category: 'price',
       status: 'REVIEW_REQUIRED',
+      basis: 'missing_input',
       expectedValue: 'NOT_PROVIDED',
       reason: 'Offer price not provided in input',
     };
   }
 
   const expectedPriceStr = `₹${expectedPrice}`;
-  // Comma-grouped ("₹1,999"), decimal ("₹1999.50") and a trailing "/-"
-  // ("Rs. 1,999/-") are all normal, correctly-formatted Indian price
-  // notation — the old bare `\d+` here matched only "1" out of "₹1,999",
-  // so any comma-formatted price FAILed Truth Check outright even when the
-  // copy was factually correct.
-  const priceMentions =
-    allText.match(/(?:₹|Rs\.?\s?|INR\s?)\s*\d{1,3}(?:,\d{2,3})*(?:\.\d+)?(?:\/-)?/gi) || [];
-  const priceMatch = priceMentions.some((p) => normalizePrice(p) === expectedPrice);
+  // The same amount is accepted however an Indian price is normally written ("₹1,999", "Rs. 1,999/-",
+  // "1999 INR", "1999 rupees"); the amount itself must still match exactly. A bare number is no price.
+  const mentions = extractQualifiedPrices(allText);
+  const priceMatch = priceAppears(allText, expectedPrice);
+  const found = mentions.map((p) => `₹${p}`).join(', ');
 
   return {
     category: 'price',
     status: priceMatch ? 'PASS' : 'FAIL',
-    generatedValue: priceMentions.join(', ') || 'NONE',
+    ...(priceMatch
+      ? {}
+      : {
+          basis:
+            mentions.length > 0
+              ? ('invalid_claim' as const)
+              : ('required_mention_missing' as const),
+        }),
+    generatedValue: found || 'NONE',
     expectedValue: expectedPriceStr,
     reason: priceMatch
       ? 'Price matches exactly'
-      : `Price mismatch. Expected ${expectedPriceStr}, found: ${priceMentions.join(', ') || 'none'}`,
+      : `Price mismatch. Expected ${expectedPriceStr}, found: ${found || 'none'}`,
   };
 }
 
@@ -819,17 +866,19 @@ function checkOriginalPrice(allText: string, originalPrice: number): TruthCheckI
     return {
       category: 'price',
       status: 'REVIEW_REQUIRED',
+      basis: 'missing_input',
       expectedValue: 'NOT_PROVIDED',
       reason: 'Original price not provided in input',
     };
   }
 
   const expectedOriginalPriceStr = `₹${originalPrice}`;
-  const originalPriceMatch = allText.includes(expectedOriginalPriceStr.toLowerCase());
+  const originalPriceMatch = priceAppears(allText, originalPrice);
 
   return {
     category: 'price',
     status: originalPriceMatch ? 'PASS' : 'REVIEW_REQUIRED',
+    ...(originalPriceMatch ? {} : { basis: 'required_mention_missing' as const }),
     generatedValue: originalPriceMatch ? expectedOriginalPriceStr : 'NOT_FOUND',
     expectedValue: expectedOriginalPriceStr,
     reason: originalPriceMatch
@@ -847,17 +896,13 @@ function checkPromotionalPrice(
     return null;
   }
 
-  const expectedPriceStr = `₹${offerPrice}`;
-  const priceMentions = allText.match(/₹\s*\d+/g) || [];
-  const priceMatch = priceMentions.some(
-    (p) => p.replace(/\s/g, '') === `₹${offerPrice}`.replace(/\s/g, '')
-  );
-
-  if (!priceMatch) {
+  if (!priceAppears(allText, offerPrice)) {
+    const mentions = extractQualifiedPrices(allText);
     return {
       category: 'price',
       status: 'FAIL',
-      generatedValue: allText.match(/₹\s*\d+/g)?.join(', ') || 'NONE',
+      basis: mentions.length > 0 ? 'invalid_claim' : 'required_mention_missing',
+      generatedValue: mentions.map((p) => `₹${p}`).join(', ') || 'NONE',
       expectedValue: `₹${offerPrice} (promotional)`,
       reason: `Promotional price ₹${offerPrice} not found in generated content`,
     };
@@ -908,7 +953,9 @@ function checkWhatsApp(allText: string, whatsappNumber: string): TruthCheckItem 
   }
 
   const expectedDigits = whatsappNumber.replace(/\D/g, '').slice(-10);
-  const whatsappMatch = allText.includes(expectedDigits);
+  const whatsappMatch =
+    allText.includes(expectedDigits) ||
+    extractPresentedContactNumbers(allText).includes(expectedDigits);
 
   return {
     category: 'contact',
@@ -932,7 +979,9 @@ function checkPhone(allText: string, phoneNumber: string): TruthCheckItem {
   }
 
   const expectedDigits = phoneNumber.replace(/\D/g, '').slice(-10);
-  const phoneMatch = allText.includes(expectedDigits);
+  const phoneMatch =
+    allText.includes(expectedDigits) ||
+    extractPresentedContactNumbers(allText).includes(expectedDigits);
 
   return {
     category: 'contact',
@@ -945,6 +994,65 @@ function checkPhone(allText: string, phoneNumber: string): TruthCheckItem {
   };
 }
 
+/**
+ * The copy must stay in the languages the owner asked for. A native script they did not ask for is an
+ * unambiguous leak (FAIL); distinctive romanised Telugu in a business that did not ask for Telugu needs a
+ * human look (REVIEW_REQUIRED). Silent when the owner's language is unknown or nothing leaked.
+ */
+function checkLanguageLeaks(
+  allText: string,
+  input: GenerationPipelineInput
+): TruthCheckItem | null {
+  const { scripts, markers } = languageLeaks(allText, localeFromInput(input));
+  if (scripts.length === 0 && markers.length === 0) return null;
+  const found = [...scripts, ...markers].join(', ');
+  return {
+    category: 'claim',
+    status: scripts.length > 0 ? 'FAIL' : 'REVIEW_REQUIRED',
+    basis: 'invalid_claim',
+    generatedValue: found,
+    expectedValue: 'only the language(s) the owner asked for',
+    reason: `Copy uses a language the owner did not ask for: ${found}`,
+  };
+}
+
+/**
+ * A number the copy presents as the business's contact must be one the business actually has. Nothing is
+ * demanded here: copy that presents no number is fine (whether the WhatsApp number appears at all is
+ * checkWhatsApp's separate question). A business with no number on file cannot present one.
+ */
+function checkContactNumberClaims(allText: string, onFile: string[]): TruthCheckItem {
+  const presented = extractPresentedContactNumbers(allText);
+  if (presented.length === 0) {
+    return {
+      category: 'contact',
+      status: 'PASS',
+      basis: 'not_applicable',
+      reason: 'No contact number is presented in the copy',
+    };
+  }
+  const foreign = presented.filter((n) => !onFile.includes(n));
+  if (foreign.length === 0) {
+    return {
+      category: 'contact',
+      status: 'PASS',
+      generatedValue: presented.join(', '),
+      reason: "The contact numbers presented are the business's own",
+    };
+  }
+  return {
+    category: 'contact',
+    status: 'FAIL',
+    basis: 'invalid_claim',
+    generatedValue: foreign.join(', '),
+    expectedValue: onFile.join(', ') || 'NONE ON FILE',
+    reason:
+      onFile.length === 0
+        ? 'Copy presents a contact number but the business has none on file'
+        : "Copy presents a contact number that is not one of the business's numbers",
+  };
+}
+
 function checkOffer(
   allText: string,
   offerType: string,
@@ -952,71 +1060,74 @@ function checkOffer(
   originalPrice?: number,
   offerHeadline?: string
 ): TruthCheckItem {
-  let expectedOfferText = '';
+  const text = unescapeJson(allText);
+  const headlineMentioned =
+    !!offerHeadline && text.toLowerCase().includes(offerHeadline.toLowerCase());
 
-  switch (offerType) {
-    case 'percentage':
-      if (originalPrice && originalPrice > 0) {
-        const discountPercent = Math.round(((originalPrice - offerPrice) / originalPrice) * 100);
-        expectedOfferText = `${discountPercent}%`;
-      }
-      break;
-    case 'fixed':
-      expectedOfferText = `₹${offerPrice}`;
-      break;
-    case 'bogo':
-      expectedOfferText = 'bogo';
-      break;
-    case 'combo':
-      expectedOfferText = 'combo';
-      break;
-    case 'free_delivery':
-      expectedOfferText = 'free delivery';
-      break;
-    case 'loyalty':
-      expectedOfferText = 'loyalty';
-      break;
-  }
-
-  const allTextLower = allText.toLowerCase();
-  const expectedLower = expectedOfferText.toLowerCase();
-
-  const discountPercent =
-    offerType === 'percentage' && originalPrice
-      ? Math.round(((originalPrice - offerPrice) / originalPrice) * 100)
-      : null;
-
-  let passed = false;
-  let reason = '';
-
-  if (discountPercent) {
-    const discountText = `${discountPercent}%`;
-    const discountMatch =
-      allText.includes(discountText) || allTextLower.includes(`${discountPercent} percent`);
-    passed = discountMatch;
-    reason = discountMatch
-      ? 'Discount percentage matches'
-      : `Discount ${discountText} not explicitly mentioned`;
-  } else if (offerType === 'fixed') {
-    const priceStr = `₹${offerPrice}`;
-    const priceMatch = allText.includes(priceStr);
-    passed = priceMatch;
-    reason = priceMatch ? 'Fixed price matches' : `Fixed price ₹${offerPrice} not mentioned`;
-  } else {
-    if (offerHeadline && allTextLower.includes(offerHeadline.toLowerCase())) {
-      passed = true;
-      reason = 'Offer headline mentioned';
-    } else {
-      passed = false;
-      reason = 'Offer type not clearly communicated';
+  if (offerType === 'percentage') {
+    const percent = discountPercentFor(offerPrice, originalPrice);
+    if (percent === null) {
+      // The campaign has no discount to state, so none can be required or verified. This is missing
+      // information about the campaign, not a wrong claim by the copy.
+      return {
+        category: 'offer',
+        status: 'REVIEW_REQUIRED',
+        basis: 'missing_input',
+        expectedValue: offerHeadline,
+        reason:
+          'Offer is a percentage discount but no usable original price was provided, so the discount cannot be verified',
+      };
     }
+    const stated = new RegExp(`(?<![\\d.])${percent}\\s*(?:%|per\\s*cent|percent)`, 'i').test(text);
+    return {
+      category: 'offer',
+      status: stated ? 'PASS' : 'FAIL',
+      ...(stated ? {} : { basis: 'required_mention_missing' as const }),
+      expectedValue: `${percent}%`,
+      reason: stated
+        ? 'Discount percentage matches'
+        : `Discount ${percent}% not explicitly mentioned`,
+    };
   }
 
+  if (offerType === 'fixed') {
+    const stated = priceAppears(text, offerPrice);
+    return {
+      category: 'offer',
+      status: stated ? 'PASS' : 'FAIL',
+      ...(stated ? {} : { basis: 'required_mention_missing' as const }),
+      expectedValue: `₹${offerPrice}`,
+      reason: stated ? 'Fixed price matches' : `Fixed price ₹${offerPrice} not mentioned`,
+    };
+  }
+
+  const concept = OFFER_TYPE_CONCEPTS[offerType];
+  if (concept) {
+    const stated = offerConceptPresent(text, offerType) || headlineMentioned;
+    return {
+      category: 'offer',
+      status: stated ? 'PASS' : 'FAIL',
+      ...(stated ? {} : { basis: 'required_mention_missing' as const }),
+      expectedValue: concept.wording,
+      reason: stated ? 'Offer type communicated' : 'Offer type not clearly communicated',
+    };
+  }
+
+  // An offer type we have no concept for: all that can be checked is the owner's own headline.
+  if (!offerHeadline) {
+    return {
+      category: 'offer',
+      status: 'PASS',
+      basis: 'not_applicable',
+      reason: 'No offer to verify',
+    };
+  }
   return {
     category: 'offer',
-    status: passed ? 'PASS' : 'FAIL',
-    expectedValue: expectedOfferText || offerHeadline,
-    reason,
+    status: headlineMentioned ? 'PASS' : 'FAIL',
+    ...(headlineMentioned ? {} : { basis: 'required_mention_missing' as const }),
+    expectedValue: offerHeadline,
+    reason: headlineMentioned ? 'Offer headline mentioned' : 'Offer type not clearly communicated',
   };
 }
 
@@ -1110,27 +1221,47 @@ function checkOfferValidity(
   if (!validityStart && !validityEnd) {
     return {
       category: 'offer',
-      status: 'REVIEW_REQUIRED',
-      expectedValue: 'NOT_PROVIDED',
-      reason: 'Offer validity dates not provided in input',
+      status: 'PASS',
+      basis: 'not_applicable',
+      reason: 'No validity window was set, so there are no dates to verify',
     };
   }
 
-  const dateRegex = /\d{1,2}[\/\-]\d{1,2}[\/\-]\d{2,4}|\d{4}[\/\-]\d{1,2}[\/\-]\d{1,2}/g;
-  const dateMentions = allText.match(dateRegex) || [];
+  const from = validityStart ? formatDateForCopy(validityStart) : null;
+  const to = validityEnd ? formatDateForCopy(validityEnd) : null;
+  const expectedValue = [from, to].filter(Boolean).join(' to ');
 
-  let passed = true;
-  let reason = 'Validity dates not explicitly verified in content';
+  const mentions = extractDateMentions(allText);
+  const outside = mentions.filter((m) => !dateMentionInWindow(m, validityStart, validityEnd));
+  if (outside.length > 0) {
+    const listed = [
+      ...new Set(outside.map((m) => `${m.day}/${m.month}${m.year ? '/' + m.year : ''}`)),
+    ].join(', ');
+    return {
+      category: 'offer',
+      status: 'FAIL',
+      basis: 'invalid_claim',
+      generatedValue: listed,
+      expectedValue,
+      reason: `Copy mentions a date (${listed}) outside the campaign's validity window`,
+    };
+  }
 
-  if (validityStart && dateMentions.length === 0) {
-    passed = false;
-    reason = 'Offer start date not mentioned in generated content';
+  if (mentions.length === 0) {
+    return {
+      category: 'offer',
+      status: 'REVIEW_REQUIRED',
+      basis: 'required_mention_missing',
+      expectedValue,
+      reason: 'A validity window was set but the copy does not state it',
+    };
   }
 
   return {
     category: 'offer',
-    status: passed ? 'PASS' : 'REVIEW_REQUIRED',
-    reason,
+    status: 'PASS',
+    expectedValue,
+    reason: 'Dates in the copy are consistent with the campaign validity window',
   };
 }
 
@@ -1176,72 +1307,19 @@ function checkOwnerProhibitedPhrases(
   };
 }
 
-function checkProhibitedClaims(allText: string): TruthCheckItem {
-  const prohibitedClaims = [
-    'best in',
-    'best restaurant',
-    'best food',
-    'number 1',
-    '#1',
-    'no. 1',
-    'number 1',
-    'top rated',
-    'highest rated',
-    'most popular',
-    'famous',
-    'renowned',
-    'legendary',
-    'iconic',
-    'guaranteed',
-    'guarantee',
-    'risk-free',
-    'risk free',
-    '100%',
-    'hundred percent',
-    'doctor recommended',
-    'clinically proven',
-    'expert recommended',
-    'award winning',
-    'award-winning',
-    'awarded',
-    'certified',
-    'verified',
-    'trusted',
-    'free delivery',
-    'free home delivery',
-    'open 24/7',
-    'open 24x7',
-    '24/7',
-    '24x7',
-    'round the clock',
-    'always open',
-    'unlimited',
-    'unlimited refills',
-    '1000+ customers',
-    '1000+ reviews',
-    'rated 5 star',
-    '5 star rating',
-    '5/5',
-    // Phase 31 — real estate financial/investment overclaims. These sit in
-    // the universal list (not a vertical keyword table) for the same
-    // reason 'best restaurant' does: it's a hype phrase that must never
-    // appear regardless of vertical, not merely one requiring a supporting
-    // fact.
-    'best property',
-    'guaranteed investment',
-    'highest returns',
-    'guaranteed returns',
-    'assured returns',
-    'guaranteed appreciation',
-  ];
-
+function checkProhibitedClaims(allText: string, offerType?: string): TruthCheckItem {
+  // The list the copywriter is shown (offerContract.PROHIBITED_CLAIM_PHRASES), minus whatever the
+  // offer itself authorises (a free-delivery offer has to say "free delivery").
   const allTextLower = allText.toLowerCase();
-  const foundClaims = prohibitedClaims.filter((claim) => allTextLower.includes(claim));
+  const foundClaims = prohibitedPhrasesFor(offerType).filter((claim) =>
+    allTextLower.includes(claim)
+  );
 
   if (foundClaims.length > 0) {
     return {
       category: 'claim',
       status: 'FAIL',
+      basis: 'invalid_claim',
       generatedValue: foundClaims.join(', '),
       expectedValue: 'NONE',
       reason: `Prohibited claims detected: ${foundClaims.join(', ')}`,
@@ -1279,7 +1357,7 @@ function checkUnsupportedClaims(
       const supportedByRules = (() => {
         switch (check.factCategory) {
           case 'delivery':
-            return (businessRules?.deliveryRadiusKm ?? 0) > 0;
+            return deliverySupportedBy(businessRules);
           case 'dine-in':
             return true;
           case 'takeaway':
@@ -1325,6 +1403,31 @@ function checkUnsupportedClaims(
  * invented by the model. Returns null (not applicable) for any business
  * with no verticalProfile catalog at all, rather than guessing.
  */
+/**
+ * Salon: a treatment the copy names (keratin, facial, bridal makeup…) must be among the owner's known
+ * offerings: defined services/packages, signature offerings, or the campaign's own product. Silent
+ * (null) when the copy names no specific treatment or every one is known.
+ */
+function checkSalonServiceClaims(
+  allText: string,
+  input: GenerationPipelineInput
+): TruthCheckItem | null {
+  const unsupported = unsupportedSalonServices(
+    allText,
+    knownSalonOfferings(input as never),
+    input.businessName
+  );
+  if (unsupported.length === 0) return null;
+  return {
+    category: 'claim',
+    status: 'REVIEW_REQUIRED',
+    basis: 'invalid_claim',
+    generatedValue: unsupported.join(', '),
+    expectedValue: knownSalonOfferings(input as never).join(', ') || 'NO SERVICES ON FILE',
+    reason: `Generated content names services not among the owner's known offerings: ${unsupported.join(', ')}.`,
+  };
+}
+
 function checkVerticalCatalogClaims(
   allText: string,
   input: GenerationPipelineInput
@@ -1432,10 +1535,8 @@ function checkPropertyFactClaims(
     return [];
   }
 
-  const productName = (input.productName || '').toLowerCase().trim();
-  const titleMatches = (p: { title: string }) =>
-    p.title.toLowerCase().includes(productName) || productName.includes(p.title.toLowerCase());
-  const property = productName ? properties.find(titleMatches) : undefined;
+  // The same match the copywriter's LISTING FACTS were built from (verticalContract.findListing).
+  const property = findListing(properties, input.productName);
 
   if (!property) {
     return [
@@ -1527,6 +1628,19 @@ function checkPropertyFactClaims(
     });
   }
 
+  // No record holds a possession DATE, so a claim like "possession in March 2027" has no source.
+  if (possessionDateClaim(allText)) {
+    items.push({
+      category: 'claim',
+      status: 'REVIEW_REQUIRED',
+      basis: 'invalid_claim',
+      generatedValue: 'possession date',
+      expectedValue: 'NOT_RECORDED',
+      reason:
+        'Generated content states a possession date, but possession dates are not recorded for listings.',
+    });
+  }
+
   const definedAmenities = (property.amenities || []).map((a) => a.toLowerCase());
   const invalidAmenityMentions = REAL_ESTATE_AMENITY_KEYWORDS.filter(
     (kw) =>
@@ -1586,7 +1700,7 @@ function checkOperations(
   // G1: sourced from the persisted, authoritative businessRules — not an AI
   // model's own summary of that data (previousResults.businessUnderstanding),
   // which could itself invent a delivery/operating fact the owner never saved.
-  const deliverySupported = (businessRules?.deliveryRadiusKm ?? 0) > 0;
+  const deliverySupported = deliverySupportedBy(businessRules);
 
   const unsupportedOps = opsMentions.filter((op) => {
     if (op === 'delivery' || op === 'home delivery') return !deliverySupported;
@@ -1651,7 +1765,7 @@ function checkContactInfo(allText: string, input: GenerationPipelineInput): Trut
   }
 
   const hasFail = checks.some((c) => c.status === 'FAIL');
-  const hasReview = checks.some((c) => c.status === 'REVIEW_REQUIRED');
+  const _hasReview = checks.some((c) => c.status === 'REVIEW_REQUIRED');
 
   return {
     category: 'contact',
@@ -1670,12 +1784,11 @@ function checkBusinessHours(
   allText: string,
   businessRules: AuthoritativeBusinessRules | undefined
 ): TruthCheckItem {
-  const allTextLower = allText.toLowerCase();
+  // A claim about when the business is open, not the bare words "open"/"close" ("open house", "close
+  // to the metro" are not hours claims).
+  const claimsHours = mentionsHoursClaim(allText);
 
-  const hoursKeywords = ['open', 'close', 'hours', 'timing', 'timings'];
-  const hoursMentions = hoursKeywords.filter((kw) => allTextLower.includes(kw));
-
-  if (hoursMentions.length === 0) {
+  if (!claimsHours) {
     return {
       category: 'operations',
       status: 'PASS',
@@ -1685,16 +1798,13 @@ function checkBusinessHours(
 
   // G1: authoritative businessRules.openingHours — a day actually defined
   // (open even one day) is what "supported" means here.
-  const openingHours = businessRules?.openingHours || {};
-  const hasDefinedHours = Object.values(openingHours).some(
-    (day) => day && !day.closed && day.open && day.close
-  );
+  const hasDefinedHours = hasDefinedOpeningHours(businessRules);
 
   if (!hasDefinedHours) {
     return {
       category: 'operations',
       status: 'REVIEW_REQUIRED',
-      generatedValue: hoursMentions.join(', '),
+      generatedValue: 'opening-hours claim',
       expectedValue: 'Only if in Business Brain',
       reason: 'Hours mentioned but not verified in Business Brain',
     };
@@ -1771,7 +1881,8 @@ function checkDeliveryRadius(
     };
   }
 
-  // G1: authoritative businessRules.deliveryRadiusKm.
+  // G1: authoritative businessRules.deliveryRadiusKm. A radius claim ("within 5 km") needs an actual
+  // radius on file; "the owner says we deliver" does not support a distance.
   const hasDeliveryRadius = (businessRules?.deliveryRadiusKm ?? 0) > 0;
 
   if (!hasDeliveryRadius) {

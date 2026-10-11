@@ -1,5 +1,6 @@
 import type { Business, LanguageCode, SlangIntensity } from '@/types';
 import type { CampaignWizardState } from './types';
+import { secondaryLanguageFor } from './localizationDefaults';
 
 export function toIsoDateTime(yyyyMmDd: string, endOfDay = false): string {
   return endOfDay ? `${yyyyMmDd}T23:59:59.000Z` : `${yyyyMmDd}T00:00:00.000Z`;
@@ -26,10 +27,27 @@ export function buildCampaignInput(
 
   const bb = business.businessBrain;
   const price = Number(state.offer.price);
+
+  // Offer validity is the owner's statement about the OFFER, never derived from the campaign dates unless the owner
+  // said "the whole campaign". Unknown stays absent.
+  const validity = state.offer.validity;
+  const offerValidity =
+    validity?.mode === 'whole_campaign'
+      ? {
+          validityStart: toIsoDateTime(state.duration.start),
+          validityEnd: toIsoDateTime(state.duration.end, true),
+          validitySource: 'whole_campaign' as const,
+        }
+      : validity?.mode === 'custom' && validity.start && validity.end
+        ? {
+            validityStart: toIsoDateTime(validity.start),
+            validityEnd: toIsoDateTime(validity.end, true),
+            validitySource: 'owner_dates' as const,
+          }
+        : {};
   const originalPrice = state.offer.originalPrice ? Number(state.offer.originalPrice) : undefined;
   const primaryLanguage = state.primaryLanguage;
-  const secondaryLanguage: LanguageCode =
-    primaryLanguage === 'te_en' ? 'te' : primaryLanguage === 'hi_en' ? 'hi' : 'en';
+  const secondaryLanguage: LanguageCode = secondaryLanguageFor(primaryLanguage);
   const localityForContext =
     state.audience.localities[0] || business.location.locality || business.location.city;
 
@@ -51,8 +69,7 @@ export function buildCampaignInput(
       price,
       originalPrice,
       type: state.offer.type,
-      validityStart: toIsoDateTime(state.duration.start),
-      validityEnd: toIsoDateTime(state.duration.end, true),
+      ...offerValidity,
       terms: state.offer.terms.trim() || undefined,
     },
     duration: {

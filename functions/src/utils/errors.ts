@@ -71,6 +71,25 @@ export class RateLimitError extends AppError {
   }
 }
 
+/**
+ * Unexpected errors reach the browser as 'internal'. Some are deliberate, customer-readable
+ * messages thrown as plain Errors ("Mitra couldn't find enough usable footage..."), but most are SDK,
+ * credential, network or path text (e.g. "Cannot sign data without `client_email`") that must never
+ * be shown to a customer. Technical-looking or very long messages are replaced; the full text stays in
+ * the server log written by the caller before mapping.
+ */
+const TECHNICAL_MESSAGE =
+  /client_email|credential|ECONN|ENOTFOUND|ETIMEDOUT|EAI_AGAIN|socket|firestore|firebase|googleapis|gcloud|projects\/|\bat .+\(|stack|TypeError|ReferenceError|SyntaxError|undefined|\bnull\b|\[object|GRPC|\bgax\b|Cannot (read|sign|set|find module)|is not a function|not found in storage|Renderer |REEL_RENDERER|PADDLE_|GEMINI|api[_ -]?key|secret|token/i;
+export function customerSafeInternalMessage(message: string): string {
+  if (/timed? ?out|timeout/i.test(message)) {
+    return 'This is taking longer than expected. Please try again in a moment.';
+  }
+  if (!message || message.length > 240 || TECHNICAL_MESSAGE.test(message)) {
+    return 'Something went wrong on our side. Please try again in a moment.';
+  }
+  return message;
+}
+
 function buildHttpsError(error: unknown): HttpsError {
   // An HttpsError (e.g. checkRateLimit's 'resource-exhausted', or
   // verifyAuth's 'unauthenticated') already carries the correct callable
@@ -108,6 +127,8 @@ function buildHttpsError(error: unknown): HttpsError {
       ALREADY_FINALIZED: 'already-exists',
       ALREADY_REFUNDED: 'failed-precondition',
       UNAUTHORIZED: 'permission-denied',
+      // Truth Check discarded the campaign (nothing delivered, credits refunded).
+      TRUTH_CHECK_FAILED: 'failed-precondition',
       OPERATION_NOT_FOUND: 'not-found',
       // P0-4: entitlements.ts's EntitlementError — same plain Error + .code
       // shape, same reasoning (no firebase-functions dependency in that
@@ -123,7 +144,7 @@ function buildHttpsError(error: unknown): HttpsError {
     }
   }
   if (error instanceof Error) {
-    return new HttpsError('internal', error.message);
+    return new HttpsError('internal', customerSafeInternalMessage(error.message));
   }
   return new HttpsError('internal', 'An unexpected error occurred');
 }

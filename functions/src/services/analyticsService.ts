@@ -1,6 +1,5 @@
 import * as admin from 'firebase-admin';
-import { FieldValue, Timestamp } from 'firebase-admin/firestore';
-import { Firestore } from 'firebase-admin/firestore';
+import { FieldValue } from 'firebase-admin/firestore';
 
 /**
  * Canonical event names for Phase 21 Analytics
@@ -30,6 +29,16 @@ export const ANALYTICS_EVENTS = {
   CREDIT_PURCHASED: 'credit_purchased',
   REEL_STARTED: 'reel_started',
   REEL_GENERATED: 'reel_generated',
+  // Conversational-onboarding funnel (emitted server-side from onboarding/draftModel.ts):
+  //   started -> industry -> subcategory -> discovery -> review -> confirmed -> onboarding_complete
+  // `onboarding_answered` carries {field} so drop-off is readable per question.
+  ONBOARDING_STARTED: 'onboarding_started',
+  ONBOARDING_ANSWERED: 'onboarding_answered',
+  ONBOARDING_INDUSTRY_SELECTED: 'onboarding_industry_selected',
+  ONBOARDING_SUBCATEGORY_SELECTED: 'onboarding_subcategory_selected',
+  ONBOARDING_DISCOVERY: 'onboarding_discovery',
+  ONBOARDING_REVIEW_SHOWN: 'onboarding_review_shown',
+  ONBOARDING_CONFIRMED: 'onboarding_confirmed',
 } as const;
 
 /**

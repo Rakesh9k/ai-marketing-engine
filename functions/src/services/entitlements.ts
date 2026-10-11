@@ -18,7 +18,13 @@ import { logFunctionStart, logFunctionComplete, logFunctionError } from '../util
  * requirePlan, requireCampaignAllowance, requireBusinessAllowance.
  */
 
-export type EntitlementFeature = 'watermark' | 'brandKit' | 'multiBusiness' | 'premiumTemplates' | 'agencyWorkspace' | 'priorityProcessing';
+export type EntitlementFeature =
+  | 'watermark'
+  | 'brandKit'
+  | 'multiBusiness'
+  | 'premiumTemplates'
+  | 'agencyWorkspace'
+  | 'priorityProcessing';
 
 export interface PlanEntitlements {
   campaignsPerMonth: number;
@@ -36,7 +42,14 @@ export const PLAN_ENTITLEMENTS: Record<SubscriptionPlan, PlanEntitlements> = {
     creativesPerMonth: 5,
     storiesPerMonth: 0,
     maxBusinesses: 1,
-    features: { watermark: true, brandKit: false, multiBusiness: false, premiumTemplates: false, agencyWorkspace: false, priorityProcessing: false },
+    features: {
+      watermark: true,
+      brandKit: false,
+      multiBusiness: false,
+      premiumTemplates: false,
+      agencyWorkspace: false,
+      priorityProcessing: false,
+    },
   },
   starter: {
     campaignsPerMonth: 5,
@@ -44,7 +57,14 @@ export const PLAN_ENTITLEMENTS: Record<SubscriptionPlan, PlanEntitlements> = {
     creativesPerMonth: 15,
     storiesPerMonth: 9,
     maxBusinesses: 1,
-    features: { watermark: false, brandKit: false, multiBusiness: false, premiumTemplates: false, agencyWorkspace: false, priorityProcessing: false },
+    features: {
+      watermark: false,
+      brandKit: false,
+      multiBusiness: false,
+      premiumTemplates: false,
+      agencyWorkspace: false,
+      priorityProcessing: false,
+    },
   },
   business: {
     campaignsPerMonth: 12,
@@ -52,7 +72,14 @@ export const PLAN_ENTITLEMENTS: Record<SubscriptionPlan, PlanEntitlements> = {
     creativesPerMonth: 30,
     storiesPerMonth: 30,
     maxBusinesses: 1,
-    features: { watermark: false, brandKit: true, multiBusiness: false, premiumTemplates: true, agencyWorkspace: false, priorityProcessing: false },
+    features: {
+      watermark: false,
+      brandKit: true,
+      multiBusiness: false,
+      premiumTemplates: true,
+      agencyWorkspace: false,
+      priorityProcessing: false,
+    },
   },
   pro: {
     campaignsPerMonth: 25,
@@ -60,7 +87,14 @@ export const PLAN_ENTITLEMENTS: Record<SubscriptionPlan, PlanEntitlements> = {
     creativesPerMonth: 60,
     storiesPerMonth: 60,
     maxBusinesses: 3,
-    features: { watermark: false, brandKit: true, multiBusiness: true, premiumTemplates: true, agencyWorkspace: false, priorityProcessing: true },
+    features: {
+      watermark: false,
+      brandKit: true,
+      multiBusiness: true,
+      premiumTemplates: true,
+      agencyWorkspace: false,
+      priorityProcessing: true,
+    },
   },
   agency: {
     campaignsPerMonth: 50,
@@ -68,11 +102,24 @@ export const PLAN_ENTITLEMENTS: Record<SubscriptionPlan, PlanEntitlements> = {
     creativesPerMonth: 120,
     storiesPerMonth: 120,
     maxBusinesses: 10,
-    features: { watermark: false, brandKit: true, multiBusiness: true, premiumTemplates: true, agencyWorkspace: true, priorityProcessing: true },
+    features: {
+      watermark: false,
+      brandKit: true,
+      multiBusiness: true,
+      premiumTemplates: true,
+      agencyWorkspace: true,
+      priorityProcessing: true,
+    },
   },
 };
 
-const PLAN_RANK: Record<SubscriptionPlan, number> = { free: 0, starter: 1, business: 2, pro: 3, agency: 4 };
+const PLAN_RANK: Record<SubscriptionPlan, number> = {
+  free: 0,
+  starter: 1,
+  business: 2,
+  pro: 3,
+  agency: 4,
+};
 
 export interface EntitlementError extends Error {
   code: string;
@@ -221,17 +268,29 @@ export async function requireStoryAllowance(userId: string): Promise<void> {
   }
 }
 
+/**
+ * Throws the business-limit error once `existingCount` has reached the plan's cap. Pure, so the
+ * transactional creation path can run it on a count it read inside its own transaction (a
+ * check-then-write outside one lets two concurrent submits both pass).
+ */
+export function assertBusinessCapacity(
+  existingCount: number,
+  plan: string,
+  maxBusinesses: number
+): void {
+  if (existingCount >= maxBusinesses) {
+    throw createEntitlementError(
+      ENTITLEMENT_ERROR_CODES.BUSINESS_LIMIT_REACHED,
+      `Your ${plan} plan allows up to ${maxBusinesses} business profile(s).`
+    );
+  }
+}
+
 /** Throws if creating another business would exceed the user's plan's business-count limit. */
 export async function requireBusinessAllowance(userId: string): Promise<void> {
   const [entitlements, existingBusinesses] = await Promise.all([
     getUserEntitlements(userId),
     getBusinessesByUser(userId),
   ]);
-  if (existingBusinesses.length >= entitlements.maxBusinesses) {
-    throw createEntitlementError(
-      ENTITLEMENT_ERROR_CODES.BUSINESS_LIMIT_REACHED,
-      `Your ${entitlements.plan} plan allows up to ${entitlements.maxBusinesses} business profile(s).`
-    );
-  }
+  assertBusinessCapacity(existingBusinesses.length, entitlements.plan, entitlements.maxBusinesses);
 }
-

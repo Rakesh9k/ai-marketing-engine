@@ -1,3 +1,4 @@
+import { CAMPAIGN_GENERATION_COST } from '@/lib/config/pricing';
 import type {
   BusinessCategory,
   CampaignObjective,
@@ -45,7 +46,7 @@ export const OBJECTIVES: ReadonlyArray<{
   {
     value: 'brand_awareness',
     label: 'Brand Awareness',
-    description: 'Get more people familiar with your restaurant.',
+    description: 'Get more people familiar with your business.',
   },
   {
     value: 'service_promotion',
@@ -87,6 +88,16 @@ export const OBJECTIVES: ReadonlyArray<{
     label: 'Project Promotion',
     description: 'Promote an entire project or development.',
   },
+  {
+    value: 'product_promotion',
+    label: 'Product Promotion',
+    description: 'Promote a specific product you sell.',
+  },
+  {
+    value: 'new_product',
+    label: 'New Product',
+    description: 'Get attention for a new product or new arrival.',
+  },
 ];
 
 /**
@@ -103,6 +114,18 @@ export const VERTICAL_OBJECTIVES: Record<BusinessCategory, CampaignObjective[]> 
   restaurant: ['weekend_offer', 'new_dish', 'festival', 'discount', 'brand_awareness'],
   salon: ['service_promotion', 'package_promotion', 'appointment_promotion', 'new_service'],
   real_estate: ['property_promotion', 'new_listing', 'open_house', 'project_promotion'],
+  // Mirrors VerticalConfig for `general` — every business that is not a restaurant, salon or
+  // real-estate agency.
+  general: [
+    'product_promotion',
+    'new_product',
+    'service_promotion',
+    'new_service',
+    'discount',
+    'festival',
+    'weekend_offer',
+    'brand_awareness',
+  ],
 };
 
 export const OFFER_TYPES: ReadonlyArray<{ value: OfferType; label: string }> = [
@@ -152,6 +175,7 @@ export const VERTICAL_CTAS: Record<BusinessCategory, CTAType[]> = {
   restaurant: ['order_whatsapp', 'book_table', 'view_menu', 'call_now', 'get_directions'],
   salon: ['book_appointment', 'call_now', 'get_directions'],
   real_estate: ['call_now', 'get_directions'],
+  general: ['order_whatsapp', 'book_appointment', 'call_now', 'get_directions'],
 };
 
 /** See VERTICAL_OBJECTIVES above — same mirroring rationale. */
@@ -159,21 +183,30 @@ export const VERTICAL_OFFER_TYPES: Record<BusinessCategory, OfferType[]> = {
   restaurant: ['percentage', 'fixed', 'bogo', 'combo', 'free_delivery', 'loyalty'],
   salon: ['percentage', 'fixed', 'combo', 'loyalty'],
   real_estate: ['fixed', 'percentage'],
+  general: ['percentage', 'fixed', 'bogo', 'combo', 'loyalty'],
 };
 
-// Restricted to MVP scope (English / Telugu / Telugu+English). Backend also accepts
-// 'hi' and 'hi_en' but those are out of scope for the Hyderabad restaurant MVP.
+// Every language the backend supports. Which ones to offer is not a Hyderabad-only decision: a Mumbai owner
+// chooses Hinglish, a Hyderabad owner chooses Telugu + English.
 export const LANGUAGES: ReadonlyArray<{ value: LanguageCode; label: string }> = [
   { value: 'en', label: 'English' },
+  { value: 'hi', label: 'Hindi' },
+  { value: 'hi_en', label: 'Hinglish (Hindi + English)' },
   { value: 'te', label: 'Telugu' },
   { value: 'te_en', label: 'Telugu + English' },
 ];
 
-// Restricted to MVP scope (Hyderabad, Telangana). Backend also accepts mumbai/
-// bangalore/delhi/chennai/kolkata but those are out of scope for this MVP.
+// The full catalogue of styles, for labels. Which ones to OFFER depends on the language and the business's
+// place: see regionalStylesFor in localizationDefaults.ts.
 export const REGIONAL_STYLES: ReadonlyArray<{ value: RegionalStyle; label: string }> = [
   { value: 'neutral', label: 'Neutral' },
   { value: 'hyderabadi', label: 'Hyderabadi' },
+  { value: 'telangana', label: 'Telangana' },
+  { value: 'mumbai', label: 'Mumbai' },
+  { value: 'bangalore', label: 'Bangalore' },
+  { value: 'delhi', label: 'Delhi' },
+  { value: 'chennai', label: 'Chennai' },
+  { value: 'kolkata', label: 'Kolkata' },
 ];
 
 export const CAMPAIGN_STYLES: ReadonlyArray<{
@@ -218,8 +251,8 @@ export const OCCASIONS: ReadonlyArray<{
 export const TOTAL_STEPS = 10;
 
 /**
- * Mirrors functions/src/config/pricing.ts PRICING.campaignBaseCredits (100) +
- * 2 * PRICING.imageGenerationCredits (20) = 140, which is exactly what
+ * Mirrors functions/src/config/pricing.ts PRICING.campaignBaseCredits (60) +
+ * 2 * PRICING.imageGenerationCredits (20) = 100, which is exactly what
  * getGenerationCost('campaign_generation') in functions/src/services/usageControl.ts
  * returns and what executeWithUsageControl actually reserves server-side.
  * The backend is authoritative for the real reservation regardless of this value —
@@ -227,4 +260,4 @@ export const TOTAL_STEPS = 10;
  * if PRICING changes (no shared package/endpoint exposes it to the frontend today;
  * see the Known Limitations section of the Phase 4 report).
  */
-export const ESTIMATED_CAMPAIGN_GENERATION_CREDITS = 140;
+export const ESTIMATED_CAMPAIGN_GENERATION_CREDITS = CAMPAIGN_GENERATION_COST;

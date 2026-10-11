@@ -1,5 +1,5 @@
-import type { GenerationPipelineInput, TruthCheckResult } from '../../types';
-import { GenerationPipeline } from './pipeline';
+import type { GenerationPipelineInput } from '../../types';
+import type { GenerationPipeline } from './pipeline';
 
 export interface InstructionChainTestCase {
   id: string;

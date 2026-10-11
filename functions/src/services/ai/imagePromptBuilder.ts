@@ -1,10 +1,5 @@
 import { VISUAL_DIRECTION_PRESETS } from './creativeBrief';
-import type {
-  CreativeBriefInput,
-  CampaignStrategyReference,
-  CopyPackReference,
-  CreativeBrief,
-} from './creativeBrief';
+import type { CreativeBrief } from './creativeBrief';
 
 /**
  * ImagePromptBuilder - Centralized prompt builder for image generation
@@ -76,7 +71,7 @@ export function buildImagePrompt(brief: CreativeBrief): ImagePrompt {
  * Build subject section - the product as visual reference
  */
 function buildSubjectSection(brief: CreativeBrief): string {
-  const { product, visualDirection } = brief;
+  const { product, visualDirection: _visualDirection } = brief;
 
   let subject = `MAIN SUBJECT: ${product.name}`;
 
@@ -154,7 +149,7 @@ function buildCompositionSection(brief: CreativeBrief): string {
  * Build lighting and mood section
  */
 function buildLightingMoodSection(brief: CreativeBrief): string {
-  const { visualDirection, brand } = brief;
+  const { visualDirection, brand: _brand } = brief;
 
   let lighting = 'LIGHTING & MOOD:';
 
@@ -179,7 +174,7 @@ function buildLightingMoodSection(brief: CreativeBrief): string {
  * Build brand identity section
  */
 function buildBrandSection(brief: CreativeBrief): string {
-  const { brand, product } = brief;
+  const { brand, product: _product } = brief;
 
   let brandSection = 'BRAND IDENTITY:';
 
@@ -258,7 +253,7 @@ function buildLocalizationSection(brief: CreativeBrief): string {
  * Build text overlay specification
  */
 function buildTextOverlay(brief: CreativeBrief): ImagePrompt['textOverlay'] {
-  const { copyPack, campaignStrategy, offer, brand, cta } = brief;
+  const { copyPack, campaignStrategy, offer, brand: _brand, cta } = brief;
 
   // Use copy pack headlines if available, otherwise generate from strategy
   const headline =
@@ -294,7 +289,7 @@ function formatCTAForOverlay(cta?: string): string {
  * Build technical specifications
  */
 function buildTechnicalSection(brief: CreativeBrief): string {
-  const { aspectRatio, generationMode } = brief;
+  const { aspectRatio: _aspectRatio, generationMode } = brief;
 
   const techSpecs = {
     product_ad:
@@ -316,7 +311,7 @@ function buildTechnicalSection(brief: CreativeBrief): string {
  * Build style guidance
  */
 function buildStyleGuidance(brief: CreativeBrief): string {
-  const { visualDirection, localization, brand, generationMode } = brief;
+  const { visualDirection, localization: _localization, brand, generationMode } = brief;
 
   let guidance = `STYLE GUIDANCE:\n`;
 
@@ -353,7 +348,7 @@ function buildStyleGuidance(brief: CreativeBrief): string {
  * Build negative prompt from prohibited elements
  */
 function buildNegativePrompt(brief: CreativeBrief): string {
-  const { prohibitedElements, product, brand, localization } = brief;
+  const { prohibitedElements, product: _product, brand, localization } = brief;
 
   const negatives: string[] = [
     'blurry, low quality, pixelated, artifact',
@@ -414,7 +409,7 @@ export function buildImagePromptPack(brief: CreativeBrief, count: number = 5): I
 /**
  * Create variations of the brief for multiple generations
  */
-function varyBriefForIndex(brief: CreativeBrief, index: number, total: number): CreativeBrief {
+function varyBriefForIndex(brief: CreativeBrief, index: number, _total: number): CreativeBrief {
   const variations = [
     { composition: 'centered hero, symmetrical', angle: 'straight-on' },
     { composition: 'rule of thirds, product left', angle: '45-degree top-down' },

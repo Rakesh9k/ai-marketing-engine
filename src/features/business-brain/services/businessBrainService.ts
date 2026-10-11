@@ -13,6 +13,7 @@ import type {
 } from '@/types';
 import { businessService } from '@/services/database';
 import { brandKitService } from '@/services/database';
+import { secondaryLanguageFor } from '@/features/campaign/localizationDefaults';
 
 // eslint-disable-next-line @typescript-eslint/consistent-type-imports
 function getDb(): import('firebase/firestore').Firestore {
@@ -100,7 +101,7 @@ export async function getBusinessBrainContext(
     city: businessData.location?.city || '',
     locality: businessData.location?.locality || '',
     primaryLanguage: bbLoc?.primaryLanguage || 'en',
-    secondaryLanguage: bbLoc?.secondaryLanguage || 'te',
+    secondaryLanguage: bbLoc?.secondaryLanguage || secondaryLanguageFor(bbLoc?.primaryLanguage),
     languageMixing: bbLoc?.languageMixing || 'minimal',
     regionalStyle: bbLoc?.regionalStyle || 'neutral',
     slangPreference: bbLoc?.slangIntensity || 'none',
@@ -205,7 +206,9 @@ async function _loadProductsByBusiness(businessId: string): Promise<Product[]> {
 /**
  * Extracts BusinessRules from the BusinessBrain, or returns defaults.
  */
-function _extractBusinessRules(businessBrainRules?: BusinessBrain['businessRules']): BusinessRules {
+export function _extractBusinessRules(
+  businessBrainRules?: BusinessBrain['businessRules']
+): BusinessRules {
   if (businessBrainRules) {
     return {
       factuality: {
@@ -216,8 +219,13 @@ function _extractBusinessRules(businessBrainRules?: BusinessBrain['businessRules
       },
       availability: {
         displayUnavailableItems: false,
-        minimumOrderRequired: true,
-        deliveryRadiusKm: businessBrainRules.deliveryRadiusKm || 50,
+        // Only what the owner gave: never "a minimum order is required" or a 50 km radius by default.
+        ...(businessBrainRules.minimumOrder !== undefined
+          ? { minimumOrderRequired: businessBrainRules.minimumOrder > 0 }
+          : {}),
+        ...(businessBrainRules.deliveryRadiusKm !== undefined
+          ? { deliveryRadiusKm: businessBrainRules.deliveryRadiusKm }
+          : {}),
       },
       communication: {
         contactInformationAllowed: true,
@@ -237,8 +245,7 @@ function _extractBusinessRules(businessBrainRules?: BusinessBrain['businessRules
     },
     availability: {
       displayUnavailableItems: false,
-      minimumOrderRequired: true,
-      deliveryRadiusKm: 50,
+      // No Business Brain: nothing is known about delivery or minimum order.
     },
     communication: {
       contactInformationAllowed: true,
