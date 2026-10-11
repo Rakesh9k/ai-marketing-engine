@@ -40,6 +40,7 @@ import {
 import { assertVerticalImplemented, getVerticalConfig } from '../../config/verticals';
 import { requireCampaignAllowance } from '../../services/entitlements';
 import { ValidationError } from '../../utils/errors';
+import { validateOffer, validateAgainstCatalog, firstMessage } from '../../utils/offerValidation';
 import { toSavedStyleContext } from '../../services/savedStyle';
 import { creativeTemplateRegistry } from '../../services/creativeTemplateRegistry';
 import type { CampaignObjective, CreativeObjective } from '../../types';
@@ -303,6 +304,41 @@ export const generateCampaignStrategy = onCall(
           { styleId: ['The selected Saved Style does not belong to this user.'] },
           'Saved Style ownership could not be verified.'
         );
+      }
+
+      // Pass 2C P1-B: a contradictory offer (a "was" price below the price now, a percentage offer with no real
+      // discount, an end date before its start, an offer that is over before the campaign begins, a "was" price
+      // that disagrees with the catalogue) is rejected HERE — before the quota check, before any credit
+      // reservation and before any AI call — with a message the owner can act on. Truth Check would only catch
+      // the downstream copy mismatch, after generation had already cost money.
+      const offerErrors = validateOffer(
+        {
+          price: data.offer.price,
+          originalPrice: data.offer.originalPrice,
+          type: data.offer.type,
+          validityStart: data.offer.validityStart,
+          validityEnd: data.offer.validityEnd,
+        },
+        data.duration
+      );
+      if (data.productId && Object.keys(offerErrors).length === 0) {
+        const catalogProduct = await getProductDoc(data.productId);
+        if (catalogProduct && catalogProduct.businessId === data.businessId) {
+          Object.assign(
+            offerErrors,
+            validateAgainstCatalog(
+              {
+                type: data.offer.type,
+                originalPrice: data.offer.originalPrice,
+                price: data.offer.price,
+              },
+              catalogProduct.price
+            )
+          );
+        }
+      }
+      if (Object.keys(offerErrors).length > 0) {
+        throw new ValidationError(offerErrors, firstMessage(offerErrors));
       }
 
       // P0-4 (docs/P0_HARDENING_TRACKER.md): plan-tier campaign quota,

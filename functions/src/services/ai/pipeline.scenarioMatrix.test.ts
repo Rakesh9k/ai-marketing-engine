@@ -29,6 +29,7 @@ jest.mock('./generatedAssetStorage', () => ({
 }));
 
 import { writeFileSync } from 'fs';
+import { validateOffer } from '../../utils/offerValidation';
 import { GenerationPipeline, CopyPackSchema, type GenerationPipelineInput } from './pipeline';
 
 type Verdict = 'PASS' | 'FAIL' | 'REVIEW' | 'NOT_TESTED';
@@ -263,9 +264,9 @@ const INVENTED: Array<[RegExp, string]> = [
 const inventedHits = (prompts: string[]) =>
   prompts.flatMap((p) =>
     INVENTED.flatMap(([re, why]) =>
-      [...p.matchAll(new RegExp(re.source, re.flags.includes('g') ? re.flags : re.flags + 'g'))].map(
-        () => why
-      )
+      [
+        ...p.matchAll(new RegExp(re.source, re.flags.includes('g') ? re.flags : re.flags + 'g')),
+      ].map(() => why)
     )
   );
 
@@ -663,20 +664,29 @@ describe('Pass 2C scenario matrix (mock mode)', () => {
       negativeDiscount ? 'FAIL' : 'PASS',
       'copy-stage prompt inspected'
     );
-    // Flagged = the pipeline refused (threw) or told the model/user about the contradiction. The callable's
-    // zod schema (generateCampaignStrategy.ts, offer{}) has no cross-field refine either (grep "refine": none).
-    const flaggedBeforeGeneration =
-      r.threw !== undefined || /contradict|conflict|inconsistent|invalid offer/i.test(prompt);
+    // The pipeline itself does not validate; the callable does (utils/offerValidation.ts, run before any credit
+    // reservation: see generateCampaignStrategy.offerValidation.test.ts). Evaluate the same validator here.
+    const offerErrors = validateOffer(
+      {
+        price: i.offerPrice,
+        originalPrice: i.offerOriginalPrice,
+        type: i.offerType,
+        validityStart: i.offerValidityStart,
+        validityEnd: i.offerValidityEnd,
+      },
+      i.duration
+    );
+    const flaggedBeforeGeneration = Object.keys(offerErrors).length > 0;
     record(
       'S10 Contradictory offer',
       'reliability',
-      'contradiction (original < price, end < start) is rejected or flagged BEFORE generation',
+      'contradiction (original < price, end < start) is rejected BEFORE generation and before any credit is reserved',
       flaggedBeforeGeneration ? 'PASS' : 'FAIL',
       flaggedBeforeGeneration
-        ? 'the contradiction was flagged'
-        : 'not flagged: generation ran to completion; callable zod schema has no cross-field refine. Truth Check catches only the downstream copy mismatch'
+        ? `rejected: ${Object.keys(offerErrors).join(', ')} (callable-level proof: generateCampaignStrategy.offerValidation.test.ts)`
+        : 'not flagged'
     );
-    expect(flaggedBeforeGeneration).toBe(false); // pins the gap; flip when input validation is added
+    expect(flaggedBeforeGeneration).toBe(true);
     expect(r.threw).toBeUndefined();
     expect(r.truth).toBe('FAIL');
     expect(negativeDiscount).toBe(false);
