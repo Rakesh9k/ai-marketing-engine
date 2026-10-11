@@ -42,18 +42,16 @@ export const envSchema = z.object({
   RAZORPAY_STARTER_PLAN_ID: z.string().optional(),
   RAZORPAY_BUSINESS_PLAN_ID: z.string().optional(),
   RAZORPAY_AGENCY_PLAN_ID: z.string().optional(),
-  // Paddle Billing (replaces PayU for recurring subscriptions).
-  // PADDLE_API_KEY — server-side only, never logged or returned to clients.
-  // PADDLE_WEBHOOK_SECRET — used in paddleWebhook.ts to verify HMAC-SHA256.
-  // PADDLE_PRICE_ID_* — Paddle price IDs (pri_xxx) for each plan tier.
-  // NEXT_PUBLIC_* vars are set in .env.local for the Next.js frontend.
+  // Which payment provider may TAKE NEW PAYMENTS and GRANT entitlements. Decision 2026-10-11: Cashfree is the
+  // approved active gateway. The inactive provider's checkout refuses and its webhook acknowledges (so the
+  // provider stops retrying) but grants nothing, so the two can never both fulfil a purchase.
+  // See services/activeProvider.ts. Defaults to 'cashfree'.
+  ACTIVE_PAYMENT_PROVIDER: z.enum(['cashfree', 'paddle']).default('cashfree'),
+  // Paddle Billing (legacy; checkout and entitlement grants are disabled unless ACTIVE_PAYMENT_PROVIDER=paddle).
+  // PADDLE_ENVIRONMENT has no default on purpose: a billing system must never silently pick an environment.
   PADDLE_API_KEY: z.string().optional(),
   PADDLE_WEBHOOK_SECRET: z.string().optional(),
-  // No default, on purpose: a billing system must never silently pick an environment.
-  // getPaddleClient() throws if this is missing.
   PADDLE_ENVIRONMENT: z.enum(['sandbox', 'production']).optional(),
-  // One price per (plan, billing cycle) plus one per credit pack. Produced by
-  // scripts/setup-paddle-catalog.mjs. Unset => that purchase is refused (never mocked).
   PADDLE_PRICE_ID_STARTER_MONTHLY: z.string().optional(),
   PADDLE_PRICE_ID_STARTER_YEARLY: z.string().optional(),
   PADDLE_PRICE_ID_BUSINESS_MONTHLY: z.string().optional(),
@@ -65,9 +63,10 @@ export const envSchema = z.object({
   PADDLE_PRICE_ID_PACK_500: z.string().optional(),
   PADDLE_PRICE_ID_PACK_1200: z.string().optional(),
   PADDLE_PRICE_ID_PACK_3000: z.string().optional(),
-  // Cashfree (INR gateway; present in code and exported, NOT the primary provider: Paddle is live).
-  // CASHFREE_* are server-side only, never logged or sent to the client. CASHFREE_WEBHOOK_SECRET verifies
-  // the HMAC-SHA256 signature in cashfreeWebhook.ts. Production status of this gateway: see docs/audits.
+  // Cashfree Payments (Primary gateway).
+  // CASHFREE_APP_ID — server-side only, client ID.
+  // CASHFREE_SECRET_KEY — server-side secret key, never logged or sent to client.
+  // CASHFREE_WEBHOOK_SECRET — used in cashfreeWebhook.ts to verify HMAC-SHA256 signature.
   CASHFREE_APP_ID: z.string().optional(),
   CASHFREE_SECRET_KEY: z.string().optional(),
   CASHFREE_WEBHOOK_SECRET: z.string().optional(),
@@ -102,7 +101,7 @@ export const envSchema = z.object({
 
 export type EnvConfig = z.infer<typeof envSchema>;
 
-let cachedEnv: EnvConfig | null = null;
+let _cachedEnv: EnvConfig | null = null;
 
 export function getEnvConfig(): EnvConfig {
   const withProjectFallback = {

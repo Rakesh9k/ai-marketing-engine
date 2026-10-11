@@ -12,6 +12,8 @@ import { createCashfreeOrder, describeCashfreePurchase } from '../../services/ca
 import { isValidCreditPack, type PaidPlan } from '../../services/paddle';
 import { logFunctionStart, logFunctionComplete, logFunctionError } from '../../utils/logging';
 import { mapErrorToHttpsError } from '../../utils/errors';
+import { assertProviderActive } from '../../services/activeProvider';
+import { isAllowedReturnUrl } from '../../services/cashfree';
 
 const db = admin.firestore();
 
@@ -51,7 +53,13 @@ export const createCashfreeCheckout = onCall(
     });
 
     try {
+      assertProviderActive('cashfree');
       await checkRateLimit(context.userId, 'createCashfreeCheckout');
+
+      // The browser is sent here after paying; only our own origins are acceptable.
+      if (data.returnUrl && !isAllowedReturnUrl(data.returnUrl)) {
+        throw new HttpsError('invalid-argument', 'Invalid return URL');
+      }
 
       const user = await getUserDoc(context.userId);
       if (!user) {
@@ -68,7 +76,13 @@ export const createCashfreeCheckout = onCall(
 
       // Resolve purchase details and canonical prices server-side.
       let purchase:
-        | { kind: 'subscription'; planId: PaidPlan; billingCycle: 'monthly' | 'yearly'; priceINR: number; credits: number }
+        | {
+            kind: 'subscription';
+            planId: PaidPlan;
+            billingCycle: 'monthly' | 'yearly';
+            priceINR: number;
+            credits: number;
+          }
         | { kind: 'credit_pack'; credits: number; priceINR: number };
 
       if (data.creditPack !== undefined) {

@@ -20,10 +20,13 @@ export function getCashfreeConfig(): CashfreeConfig {
   const secretKey = env.CASHFREE_SECRET_KEY;
 
   if (!appId || !secretKey) {
-    throw new Error('Cashfree credentials not configured (CASHFREE_APP_ID or CASHFREE_SECRET_KEY missing)');
+    throw new Error(
+      'Cashfree credentials not configured (CASHFREE_APP_ID or CASHFREE_SECRET_KEY missing)'
+    );
   }
 
-  const environment: CashfreeEnvironment = env.CASHFREE_ENVIRONMENT === 'production' ? 'production' : 'sandbox';
+  const environment: CashfreeEnvironment =
+    env.CASHFREE_ENVIRONMENT === 'production' ? 'production' : 'sandbox';
   const baseUrl =
     environment === 'production'
       ? 'https://api.cashfree.com/pg'
@@ -54,10 +57,7 @@ export function verifyCashfreeWebhookSignature(
 
   const key = secretKey || getCashfreeConfig().webhookSecret;
   const signedPayload = timestamp + rawBody;
-  const expectedSignature = crypto
-    .createHmac('sha256', key)
-    .update(signedPayload)
-    .digest('base64');
+  const expectedSignature = crypto.createHmac('sha256', key).update(signedPayload).digest('base64');
 
   // timingSafeEqual throws a RangeError on unequal lengths, which the webhook handler would
   // turn into a 500 (and a provider retry). A wrong-length signature is simply invalid.
@@ -72,7 +72,9 @@ export function verifyCashfreeWebhookSignature(
 /**
  * Creates a Cashfree payment order via Cashfree PG API.
  */
-export async function createCashfreeOrder(input: CreateCheckoutInput): Promise<CreateCheckoutResult> {
+export async function createCashfreeOrder(
+  input: CreateCheckoutInput
+): Promise<CreateCheckoutResult> {
   const config = getCashfreeConfig();
   const orderId = `mitra_ord_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
 
@@ -246,4 +248,31 @@ export function describeCashfreePurchase(
     return `${credits.toLocaleString('en-IN')} credit top-up pack — Cashfree`;
   }
   return 'Mitra Payment — Cashfree';
+}
+
+/**
+ * The browser return URL after payment must be one of our own origins (APP_URL, the production domains, or
+ * localhost in development/emulator), so a crafted checkout request cannot bounce a payer to another site.
+ */
+export function isAllowedReturnUrl(url: string): boolean {
+  let parsed: URL;
+  try {
+    parsed = new URL(url.replace('{order_id}', 'x'));
+  } catch {
+    return false;
+  }
+  const env = getEnvConfig();
+  const allowed = new Set<string>(['https://brain-wise.com', 'https://www.brain-wise.com']);
+  if (env.APP_URL) {
+    try {
+      allowed.add(new URL(env.APP_URL).origin);
+    } catch {
+      /* ignore a malformed APP_URL */
+    }
+  }
+  if (env.NODE_ENV !== 'production' || env.FUNCTIONS_EMULATOR) {
+    allowed.add('http://localhost:3000');
+    allowed.add('http://127.0.0.1:3000');
+  }
+  return allowed.has(parsed.origin);
 }

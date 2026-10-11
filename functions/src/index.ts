@@ -59,10 +59,9 @@ export { onUserDeletedHandler } from './functions/auth/onUserCreated';
 export { getUploadUrl } from './functions/assets/getUploadUrl';
 export { confirmUpload } from './functions/assets/confirmUpload';
 export { deleteAsset } from './functions/assets/deleteAsset';
-// Payments: Paddle is the live provider (requires the PADDLE_API_KEY / PADDLE_WEBHOOK_SECRET secrets and
-// PADDLE_PRICE_ID_* config; see docs/PAYMENT_GATEWAY.md). The Cashfree functions below are exported and
-// deploy with the bundle, but their production status is UNVERIFIED (see docs/audits/mitra-complete-audit);
-// do not treat Cashfree as the primary gateway.
+// Payments: Cashfree is the approved ACTIVE gateway (decision 2026-10-11). Paddle stays exported but inert: with
+// ACTIVE_PAYMENT_PROVIDER=cashfree (the default) its checkout refuses and its webhook grants nothing (see
+// services/activeProvider.ts). Only one provider may take payments and grant entitlements at a time.
 export { createPaddleCheckout } from './functions/subscriptions/createPaddleCheckout';
 export { cancelPaddleSubscription } from './functions/subscriptions/cancelPaddleSubscription';
 export { paddleWebhook } from './functions/webhooks/paddleWebhook';

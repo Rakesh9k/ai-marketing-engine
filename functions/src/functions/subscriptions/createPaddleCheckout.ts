@@ -19,6 +19,7 @@ import {
 } from '../../services/paddle';
 import { logFunctionStart, logFunctionComplete, logFunctionError } from '../../utils/logging';
 import { mapErrorToHttpsError } from '../../utils/errors';
+import { assertProviderActive } from '../../services/activeProvider';
 
 const db = admin.firestore();
 
@@ -92,6 +93,8 @@ export const createPaddleCheckout = onCall(
     });
 
     try {
+      // Paddle takes new payments only when it is the active provider (ACTIVE_PAYMENT_PROVIDER).
+      assertProviderActive('paddle');
       await checkRateLimit(context.userId, 'createPaddleCheckout');
 
       const user = await getUserDoc(context.userId);

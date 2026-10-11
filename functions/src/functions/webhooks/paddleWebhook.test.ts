@@ -7,6 +7,7 @@
  * Env vars must be set BEFORE getEnvConfig() first reads them (it caches).
  */
 const WEBHOOK_SECRET = 'pdl_ntfset_test_secret_for_unit_tests';
+process.env['ACTIVE_PAYMENT_PROVIDER'] = 'paddle'; // these tests exercise the Paddle path, which is inert unless Paddle is the active provider
 process.env['PADDLE_API_KEY'] = 'pdl_sdbx_apikey_test_only';
 process.env['PADDLE_WEBHOOK_SECRET'] = WEBHOOK_SECRET;
 process.env['PADDLE_ENVIRONMENT'] = 'sandbox';

@@ -8,9 +8,7 @@ import {
   logFunctionError,
 } from '../../utils/logging';
 import { trackEvent, ANALYTICS_EVENTS } from '../../services/analyticsService';
-import {
-  verifyCashfreeWebhookSignature,
-} from '../../services/cashfree';
+import { verifyCashfreeWebhookSignature } from '../../services/cashfree';
 import {
   applyPlanEntitlement,
   grantTopUpCredits,
@@ -19,6 +17,7 @@ import {
 } from '../../services/billing';
 import { getMonthlyCredits, type SubscriptionPlan } from '../../config/pricing';
 import type { PaidPlan, BillingCycle } from '../../services/paymentProvider';
+import { isProviderActive, recordIgnoredProviderEvent } from '../../services/activeProvider';
 
 const db = admin.firestore();
 const webhookLogger = createLogger({ function: 'cashfreeWebhook' });
@@ -85,7 +84,10 @@ export const cashfreeWebhook = onRequest(
       const timestamp = req.headers['x-webhook-timestamp'] as string;
 
       if (!signature || !timestamp) {
-        logger.error('cashfreeWebhook missing signature or timestamp headers', new Error('Missing headers'));
+        logger.error(
+          'cashfreeWebhook missing signature or timestamp headers',
+          new Error('Missing headers')
+        );
         res.status(400).send('Missing signature or timestamp header');
         return;
       }
@@ -98,12 +100,32 @@ export const cashfreeWebhook = onRequest(
 
       const isValid = verifyCashfreeWebhookSignature(rawBody, signature, timestamp);
       if (!isValid) {
-        logger.error('cashfreeWebhook signature verification failed', new Error('Invalid signature'));
+        logger.error(
+          'cashfreeWebhook signature verification failed',
+          new Error('Invalid signature')
+        );
         res.status(400).send('Invalid webhook signature');
         return;
       }
 
-      const payload = (typeof req.body === 'string' ? JSON.parse(req.body) : req.body) as CashfreeWebhookPayload;
+      const payload = (
+        typeof req.body === 'string' ? JSON.parse(req.body) : req.body
+      ) as CashfreeWebhookPayload;
+
+      if (!isProviderActive('cashfree')) {
+        const o = payload.data?.order?.order_id ?? payload.data?.refund?.refund_id ?? 'unknown';
+        await recordIgnoredProviderEvent('cashfree', `${payload.type}_${o}`, payload.type, {
+          orderId: payload.data?.order?.order_id ?? null,
+        });
+        logger.warn(
+          'cashfreeWebhook: event ignored because Cashfree is not the active payment provider',
+          {
+            eventType: payload.type,
+          }
+        );
+        res.status(200).send('OK (ignored: provider inactive)');
+        return;
+      }
 
       await processCashfreeEvent(payload);
 
@@ -172,10 +194,51 @@ async function handlePaymentSuccess(payload: CashfreeWebhookPayload) {
   }
 
   const txnData = txnSnap.data()!;
-  const userId = txnData['userId'] as string || customer?.customer_id;
+  const userId = (txnData['userId'] as string) || customer?.customer_id;
 
   if (!userId) {
-    webhookLogger.error('cashfreeWebhook: cannot attribute payment to user', new Error('Missing userId'), { orderId });
+    webhookLogger.error(
+      'cashfreeWebhook: cannot attribute payment to user',
+      new Error('Missing userId'),
+      { orderId }
+    );
+    return;
+  }
+
+  // The webhook is signed, but a grant must also match the order WE created: the payment succeeded, in INR,
+  // for exactly the price the server stored when it created the order (never trust the payload to name the
+  // product, and never grant for a short payment).
+  const expectedPrice = txnData['metadata']?.['priceINR'] as number | undefined;
+  const paidStatus = payment?.payment_status;
+  const paidAmount = payment?.payment_amount ?? order.order_amount;
+  const paidCurrency = payment?.payment_currency ?? order.order_currency;
+  const problems: string[] = [];
+  if (paidStatus !== undefined && paidStatus !== 'SUCCESS')
+    problems.push(`payment_status=${paidStatus}`);
+  if (paidCurrency !== undefined && paidCurrency !== 'INR')
+    problems.push(`currency=${paidCurrency}`);
+  if (typeof expectedPrice !== 'number') problems.push('no stored price to compare');
+  else if (typeof paidAmount !== 'number' || Math.abs(paidAmount - expectedPrice) > 0.005)
+    problems.push(`amount ${paidAmount} != expected ${expectedPrice}`);
+  if (problems.length > 0) {
+    webhookLogger.error(
+      'cashfreeWebhook: payment does not match the order, nothing granted',
+      new Error(problems.join('; ')),
+      { orderId }
+    );
+    await db
+      .collection('cashfree_grants')
+      .doc(orderId)
+      .set(
+        {
+          orderId,
+          userId,
+          status: 'flagged',
+          reason: problems.join('; '),
+          flaggedAt: FieldValue.serverTimestamp(),
+        },
+        { merge: true }
+      );
     return;
   }
 
@@ -204,7 +267,9 @@ async function handlePaymentSuccess(payload: CashfreeWebhookPayload) {
       const subId = `sub_cf_${userId}_${planId}`;
       const subRef = db.collection('subscriptions').doc(subId);
       const nowIso = new Date().toISOString();
-      const periodEnd = new Date(Date.now() + (billingCycle === 'yearly' ? 365 : 30) * 86400_000).toISOString();
+      const periodEnd = new Date(
+        Date.now() + (billingCycle === 'yearly' ? 365 : 30) * 86400_000
+      ).toISOString();
 
       tx.set(
         subRef,
@@ -239,8 +304,11 @@ async function handlePaymentSuccess(payload: CashfreeWebhookPayload) {
     }
 
     const usedNow = (usage.snap.data()?.['creditsUsed'] as number | undefined) ?? 0;
-    const bonusAfter = (usage.snap.data()?.['bonusCredits'] as number | undefined) ?? (kind === 'credit_pack' ? credits : 0);
-    const planForAllowance = (usage.snap.data()?.['planId'] as SubscriptionPlan | undefined) ?? planId;
+    const bonusAfter =
+      (usage.snap.data()?.['bonusCredits'] as number | undefined) ??
+      (kind === 'credit_pack' ? credits : 0);
+    const planForAllowance =
+      (usage.snap.data()?.['planId'] as SubscriptionPlan | undefined) ?? planId;
 
     // Update transaction to completed
     tx.set(
@@ -270,17 +338,26 @@ async function handlePaymentSuccess(payload: CashfreeWebhookPayload) {
   });
 
   if (!result.granted) {
-    webhookLogger.info('cashfreeWebhook: payment already fulfilled (duplicate webhook)', { orderId });
+    webhookLogger.info('cashfreeWebhook: payment already fulfilled (duplicate webhook)', {
+      orderId,
+    });
     return;
   }
 
   if (kind === 'subscription') {
-    await trackEvent(ANALYTICS_EVENTS.SUBSCRIPTION_STARTED, userId, undefined, undefined, undefined, {
-      orderId,
-      planId,
-      billingCycle,
-      provider: 'cashfree',
-    });
+    await trackEvent(
+      ANALYTICS_EVENTS.SUBSCRIPTION_STARTED,
+      userId,
+      undefined,
+      undefined,
+      undefined,
+      {
+        orderId,
+        planId,
+        billingCycle,
+        provider: 'cashfree',
+      }
+    );
   } else {
     await trackEvent(ANALYTICS_EVENTS.CREDIT_PURCHASED, userId, undefined, undefined, undefined, {
       orderId,
@@ -348,7 +425,30 @@ async function handleRefundStatusChange(payload: CashfreeWebhookPayload) {
   const refund = payload.data?.refund;
   if (!refund?.refund_id) return;
 
-  webhookLogger.info('cashfreeWebhook: refund status update received', {
+  const orderId = payload.data?.order?.order_id;
+  await db
+    .collection('cashfree_refunds')
+    .doc(refund.refund_id)
+    .set(
+      {
+        refundId: refund.refund_id,
+        orderId: orderId ?? null,
+        status: refund.refund_status,
+        amount: refund.refund_amount ?? null,
+        // Whether a refund removes credits/entitlement is a business-policy decision that is not defined, so
+        // an operator reviews every successful refund; nothing is revoked automatically.
+        needsManualReview: refund.refund_status === 'SUCCESS',
+        updatedAt: FieldValue.serverTimestamp(),
+      },
+      { merge: true }
+    );
+  if (orderId && refund.refund_status === 'SUCCESS') {
+    await db
+      .collection('transactions')
+      .doc(orderId)
+      .set({ reconciliation: { state: 'refunded', refundId: refund.refund_id } }, { merge: true });
+  }
+  webhookLogger.info('cashfreeWebhook: refund status recorded', {
     refundId: refund.refund_id,
     status: refund.refund_status,
   });

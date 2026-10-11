@@ -2,7 +2,7 @@ import crypto from 'crypto';
 import * as admin from 'firebase-admin';
 import { cashfreeWebhook, processCashfreeEvent } from './cashfreeWebhook';
 import { getUsageDocId } from '../../services/firestore';
-import { PRICING } from '../../config/pricing';
+import { PRICING, getPlanPrice } from '../../config/pricing';
 
 const APP_ID = 'test_cashfree_app_id';
 const SECRET_KEY = 'test_cashfree_secret_key_12345';
@@ -64,24 +64,27 @@ describeIfEmulator('cashfreeWebhook (Firestore emulator)', () => {
     planId = 'starter',
     credits = 500
   ) {
-    await db.collection('transactions').doc(orderId).set({
-      transactionId: orderId,
-      userId,
-      type: kind === 'credit_pack' ? 'credit_purchase' : 'subscription',
-      amount: credits,
-      currency: 'INR',
-      balanceAfter: 0,
-      status: 'pending',
-      provider: 'cashfree',
-      cashfreeOrderId: orderId,
-      metadata: {
-        kind,
-        planId: kind === 'subscription' ? planId : null,
-        billingCycle: 'monthly',
-        credits,
-        priceINR: kind === 'subscription' ? 1499 : 999,
-      },
-    });
+    await db
+      .collection('transactions')
+      .doc(orderId)
+      .set({
+        transactionId: orderId,
+        userId,
+        type: kind === 'credit_pack' ? 'credit_purchase' : 'subscription',
+        amount: credits,
+        currency: 'INR',
+        balanceAfter: 0,
+        status: 'pending',
+        provider: 'cashfree',
+        cashfreeOrderId: orderId,
+        metadata: {
+          kind,
+          planId: kind === 'subscription' ? planId : null,
+          billingCycle: 'monthly',
+          credits,
+          priceINR: kind === 'subscription' ? getPlanPrice(planId as 'business', 'monthly') : 999,
+        },
+      });
   }
 
   describe('one-time credit pack fulfillment', () => {
@@ -95,7 +98,12 @@ describeIfEmulator('cashfreeWebhook (Firestore emulator)', () => {
         type: 'PAYMENT_SUCCESS_WEBHOOK',
         data: {
           order: { order_id: orderId, order_amount: 999, order_currency: 'INR' },
-          payment: { cf_payment_id: 'cf_pay_111', payment_status: 'SUCCESS', payment_amount: 999, payment_currency: 'INR' },
+          payment: {
+            cf_payment_id: 'cf_pay_111',
+            payment_status: 'SUCCESS',
+            payment_amount: 999,
+            payment_currency: 'INR',
+          },
           customer_details: { customer_id: userId },
         },
       };
@@ -127,8 +135,17 @@ describeIfEmulator('cashfreeWebhook (Firestore emulator)', () => {
       const payload = {
         type: 'PAYMENT_SUCCESS_WEBHOOK',
         data: {
-          order: { order_id: orderId, order_amount: 2999, order_currency: 'INR' },
-          payment: { cf_payment_id: 'cf_pay_222', payment_status: 'SUCCESS', payment_amount: 2999, payment_currency: 'INR' },
+          order: {
+            order_id: orderId,
+            order_amount: getPlanPrice('business', 'monthly'),
+            order_currency: 'INR',
+          },
+          payment: {
+            cf_payment_id: 'cf_pay_222',
+            payment_status: 'SUCCESS',
+            payment_amount: getPlanPrice('business', 'monthly'),
+            payment_currency: 'INR',
+          },
           customer_details: { customer_id: userId },
         },
       };
@@ -142,7 +159,9 @@ describeIfEmulator('cashfreeWebhook (Firestore emulator)', () => {
       const userDoc = (await db.collection('users').doc(userId).get()).data()!;
       expect(userDoc['subscriptionId']).toBe(`sub_cf_${userId}_business`);
 
-      const subDoc = (await db.collection('subscriptions').doc(`sub_cf_${userId}_business`).get()).data()!;
+      const subDoc = (
+        await db.collection('subscriptions').doc(`sub_cf_${userId}_business`).get()
+      ).data()!;
       expect(subDoc['status']).toBe('active');
       expect(subDoc['provider']).toBe('cashfree');
     });
@@ -159,7 +178,12 @@ describeIfEmulator('cashfreeWebhook (Firestore emulator)', () => {
         type: 'PAYMENT_SUCCESS_WEBHOOK',
         data: {
           order: { order_id: orderId, order_amount: 999, order_currency: 'INR' },
-          payment: { cf_payment_id: 'cf_pay_333', payment_status: 'SUCCESS', payment_amount: 999, payment_currency: 'INR' },
+          payment: {
+            cf_payment_id: 'cf_pay_333',
+            payment_status: 'SUCCESS',
+            payment_amount: 999,
+            payment_currency: 'INR',
+          },
           customer_details: { customer_id: userId },
         },
       };
@@ -211,7 +235,12 @@ describeIfEmulator('cashfreeWebhook (Firestore emulator)', () => {
         type: 'PAYMENT_SUCCESS_WEBHOOK',
         data: {
           order: { order_id: orderId, order_amount: 999, order_currency: 'INR' },
-          payment: { cf_payment_id: 'cf_pay_bad', payment_status: 'SUCCESS', payment_amount: 999, payment_currency: 'INR' },
+          payment: {
+            cf_payment_id: 'cf_pay_bad',
+            payment_status: 'SUCCESS',
+            payment_amount: 999,
+            payment_currency: 'INR',
+          },
           customer_details: { customer_id: userId },
         },
       };
@@ -242,7 +271,9 @@ describeIfEmulator('cashfreeWebhook (Firestore emulator)', () => {
       expect(await usageOf(userId)).toEqual(before);
       const txn = (await db.collection('transactions').doc(orderId).get()).data()!;
       expect(txn['status']).toBe('pending');
-      expect((await db.collection('cashfree_grants').get()).docs.some((d) => d.id.includes('cf_pay_bad'))).toBe(false);
+      expect(
+        (await db.collection('cashfree_grants').get()).docs.some((d) => d.id.includes('cf_pay_bad'))
+      ).toBe(false);
     });
 
     it('rejects request with invalid signature', async () => {

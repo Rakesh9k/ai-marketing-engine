@@ -5,6 +5,7 @@
  * with the purchaser in custom_data and a pending record keyed by the REAL Paddle
  * transaction ID — which is exactly what paddleWebhook later reconciles against.
  */
+process.env['ACTIVE_PAYMENT_PROVIDER'] = 'paddle'; // these tests exercise the Paddle path, which is inert unless Paddle is the active provider
 process.env['PADDLE_API_KEY'] = 'pdl_sdbx_apikey_test_only';
 process.env['PADDLE_ENVIRONMENT'] = 'sandbox';
 process.env['PADDLE_PRICE_ID_STARTER_MONTHLY'] = 'pri_starter_m';

@@ -22,6 +22,7 @@ import {
   getCurrentUsageRefAndSnap,
   getPeriodCreditAllowance,
 } from '../../services/billing';
+import { isProviderActive, recordIgnoredProviderEvent } from '../../services/activeProvider';
 import type { SubscriptionStatus } from '../../types';
 import type { SubscriptionNotification, TransactionNotification } from '@paddle/paddle-node-sdk';
 
@@ -88,6 +89,24 @@ export const paddleWebhook = onRequest(
       } catch (sigError) {
         logger.error('paddleWebhook signature verification failed', sigError as Error);
         res.status(400).send('Invalid webhook signature');
+        return;
+      }
+
+      // Only the ACTIVE provider may grant credits or entitlements. A verified Paddle event arriving while
+      // Cashfree is active is acknowledged (so Paddle stops retrying) and recorded for an operator, but
+      // changes no subscription, credit or usage state.
+      if (!isProviderActive('paddle')) {
+        await recordIgnoredProviderEvent('paddle', event.eventId, String(event.eventType), {
+          occurredAt: event.occurredAt,
+        });
+        logger.warn(
+          'paddleWebhook: event ignored because Paddle is not the active payment provider',
+          {
+            eventId: event.eventId,
+            eventType: String(event.eventType),
+          }
+        );
+        res.status(200).send('OK (ignored: provider inactive)');
         return;
       }
 
