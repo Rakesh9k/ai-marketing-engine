@@ -59,12 +59,17 @@ export { onUserDeletedHandler } from './functions/auth/onUserCreated';
 export { getUploadUrl } from './functions/assets/getUploadUrl';
 export { confirmUpload } from './functions/assets/confirmUpload';
 export { deleteAsset } from './functions/assets/deleteAsset';
-// Payments: Paddle is the primary (and only deployed) provider. Requires the
-// PADDLE_API_KEY / PADDLE_WEBHOOK_SECRET secrets and PADDLE_PRICE_ID_* config
-// (see docs/PAYMENT_GATEWAY.md).
+// Payments: Paddle is the live provider (requires the PADDLE_API_KEY / PADDLE_WEBHOOK_SECRET secrets and
+// PADDLE_PRICE_ID_* config; see docs/PAYMENT_GATEWAY.md). The Cashfree functions below are exported and
+// deploy with the bundle, but their production status is UNVERIFIED (see docs/audits/mitra-complete-audit);
+// do not treat Cashfree as the primary gateway.
 export { createPaddleCheckout } from './functions/subscriptions/createPaddleCheckout';
 export { cancelPaddleSubscription } from './functions/subscriptions/cancelPaddleSubscription';
 export { paddleWebhook } from './functions/webhooks/paddleWebhook';
+
+export { createCashfreeCheckout } from './functions/subscriptions/createCashfreeCheckout';
+export { cancelCashfreeSubscription } from './functions/subscriptions/cancelCashfreeSubscription';
+export { cashfreeWebhook } from './functions/webhooks/cashfreeWebhook';
 // PayU is kept in the repo for migration/rollback but deliberately NOT exported, so the
 // app can never present two competing payment flows. To roll back, re-enable these and
 // point src/app/billing/page.tsx back at createPayUPayment (see docs/PAYMENT_GATEWAY.md).
@@ -84,6 +89,9 @@ export { cleanupExpiredRateLimits } from './functions/usage/cleanupExpiredRateLi
 export { expireSubscriptions } from './functions/subscriptions/expireSubscriptions';
 export { requestAccountDeletion } from './functions/auth/requestAccountDeletion';
 export { recordConsentAcceptance } from './functions/auth/recordConsentAcceptance';
+export { saveOnboardingDraft } from './functions/onboarding/saveOnboardingDraft';
+export { discoverOnboardingFacts } from './functions/onboarding/discoverOnboardingFacts';
+export { confirmOnboardingBusiness } from './functions/onboarding/confirmOnboardingBusiness';
 export { trackAnalyticsEvent } from './functions/analytics/trackAnalyticsEvent';
 export { trackCreativeEventEndpoint } from './functions/analytics/trackCreativeEventEndpoint';
 export { getAnalyticsDashboard } from './functions/analytics/getAnalyticsDashboard';
@@ -124,3 +132,14 @@ export { getMarketingPlan } from './functions/calendar/getMarketingPlan';
 export { updateCalendarItem } from './functions/calendar/updateCalendarItem';
 export { skipCalendarItem } from './functions/calendar/skipCalendarItem';
 export { createCampaignFromCalendarItem } from './functions/calendar/createCampaignFromCalendarItem';
+
+// Phase 10.21 — Creative Brain API Endpoints
+export { getCreativeBrainSession } from './functions/creativeBrain/getCreativeBrainSession';
+export { createCreativeBrainSession } from './functions/creativeBrain/createCreativeBrainSession';
+export { getStrategicConfirmationEndpoint } from './functions/creativeBrain/getStrategicConfirmation';
+export { generateStrategicConfirmationEndpoint } from './functions/creativeBrain/generateStrategicConfirmation';
+export { submitStrategicDecisionEndpoint } from './functions/creativeBrain/submitStrategicDecision';
+export { exploreCreativeDirectionEndpoint } from './functions/creativeBrain/exploreCreativeDirection';
+export { reviseCreativeBrainSessionEndpoint } from './functions/creativeBrain/reviseCreativeBrainSession';
+export { getCreativeBrainOperationEndpoint } from './functions/creativeBrain/getCreativeBrainOperation';
+
