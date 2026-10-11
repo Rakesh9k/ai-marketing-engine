@@ -65,6 +65,16 @@ service cloud.firestore {
       }
     }
 
+    // Onboarding drafts: the temporary construction layer for a Business Brain
+    // (functions/src/onboarding/draftModel.ts). Document id == the owner's uid, so a plain owner
+    // check is the whole read rule. Read-only for clients: the only writer is saveOnboardingDraft
+    // (Admin SDK), which validates every path/value and stamps provenance server-side — a client
+    // could otherwise forge `source: USER_CONFIRMED` / `confirmed: true` on an arbitrary fact.
+    match /onboarding_drafts/{userId} {
+      allow read: if isOwner(userId);
+      allow write: if false;
+    }
+
     // Meta server-only collections (Phase 9 Meta integration)
     // Server Admin SDK only — client access completely disallowed
     match /metaCredentials/{connectionId} {
@@ -162,10 +172,10 @@ service cloud.firestore {
     // Products collection
     match /products/{productId} {
       allow read: if isAuthenticated() &&
-        get(/databases/$(database)/documents/businesses/$(resource.data.businessId)).data.userId == request.auth.uid ||
-        hasBusinessAccess(resource.data.businessId) ||
-        (request.auth.token.role == 'agency_member' &&
-         get(/databases/$(database)/documents/businesses/$(resource.data.businessId)).data.agencyId == request.auth.token.agencyId);
+        (get(/databases/$(database)/documents/businesses/$(resource.data.businessId)).data.userId == request.auth.uid ||
+         hasBusinessAccess(resource.data.businessId) ||
+         (request.auth.token.role == 'agency_member' &&
+          get(/databases/$(database)/documents/businesses/$(resource.data.businessId)).data.agencyId == request.auth.token.agencyId));
       allow create: if isAuthenticated() &&
         request.resource.data.businessId in request.auth.token.businessIds;
       // businessId must not change on update — otherwise an owner could
@@ -186,9 +196,11 @@ service cloud.firestore {
          resource.data.businessId in request.auth.token.businessIds ||
          (request.auth.token.role == 'agency_member' &&
           get(/databases/$(database)/documents/businesses/$(resource.data.businessId)).data.agencyId == request.auth.token.agencyId));
-      allow create: if isAuthenticated() &&
-        request.resource.data.userId == request.auth.uid &&
-        request.resource.data.businessId in request.auth.token.businessIds;
+      // Campaigns are created only by generateCampaignStrategy (Admin SDK, bypasses
+      // rules). No client code creates them, and an open create let any signed-in user
+      // write a campaign already marked status 'verified' with truthCheckStatus 'PASS',
+      // forging the Truth Check badge (found by tests/security.tenant.test.ts).
+      allow create: if false;
 
       // Users can update their own campaigns, but NOT the authoritative
       // verification/credit fields. Truth Check status, campaign status
@@ -274,7 +286,19 @@ service cloud.firestore {
 
     // Usage collection
     match /usage/{usageId} {
-      allow read: if isAuthenticated() && resource.data.userId == request.auth.uid;
+      // The server creates a period's usage doc lazily (signup, or the first
+      // credit reservation of the month), so the client's single-doc read of the
+      // current period legitimately targets a doc that does not exist yet.
+      // `resource.data.userId` on a missing doc evaluates to an error, which
+      // Firestore reports as permission-denied and broke every dashboard load at
+      // the start of a new month. Allow `get` of a missing doc only for the
+      // caller's own id namespace ({uid}_{date}); an existing doc still needs
+      // userId to match, and queries (`list`) still need the userId constraint.
+      allow get: if isAuthenticated() &&
+        (resource == null
+          ? usageId.matches(request.auth.uid + '_.*')
+          : resource.data.userId == request.auth.uid);
+      allow list: if isAuthenticated() && resource.data.userId == request.auth.uid;
       allow write: if false; // Cloud Functions only
     }
 
