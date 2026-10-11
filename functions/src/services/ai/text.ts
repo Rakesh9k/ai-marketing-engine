@@ -4,6 +4,7 @@ import { getEnvConfig } from '../../config/env';
 import { textModel } from '../../config/geminiModels';
 import { schemaInstruction } from './schemaPrompt';
 import { recordAiCall } from './aiCallLog';
+import { meteredCall } from './usageMeter';
 
 /** Max extra model calls spent repairing a response that failed schema validation. */
 export const MAX_SCHEMA_REPAIRS = 2;
@@ -51,7 +52,13 @@ export async function generateValidatedJson<T>(
     try {
       const result = schema.safeParse(JSON.parse(raw));
       if (result.success) {
-        recordAiCall({ model: meta.model ?? 'unknown', attempt, repair: attempt > 0, ok: true, ms: Date.now() - startedAt });
+        recordAiCall({
+          model: meta.model ?? 'unknown',
+          attempt,
+          repair: attempt > 0,
+          ok: true,
+          ms: Date.now() - startedAt,
+        });
         return result.data;
       }
       problem = summarizeIssues(result.error.issues);
@@ -116,7 +123,14 @@ export class GeminiTextProvider {
 
     try {
       return await generateValidatedJson(
-        async (p) => (await model.generateContent(p)).response.text(),
+        async (p) =>
+          (
+            await meteredCall(
+              { kind: 'text', model: modelName },
+              () => model.generateContent(p),
+              (r) => r.response.usageMetadata
+            )
+          ).response.text(),
         prompt + schemaInstruction(schema),
         schema,
         MAX_SCHEMA_REPAIRS,
@@ -148,7 +162,11 @@ export class GeminiTextProvider {
     });
 
     try {
-      const genResult = await model.generateContent(prompt);
+      const genResult = await meteredCall(
+        { kind: 'text', model: modelName },
+        () => model.generateContent(prompt),
+        (r) => r.response.usageMetadata
+      );
       return genResult.response.text();
     } catch (error) {
       throw new Error(

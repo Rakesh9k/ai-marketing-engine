@@ -1,5 +1,6 @@
 import { getEnvConfig } from '../../config/env';
 import type { ImageGenerationRequest, ImageGenerationResponse } from '../../types';
+import { beginMeteredCall } from './usageMeter';
 
 /**
  * Image AI provider backed by Google Gemini image generation, replacing the
@@ -132,20 +133,38 @@ export class GeminiImageProvider {
       }
       const body = await this.buildRequestBody(request);
 
-      const response = await fetch(`${GEMINI_API_BASE}/${model}:generateContent`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'x-goog-api-key': this.apiKey },
-        body: JSON.stringify(body),
-      });
+      // Live-run budget: reserve this call's worst case first (a no-op unless a harness installed a meter).
+      const ticket = beginMeteredCall('image', model);
+      let response: Response;
+      try {
+        response = await fetch(`${GEMINI_API_BASE}/${model}:generateContent`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'x-goog-api-key': this.apiKey },
+          body: JSON.stringify(body),
+        });
+      } catch (networkError) {
+        ticket?.failure(networkError);
+        throw networkError;
+      }
       if (!response.ok) {
+        ticket?.failure(new Error(`HTTP ${response.status}`));
         // Body may echo request details; classify and discard, never log it.
         throw classifyHttpError(response.status, await response.text().catch(() => ''));
       }
 
-      const json = (await response.json()) as {
+      let json: {
         candidates?: Array<{ finishReason?: string; content?: { parts?: GeminiPart[] } }>;
         promptFeedback?: { blockReason?: string };
+        usageMetadata?: import('./usageMeter').GeminiUsage;
       };
+      try {
+        json = (await response.json()) as typeof json;
+      } catch (parseError) {
+        ticket?.failure(parseError); // release the reservation; the call may still have been billed
+        throw parseError;
+      }
+      // The call was made and billed whatever we do with the answer: measure it from reported usage.
+      ticket?.success(json.usageMetadata);
       if (json.promptFeedback?.blockReason) {
         throw new ImageProviderError(
           'SAFETY_BLOCKED',

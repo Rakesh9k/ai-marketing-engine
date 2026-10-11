@@ -1,4 +1,5 @@
 import { GoogleGenerativeAI } from '@google/generative-ai';
+import { meteredCall } from './usageMeter';
 import { z } from 'zod';
 import { getEnvConfig } from '../../config/env';
 import { visionModel } from '../../config/geminiModels';
@@ -166,7 +167,11 @@ export class GeminiVisionProvider {
     let current = prompt;
     let lastError: Error = new Error('no response');
     for (let attempt = 0; attempt <= maxRepairs; attempt++) {
-      const result = await this.getModel().generateContent([current, ...imageParts]);
+      const result = await meteredCall(
+        { kind: 'vision', model: visionModel() },
+        () => this.getModel().generateContent([current, ...imageParts]),
+        (r: any) => r.response.usageMetadata
+      );
       const raw = result.response.text();
       try {
         return parse(raw);
@@ -453,7 +458,11 @@ Return JSON:
   ]
 }`;
 
-    const result = await this.getModel().generateContent([prompt, ...imageParts]);
+    const result = await meteredCall(
+      { kind: 'vision', model: visionModel() },
+      () => this.getModel().generateContent([prompt, ...imageParts]),
+      (r: any) => r.response.usageMetadata
+    );
     const responseText = result.response.text();
     const jsonMatch = responseText.match(/\{[\s\S]*\}/);
     const parsed = JSON.parse(jsonMatch ? jsonMatch[0] : responseText);
