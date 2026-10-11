@@ -64,3 +64,25 @@ The working-tree files above remain exactly as they were; nothing was discarded.
 
 ## Cleanup
 `../_clean_head` still exists (kept for verification). Remove junctions first with `cmd /c rmdir`, then `git worktree remove`.
+
+---
+
+# Update — Free-plan contract and both P1 integrity fixes (2026-10-11)
+
+Commits: `f2ba6d3` (Free plan entitlements = delivered), `850a928` (P1-A Truth Check risk policy), `904e25e` (P1-B offer validation), `afd6fe8` (RERA test expectation, caught by the full clean-checkout run).
+
+**Clean checkout of `afd6fe8`:** tsc root 0 errors, tsc functions 0 errors, `eslint --max-warnings 0` exit 0; functions jest (emulators, `--maxWorkers=50%`) 255 suites passed / 7 skipped, 2667 tests passed / 0 failed / 50 skipped; root jest 113 suites, 1627 passed / 0 failed / 7 skipped (verified at `904e25e`; only a functions test changed afterwards).
+One full run at default parallelism showed 3 failures: `verticals.test.ts` (real: the RERA expectation, fixed in `afd6fe8`) and two Creative Brain suites that hit their hard 60 s timeout under load and pass alone in 36 s and 53 s. They remain slow and load-sensitive; consider raising their timeout or trimming their work.
+
+## Free plan contract (implemented)
+1 campaign every month (recurring), 1 poster + 3 stories + 1 reel concept (= 5 social creatives), 140 credits every month (a campaign costs 100, leaving 40), no AI-generated video reels. Pinned by `freePlanContract.test.ts`, by `pricingParity` (card copy) and by the pipeline matrix, which asserts the DELIVERED assets are exactly 1 poster, 3 stories and 1 reel.
+
+## P1-A Truth Check risk policy (implemented)
+BLOCK (FAIL): an unsupported discount presented as a discount, legal approvals (RERA…), possession dates, bedroom/bathroom/area figures nobody recorded or the owner did not write in the listing (all mentions are checked; previously only the first, and an unrecorded bathroom count passed silently). REVIEW: non-essential or unverifiable details, bare percentages ("25% more chicken"), operational claims (delivery/hours — deliberately not escalated so honest restaurants are not blocked; **founder decision if you want them escalated**). PASS: honest copy that omits the phone number; a different number still FAILs. Owner-stated percentages/specs in the headline, description, terms or listing title are allowed. The FAIL summary now names up to three offending claims. End to end (`generateCampaignStrategy.truthBlock.test.ts`): a blocked campaign names the claim, is stored as failed with no assets, and costs 0 credits; honest copy is delivered and charged 100.
+
+## P1-B offer validation (implemented)
+`utils/offerValidation.ts`, run before the quota check, credit reservation and any AI call: "was" price below the price now; percentage offer with equal prices or a <1% difference; offer end before start; campaign end before start; offer over before the campaign starts; non-positive / non-finite / over-large / >2-decimal prices; a percentage offer's "was" price that disagrees with the chosen product's catalogue price. Rejections are `invalid-argument` with an actionable message and create no campaign, no credit transaction and no AI call (9 callable tests); boundary cases are accepted and charged once (24 pure tests).
+Not done: the frontend wizard does not yet mirror these checks (the user sees the server message after submit); free-text Business Brain rules (`offerValidityRules`, `pricingRules`) cannot be compared deterministically.
+
+## Still open
+Cashfree vs Paddle UI decision and the five Cashfree-era billing UI files; working-tree `env.ts`/`index.ts` variants; icon assets and mascot images; live AI subset (cost estimate not yet reconciled with the raw 2026-10-05 benchmark); `../_clean_head` worktree cleanup.
