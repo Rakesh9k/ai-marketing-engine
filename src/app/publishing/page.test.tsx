@@ -9,8 +9,8 @@ jest.mock('next/navigation', () => ({
 }));
 
 describe('PublishingDashboardPage', () => {
-  it('redirects to /creative', () => {
+  it('redirects to /dashboard', () => {
     render(<PublishingDashboardPage />);
-    expect(mockReplace).toHaveBeenCalledWith('/creative');
+    expect(mockReplace).toHaveBeenCalledWith('/dashboard');
   });
 });

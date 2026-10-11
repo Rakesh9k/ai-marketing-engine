@@ -1,15 +1,15 @@
 'use client';
 
 import { useState, useRef } from 'react';
-import { useRouter } from 'next/navigation';
 import { motion, useReducedMotion } from 'motion/react';
 import { Button } from '@/components/ui/Button';
 import { MitraMascot } from '@/components/ui/MitraMascot';
-import { FloatingCards, BusinessContext } from './FloatingCards';
+import type { BusinessContext } from './FloatingCards';
+import { FloatingCards } from './FloatingCards';
 import { ConnectingLines } from './ConnectingLines';
 import { MarqueeTicker } from './MarqueeTicker';
 import { useAutoRotate } from '@/hooks/useAutoRotate';
-import { Magnetic, KineticHeadline, RotatingWordHeadline } from './KineticEffects';
+import { Magnetic } from './KineticEffects';
 
 const BUSINESS_PRESETS: BusinessContext[] = [
   {
@@ -60,11 +60,8 @@ const BUSINESS_PRESETS: BusinessContext[] = [
 ];
 
 export function HeroSection({ onGetStarted }: { onGetStarted: () => void }) {
-  const router = useRouter();
   const reduceMotion = useReducedMotion();
 
-  // Dynamic business context state
-  const [promptInput, setPromptInput] = useState('');
   const heroRef = useRef<HTMLDivElement>(null);
 
   // Parallax coordinates
@@ -92,33 +89,24 @@ export function HeroSection({ onGetStarted }: { onGetStarted: () => void }) {
     });
   };
 
-  const handlePromptSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (promptInput.trim()) {
-      router.push(`/signup?business=${encodeURIComponent(promptInput.trim())}`);
-    } else {
-      onGetStarted();
-    }
-  };
-
   const currentBusiness = BUSINESS_PRESETS[activeBusinessIdx];
 
   return (
     <section
       ref={heroRef}
       onMouseMove={handleMouseMove}
-      className="relative overflow-hidden pt-20 pb-12 sm:pt-24 sm:pb-16 lg:pt-28 lg:pb-20 select-none"
+      className="relative overflow-hidden pt-20 pb-12 select-none sm:pt-24 sm:pb-16 lg:pt-28 lg:pb-20"
     >
       {/* Background Marquee Ticker */}
-      <div className="absolute top-16 left-0 right-0 opacity-80 pointer-events-auto">
+      <div className="pointer-events-auto absolute top-16 right-0 left-0 opacity-80">
         <MarqueeTicker />
       </div>
 
-      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 pt-12">
+      <div className="mx-auto max-w-7xl px-4 pt-12 sm:px-6 lg:px-8">
         {/* ==========================================
             HERO HEADER CONTENT (KINETIC & BOLD)
             ========================================== */}
-        <div className="relative z-40 mx-auto max-w-4xl sm:max-w-5xl text-center px-2 sm:px-4">
+        <div className="relative z-40 mx-auto max-w-4xl px-2 text-center sm:max-w-5xl sm:px-4">
           {/* Social Proof Pill */}
           <motion.div
             initial={reduceMotion ? { opacity: 1 } : { opacity: 0, y: -10 }}
@@ -126,26 +114,9 @@ export function HeroSection({ onGetStarted }: { onGetStarted: () => void }) {
             transition={{ duration: 0.5 }}
             className="border-border-light bg-surface/90 inline-flex items-center gap-2 rounded-full border px-4 py-1.5 shadow-xs backdrop-blur-md"
           >
-            <div className="flex -space-x-2 overflow-hidden">
-              <img
-                className="inline-block h-5 w-5 rounded-full ring-2 ring-white"
-                src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&auto=format&fit=crop&q=80"
-                alt="User avatar"
-              />
-              <img
-                className="inline-block h-5 w-5 rounded-full ring-2 ring-white"
-                src="https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=100&auto=format&fit=crop&q=80"
-                alt="User avatar"
-              />
-              <img
-                className="inline-block h-5 w-5 rounded-full ring-2 ring-white"
-                src="https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=100&auto=format&fit=crop&q=80"
-                alt="User avatar"
-              />
-            </div>
-            <span className="text-text-primary text-xs font-bold">10K+ Happy Businesses</span>
-            <span className="text-text-tertiary text-xs">•</span>
-            <span className="text-brand-600 text-xs font-bold">One photo. A month of marketing.</span>
+            <span className="text-brand-600 text-xs font-bold">
+              One photo. A month of marketing.
+            </span>
           </motion.div>
 
           {/* Main Headline per Positioning */}
@@ -153,7 +124,7 @@ export function HeroSection({ onGetStarted }: { onGetStarted: () => void }) {
             initial={reduceMotion ? { opacity: 1 } : { opacity: 0, y: -10 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.5, delay: 0.1 }}
-            className="text-text-primary text-3xl sm:text-5xl md:text-6xl font-black tracking-tight leading-tight"
+            className="text-text-primary text-3xl leading-tight font-black tracking-tight sm:text-5xl md:text-6xl"
           >
             Your next marketing campaign <br className="hidden sm:inline" />
             <span className="text-brand-500">starts with one photo.</span>
@@ -164,9 +135,13 @@ export function HeroSection({ onGetStarted }: { onGetStarted: () => void }) {
             initial={reduceMotion ? { opacity: 1 } : { opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.5, delay: 0.2 }}
-            className="text-text-secondary mx-auto mt-4 max-w-2xl text-base sm:text-lg leading-relaxed font-normal"
+            className="text-text-secondary mx-auto mt-4 max-w-2xl text-base leading-relaxed font-normal sm:text-lg"
           >
-            Give Mitra a photo, an offer, or simply tell it what&apos;s happening in your business. Mitra turns it into posts, reels and campaign ideas ready to use.
+            Give Mitra a photo, an offer, or simply tell it what&apos;s happening in your business.
+            Mitra turns it into posts, reels and campaign ideas ready to use.
+            <span className="mt-2 block font-semibold">
+              Tell Mitra about your business once. It remembers what matters.
+            </span>
           </motion.p>
 
           {/* Action CTAs */}
@@ -180,36 +155,37 @@ export function HeroSection({ onGetStarted }: { onGetStarted: () => void }) {
               <Button
                 size="lg"
                 onClick={onGetStarted}
-                className="shadow-brand-500/30 w-full rounded-full shadow-lg sm:w-auto px-8 py-4 text-base font-bold bg-brand-500 hover:bg-brand-600 transition-all hover:shadow-brand-500/40 text-white cursor-pointer"
+                className="shadow-brand-500/30 bg-brand-500 hover:bg-brand-600 hover:shadow-brand-500/40 w-full cursor-pointer rounded-full px-8 py-4 text-base font-bold text-white shadow-lg transition-all sm:w-auto"
               >
-                Create My First Campaign →
+                Try Mitra
               </Button>
             </Magnetic>
 
-            <a
-              href="#demo"
-              className="w-full sm:w-auto inline-block"
-            >
+            <a href="#how-it-works" className="inline-block w-full sm:w-auto">
               <Button
                 size="lg"
                 variant="outline"
-                className="w-full rounded-full sm:w-auto px-7 py-4 text-sm font-bold border-border-medium text-text-primary hover:bg-surface-hover hover:border-brand-500 transition-all cursor-pointer"
+                className="border-border-medium text-text-primary hover:bg-surface-hover hover:border-brand-500 w-full cursor-pointer rounded-full px-7 py-4 text-sm font-bold transition-all sm:w-auto"
               >
-                See How Mitra Works
+                See how it works
               </Button>
             </a>
           </motion.div>
 
-          <p className="text-text-tertiary mt-3 text-xs font-medium">✨ No technical experience required • Takes less than 2 minutes</p>
+          <p className="text-text-tertiary mt-3 text-xs font-medium">
+            ✨ No technical experience required • Takes less than 2 minutes
+          </p>
 
           {/* Business Type Quick Switcher Chips */}
           <div className="mt-4 flex flex-wrap items-center justify-center gap-1.5">
-            <span className="text-text-tertiary text-[11px] font-semibold">Try sample context:</span>
+            <span className="text-text-tertiary text-[11px] font-semibold">
+              Try sample context:
+            </span>
             {BUSINESS_PRESETS.map((b, idx) => (
               <button
                 key={b.id}
                 onClick={() => setActiveBusinessIdx(idx)}
-                className={`rounded-full px-3 py-1 text-[11px] font-bold transition-all cursor-pointer ${
+                className={`cursor-pointer rounded-full px-3 py-1 text-[11px] font-bold transition-all ${
                   activeBusinessIdx === idx
                     ? 'bg-brand-600 text-white shadow-xs'
                     : 'bg-surface border-border-light text-text-secondary hover:border-brand-500 border'
@@ -265,7 +241,7 @@ export function HeroSection({ onGetStarted }: { onGetStarted: () => void }) {
                   glow
                   shadow
                   animated
-                  alt="Mitra Official AI Assistant"
+                  alt="Mitra AI Campaign Generator"
                 />
               </motion.div>
             </div>

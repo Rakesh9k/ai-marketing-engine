@@ -19,7 +19,9 @@ describe('About Page Component', () => {
     renderAboutPage();
     expect(screen.getAllByText(/Small Businesses/i)[0]).toBeInTheDocument();
     expect(screen.getByText(/That’s Why We’re Here/i)).toBeInTheDocument();
-    expect(screen.getByText(/Mitra by Brainwise was born from a simple belief/i)).toBeInTheDocument();
+    expect(
+      screen.getByText(/Mitra by Brainwise was born from a simple belief/i)
+    ).toBeInTheDocument();
   });
 
   it('renders problem section and reality cards', () => {

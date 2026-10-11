@@ -12,7 +12,11 @@ interface BusinessProfileSectionProps {
   onCancel?: () => void;
 }
 
-export function BusinessProfileSection({ business, onSaved, onCancel }: BusinessProfileSectionProps) {
+export function BusinessProfileSection({
+  business,
+  onSaved,
+  onCancel,
+}: BusinessProfileSectionProps) {
   const [name, setName] = useState(business.name || '');
   const [description, setDescription] = useState(business.description || '');
   const [city, setCity] = useState(business.location?.city || '');
@@ -23,7 +27,7 @@ export function BusinessProfileSection({ business, onSaved, onCancel }: Business
   const [whatsapp, setWhatsapp] = useState(business.contact?.whatsapp || '');
   const [website, setWebsite] = useState(business.contact?.website || '');
   const [instagram, setInstagram] = useState(business.contact?.instagram || '');
-  
+
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [savedNotice, setSavedNotice] = useState<string | null>(null);
@@ -85,22 +89,29 @@ export function BusinessProfileSection({ business, onSaved, onCancel }: Business
   };
 
   return (
-    <form onSubmit={handleSave} className="space-y-6 rounded-2xl border border-neutral-200 bg-white p-6 shadow-sm">
+    <form
+      onSubmit={handleSave}
+      className="space-y-6 rounded-2xl border border-neutral-200 bg-white p-6 shadow-sm"
+    >
       <div className="border-b border-neutral-100 pb-4">
         <h2 className="text-xl font-bold text-neutral-900">Business Profile</h2>
         <p className="mt-1 text-sm text-neutral-500">
-          Core identity, location, and contact information Mitra uses across all generated marketing assets.
+          Core identity, location, and contact information Mitra uses across all generated marketing
+          assets.
         </p>
       </div>
 
       {error && (
-        <div className="rounded-lg bg-red-50 p-4 text-sm text-red-700 border border-red-200" role="alert">
+        <div
+          className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700"
+          role="alert"
+        >
           {error}
         </div>
       )}
 
       {savedNotice && (
-        <div className="rounded-lg bg-emerald-50 p-4 text-sm text-emerald-700 border border-emerald-200">
+        <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-700">
           ✓ {savedNotice}
         </div>
       )}
@@ -118,7 +129,7 @@ export function BusinessProfileSection({ business, onSaved, onCancel }: Business
           <input
             value={business.category?.replace(/_/g, ' ') || 'restaurant'}
             disabled
-            className="w-full rounded-lg border border-neutral-200 bg-neutral-50 px-4 py-2.5 text-sm font-medium text-neutral-500 capitalize cursor-not-allowed"
+            className="w-full cursor-not-allowed rounded-lg border border-neutral-200 bg-neutral-50 px-4 py-2.5 text-sm font-medium text-neutral-500 capitalize"
           />
           <p className="mt-1 text-xs text-neutral-400">
             Category is locked to ensure compliance with vertical models.
@@ -126,23 +137,20 @@ export function BusinessProfileSection({ business, onSaved, onCancel }: Business
         </div>
 
         <div>
-          <label className="mb-1.5 block text-sm font-medium text-neutral-700">Business Description</label>
+          <label className="mb-1.5 block text-sm font-medium text-neutral-700">
+            Business Description
+          </label>
           <textarea
             value={description}
             onChange={(e) => setDescription(e.target.value)}
             rows={3}
             placeholder="Tell Mitra what makes your business special..."
-            className="w-full rounded-lg border border-neutral-300 px-4 py-2.5 text-sm text-neutral-900 focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 focus:outline-none"
+            className="focus:border-brand-500 focus:ring-brand-500/20 w-full rounded-lg border border-neutral-300 px-4 py-2.5 text-sm text-neutral-900 focus:ring-2 focus:outline-none"
           />
         </div>
 
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-          <Input
-            label="City *"
-            value={city}
-            onChange={(e) => setCity(e.target.value)}
-            required
-          />
+          <Input label="City *" value={city} onChange={(e) => setCity(e.target.value)} required />
           <Input
             label="State *"
             value={state}

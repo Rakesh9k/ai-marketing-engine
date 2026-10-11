@@ -39,7 +39,11 @@ describe('ResetPasswordForm', () => {
     await user.click(screen.getByRole('button', { name: /reset password/i }));
 
     await waitFor(() => {
-      expect(confirmPasswordResetMock).toHaveBeenCalledWith(expect.anything(), 'code123', 'Password123!');
+      expect(confirmPasswordResetMock).toHaveBeenCalledWith(
+        expect.anything(),
+        'code123',
+        'Password123!'
+      );
     });
     expect(await screen.findByText(/password updated/i)).toBeInTheDocument();
   });

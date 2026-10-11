@@ -17,9 +17,13 @@ export function LocationsSection({ business, onSaved, onCancel }: LocationsSecti
   const [state, setState] = useState(business.location?.state || '');
   const [locality, setLocality] = useState(business.location?.locality || '');
   const [address, setAddress] = useState(business.location?.address || '');
-  const [deliveryRadiusKm, setDeliveryRadiusKm] = useState<number>(
-    business.businessBrain?.businessRules?.deliveryRadiusKm || 10
+  // Unknown stays unknown: the field opens empty unless the owner gave a radius, and an empty field is
+  // never saved (it used to open at 10 km and write that into the Business Brain on any save).
+  const storedRadius = business.businessBrain?.businessRules?.deliveryRadiusKm;
+  const [deliveryRadiusKm, setDeliveryRadiusKm] = useState<string>(
+    storedRadius !== undefined ? String(storedRadius) : ''
   );
+  const radius = deliveryRadiusKm.trim() === '' ? undefined : Number(deliveryRadiusKm);
 
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -45,15 +49,17 @@ export function LocationsSection({ business, onSaved, onCancel }: LocationsSecti
         },
       });
 
-      await callFunction({
-        functionName: 'updateBusinessBrain',
-        data: {
-          businessId: business.businessId,
-          businessRules: {
-            deliveryRadiusKm,
+      if (radius !== undefined) {
+        await callFunction({
+          functionName: 'updateBusinessBrain',
+          data: {
+            businessId: business.businessId,
+            businessRules: {
+              deliveryRadiusKm: radius,
+            },
           },
-        },
-      });
+        });
+      }
 
       onSaved({
         location: {
@@ -67,7 +73,7 @@ export function LocationsSection({ business, onSaved, onCancel }: LocationsSecti
           ...business.businessBrain,
           businessRules: {
             ...(business.businessBrain?.businessRules || {}),
-            deliveryRadiusKm,
+            ...(radius !== undefined ? { deliveryRadiusKm: radius } : {}),
           },
         } as any,
       });
@@ -81,7 +87,10 @@ export function LocationsSection({ business, onSaved, onCancel }: LocationsSecti
   };
 
   return (
-    <form onSubmit={handleSave} className="space-y-6 rounded-2xl border border-neutral-200 bg-white p-6 shadow-sm">
+    <form
+      onSubmit={handleSave}
+      className="space-y-6 rounded-2xl border border-neutral-200 bg-white p-6 shadow-sm"
+    >
       <div className="border-b border-neutral-100 pb-4">
         <h2 className="text-xl font-bold text-neutral-900">Locations & Outlets</h2>
         <p className="mt-1 text-sm text-neutral-500">
@@ -90,25 +99,23 @@ export function LocationsSection({ business, onSaved, onCancel }: LocationsSecti
       </div>
 
       {error && (
-        <div className="rounded-lg bg-red-50 p-4 text-sm text-red-700 border border-red-200" role="alert">
+        <div
+          className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700"
+          role="alert"
+        >
           {error}
         </div>
       )}
 
       {savedNotice && (
-        <div className="rounded-lg bg-emerald-50 p-4 text-sm text-emerald-700 border border-emerald-200">
+        <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-700">
           ✓ {savedNotice}
         </div>
       )}
 
       <div className="space-y-4">
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-          <Input
-            label="City *"
-            value={city}
-            onChange={(e) => setCity(e.target.value)}
-            required
-          />
+          <Input label="City *" value={city} onChange={(e) => setCity(e.target.value)} required />
           <Input
             label="State *"
             value={state}
@@ -137,11 +144,12 @@ export function LocationsSection({ business, onSaved, onCancel }: LocationsSecti
             label="Delivery / Service Radius (in km)"
             type="number"
             value={deliveryRadiusKm}
-            onChange={(e) => setDeliveryRadiusKm(Number(e.target.value))}
-            placeholder="10"
+            onChange={(e) => setDeliveryRadiusKm(e.target.value)}
+            placeholder="e.g. 5"
           />
           <p className="mt-1 text-xs text-neutral-500">
-            Mitra uses this radius to specify local offer validity and delivery areas in generated copy.
+            Mitra uses this radius to specify local offer validity and delivery areas in generated
+            copy.
           </p>
         </div>
       </div>

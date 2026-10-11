@@ -1,7 +1,6 @@
 'use client';
 
 import { useState } from 'react';
-import Image from 'next/image';
 import Link from 'next/link';
 import { motion, useReducedMotion } from 'motion/react';
 import { ProtectedRoute } from '@/features/auth/components/ProtectedRoute';
@@ -26,7 +25,8 @@ const SAMPLE_ACTIVITIES: ActivityItem[] = [
     dateGroup: 'TODAY',
     type: 'ai',
     title: 'Mitra generated your Instagram reel draft',
-    description: 'Generated 15-second reel video script and background music track for Weekend Offer.',
+    description:
+      'Generated 15-second reel video script and background music track for Weekend Offer.',
     icon: '🎬',
     badge: { label: 'AI Generation', color: 'bg-orange-100 text-orange-700' },
     actionLink: { href: '/reels/new', label: 'Review Reel' },
@@ -93,9 +93,7 @@ export default function ActivityPage() {
   const reduceMotion = useReducedMotion();
 
   const filteredItems =
-    filter === 'all'
-      ? SAMPLE_ACTIVITIES
-      : SAMPLE_ACTIVITIES.filter((item) => item.type === filter);
+    filter === 'all' ? SAMPLE_ACTIVITIES : SAMPLE_ACTIVITIES.filter((item) => item.type === filter);
 
   const groups = ['TODAY', 'YESTERDAY', 'THIS WEEK'] as const;
 
@@ -103,16 +101,17 @@ export default function ActivityPage() {
     <ProtectedRoute>
       <div className="mx-auto max-w-5xl space-y-6 px-4 py-4 sm:px-6 lg:px-8">
         {/* Header Hero Banner */}
-        <div className="relative overflow-hidden rounded-3xl bg-gradient-to-r from-orange-50 via-amber-50 to-white p-6 sm:p-8 border border-orange-200/60 shadow-2xs flex flex-col sm:flex-row items-center justify-between gap-6">
+        <div className="relative flex flex-col items-center justify-between gap-6 overflow-hidden rounded-3xl border border-orange-200/60 bg-gradient-to-r from-orange-50 via-amber-50 to-white p-6 shadow-2xs sm:flex-row sm:p-8">
           <div className="space-y-2 text-center sm:text-left">
-            <span className="font-serif italic text-sm text-[#E84D1A] font-semibold">
+            <span className="font-serif text-sm font-semibold text-[#E84D1A] italic">
               ✨ Everything Mitra has been doing for your business
             </span>
-            <h1 className="text-2xl sm:text-3xl font-bold text-[#1A1A1E]">
+            <h1 className="text-2xl font-bold text-[#1A1A1E] sm:text-3xl">
               Activity &amp; Work Timeline
             </h1>
-            <p className="text-sm text-[#5C5C66] max-w-md leading-relaxed">
-              Track campaign progress, AI generations, customer actions, and publishing milestones in one live feed.
+            <p className="max-w-md text-sm leading-relaxed text-[#5C5C66]">
+              Track campaign progress, AI generations, customer actions, and publishing milestones
+              in one live feed.
             </p>
           </div>
 
@@ -135,7 +134,7 @@ export default function ActivityPage() {
               className={`rounded-full px-4 py-1.5 text-xs font-semibold transition-all ${
                 filter === tab.id
                   ? 'bg-[#E84D1A] text-white shadow-xs'
-                  : 'bg-white text-[#5C5C66] hover:bg-neutral-100 border border-[#F0EBE1]'
+                  : 'border border-[#F0EBE1] bg-white text-[#5C5C66] hover:bg-neutral-100'
               }`}
             >
               {tab.label}
@@ -152,46 +151,50 @@ export default function ActivityPage() {
             return (
               <div key={group} className="space-y-4">
                 <div className="flex items-center gap-3">
-                  <span className="text-xs font-bold text-[#757580] uppercase tracking-wider bg-neutral-100 px-3 py-1 rounded-full">
+                  <span className="rounded-full bg-neutral-100 px-3 py-1 text-xs font-bold tracking-wider text-[#757580] uppercase">
                     {group}
                   </span>
                   <div className="h-px flex-1 bg-[#F0EBE1]" />
                 </div>
 
-                <div className="space-y-3 pl-2 sm:pl-4 border-l-2 border-orange-100">
+                <div className="space-y-3 border-l-2 border-orange-100 pl-2 sm:pl-4">
                   {itemsInGroup.map((item) => (
                     <motion.div
                       key={item.id}
                       initial={reduceMotion ? false : { opacity: 0, x: -10 }}
                       animate={{ opacity: 1, x: 0 }}
-                      className="relative pl-6 py-2 group"
+                      className="group relative py-2 pl-6"
                     >
                       {/* Timeline Dot */}
-                      <div className="absolute -left-[31px] top-3.5 h-4 w-4 rounded-full border-2 border-white bg-[#E84D1A] shadow-xs" />
+                      <div className="absolute top-3.5 -left-[31px] h-4 w-4 rounded-full border-2 border-white bg-[#E84D1A] shadow-xs" />
 
                       {/* Card Container */}
-                      <div className="rounded-2xl bg-white p-4 border border-[#F0EBE1] shadow-2xs hover:shadow-md transition-all flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                      <div className="flex flex-col justify-between gap-4 rounded-2xl border border-[#F0EBE1] bg-white p-4 shadow-2xs transition-all hover:shadow-md sm:flex-row sm:items-center">
                         <div className="flex items-start gap-3">
-                          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-neutral-50 text-xl border border-neutral-100">
+                          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-neutral-100 bg-neutral-50 text-xl">
                             {item.icon}
                           </div>
                           <div>
                             <div className="flex flex-wrap items-center gap-2">
                               <h3 className="text-sm font-bold text-[#1A1A1E]">{item.title}</h3>
-                              <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${item.badge.color}`}>
+                              <span
+                                className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${item.badge.color}`}
+                              >
                                 {item.badge.label}
                               </span>
                             </div>
-                            <p className="mt-1 text-xs text-[#5C5C66] leading-relaxed">
+                            <p className="mt-1 text-xs leading-relaxed text-[#5C5C66]">
                               {item.description}
                             </p>
-                            <p className="mt-1.5 text-[10px] text-[#757580] font-medium">{item.time}</p>
+                            <p className="mt-1.5 text-[10px] font-medium text-[#757580]">
+                              {item.time}
+                            </p>
                           </div>
                         </div>
 
                         {item.actionLink && (
                           <Link href={item.actionLink.href} className="shrink-0">
-                            <button className="rounded-xl border border-border-medium bg-surface px-3.5 py-1.5 text-xs font-semibold text-[#1A1A1E] hover:bg-neutral-100 transition-colors">
+                            <button className="border-border-medium bg-surface rounded-xl border px-3.5 py-1.5 text-xs font-semibold text-[#1A1A1E] transition-colors hover:bg-neutral-100">
                               {item.actionLink.label} &rarr;
                             </button>
                           </Link>

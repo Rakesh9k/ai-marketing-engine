@@ -5,14 +5,11 @@ interface AnimatedConnectorProps {
   variant?: 'curved' | 'horizontal' | 'vertical' | 'loop';
 }
 
-export function AnimatedConnector({
-  className = '',
-  variant = 'curved',
-}: AnimatedConnectorProps) {
+export function AnimatedConnector({ className = '', variant = 'curved' }: AnimatedConnectorProps) {
   if (variant === 'horizontal') {
     return (
       <svg
-        className={`w-full h-6 pointer-events-none ${className}`}
+        className={`pointer-events-none h-6 w-full ${className}`}
         viewBox="0 0 300 24"
         fill="none"
         xmlns="http://www.w3.org/2000/svg"
@@ -32,7 +29,7 @@ export function AnimatedConnector({
   if (variant === 'loop') {
     return (
       <svg
-        className={`w-32 h-32 pointer-events-none ${className}`}
+        className={`pointer-events-none h-32 w-32 ${className}`}
         viewBox="0 0 120 120"
         fill="none"
         xmlns="http://www.w3.org/2000/svg"
@@ -54,7 +51,7 @@ export function AnimatedConnector({
 
   return (
     <svg
-      className={`w-full h-24 pointer-events-none ${className}`}
+      className={`pointer-events-none h-24 w-full ${className}`}
       viewBox="0 0 400 96"
       fill="none"
       xmlns="http://www.w3.org/2000/svg"

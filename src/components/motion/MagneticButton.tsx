@@ -42,7 +42,7 @@ export function MagneticButton({
       animate={{ x: position.x, y: position.y }}
       whileTap={reduceMotion ? undefined : { scale: 0.97 }}
       transition={{ type: 'spring', stiffness: 350, damping: 20 }}
-      className={`border-trace relative inline-flex overflow-hidden items-center justify-center rounded-xl font-bold transition-shadow focus:outline-none disabled:opacity-50 ${className}`.trim()}
+      className={`border-trace relative inline-flex items-center justify-center overflow-hidden rounded-xl font-bold transition-shadow focus:outline-none disabled:opacity-50 ${className}`.trim()}
       {...(props as any)}
     >
       {children}

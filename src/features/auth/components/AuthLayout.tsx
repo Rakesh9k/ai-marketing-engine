@@ -8,7 +8,8 @@ import { motion, useReducedMotion } from 'motion/react';
 import { MitraLogo } from '@/components/ui/MitraLogo';
 import { Mascot } from '@/components/mascot/Mascot';
 
-export type AuthViewMode = 'login' | 'signup' | 'forgot-password' | 'reset-password' | 'verify-email';
+export type AuthViewMode =
+  'login' | 'signup' | 'forgot-password' | 'reset-password' | 'verify-email';
 
 interface AuthLayoutProps {
   children: ReactNode;
@@ -40,25 +41,28 @@ const VIEW_CONFIGS: Record<
     badges: [
       { icon: '⚡', title: 'AI-Powered Campaigns' },
       { icon: '🗣️', title: 'Local Language Support' },
-      { icon: '💬', title: 'WhatsApp Integration' },
+      { icon: '💬', title: 'WhatsApp-Ready Messages' },
     ],
     creativeCards: [
       {
         title: 'Glow & Shine Beauty Salon',
         tag: 'Beauty Salon',
-        image: 'https://images.unsplash.com/photo-1560066984-138dadb4c035?auto=format&fit=crop&w=300&q=80',
+        image:
+          'https://images.unsplash.com/photo-1560066984-138dadb4c035?auto=format&fit=crop&w=300&q=80',
         color: 'from-pink-500/20 to-purple-500/20',
       },
       {
         title: 'Fresh Biryani Swady',
         tag: 'Flat 20% OFF',
-        image: 'https://images.unsplash.com/photo-1563379091339-03b21ab4a4f8?auto=format&fit=crop&w=300&q=80',
+        image:
+          'https://images.unsplash.com/photo-1563379091339-03b21ab4a4f8?auto=format&fit=crop&w=300&q=80',
         color: 'from-amber-500/20 to-orange-500/20',
       },
       {
         title: 'Modern Homes',
         tag: 'Real Estate',
-        image: 'https://images.unsplash.com/photo-1600585154340-be6161a56a0c?auto=format&fit=crop&w=300&q=80',
+        image:
+          'https://images.unsplash.com/photo-1600585154340-be6161a56a0c?auto=format&fit=crop&w=300&q=80',
         color: 'from-blue-500/20 to-cyan-500/20',
       },
     ],
@@ -68,7 +72,8 @@ const VIEW_CONFIGS: Record<
     mascotState: 'thumbs-up',
     mascotAlt: 'Mitra mascot pointing enthusiastically',
     headline: 'Create Your Account',
-    description: 'Start your free journey with Mitra today and transform your local business marketing.',
+    description:
+      'Start your free journey with Mitra today and transform your local business marketing.',
     badges: [
       { icon: '🎁', title: 'Free Credits', sub: 'Get started instantly' },
       { icon: '💳', title: 'No Credit Card', sub: 'Required' },
@@ -78,19 +83,22 @@ const VIEW_CONFIGS: Record<
       {
         title: 'Special Thali Special',
         tag: 'Restaurant',
-        image: 'https://images.unsplash.com/photo-1546833999-b9f581a1996d?auto=format&fit=crop&w=300&q=80',
+        image:
+          'https://images.unsplash.com/photo-1546833999-b9f581a1996d?auto=format&fit=crop&w=300&q=80',
         color: 'from-orange-500/20 to-red-500/20',
       },
       {
         title: 'Beauty Self-Care',
         tag: 'Salon & Spa',
-        image: 'https://images.unsplash.com/photo-1522337360788-8b13dee7a37e?auto=format&fit=crop&w=300&q=80',
+        image:
+          'https://images.unsplash.com/photo-1522337360788-8b13dee7a37e?auto=format&fit=crop&w=300&q=80',
         color: 'from-rose-500/20 to-pink-500/20',
       },
       {
         title: 'Luxury Homes',
         tag: 'Live The Dream',
-        image: 'https://images.unsplash.com/photo-1600596542815-ffad4c1539a9?auto=format&fit=crop&w=300&q=80',
+        image:
+          'https://images.unsplash.com/photo-1600596542815-ffad4c1539a9?auto=format&fit=crop&w=300&q=80',
         color: 'from-emerald-500/20 to-teal-500/20',
       },
     ],
@@ -110,7 +118,8 @@ const VIEW_CONFIGS: Record<
       {
         title: 'Account Recovery',
         tag: 'Instant Link',
-        image: 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&w=300&q=80',
+        image:
+          'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&w=300&q=80',
         color: 'from-amber-500/20 to-brand-500/20',
       },
     ],
@@ -130,7 +139,8 @@ const VIEW_CONFIGS: Record<
       {
         title: 'Security Verified',
         tag: 'Strong Password',
-        image: 'https://images.unsplash.com/photo-1563986768609-322da13575f3?auto=format&fit=crop&w=300&q=80',
+        image:
+          'https://images.unsplash.com/photo-1563986768609-322da13575f3?auto=format&fit=crop&w=300&q=80',
         color: 'from-emerald-500/20 to-teal-500/20',
       },
     ],
@@ -143,13 +153,18 @@ const VIEW_CONFIGS: Record<
     description:
       "We've sent a verification link to your email address. Click the link to activate your account.",
     badges: [
-      { icon: '📬', title: "Didn't receive the email?", sub: 'Check your spam folder or request a new link' },
+      {
+        icon: '📬',
+        title: "Didn't receive the email?",
+        sub: 'Check your spam folder or request a new link',
+      },
     ],
     creativeCards: [
       {
         title: 'Email Sent',
         tag: 'Check Inbox',
-        image: 'https://images.unsplash.com/photo-1596526131083-e8c633c948d2?auto=format&fit=crop&w=300&q=80',
+        image:
+          'https://images.unsplash.com/photo-1596526131083-e8c633c948d2?auto=format&fit=crop&w=300&q=80',
         color: 'from-brand-500/20 to-orange-500/20',
       },
     ],
@@ -185,13 +200,13 @@ export function AuthLayout({
     mode === 'login'
       ? { text: "Don't have an account?", href: '/signup', label: 'Sign up' }
       : mode === 'signup'
-      ? { text: 'Already have an account?', href: '/login', label: 'Log in' }
-      : { text: 'Remember your password?', href: '/login', label: 'Log in' };
+        ? { text: 'Already have an account?', href: '/login', label: 'Log in' }
+        : { text: 'Remember your password?', href: '/login', label: 'Log in' };
 
   const linkInfo = topRightLink || defaultTopRight;
 
   return (
-    <div className="relative min-h-screen w-full bg-[#FDFBF8] text-[#1A1A1E] font-sans antialiased overflow-x-hidden selection:bg-brand-500/20 selection:text-brand-600 flex flex-col justify-between">
+    <div className="selection:bg-brand-500/20 selection:text-brand-600 relative flex min-h-screen w-full flex-col justify-between overflow-x-hidden bg-[#FDFBF8] font-sans text-[#1A1A1E] antialiased">
       {/* Background Grid & Ambient Glows */}
       <div className="pointer-events-none absolute inset-0 z-0 overflow-hidden">
         {/* Dot grid texture */}
@@ -203,23 +218,26 @@ export function AuthLayout({
           }}
         />
         {/* Soft orange radial glows */}
-        <div className="absolute -left-24 -top-24 h-96 w-96 rounded-full bg-brand-500/10 blur-3xl" />
-        <div className="absolute right-10 top-1/3 h-80 w-80 rounded-full bg-amber-500/10 blur-3xl" />
+        <div className="bg-brand-500/10 absolute -top-24 -left-24 h-96 w-96 rounded-full blur-3xl" />
+        <div className="absolute top-1/3 right-10 h-80 w-80 rounded-full bg-amber-500/10 blur-3xl" />
         <div className="absolute -bottom-20 left-1/3 h-96 w-96 rounded-full bg-orange-400/10 blur-3xl" />
       </div>
 
       {/* Main Container */}
-      <div className="relative z-10 mx-auto flex w-full max-w-7xl flex-1 flex-col px-4 sm:px-6 lg:px-8 py-6 lg:py-10 justify-center">
+      <div className="relative z-10 mx-auto flex w-full max-w-7xl flex-1 flex-col justify-center px-4 py-6 sm:px-6 lg:px-8 lg:py-10">
         {/* Header bar with Brand Logo and Auth Mode Switcher */}
-        <header className="mb-6 lg:mb-10 flex items-center justify-between">
-          <Link href="/" className="inline-flex items-center gap-2 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 rounded-lg">
+        <header className="mb-6 flex items-center justify-between lg:mb-10">
+          <Link
+            href="/"
+            className="focus-visible:ring-brand-500 inline-flex items-center gap-2 rounded-lg focus:outline-none focus-visible:ring-2"
+          >
             <MitraLogo size="md" />
           </Link>
-          <div className="text-xs sm:text-sm text-[#5C5C66]">
+          <div className="text-xs text-[#5C5C66] sm:text-sm">
             <span>{linkInfo.text}</span>{' '}
             <Link
               href={linkInfo.href}
-              className="font-semibold text-[#E84D1A] hover:underline hover:text-brand-700 transition-colors"
+              className="hover:text-brand-700 font-semibold text-[#E84D1A] transition-colors hover:underline"
             >
               {linkInfo.label}
             </Link>
@@ -227,10 +245,10 @@ export function AuthLayout({
         </header>
 
         {/* Split Grid */}
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12 items-center">
+        <div className="grid grid-cols-1 items-center gap-8 lg:grid-cols-12 lg:gap-12">
           {/* Left Hero Storytelling Panel (Desktop) / Header Accent (Mobile) */}
           <motion.div
-            className="lg:col-span-6 flex flex-col justify-center relative"
+            className="relative flex flex-col justify-center lg:col-span-6"
             initial={reduceMotion ? false : { opacity: 0, x: -20 }}
             animate={{ opacity: 1, x: 0 }}
             transition={{ duration: 0.5, ease: 'easeOut' }}
@@ -238,22 +256,27 @@ export function AuthLayout({
             {/* Handwritten Cursive Callout Accent */}
             <div className="relative mb-3 inline-block">
               <motion.span
-                className="inline-flex items-center gap-2 font-serif italic text-lg sm:text-xl text-[#E84D1A] font-semibold tracking-wide"
+                className="inline-flex items-center gap-2 font-serif text-lg font-semibold tracking-wide text-[#E84D1A] italic sm:text-xl"
                 animate={reduceMotion ? {} : { y: [0, -3, 0] }}
                 transition={{ duration: 4, repeat: Infinity, ease: 'easeInOut' }}
               >
                 <span>✨ {config.handwritten}</span>
                 <svg className="h-4 w-12 text-[#E84D1A]/40" viewBox="0 0 100 20" fill="none">
-                  <path d="M0 10 Q 25 0, 50 10 T 100 10" stroke="currentColor" strokeWidth="2" fill="none" />
+                  <path
+                    d="M0 10 Q 25 0, 50 10 T 100 10"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    fill="none"
+                  />
                 </svg>
               </motion.span>
             </div>
 
             {/* Visual Mascot & Creative Cards Stack */}
-            <div className="relative my-4 sm:my-6 min-h-[260px] sm:min-h-[340px] w-full flex items-center justify-center">
+            <div className="relative my-4 flex min-h-[260px] w-full items-center justify-center sm:my-6 sm:min-h-[340px]">
               {/* Parallax Container */}
               <motion.div
-                className="relative w-full max-w-lg flex items-center justify-center"
+                className="relative flex w-full max-w-lg items-center justify-center"
                 style={{
                   transform: reduceMotion
                     ? undefined
@@ -261,12 +284,12 @@ export function AuthLayout({
                 }}
               >
                 {/* Background Card Shapes */}
-                <div className="absolute -inset-4 rounded-3xl bg-gradient-to-tr from-orange-100/40 via-amber-50/50 to-white/60 backdrop-blur-sm border border-orange-200/30 shadow-inner -rotate-1" />
+                <div className="absolute -inset-4 -rotate-1 rounded-3xl border border-orange-200/30 bg-gradient-to-tr from-orange-100/40 via-amber-50/50 to-white/60 shadow-inner backdrop-blur-sm" />
 
                 {/* Floating Creative Cards */}
                 {config.creativeCards[0] && (
                   <motion.div
-                    className="absolute -top-4 -left-2 sm:left-2 z-10 w-44 sm:w-52 rounded-2xl bg-white p-2.5 shadow-lg border border-neutral-100/80 -rotate-6"
+                    className="absolute -top-4 -left-2 z-10 w-44 -rotate-6 rounded-2xl border border-neutral-100/80 bg-white p-2.5 shadow-lg sm:left-2 sm:w-52"
                     animate={reduceMotion ? {} : { y: [0, -6, 0] }}
                     transition={{ duration: 5, repeat: Infinity, ease: 'easeInOut' }}
                   >
@@ -281,7 +304,7 @@ export function AuthLayout({
                         />
                       </div>
                       <div className="overflow-hidden">
-                        <span className="inline-block text-[10px] font-semibold uppercase tracking-wider text-brand-600 bg-brand-50 px-1.5 py-0.5 rounded">
+                        <span className="text-brand-600 bg-brand-50 inline-block rounded px-1.5 py-0.5 text-[10px] font-semibold tracking-wider uppercase">
                           {config.creativeCards[0].tag}
                         </span>
                         <p className="truncate text-xs font-semibold text-neutral-800">
@@ -294,7 +317,7 @@ export function AuthLayout({
 
                 {config.creativeCards[1] && (
                   <motion.div
-                    className="absolute top-12 -right-2 sm:right-0 z-10 w-40 sm:w-48 rounded-2xl bg-white p-2.5 shadow-lg border border-neutral-100/80 rotate-6"
+                    className="absolute top-12 -right-2 z-10 w-40 rotate-6 rounded-2xl border border-neutral-100/80 bg-white p-2.5 shadow-lg sm:right-0 sm:w-48"
                     animate={reduceMotion ? {} : { y: [0, 6, 0] }}
                     transition={{ duration: 6, repeat: Infinity, ease: 'easeInOut', delay: 0.5 }}
                   >
@@ -309,7 +332,7 @@ export function AuthLayout({
                         />
                       </div>
                       <div className="overflow-hidden">
-                        <span className="inline-block text-[10px] font-semibold uppercase tracking-wider text-amber-600 bg-amber-50 px-1.5 py-0.5 rounded">
+                        <span className="inline-block rounded bg-amber-50 px-1.5 py-0.5 text-[10px] font-semibold tracking-wider text-amber-600 uppercase">
                           {config.creativeCards[1].tag}
                         </span>
                         <p className="truncate text-xs font-semibold text-neutral-800">
@@ -348,19 +371,19 @@ export function AuthLayout({
 
             {/* Left Headline & Subtitle */}
             <div className="mt-2 text-center lg:text-left">
-              <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold tracking-tight text-[#1A1A1E]">
+              <h1 className="text-2xl font-bold tracking-tight text-[#1A1A1E] sm:text-3xl lg:text-4xl">
                 {config.headline}
               </h1>
-              <p className="mt-2 text-sm sm:text-base text-[#5C5C66] max-w-md mx-auto lg:mx-0 leading-relaxed">
+              <p className="mx-auto mt-2 max-w-md text-sm leading-relaxed text-[#5C5C66] sm:text-base lg:mx-0">
                 {config.description}
               </p>
 
               {/* Feature/Trust Badges */}
-              <div className="mt-5 flex flex-wrap gap-2.5 justify-center lg:justify-start">
+              <div className="mt-5 flex flex-wrap justify-center gap-2.5 lg:justify-start">
                 {config.badges.map((b, idx) => (
                   <div
                     key={idx}
-                    className="inline-flex items-center gap-1.5 rounded-full bg-white px-3 py-1.5 text-xs font-medium text-[#1A1A1E] border border-orange-100 shadow-2xs"
+                    className="inline-flex items-center gap-1.5 rounded-full border border-orange-100 bg-white px-3 py-1.5 text-xs font-medium text-[#1A1A1E] shadow-2xs"
                   >
                     <span>{b.icon}</span>
                     <span className="font-semibold">{b.title}</span>
@@ -373,17 +396,19 @@ export function AuthLayout({
 
           {/* Right Authentication Panel */}
           <motion.div
-            className="lg:col-span-6 w-full max-w-md mx-auto"
+            className="mx-auto w-full max-w-md lg:col-span-6"
             initial={reduceMotion ? false : { opacity: 0, y: 15 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.5, ease: 'easeOut', delay: 0.1 }}
           >
             {/* Card Container */}
-            <div className="rounded-3xl bg-white p-6 sm:p-8 shadow-xl shadow-orange-950/5 border border-[#F0EBE1] relative">
+            <div className="relative rounded-3xl border border-[#F0EBE1] bg-white p-6 shadow-xl shadow-orange-950/5 sm:p-8">
               {/* Top Card Title if supplied */}
               {(title || subtitle) && (
                 <div className="mb-6">
-                  {title && <h2 className="text-xl sm:text-2xl font-bold text-[#1A1A1E]">{title}</h2>}
+                  {title && (
+                    <h2 className="text-xl font-bold text-[#1A1A1E] sm:text-2xl">{title}</h2>
+                  )}
                   {subtitle && <p className="mt-1 text-sm text-[#5C5C66]">{subtitle}</p>}
                 </div>
               )}

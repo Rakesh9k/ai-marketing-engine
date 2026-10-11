@@ -1,8 +1,16 @@
 import type { Variants } from 'motion/react';
 
+/**
+ * Timing hierarchy (seconds) — kept in step with DURATION in ./motionTokens so the two
+ * motion vocabularies agree:
+ *   instant  micro interactions (press, hover feedback)
+ *   fast     small UI transitions and all exits (exits are quicker than entrances)
+ *   normal   content entrances (lists, cards, panels)
+ *   slow     large / hero transitions
+ */
 export const MOTION_DURATIONS = {
   instant: 0.1,
-  fast: 0.2,
+  fast: 0.18,
   normal: 0.3,
   slow: 0.5,
 } as const;
@@ -15,7 +23,7 @@ export const fadeInUpVariants: Variants = {
   visible: {
     opacity: 1,
     y: 0,
-    transition: { duration: MOTION_DURATIONS.fast, ease: EASE_OUT_EXPO },
+    transition: { duration: MOTION_DURATIONS.normal, ease: EASE_OUT_EXPO },
   },
   exit: {
     opacity: 0,
@@ -29,7 +37,7 @@ export const scaleInVariants: Variants = {
   visible: {
     opacity: 1,
     scale: 1,
-    transition: { duration: MOTION_DURATIONS.fast, ease: EASE_OUT_EXPO },
+    transition: { duration: MOTION_DURATIONS.normal, ease: EASE_OUT_EXPO },
   },
   exit: {
     opacity: 0,

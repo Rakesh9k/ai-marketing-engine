@@ -1,70 +1,73 @@
 'use client';
 
 import Link from 'next/link';
-import { motion, useReducedMotion } from 'motion/react';
+import { useReducedMotion } from 'motion/react';
 import { MitraMascot } from '@/components/ui/MitraMascot';
 
 export function AboutCTA() {
-  const reduceMotion = useReducedMotion();
+  const _reduceMotion = useReducedMotion();
 
   return (
-    <section className="bg-surface py-20 relative overflow-hidden border-t border-border-light">
+    <section className="bg-surface border-border-light relative overflow-hidden border-t py-20">
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-        <div className="relative overflow-hidden rounded-3xl border border-brand-300 bg-gradient-to-r from-neutral-900 via-neutral-900 to-neutral-800 p-8 sm:p-14 text-white shadow-2xl">
+        <div className="border-brand-300 relative overflow-hidden rounded-3xl border bg-gradient-to-r from-neutral-900 via-neutral-900 to-neutral-800 p-8 text-white shadow-2xl sm:p-14">
           {/* Subtle background glow */}
-          <div className="pointer-events-none absolute -right-20 -top-20 h-80 w-80 rounded-full bg-brand-500/20 blur-3xl" />
+          <div className="bg-brand-500/20 pointer-events-none absolute -top-20 -right-20 h-80 w-80 rounded-full blur-3xl" />
 
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-center">
+          <div className="grid grid-cols-1 items-center gap-8 lg:grid-cols-12">
             {/* Left Column: Mascot & Speech Note */}
-            <div className="flex flex-col sm:flex-row items-center justify-center lg:justify-start gap-4 lg:col-span-5 text-center sm:text-left">
-              <MitraMascot pose="cheer" size={160} className="drop-shadow-lg shrink-0" />
+            <div className="flex flex-col items-center justify-center gap-4 text-center sm:flex-row sm:text-left lg:col-span-5 lg:justify-start">
+              <MitraMascot pose="cheer" size={160} className="shrink-0 drop-shadow-lg" />
               <div className="space-y-1">
-                <span className="font-handwriting text-brand-300 text-sm font-bold block rotate-1">
+                <span className="font-handwriting text-brand-300 block rotate-1 text-sm font-bold">
                   “Let’s build the future of local business together!” 👋
                 </span>
-                <p className="text-[11px] text-neutral-400 font-medium">
+                <p className="text-[11px] font-medium text-neutral-400">
                   Real Businesses. Real Stories. With Mitra. ❤️
                 </p>
               </div>
             </div>
 
             {/* Right Column: CTA Content & Buttons */}
-            <div className="space-y-6 lg:col-span-7 text-center lg:text-left">
-              <div className="inline-flex items-center gap-2 rounded-full bg-white/10 border border-white/20 px-3.5 py-1 text-xs font-bold text-brand-300">
+            <div className="space-y-6 text-center lg:col-span-7 lg:text-left">
+              <div className="text-brand-300 inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/10 px-3.5 py-1 text-xs font-bold">
                 <span>✨ Join the Movement</span>
               </div>
 
-              <h2 className="text-3xl sm:text-4xl lg:text-5xl font-black tracking-tight text-white leading-tight">
+              <h2 className="text-3xl leading-tight font-black tracking-tight text-white sm:text-4xl lg:text-5xl">
                 Be Part of the <span className="text-brand-400">Next Chapter</span>
               </h2>
 
-              <p className="text-neutral-300 text-sm sm:text-base leading-relaxed max-w-xl">
-                Whether you’re a restaurant owner, salon founder, realtor, or local entrepreneur — give Mitra a little context about your business and see what happens.
+              <p className="max-w-xl text-sm leading-relaxed text-neutral-300 sm:text-base">
+                Whether you’re a restaurant owner, salon founder, realtor, or local entrepreneur —
+                give Mitra a little context about your business and see what happens.
               </p>
 
-              <div className="flex flex-col sm:flex-row items-center justify-center lg:justify-start gap-4 pt-2">
+              <div className="flex flex-col items-center justify-center gap-4 pt-2 sm:flex-row lg:justify-start">
                 <Link
                   href="/signup"
-                  className="w-full sm:w-auto inline-flex items-center justify-center rounded-xl bg-brand-500 px-8 py-4 text-sm font-extrabold text-white shadow-lg shadow-brand-500/30 transition-all hover:bg-brand-400 hover:scale-105 focus:ring-2 focus:ring-brand-400 focus:outline-none"
+                  className="bg-brand-500 shadow-brand-500/30 hover:bg-brand-400 focus:ring-brand-400 inline-flex w-full items-center justify-center rounded-xl px-8 py-4 text-sm font-extrabold text-white shadow-lg transition-all hover:scale-105 focus:ring-2 focus:outline-none sm:w-auto"
                 >
                   Get Started Free →
                 </Link>
-                <span className="text-xs text-neutral-400 font-medium">No credit card required.</span>
+                <span className="text-xs font-medium text-neutral-400">
+                  No credit card required.
+                </span>
               </div>
 
               {/* Stats Bar */}
-              <div className="grid grid-cols-3 gap-4 pt-6 border-t border-white/10 text-center lg:text-left">
+              <div className="grid grid-cols-3 gap-4 border-t border-white/10 pt-6 text-center lg:text-left">
                 <div>
-                  <h4 className="text-xl sm:text-2xl font-black text-brand-400">1000+</h4>
-                  <p className="text-[11px] text-neutral-400 font-semibold">Businesses Onboarded</p>
+                  <h4 className="text-brand-400 text-xl font-black sm:text-2xl">1000+</h4>
+                  <p className="text-[11px] font-semibold text-neutral-400">Businesses Onboarded</p>
                 </div>
                 <div>
-                  <h4 className="text-xl sm:text-2xl font-black text-brand-400">50+</h4>
-                  <p className="text-[11px] text-neutral-400 font-semibold">Cities &amp; Towns</p>
+                  <h4 className="text-brand-400 text-xl font-black sm:text-2xl">50+</h4>
+                  <p className="text-[11px] font-semibold text-neutral-400">Cities &amp; Towns</p>
                 </div>
                 <div>
-                  <h4 className="text-xl sm:text-2xl font-black text-brand-400">10+</h4>
-                  <p className="text-[11px] text-neutral-400 font-semibold">Languages Supported</p>
+                  <h4 className="text-brand-400 text-xl font-black sm:text-2xl">10+</h4>
+                  <p className="text-[11px] font-semibold text-neutral-400">Languages Supported</p>
                 </div>
               </div>
             </div>

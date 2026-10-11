@@ -4,6 +4,7 @@ import type { ReactNode } from 'react';
 import { useEffect } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import { useAuthStatus } from '@/features/auth/hooks/useAuth';
+import { useAuthFlowBusy } from '@/features/auth/authFlowState';
 import { MitraMark } from '@/components/ui/MitraMark';
 
 interface ProtectedRouteProps {
@@ -41,17 +42,51 @@ export function ProtectedRoute({ children, fallback = null }: ProtectedRouteProp
   return <>{children}</>;
 }
 
-export function PublicOnlyRoute({ children, fallback = null }: ProtectedRouteProps) {
+export function PublicOnlyRoute({
+  children,
+  fallback = null,
+  redirectTo = '/dashboard',
+  smartRedirect = false,
+  redirectParam = null,
+}: ProtectedRouteProps & {
+  redirectTo?: string;
+  /**
+   * Decide the destination from the account's state (has a business? email verified?) instead of
+   * using the fixed `redirectTo`. Used by /login and /signup so every entry point routes alike.
+   */
+  smartRedirect?: boolean;
+  /** Raw `?redirect=` value; sanitised before use. Only read when `smartRedirect` is on. */
+  redirectParam?: string | null;
+}) {
   const router = useRouter();
   const authStatus = useAuthStatus();
+  // Don't tear the page down while a sign-in is mid-flight: a brand-new Google user is
+  // "authenticated" before they have accepted the Terms, and the consent card lives in `children`.
+  const flowBusy = useAuthFlowBusy();
+  const settled = authStatus === 'authenticated' && !flowBusy;
 
   useEffect(() => {
-    if (authStatus === 'authenticated') {
-      router.push('/dashboard');
+    if (!settled) return;
+    if (!smartRedirect) {
+      router.push(redirectTo);
+      return;
     }
-  }, [authStatus, router]);
+    let cancelled = false;
+    void (async () => {
+      const [{ resolvePostAuthDestination }, { getCurrentUser }] = await Promise.all([
+        import('@/features/auth/utils/postAuthRouting'),
+        import('@/features/auth/services/authService'),
+      ]);
+      const destination = await resolvePostAuthDestination(getCurrentUser(), redirectParam);
+      if (!cancelled) router.replace(destination);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [settled, router, redirectTo, smartRedirect, redirectParam]);
 
-  if (authStatus === 'loading') {
+  // While a smart redirect resolves (one Firestore read) keep the spinner up, not a blank page.
+  if (authStatus === 'loading' || (settled && smartRedirect)) {
     return (
       <div
         className="flex min-h-screen items-center justify-center"
@@ -63,7 +98,7 @@ export function PublicOnlyRoute({ children, fallback = null }: ProtectedRoutePro
     );
   }
 
-  if (authStatus === 'authenticated') {
+  if (settled) {
     return <>{fallback}</>;
   }
 

@@ -27,14 +27,27 @@ What would you like to achieve today?`,
     type: 'text',
     createdAt: new Date().toISOString(),
     actions: [
-      { id: 'act-1', label: '🚀 Create New Campaign', url: '/campaigns/new', type: 'create_campaign' },
-      { id: 'act-2', label: '🎨 Design Banner / Poster', url: '/creative', type: 'create_creative' },
+      {
+        id: 'act-1',
+        label: '🚀 Create New Campaign',
+        url: '/campaigns/new',
+        type: 'create_campaign',
+      },
+      {
+        id: 'act-2',
+        label: '🎨 Design Banner / Poster',
+        url: '/creative',
+        type: 'create_creative',
+      },
       { id: 'act-3', label: '🧠 Review Business Brain', url: '/business', type: 'update_brain' },
     ],
   },
 ];
 
-export function AssistantWorkspace({ conversationId = 'default', initialContext }: AssistantWorkspaceProps) {
+export function AssistantWorkspace({
+  conversationId = 'default',
+  initialContext,
+}: AssistantWorkspaceProps) {
   const [messages, setMessages] = useState<AssistantMessage[]>(INITIAL_MESSAGES);
   const [isLoading, setIsLoading] = useState(false);
   const { user } = useAuth();
@@ -119,18 +132,24 @@ export function AssistantWorkspace({ conversationId = 'default', initialContext 
       // Synthesize intelligent fallback if backend did not respond
       if (!responseText) {
         if (content.toLowerCase().includes('campaign') || content.toLowerCase().includes('offer')) {
-          responseText = `Here is a tailored **High-Converting Festival Offer Strategy** for your business:\n\n` +
+          responseText =
+            `Here is a tailored **High-Converting Festival Offer Strategy** for your business:\n\n` +
             `🎯 **Objective**: Drive high footfall & online sales\n` +
             `🏷️ **Recommended Promo**: "Festive Special — Buy 2 Get 1 Free + Free Delivery"\n` +
             `📱 **Best Channels**: Instagram Reels & WhatsApp Broadcast\n\n` +
             `Would you like me to generate a complete ready-to-publish campaign with visual creatives?`;
-        } else if (content.toLowerCase().includes('caption') || content.toLowerCase().includes('post')) {
-          responseText = `Here are 3 engaging social post captions for your business:\n\n` +
+        } else if (
+          content.toLowerCase().includes('caption') ||
+          content.toLowerCase().includes('post')
+        ) {
+          responseText =
+            `Here are 3 engaging social post captions for your business:\n\n` +
             `1. 🌟 **The Festive Glow**: "Transform your celebrations with our signature offerings! Special discounts available this week only. Tap to reserve yours now! #LocalFavorite #FestiveVibes"\n\n` +
             `2. 🎁 **Exclusive Offer**: "Quality you love at prices you'll cherish. Don't miss out on our limited-time deal! #SpecialOffer"\n\n` +
             `3. ✨ **Customer Choice**: "Hyderabad's favorite experience. Book today and get a complimentary treat on us!"`;
         } else {
-          responseText = `I've analyzed your input: "${content}".\n\n` +
+          responseText =
+            `I've analyzed your input: "${content}".\n\n` +
             `Based on your Business Brain guidelines, I recommend creating a targeted visual asset in Creative Studio or launching a multi-channel festival campaign.`;
         }
       }
@@ -144,8 +163,18 @@ export function AssistantWorkspace({ conversationId = 'default', initialContext 
         type: 'text',
         createdAt: new Date().toISOString(),
         actions: [
-          { id: 'a1', label: '🚀 Launch in Campaign Studio', url: '/campaigns/new', type: 'create_campaign' },
-          { id: 'a2', label: '🎨 Open in Creative Studio', url: '/creative', type: 'create_creative' },
+          {
+            id: 'a1',
+            label: '🚀 Launch in Campaign Studio',
+            url: '/campaigns/new',
+            type: 'create_campaign',
+          },
+          {
+            id: 'a2',
+            label: '🎨 Open in Creative Studio',
+            url: '/creative',
+            type: 'create_creative',
+          },
         ],
       };
 
@@ -159,55 +188,59 @@ export function AssistantWorkspace({ conversationId = 'default', initialContext 
   };
 
   return (
-    <div className="flex flex-col h-[calc(100vh-6rem)] max-w-6xl mx-auto space-y-4">
+    <div className="mx-auto flex h-[calc(100vh-6rem)] max-w-6xl flex-col space-y-4">
       {/* Top Header & Navigation Bar */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 rounded-2xl border border-neutral-200 bg-white p-4 shadow-xs">
+      <div className="flex flex-col justify-between gap-4 rounded-2xl border border-neutral-200 bg-white p-4 shadow-xs sm:flex-row sm:items-center">
         <div className="flex items-center gap-3">
-          <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-brand-100 border border-brand-200">
+          <div className="bg-brand-100 border-brand-200 flex h-12 w-12 items-center justify-center rounded-2xl border">
             <MitraMascot pose="idea" size="md" />
           </div>
           <div>
             <div className="flex items-center gap-2">
-              <h1 className="text-xl font-bold text-neutral-900 tracking-tight">Mitra AI Assistant</h1>
-              <span className="rounded-full bg-brand-100 text-brand-700 px-2.5 py-0.5 text-xs font-extrabold">
+              <h1 className="text-xl font-bold tracking-tight text-neutral-900">
+                Mitra AI Assistant
+              </h1>
+              <span className="bg-brand-100 text-brand-700 rounded-full px-2.5 py-0.5 text-xs font-extrabold">
                 PRO COPILOT
               </span>
             </div>
-            <p className="text-xs text-neutral-500 font-medium">Your 24/7 Intelligent Marketing Strategist & Execution Partner</p>
+            <p className="text-xs font-medium text-neutral-500">
+              Your 24/7 Intelligent Marketing Strategist & Execution Partner
+            </p>
           </div>
         </div>
 
         {/* Sub-Navigation Links */}
-        <div className="flex items-center gap-1 bg-neutral-100 p-1 rounded-xl text-xs font-bold">
+        <div className="flex items-center gap-1 rounded-xl bg-neutral-100 p-1 text-xs font-bold">
           <Link
             href="/assistant"
-            className="rounded-lg bg-white px-3 py-1.5 text-brand-700 shadow-xs transition-all"
+            className="text-brand-700 rounded-lg bg-white px-3 py-1.5 shadow-xs transition-all"
           >
             💬 Assistant Hub
           </Link>
           <Link
             href="/assistant/history"
-            className="rounded-lg px-3 py-1.5 text-neutral-600 hover:text-neutral-900 transition-colors"
+            className="rounded-lg px-3 py-1.5 text-neutral-600 transition-colors hover:text-neutral-900"
           >
             📜 Conversation History
           </Link>
           <Link
             href="/assistant/recommendations"
-            className="rounded-lg px-3 py-1.5 text-neutral-600 hover:text-neutral-900 transition-colors flex items-center gap-1"
+            className="flex items-center gap-1 rounded-lg px-3 py-1.5 text-neutral-600 transition-colors hover:text-neutral-900"
           >
             💡 Recommendations
-            <span className="h-2 w-2 rounded-full bg-brand-500" />
+            <span className="bg-brand-500 h-2 w-2 rounded-full" />
           </Link>
         </div>
       </div>
 
       {/* Main Conversation Stream */}
-      <div className="flex-1 overflow-y-auto rounded-2xl border border-neutral-200 bg-neutral-50/50 p-4 sm:p-6 space-y-6">
+      <div className="flex-1 space-y-6 overflow-y-auto rounded-2xl border border-neutral-200 bg-neutral-50/50 p-4 sm:p-6">
         {messages.map((msg) => (
           <AssistantMessageItem key={msg.id} message={msg} />
         ))}
         {isLoading && (
-          <div className="flex items-center gap-3 text-xs text-neutral-500 font-medium italic">
+          <div className="flex items-center gap-3 text-xs font-medium text-neutral-500 italic">
             <MitraMascot pose="thinking" size="sm" />
             <span>Mitra is formulating marketing strategy...</span>
           </div>

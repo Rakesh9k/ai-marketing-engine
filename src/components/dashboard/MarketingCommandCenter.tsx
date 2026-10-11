@@ -1,6 +1,5 @@
 'use client';
 
-import Image from 'next/image';
 import Link from 'next/link';
 import { motion, useReducedMotion } from 'motion/react';
 import { Mascot } from '@/components/mascot/Mascot';
@@ -17,15 +16,16 @@ interface MarketingCommandCenterProps {
 export function MarketingCommandCenter({
   business,
   greeting,
-  recommendationTitle,
+  recommendationTitle: _recommendationTitle,
   recommendationSubtitle,
 }: MarketingCommandCenterProps) {
   const reduceMotion = useReducedMotion();
   const businessName = business?.name || 'your business';
 
   const defaultGreeting = `Good morning, ${businessName}!`;
-  const defaultTitle = "What are we marketing today?";
-  const defaultSub = 'Turn your latest offer, dish, or event into complete posts, reels, and WhatsApp campaigns.';
+  const defaultTitle = 'What are we marketing today?';
+  const defaultSub =
+    'Turn your latest offer, dish, or event into complete posts, reels, and WhatsApp campaigns.';
 
   return (
     <motion.div
@@ -91,38 +91,6 @@ export function MarketingCommandCenter({
           <div className="relative flex w-full max-w-xs items-center justify-center">
             {/* Mascot Image */}
             <Mascot state="waving" size="xl" glow shadow animated priority />
-
-            {/* Floating Thumbnail Card 1 */}
-            <motion.div
-              animate={reduceMotion ? {} : { y: [0, -6, 0] }}
-              transition={{ duration: 5, repeat: Infinity, ease: 'easeInOut' }}
-              className="absolute -top-2 -right-2 z-10 hidden h-20 w-28 rotate-6 rounded-xl border border-orange-100 bg-white p-1.5 shadow-md sm:block"
-            >
-              <div className="relative h-full w-full overflow-hidden rounded-lg bg-neutral-100">
-                <Image
-                  src="https://images.unsplash.com/photo-1563379091339-03b21ab4a4f8?auto=format&fit=crop&w=200&q=80"
-                  alt="Biryani Special Offer"
-                  fill
-                  className="object-cover"
-                />
-              </div>
-            </motion.div>
-
-            {/* Floating Thumbnail Card 2 */}
-            <motion.div
-              animate={reduceMotion ? {} : { y: [0, 6, 0] }}
-              transition={{ duration: 6, repeat: Infinity, ease: 'easeInOut', delay: 0.5 }}
-              className="absolute -bottom-2 -left-2 z-10 hidden h-18 w-24 -rotate-6 rounded-xl border border-orange-100 bg-white p-1.5 shadow-md sm:block"
-            >
-              <div className="relative h-full w-full overflow-hidden rounded-lg bg-neutral-100">
-                <Image
-                  src="https://images.unsplash.com/photo-1560066984-138dadb4c035?auto=format&fit=crop&w=200&q=80"
-                  alt="Salon Promotion"
-                  fill
-                  className="object-cover"
-                />
-              </div>
-            </motion.div>
           </div>
         </div>
       </div>

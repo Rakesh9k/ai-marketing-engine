@@ -1,12 +1,7 @@
 'use client';
 
 import { Mascot, type MascotProps } from './Mascot';
-import {
-  MASCOT_STATES,
-  MASCOT_SIZE_MAP,
-  type MascotState,
-  type MascotSize,
-} from './mascotStates';
+import { MASCOT_STATES, MASCOT_SIZE_MAP, type MascotState, type MascotSize } from './mascotStates';
 
 export type MitraMascotPose = MascotState;
 export type MitraMascotSize = MascotSize;

@@ -16,8 +16,12 @@ const OPERATING_MODES = ['dine-in', 'takeaway', 'delivery'] as const;
 export function PreferencesSection({ business, onSaved, onCancel }: PreferencesSectionProps) {
   const currentMode = business.businessBrain?.businessRules?.operatingMode || 'dine-in';
   const [operatingMode, setOperatingMode] = useState(currentMode);
-  
-  const [channels, setChannels] = useState<{ instagram: boolean; whatsapp: boolean; facebook: boolean }>({
+
+  const [channels, setChannels] = useState<{
+    instagram: boolean;
+    whatsapp: boolean;
+    facebook: boolean;
+  }>({
     instagram: true,
     whatsapp: true,
     facebook: true,
@@ -63,7 +67,10 @@ export function PreferencesSection({ business, onSaved, onCancel }: PreferencesS
   };
 
   return (
-    <form onSubmit={handleSave} className="space-y-6 rounded-2xl border border-neutral-200 bg-white p-6 shadow-sm">
+    <form
+      onSubmit={handleSave}
+      className="space-y-6 rounded-2xl border border-neutral-200 bg-white p-6 shadow-sm"
+    >
       <div className="border-b border-neutral-100 pb-4">
         <h2 className="text-xl font-bold text-neutral-900">Marketing Preferences & Channels</h2>
         <p className="mt-1 text-sm text-neutral-500">
@@ -72,20 +79,25 @@ export function PreferencesSection({ business, onSaved, onCancel }: PreferencesS
       </div>
 
       {error && (
-        <div className="rounded-lg bg-red-50 p-4 text-sm text-red-700 border border-red-200" role="alert">
+        <div
+          className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700"
+          role="alert"
+        >
           {error}
         </div>
       )}
 
       {savedNotice && (
-        <div className="rounded-lg bg-emerald-50 p-4 text-sm text-emerald-700 border border-emerald-200">
+        <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-700">
           ✓ {savedNotice}
         </div>
       )}
 
       <div className="space-y-6">
         <div>
-          <label className="mb-3 block text-sm font-semibold text-neutral-900">Fulfillment / Operating Modes</label>
+          <label className="mb-3 block text-sm font-semibold text-neutral-900">
+            Fulfillment / Operating Modes
+          </label>
           <div className="flex flex-wrap gap-3">
             {OPERATING_MODES.map((mode) => {
               const active = operatingMode === mode;
@@ -96,7 +108,7 @@ export function PreferencesSection({ business, onSaved, onCancel }: PreferencesS
                   onClick={() => setOperatingMode(mode)}
                   className={`rounded-xl px-5 py-3 text-sm font-semibold capitalize transition-all ${
                     active
-                      ? 'bg-brand-600 text-white shadow-md shadow-brand-500/20'
+                      ? 'bg-brand-600 shadow-brand-500/20 text-white shadow-md'
                       : 'border border-neutral-200 bg-neutral-50 text-neutral-700 hover:bg-neutral-100'
                   }`}
                 >
@@ -106,12 +118,15 @@ export function PreferencesSection({ business, onSaved, onCancel }: PreferencesS
             })}
           </div>
           <p className="mt-2 text-xs text-neutral-500">
-            Mitra will tailor Call-To-Action buttons and offer messaging based on your selected mode.
+            Mitra will tailor Call-To-Action buttons and offer messaging based on your selected
+            mode.
           </p>
         </div>
 
         <div>
-          <label className="mb-3 block text-sm font-semibold text-neutral-900">Active Marketing Channels</label>
+          <label className="mb-3 block text-sm font-semibold text-neutral-900">
+            Active Marketing Channels
+          </label>
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
             <label className="flex cursor-pointer items-center justify-between rounded-xl border border-neutral-200 p-4 hover:border-neutral-300">
               <span className="font-medium text-neutral-900">Instagram</span>
@@ -119,7 +134,7 @@ export function PreferencesSection({ business, onSaved, onCancel }: PreferencesS
                 type="checkbox"
                 checked={channels.instagram}
                 onChange={(e) => setChannels({ ...channels, instagram: e.target.checked })}
-                className="h-4 w-4 rounded border-neutral-300 text-brand-600 focus:ring-brand-500"
+                className="text-brand-600 focus:ring-brand-500 h-4 w-4 rounded border-neutral-300"
               />
             </label>
 
@@ -129,7 +144,7 @@ export function PreferencesSection({ business, onSaved, onCancel }: PreferencesS
                 type="checkbox"
                 checked={channels.whatsapp}
                 onChange={(e) => setChannels({ ...channels, whatsapp: e.target.checked })}
-                className="h-4 w-4 rounded border-neutral-300 text-brand-600 focus:ring-brand-500"
+                className="text-brand-600 focus:ring-brand-500 h-4 w-4 rounded border-neutral-300"
               />
             </label>
 
@@ -139,7 +154,7 @@ export function PreferencesSection({ business, onSaved, onCancel }: PreferencesS
                 type="checkbox"
                 checked={channels.facebook}
                 onChange={(e) => setChannels({ ...channels, facebook: e.target.checked })}
-                className="h-4 w-4 rounded border-neutral-300 text-brand-600 focus:ring-brand-500"
+                className="text-brand-600 focus:ring-brand-500 h-4 w-4 rounded border-neutral-300"
               />
             </label>
           </div>

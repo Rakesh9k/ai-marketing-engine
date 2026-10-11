@@ -39,18 +39,20 @@ const SLANG_LEVELS = [
 
 export function LocalizationSection({ business, onSaved, onCancel }: LocalizationSectionProps) {
   const loc = business.businessBrain?.localization || {
+    // An owner with nothing stored starts at English / neutral (what createBusiness stores). Saving
+    // without a change must never write Telugu or Hyderabadi into their Business Brain.
     primaryLanguage: 'en',
-    secondaryLanguage: 'te',
-    regionalStyle: 'hyderabadi',
+    secondaryLanguage: 'en',
+    regionalStyle: 'neutral',
     slangIntensity: 'light',
-    languageMixing: 'natural',
+    languageMixing: 'minimal',
   };
 
   const [primaryLanguage, setPrimaryLanguage] = useState<any>(loc.primaryLanguage || 'en');
-  const [secondaryLanguage, setSecondaryLanguage] = useState<any>(loc.secondaryLanguage || 'te');
-  const [regionalStyle, setRegionalStyle] = useState<any>(loc.regionalStyle || 'hyderabadi');
+  const [secondaryLanguage, setSecondaryLanguage] = useState<any>(loc.secondaryLanguage || 'en');
+  const [regionalStyle, setRegionalStyle] = useState<any>(loc.regionalStyle || 'neutral');
   const [slangIntensity, setSlangIntensity] = useState<any>(loc.slangIntensity || 'light');
-  const [languageMixing, setLanguageMixing] = useState<any>(loc.languageMixing || 'natural');
+  const [languageMixing, _setLanguageMixing] = useState<any>(loc.languageMixing || 'natural');
 
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -95,7 +97,10 @@ export function LocalizationSection({ business, onSaved, onCancel }: Localizatio
   };
 
   return (
-    <form onSubmit={handleSave} className="space-y-6 rounded-2xl border border-neutral-200 bg-white p-6 shadow-sm">
+    <form
+      onSubmit={handleSave}
+      className="space-y-6 rounded-2xl border border-neutral-200 bg-white p-6 shadow-sm"
+    >
       <div className="border-b border-neutral-100 pb-4">
         <h2 className="text-xl font-bold text-neutral-900">Localization & Cultural Dialect</h2>
         <p className="mt-1 text-sm text-neutral-500">
@@ -104,13 +109,16 @@ export function LocalizationSection({ business, onSaved, onCancel }: Localizatio
       </div>
 
       {error && (
-        <div className="rounded-lg bg-red-50 p-4 text-sm text-red-700 border border-red-200" role="alert">
+        <div
+          className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700"
+          role="alert"
+        >
           {error}
         </div>
       )}
 
       {savedNotice && (
-        <div className="rounded-lg bg-emerald-50 p-4 text-sm text-emerald-700 border border-emerald-200">
+        <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-700">
           ✓ {savedNotice}
         </div>
       )}
@@ -118,11 +126,13 @@ export function LocalizationSection({ business, onSaved, onCancel }: Localizatio
       <div className="space-y-4">
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <div>
-            <label className="mb-1.5 block text-sm font-medium text-neutral-700">Primary Language</label>
+            <label className="mb-1.5 block text-sm font-medium text-neutral-700">
+              Primary Language
+            </label>
             <select
               value={primaryLanguage}
               onChange={(e) => setPrimaryLanguage(e.target.value)}
-              className="w-full rounded-lg border border-neutral-300 px-4 py-2.5 text-sm text-neutral-900 focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 focus:outline-none"
+              className="focus:border-brand-500 focus:ring-brand-500/20 w-full rounded-lg border border-neutral-300 px-4 py-2.5 text-sm text-neutral-900 focus:ring-2 focus:outline-none"
             >
               {LANGUAGES.map((l) => (
                 <option key={l.value} value={l.value}>
@@ -133,11 +143,13 @@ export function LocalizationSection({ business, onSaved, onCancel }: Localizatio
           </div>
 
           <div>
-            <label className="mb-1.5 block text-sm font-medium text-neutral-700">Secondary / Fallback Language</label>
+            <label className="mb-1.5 block text-sm font-medium text-neutral-700">
+              Secondary / Fallback Language
+            </label>
             <select
               value={secondaryLanguage}
               onChange={(e) => setSecondaryLanguage(e.target.value)}
-              className="w-full rounded-lg border border-neutral-300 px-4 py-2.5 text-sm text-neutral-900 focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 focus:outline-none"
+              className="focus:border-brand-500 focus:ring-brand-500/20 w-full rounded-lg border border-neutral-300 px-4 py-2.5 text-sm text-neutral-900 focus:ring-2 focus:outline-none"
             >
               {LANGUAGES.map((l) => (
                 <option key={l.value} value={l.value}>
@@ -150,11 +162,13 @@ export function LocalizationSection({ business, onSaved, onCancel }: Localizatio
 
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <div>
-            <label className="mb-1.5 block text-sm font-medium text-neutral-700">Regional Dialect / Style</label>
+            <label className="mb-1.5 block text-sm font-medium text-neutral-700">
+              Regional Dialect / Style
+            </label>
             <select
               value={regionalStyle}
               onChange={(e) => setRegionalStyle(e.target.value)}
-              className="w-full rounded-lg border border-neutral-300 px-4 py-2.5 text-sm text-neutral-900 focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 focus:outline-none"
+              className="focus:border-brand-500 focus:ring-brand-500/20 w-full rounded-lg border border-neutral-300 px-4 py-2.5 text-sm text-neutral-900 focus:ring-2 focus:outline-none"
             >
               {REGIONAL_STYLES.map((r) => (
                 <option key={r.value} value={r.value}>
@@ -165,11 +179,13 @@ export function LocalizationSection({ business, onSaved, onCancel }: Localizatio
           </div>
 
           <div>
-            <label className="mb-1.5 block text-sm font-medium text-neutral-700">Slang Intensity</label>
+            <label className="mb-1.5 block text-sm font-medium text-neutral-700">
+              Slang Intensity
+            </label>
             <select
               value={slangIntensity}
               onChange={(e) => setSlangIntensity(e.target.value)}
-              className="w-full rounded-lg border border-neutral-300 px-4 py-2.5 text-sm text-neutral-900 focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 focus:outline-none"
+              className="focus:border-brand-500 focus:ring-brand-500/20 w-full rounded-lg border border-neutral-300 px-4 py-2.5 text-sm text-neutral-900 focus:ring-2 focus:outline-none"
             >
               {SLANG_LEVELS.map((s) => (
                 <option key={s.value} value={s.value}>

@@ -1,7 +1,6 @@
 'use client';
 
 import Link from 'next/link';
-import { Button } from '@/components/ui/Button';
 
 export default function MainSettingsPage() {
   const settingsTabs = [
@@ -16,12 +15,6 @@ export default function MainSettingsPage() {
       description: 'Configure brand voice, color tokens, and design style guides.',
       href: '/brand',
       icon: '🎨',
-    },
-    {
-      title: 'Connected Social Accounts',
-      description: 'Link Facebook and Instagram pages for 1-click publishing.',
-      href: '/settings/social',
-      icon: '🔗',
     },
     {
       title: 'Billing & Plan Subscriptions',
@@ -50,7 +43,7 @@ export default function MainSettingsPage() {
           Account &amp; Workspace Settings
         </h1>
         <p className="text-text-secondary mt-2">
-          Configure your business profile, brand preferences, social channels, and billing plan.
+          Configure your business profile, brand preferences, and billing plan.
         </p>
       </div>
 

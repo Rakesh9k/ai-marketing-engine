@@ -14,11 +14,11 @@ export default function RealEstateSolutionPage() {
     },
     {
       title: 'Agent Personal Branding',
-      desc: 'Build trust with clean, professional real estate advisor branding templates and market trend updates.',
+      desc: 'Build trust with clean, professional real estate advisor branding for your listings.',
     },
     {
       title: 'WhatsApp Property Brochures',
-      desc: 'Send site visit invitations, location highlights, and price breakdowns directly to prospective buyers on WhatsApp.',
+      desc: 'Generate site visit invitations, location highlights, and price breakdowns ready to share with prospective buyers on WhatsApp.',
     },
     {
       title: 'Localized Area Highlights',

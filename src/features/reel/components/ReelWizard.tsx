@@ -21,6 +21,7 @@ import { SavedStylePicker } from '@/features/style/components/SavedStylePicker';
 import { createReelProject, generateReel } from '@/features/reel/services/reelService';
 import { PageSkeleton } from '@/components/motion/PageSkeleton';
 import { MagneticWrap } from '@/components/motion/MagneticWrap';
+import { useDraftAutoSave } from '@/hooks/useDraftAutoSave';
 import type {
   Business,
   CreativeObjective,
@@ -125,9 +126,35 @@ export function ReelWizard() {
   const [durationSeconds, setDurationSeconds] = useState<ReelDurationSeconds>(
     REEL_DEFAULT_DURATION_SECONDS
   );
-  const [offer, setOffer] = useState('');
-  const [cta, setCta] = useState('');
-  const [additionalMessage, setAdditionalMessage] = useState('');
+  const {
+    draft,
+    updateField,
+    isRestored: _isRestored,
+    clearDraft: _clearDraft,
+    dismissRestoredNotice: _dismissRestoredNotice,
+    lastSavedAt: _lastSavedAt,
+  } = useDraftAutoSave<{
+    offer: string;
+    cta: string;
+    additionalMessage: string;
+  }>({
+    draftKey: 'reel-wizard-draft',
+    initialState: {
+      offer: '',
+      cta: '',
+      additionalMessage: '',
+    },
+  });
+
+  const offer = draft.offer;
+  const setOffer = useCallback((val: string) => updateField('offer', val), [updateField]);
+  const cta = draft.cta;
+  const setCta = useCallback((val: string) => updateField('cta', val), [updateField]);
+  const additionalMessage = draft.additionalMessage;
+  const setAdditionalMessage = useCallback(
+    (val: string) => updateField('additionalMessage', val),
+    [updateField]
+  );
 
   const [reelId, setReelId] = useState<string | null>(null);
   const [reel, setReel] = useState<ReelProject | null>(null);
@@ -238,7 +265,7 @@ export function ReelWizard() {
     setReelId(null);
     setReel(null);
     setClips([]);
-  }, []);
+  }, [setAdditionalMessage, setCta, setOffer]);
 
   const handleProceedToUpload = useCallback(async () => {
     if (!selectedBusinessId || !goal || !style || !templateId) {

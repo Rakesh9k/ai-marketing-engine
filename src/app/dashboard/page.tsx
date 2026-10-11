@@ -18,8 +18,6 @@ import { PosterIllustration, SparkIllustration } from '@/components/illustration
 import { MarketingCommandCenter } from '@/components/dashboard/MarketingCommandCenter';
 import { QuickActionsGrid } from '@/components/dashboard/QuickActionsGrid';
 import { RecentCampaignsSection } from '@/components/dashboard/RecentCampaignsSection';
-import { PerformanceAndAISuggestions } from '@/components/dashboard/PerformanceAndAISuggestions';
-import { RightActivityColumn } from '@/components/dashboard/RightActivityColumn';
 
 function EmptyState({
   title,
@@ -100,9 +98,9 @@ export default function DashboardPage() {
   const { user } = useAuth();
   const [businesses, setBusinesses] = useState<Business[]>([]);
   const [selectedBusinessId, setSelectedBusinessId] = useState<string | null>(null);
-  const [usage, setUsage] = useState<Usage | null>(null);
+  const [_usage, setUsage] = useState<Usage | null>(null);
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
-  const [subscription, setSubscription] = useState<Subscription | null>(null);
+  const [_subscription, setSubscription] = useState<Subscription | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -123,7 +121,8 @@ export default function DashboardPage() {
           setSelectedBusinessId(firstBusinessId);
 
           const [usageData, campaignsData] = await Promise.all([
-            usageService.getCurrentPeriod(user.uid),
+            // Usage is informational here; a failed read must not blank the dashboard.
+            usageService.getCurrentPeriod(user.uid).catch(() => null),
             campaignService.listByBusiness(firstBusinessId, undefined, undefined, 5),
           ]);
           setUsage(usageData);
@@ -201,27 +200,13 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      {/* Main 2-Column Dashboard Grid */}
-      <div className="grid grid-cols-1 gap-8 lg:grid-cols-12">
-        {/* Main Column (8 cols on desktop) */}
-        <div className="space-y-8 lg:col-span-8">
-          {/* 1. Hero Command Center */}
-          <MarketingCommandCenter business={selectedBusiness} />
-
-          {/* 2. Quick Actions */}
-          <QuickActionsGrid />
-
-          {/* 3. Your Recent Campaigns */}
-          <RecentCampaignsSection campaigns={campaigns} />
-
-          {/* 4. Performance & AI Suggestions */}
-          <PerformanceAndAISuggestions />
-        </div>
-
-        {/* Activity & Insights Column (4 cols on desktop) */}
-        <div className="lg:col-span-4">
-          <RightActivityColumn business={selectedBusiness} />
-        </div>
+      {/* Launch dashboard: create + recent campaigns only. The sample-data
+          performance/AI-suggestion/activity widgets are intentionally not
+          rendered (see docs/LAUNCH_SCOPE.md). */}
+      <div className="space-y-8">
+        <MarketingCommandCenter business={selectedBusiness} />
+        <QuickActionsGrid />
+        <RecentCampaignsSection campaigns={campaigns} />
       </div>
     </div>
   );

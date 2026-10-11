@@ -38,7 +38,7 @@ export function ReelPreview({ reel, onCreateAnother }: ReelPreviewProps) {
 
       <div className="flex flex-col gap-2">
         {reel.outputUrl && (
-          <a href={reel.outputUrl} download>
+          <a href={reel.downloadUrl ?? reel.outputUrl} download>
             <Button variant="primary" fullWidth>
               Download Reel
             </Button>

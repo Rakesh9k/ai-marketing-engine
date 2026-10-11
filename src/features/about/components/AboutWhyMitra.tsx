@@ -7,10 +7,10 @@ export function AboutWhyMitra() {
   const reduceMotion = useReducedMotion();
 
   return (
-    <section className="bg-bg-primary py-20 relative overflow-hidden border-t border-border-light">
+    <section className="bg-bg-primary border-border-light relative overflow-hidden border-t py-20">
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-        <div className="rounded-3xl border border-brand-200/80 bg-gradient-to-b from-surface via-brand-50/20 to-surface p-8 sm:p-14 shadow-xl text-center space-y-8 max-w-5xl mx-auto">
-          <div className="inline-flex items-center gap-2 rounded-full border border-brand-200 bg-brand-100/60 px-4 py-1.5 text-xs font-bold text-brand-800">
+        <div className="border-brand-200/80 from-surface via-brand-50/20 to-surface mx-auto max-w-5xl space-y-8 rounded-3xl border bg-gradient-to-b p-8 text-center shadow-xl sm:p-14">
+          <div className="border-brand-200 bg-brand-100/60 text-brand-800 inline-flex items-center gap-2 rounded-full border px-4 py-1.5 text-xs font-bold">
             <span>🤝</span>
             <span>Why "Mitra"?</span>
           </div>
@@ -24,30 +24,31 @@ export function AboutWhyMitra() {
           >
             <div className="flex items-center justify-center gap-4">
               <MitraMascot pose="idea" size={100} />
-              <h2 className="text-5xl sm:text-6xl lg:text-7xl font-black text-text-primary tracking-tighter">
+              <h2 className="text-text-primary text-5xl font-black tracking-tighter sm:text-6xl lg:text-7xl">
                 MITRA
               </h2>
             </div>
-            <p className="text-sm font-bold uppercase tracking-widest text-brand-600">
+            <p className="text-brand-600 text-sm font-bold tracking-widest uppercase">
               Friend • Partner • Companion • Copilot
             </p>
           </motion.div>
 
-          <p className="text-text-secondary text-lg sm:text-xl font-medium leading-relaxed max-w-3xl mx-auto">
-            “Mitra isn’t meant to feel like complex software you operate. It’s meant to feel like an intelligent, friendly marketing partner sitting right beside you.”
+          <p className="text-text-secondary mx-auto max-w-3xl text-lg leading-relaxed font-medium sm:text-xl">
+            “Mitra isn’t meant to feel like complex software you operate. It’s meant to feel like an
+            intelligent, friendly marketing partner sitting right beside you.”
           </p>
 
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-xs font-semibold text-text-secondary pt-4 max-w-2xl mx-auto">
-            <div className="rounded-2xl border border-border-light bg-surface p-4 shadow-2xs">
-              <span className="text-base block mb-1">🤝</span>
+          <div className="text-text-secondary mx-auto grid max-w-2xl grid-cols-1 gap-4 pt-4 text-xs font-semibold sm:grid-cols-3">
+            <div className="border-border-light bg-surface rounded-2xl border p-4 shadow-2xs">
+              <span className="mb-1 block text-base">🤝</span>
               <span>A true partner, not another SaaS tool</span>
             </div>
-            <div className="rounded-2xl border border-border-light bg-surface p-4 shadow-2xs">
-              <span className="text-base block mb-1">👂</span>
+            <div className="border-border-light bg-surface rounded-2xl border p-4 shadow-2xs">
+              <span className="mb-1 block text-base">👂</span>
               <span>Listens &amp; remembers your business</span>
             </div>
-            <div className="rounded-2xl border border-border-light bg-surface p-4 shadow-2xs">
-              <span className="text-base block mb-1">⚡</span>
+            <div className="border-border-light bg-surface rounded-2xl border p-4 shadow-2xs">
+              <span className="mb-1 block text-base">⚡</span>
               <span>Executes campaigns in seconds</span>
             </div>
           </div>

@@ -10,6 +10,7 @@ import {
   REGIONAL_STYLES,
   CAMPAIGN_STYLES,
 } from '@/features/campaign/constants';
+import { regionalStylesFor } from '@/features/campaign/localizationDefaults';
 import type { Business } from '@/types';
 
 /**
@@ -41,8 +42,10 @@ const generateCampaignStrategySchema = z.object({
     price: z.number().positive(),
     originalPrice: z.number().positive().optional(),
     type: z.enum(['percentage', 'fixed', 'bogo', 'combo', 'free_delivery', 'loyalty']),
-    validityStart: z.string().datetime(),
-    validityEnd: z.string().datetime(),
+    // optional: the OFFER's own dates; the campaign's duration is not offer validity
+    validityStart: z.string().datetime().optional(),
+    validityEnd: z.string().datetime().optional(),
+    validitySource: z.enum(['owner_dates', 'whole_campaign']).optional(),
     terms: z.string().max(1000).optional(),
   }),
   duration: z.object({ start: z.string().datetime(), end: z.string().datetime() }),
@@ -277,6 +280,8 @@ describe('MVP-restricted UI enums stay within backend-supported values', () => {
     'new_listing',
     'open_house',
     'project_promotion',
+    'product_promotion',
+    'new_product',
   ];
   const backendOfferTypes = ['percentage', 'fixed', 'bogo', 'combo', 'free_delivery', 'loyalty'];
   const backendCtas = [
@@ -323,19 +328,53 @@ describe('MVP-restricted UI enums stay within backend-supported values', () => {
     CTA_OPTIONS.forEach((c) => expect(backendCtas).toContain(c.value));
   });
 
-  it('exposes only the MVP language subset (en/te/te_en), never hi/hi_en', () => {
+  // The wizard used to expose only en / te / te_en (a Hyderabad-restaurant MVP), so a Mumbai owner could not
+  // choose Hinglish. It now offers every language the backend supports.
+  it('exposes every backend-supported language, and nothing the backend would reject', () => {
     const exposed = LANGUAGES.map((l) => l.value);
-    expect(exposed.sort()).toEqual(['en', 'te', 'te_en'].sort());
+    expect(exposed.sort()).toEqual([...backendLanguages].sort());
     exposed.forEach((v) => expect(backendLanguages).toContain(v));
   });
 
-  it('exposes only the MVP regional style subset (neutral/hyderabadi)', () => {
+  it('keeps the full style catalogue, all backend-supported', () => {
     const exposed = REGIONAL_STYLES.map((r) => r.value);
-    expect(exposed.sort()).toEqual(['neutral', 'hyderabadi'].sort());
-    exposed.forEach((v) => expect(backendRegionalStyles).toContain(v));
+    expect(exposed.sort()).toEqual([...backendRegionalStyles].sort());
+  });
+
+  it('every style OFFERED for any language and place is backend-supported', () => {
+    const places = [
+      { city: 'Hyderabad', state: 'Telangana' },
+      { city: 'Mumbai' },
+      { city: 'Bengaluru' },
+      { city: 'Pune' },
+      undefined,
+    ];
+    for (const language of backendLanguages) {
+      for (const location of places) {
+        for (const style of regionalStylesFor({ language: language as never, location })) {
+          expect(backendRegionalStyles).toContain(style);
+        }
+      }
+    }
   });
 
   it('every exposed campaign style is backend-supported', () => {
     CAMPAIGN_STYLES.forEach((c) => expect(backendCampaignStyles).toContain(c.value));
+  });
+});
+
+describe('the mirrored backend schema has not drifted on offer validity', () => {
+  it('the real schema declares the same optional validity fields', () => {
+    const real = require('fs').readFileSync(
+      require('path').join(
+        __dirname,
+        '..',
+        'functions/src/functions/campaigns/generateCampaignStrategy.ts'
+      ),
+      'utf8'
+    );
+    expect(real).toContain('validityStart: z.string().datetime().optional(),');
+    expect(real).toContain('validityEnd: z.string().datetime().optional(),');
+    expect(real).toContain("validitySource: z.enum(['owner_dates', 'whole_campaign']).optional(),");
   });
 });

@@ -1,10 +1,11 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { getAdditionalUserInfo } from 'firebase/auth';
 import { signInWithGoogle, logout } from '@/features/auth/services/authService';
 import { getAuthErrorMessage } from '@/features/auth/utils/authErrors';
 import { callFunction } from '@/services/api';
+import { beginAuthFlow } from '@/features/auth/authFlowState';
 import { Button } from '@/components/ui/Button';
 
 interface GoogleSignInButtonProps {
@@ -47,10 +48,23 @@ export function GoogleSignInButton({ onSuccess, disabled }: GoogleSignInButtonPr
   const [needsConsent, setNeedsConsent] = useState(false);
   const [consentChecked, setConsentChecked] = useState(false);
   const [confirming, setConfirming] = useState(false);
+  // Held from the popup opening until the user is fully through (incl. new-user consent), so
+  // PublicOnlyRoute doesn't unmount this component the instant Firebase reports 'authenticated'.
+  const releaseFlow = useRef<(() => void) | null>(null);
+
+  const endFlow = () => {
+    releaseFlow.current?.();
+    releaseFlow.current = null;
+  };
+
+  // Never leave the app-wide busy flag stuck if this unmounts mid-flow.
+  useEffect(() => () => endFlow(), []);
 
   const handleClick = async () => {
     setError('');
     setIsLoading(true);
+    endFlow();
+    releaseFlow.current = beginAuthFlow();
     try {
       const credential = await signInWithGoogle();
       const additionalInfo = getAdditionalUserInfo(credential);
@@ -60,9 +74,11 @@ export function GoogleSignInButton({ onSuccess, disabled }: GoogleSignInButtonPr
         return;
       }
       onSuccess();
+      endFlow();
     } catch (err) {
       setError(getAuthErrorMessage(err));
       setIsLoading(false);
+      endFlow();
     }
   };
 
@@ -76,6 +92,7 @@ export function GoogleSignInButton({ onSuccess, disabled }: GoogleSignInButtonPr
         data: { accepted: true },
       });
       onSuccess();
+      endFlow();
     } catch (err) {
       setError(getAuthErrorMessage(err));
       setConfirming(false);
@@ -94,6 +111,8 @@ export function GoogleSignInButton({ onSuccess, disabled }: GoogleSignInButtonPr
       await logout();
     } catch {
       // Best-effort — nothing actionable if this itself fails.
+    } finally {
+      endFlow();
     }
   };
 

@@ -11,12 +11,42 @@ interface BrainNode {
 }
 
 const DEFAULT_NODES: BrainNode[] = [
-  { id: '1', label: 'Business Type', value: 'Restaurant & Cloud Kitchen', icon: '🍽️', completed: true },
+  {
+    id: '1',
+    label: 'Business Type',
+    value: 'Restaurant & Cloud Kitchen',
+    icon: '🍽️',
+    completed: true,
+  },
   { id: '2', label: 'Primary Location', value: 'Kondapur, Hyderabad', icon: '📍', completed: true },
-  { id: '3', label: 'Target Audience', value: 'Families & IT Professionals', icon: '👥', completed: true },
-  { id: '4', label: 'Brand Voice', value: 'Warm, Authentic & Festive', icon: '🗣️', completed: true },
-  { id: '5', label: 'Product Catalog', value: '12 Menu Items Uploaded', icon: '🍱', completed: true },
-  { id: '6', label: 'Marketing Offers', value: 'Flat 20% OFF Weekend Special', icon: '🏷️', completed: false },
+  {
+    id: '3',
+    label: 'Target Audience',
+    value: 'Families & IT Professionals',
+    icon: '👥',
+    completed: true,
+  },
+  {
+    id: '4',
+    label: 'Brand Voice',
+    value: 'Warm, Authentic & Festive',
+    icon: '🗣️',
+    completed: true,
+  },
+  {
+    id: '5',
+    label: 'Product Catalog',
+    value: '12 Menu Items Uploaded',
+    icon: '🍱',
+    completed: true,
+  },
+  {
+    id: '6',
+    label: 'Marketing Offers',
+    value: 'Flat 20% OFF Weekend Special',
+    icon: '🏷️',
+    completed: false,
+  },
 ];
 
 export function BusinessBrainGraph({ nodes = DEFAULT_NODES }: { nodes?: BrainNode[] }) {
@@ -26,7 +56,7 @@ export function BusinessBrainGraph({ nodes = DEFAULT_NODES }: { nodes?: BrainNod
   return (
     <div className="rounded-3xl border border-neutral-200/80 bg-white/90 p-6 shadow-xl backdrop-blur-md dark:border-neutral-800/80 dark:bg-neutral-900/90">
       {/* Header & Completeness Bar */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-neutral-100 pb-4 dark:border-neutral-800">
+      <div className="flex flex-col justify-between gap-4 border-b border-neutral-100 pb-4 sm:flex-row sm:items-center dark:border-neutral-800">
         <div>
           <div className="inline-flex items-center gap-2 rounded-full bg-[#E84D1A]/10 px-3 py-1 text-xs font-semibold text-[#E84D1A]">
             🧠 Active Business Brain
@@ -37,22 +67,22 @@ export function BusinessBrainGraph({ nodes = DEFAULT_NODES }: { nodes?: BrainNod
         </div>
 
         <div className="flex items-center gap-3">
-          <div className="w-36 overflow-hidden rounded-full bg-neutral-100 dark:bg-neutral-800 h-2.5">
+          <div className="h-2.5 w-36 overflow-hidden rounded-full bg-neutral-100 dark:bg-neutral-800">
             <motion.div
               initial={{ width: 0 }}
               animate={{ width: `${percentage}%` }}
               transition={{ duration: 1.2, ease: 'easeOut' }}
-              className="h-full bg-gradient-to-r from-amber-500 to-[#E84D1A] rounded-full"
+              className="h-full rounded-full bg-gradient-to-r from-amber-500 to-[#E84D1A]"
             />
           </div>
-          <span className="text-xs font-bold text-neutral-900 dark:text-white font-mono">
+          <span className="font-mono text-xs font-bold text-neutral-900 dark:text-white">
             {percentage}%
           </span>
         </div>
       </div>
 
       {/* Interconnected Visual Nodes */}
-      <div className="mt-6 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+      <div className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {nodes.map((node, idx) => (
           <motion.div
             key={node.id}
@@ -81,7 +111,7 @@ export function BusinessBrainGraph({ nodes = DEFAULT_NODES }: { nodes?: BrainNod
             <h4 className="mt-2 text-xs font-semibold text-neutral-500 dark:text-neutral-400">
               {node.label}
             </h4>
-            <p className="text-xs font-bold text-neutral-900 dark:text-white mt-0.5 truncate">
+            <p className="mt-0.5 truncate text-xs font-bold text-neutral-900 dark:text-white">
               {node.value}
             </p>
           </motion.div>

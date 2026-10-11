@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import { pageMetadata } from '@/lib/seo';
 import Link from 'next/link';
 import { MitraLogo } from '@/components/ui/MitraLogo';
 import { LandingNav } from '@/features/landing/components/LandingNav';
@@ -6,11 +7,12 @@ import { LandingFooter } from '@/features/landing/components/LandingFooter';
 import { Reveal } from '@/components/motion/Reveal';
 import { Button } from '@/components/ui/Button';
 
-export const metadata: Metadata = {
+export const metadata: Metadata = pageMetadata({
   title: 'Features — Mitra by Brainwise',
   description:
     'Explore Mitra AI marketing engine features: campaign generation, Truth Check, regional styles, and WhatsApp messaging.',
-};
+  path: '/features',
+});
 
 export default function FeaturesPage() {
   const featureList = [

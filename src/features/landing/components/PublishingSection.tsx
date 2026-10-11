@@ -40,8 +40,8 @@ export function PublishingSection() {
       action: 'Copy & Post',
     },
     {
-      name: 'Digital Posters',
-      type: 'Print & Storefront Flyers',
+      name: 'Social Media Visuals',
+      type: 'Feed Posts & Stories',
       status: 'Ready for Export',
       icon: (
         <svg

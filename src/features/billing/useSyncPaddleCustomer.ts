@@ -19,7 +19,7 @@ export function useSyncPaddleCustomer(uid: string | undefined): void {
       return;
     }
     let cancelled = false;
-    (async () => {
+    void (async () => {
       try {
         const db = getFirebaseDb();
         if (!db) return;

@@ -29,9 +29,11 @@ export function ProductImageGallery({ products }: ProductImageGalleryProps) {
 
   return (
     <div className="mx-auto max-w-6xl space-y-6 pb-12">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between border-b border-neutral-200 pb-4">
+      <div className="flex flex-col gap-4 border-b border-neutral-200 pb-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight text-neutral-900">Product Image Library</h1>
+          <h1 className="text-2xl font-bold tracking-tight text-neutral-900">
+            Product Image Library
+          </h1>
           <p className="mt-1 text-sm text-neutral-500">
             Marketing-ready imagery used in AI posters, social ads, and campaign storyboards.
           </p>
@@ -59,7 +61,7 @@ export function ProductImageGallery({ products }: ProductImageGalleryProps) {
       {filteredImages.length === 0 ? (
         <div className="rounded-3xl border border-dashed border-neutral-300 bg-neutral-50/50 p-12 text-center">
           <CameraIllustration size={40} className="mx-auto text-neutral-400" />
-          <h3 className="mt-4 font-bold text-neutral-900 text-lg">No photos in media library</h3>
+          <h3 className="mt-4 text-lg font-bold text-neutral-900">No photos in media library</h3>
           <p className="mt-1 text-xs text-neutral-500">
             Add product photos when creating or editing items in your catalog.
           </p>
@@ -82,14 +84,14 @@ export function ProductImageGallery({ products }: ProductImageGalleryProps) {
                   className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
                 />
                 {img.isPrimary && (
-                  <span className="absolute left-2 top-2 rounded-full bg-brand-600 px-2 py-0.5 text-[10px] font-bold text-white shadow-sm">
+                  <span className="bg-brand-600 absolute top-2 left-2 rounded-full px-2 py-0.5 text-[10px] font-bold text-white shadow-sm">
                     Primary
                   </span>
                 )}
               </div>
-              <div className="p-2 space-y-1">
-                <h4 className="font-bold text-xs text-neutral-900 truncate">{img.productName}</h4>
-                <p className="text-[11px] font-semibold text-brand-600">₹{img.price}</p>
+              <div className="space-y-1 p-2">
+                <h4 className="truncate text-xs font-bold text-neutral-900">{img.productName}</h4>
+                <p className="text-brand-600 text-[11px] font-semibold">₹{img.price}</p>
               </div>
             </div>
           ))}

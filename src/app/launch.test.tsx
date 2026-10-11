@@ -46,5 +46,17 @@ describe('Phase 22 Public Launch — Frontend Surface Verification', () => {
     expect(launchRoutes).toContain('/publishing');
     expect(launchRoutes).toContain('/analytics');
     expect(launchRoutes).toContain('/billing');
+    expect(launchRoutes).not.toContain('/assistant');
+  });
+
+  it('verifies AI Assistant is not exposed in public launch surface', () => {
+    render(
+      <ThemeProvider>
+        <LandingPage />
+      </ThemeProvider>
+    );
+
+    expect(screen.queryByText(/Ask Mitra AI Assistant/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Mitra Official AI Assistant/i)).not.toBeInTheDocument();
   });
 });

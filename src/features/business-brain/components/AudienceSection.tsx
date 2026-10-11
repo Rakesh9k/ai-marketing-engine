@@ -23,7 +23,9 @@ export function AudienceSection({ business, onSaved, onCancel }: AudienceSection
   const [targetCustomer, setTargetCustomer] = useState(initialAudience.targetCustomer || '');
   const [minAge, setMinAge] = useState(initialAudience.ageRange?.min || 18);
   const [maxAge, setMaxAge] = useState(initialAudience.ageRange?.max || 55);
-  const [localitiesText, setLocalitiesText] = useState((initialAudience.localities || []).join(', '));
+  const [localitiesText, setLocalitiesText] = useState(
+    (initialAudience.localities || []).join(', ')
+  );
   const [preferences, setPreferences] = useState(initialAudience.preferences || '');
 
   const [saving, setSaving] = useState(false);
@@ -73,22 +75,29 @@ export function AudienceSection({ business, onSaved, onCancel }: AudienceSection
   };
 
   return (
-    <form onSubmit={handleSave} className="space-y-6 rounded-2xl border border-neutral-200 bg-white p-6 shadow-sm">
+    <form
+      onSubmit={handleSave}
+      className="space-y-6 rounded-2xl border border-neutral-200 bg-white p-6 shadow-sm"
+    >
       <div className="border-b border-neutral-100 pb-4">
         <h2 className="text-xl font-bold text-neutral-900">Customers & Target Audience</h2>
         <p className="mt-1 text-sm text-neutral-500">
-          Tell Mitra who buys from you so hooks, tone, and messaging resonate with your exact audience.
+          Tell Mitra who buys from you so hooks, tone, and messaging resonate with your exact
+          audience.
         </p>
       </div>
 
       {error && (
-        <div className="rounded-lg bg-red-50 p-4 text-sm text-red-700 border border-red-200" role="alert">
+        <div
+          className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700"
+          role="alert"
+        >
           {error}
         </div>
       )}
 
       {savedNotice && (
-        <div className="rounded-lg bg-emerald-50 p-4 text-sm text-emerald-700 border border-emerald-200">
+        <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-700">
           ✓ {savedNotice}
         </div>
       )}
@@ -103,7 +112,7 @@ export function AudienceSection({ business, onSaved, onCancel }: AudienceSection
             onChange={(e) => setTargetCustomer(e.target.value)}
             rows={3}
             placeholder="e.g. IT professionals, foodies, families who love authentic Hyderabadi Dum Biryani and late-night cravings"
-            className="w-full rounded-lg border border-neutral-300 px-4 py-2.5 text-sm text-neutral-900 focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 focus:outline-none"
+            className="focus:border-brand-500 focus:ring-brand-500/20 w-full rounded-lg border border-neutral-300 px-4 py-2.5 text-sm text-neutral-900 focus:ring-2 focus:outline-none"
           />
         </div>
 
@@ -138,7 +147,7 @@ export function AudienceSection({ business, onSaved, onCancel }: AudienceSection
             onChange={(e) => setPreferences(e.target.value)}
             rows={3}
             placeholder="e.g. Looking for authentic taste without compromising on hygiene. Quick delivery during lunch hours."
-            className="w-full rounded-lg border border-neutral-300 px-4 py-2.5 text-sm text-neutral-900 focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 focus:outline-none"
+            className="focus:border-brand-500 focus:ring-brand-500/20 w-full rounded-lg border border-neutral-300 px-4 py-2.5 text-sm text-neutral-900 focus:ring-2 focus:outline-none"
           />
         </div>
       </div>

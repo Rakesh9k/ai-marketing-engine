@@ -8,7 +8,7 @@ export function AmbientBackground() {
   return (
     <div className="pointer-events-none fixed inset-0 z-0 overflow-hidden select-none">
       {/* Subtle Warm Background Mesh Grid */}
-      <div 
+      <div
         className="absolute inset-0 opacity-[0.03] dark:opacity-[0.05]"
         style={{
           backgroundImage: `radial-gradient(#1c1815 0.75px, transparent 0.75px), radial-gradient(#1c1815 0.75px, transparent 0.75px)`,
@@ -38,7 +38,7 @@ export function AmbientBackground() {
                 ease: 'easeInOut',
               }
         }
-        className="absolute -top-32 -left-32 h-[500px] w-[500px] rounded-full bg-gradient-to-br from-brand-500/12 via-brand-400/8 to-transparent blur-[100px] dark:from-brand-500/20 dark:via-brand-600/10"
+        className="from-brand-500/12 via-brand-400/8 dark:from-brand-500/20 dark:via-brand-600/10 absolute -top-32 -left-32 h-[500px] w-[500px] rounded-full bg-gradient-to-br to-transparent blur-[100px]"
       />
 
       {/* Morphing Fluid Blob 2 - Center Right Warm Amber */}
@@ -62,7 +62,7 @@ export function AmbientBackground() {
                 ease: 'easeInOut',
               }
         }
-        className="absolute top-1/3 -right-24 h-[600px] w-[600px] rounded-full bg-gradient-to-bl from-amber-500/10 via-brand-500/6 to-transparent blur-[120px] dark:from-amber-500/15 dark:via-brand-500/10"
+        className="via-brand-500/6 dark:via-brand-500/10 absolute top-1/3 -right-24 h-[600px] w-[600px] rounded-full bg-gradient-to-bl from-amber-500/10 to-transparent blur-[120px] dark:from-amber-500/15"
       />
 
       {/* Morphing Fluid Blob 3 - Bottom Left Soft Flame */}
@@ -85,7 +85,7 @@ export function AmbientBackground() {
                 ease: 'easeInOut',
               }
         }
-        className="absolute -bottom-40 left-1/4 h-[550px] w-[550px] rounded-full bg-gradient-to-tr from-brand-600/8 via-amber-400/5 to-transparent blur-[110px] dark:from-brand-600/15"
+        className="from-brand-600/8 dark:from-brand-600/15 absolute -bottom-40 left-1/4 h-[550px] w-[550px] rounded-full bg-gradient-to-tr via-amber-400/5 to-transparent blur-[110px]"
       />
     </div>
   );

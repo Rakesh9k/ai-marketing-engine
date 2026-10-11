@@ -1,12 +1,5 @@
-'use client';
-
-import { Sidebar } from '@/components/layout/Sidebar';
-import { AssistantWorkspace } from '@/features/assistant/components/AssistantWorkspace';
+import { redirect } from 'next/navigation';
 
 export default function AssistantPage() {
-  return (
-    <Sidebar>
-      <AssistantWorkspace />
-    </Sidebar>
-  );
+  redirect('/dashboard');
 }

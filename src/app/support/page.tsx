@@ -1,11 +1,13 @@
 import type { Metadata } from 'next';
+import { pageMetadata } from '@/lib/seo';
 import Link from 'next/link';
 import { MitraLogo } from '@/components/ui/MitraLogo';
 
-export const metadata: Metadata = {
+export const metadata: Metadata = pageMetadata({
   title: 'Support — Mitra',
   description: 'Get help with Mitra, the AI marketing engine by Brainwise.',
-};
+  path: '/support',
+});
 
 export default function SupportPage() {
   return (

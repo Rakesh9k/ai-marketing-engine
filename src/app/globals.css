@@ -5,7 +5,7 @@
   --color-brand-50: #fff4ed;
   --color-brand-100: #ffe8d6;
   --color-brand-500: #e84d1a;
-  --color-brand-600: #d63d15;
+  --color-brand-600: #cc3a13; /* 4.9:1 on bg-primary, 5.0:1 under white button text (was #d63d15 = 4.48:1) */
   --color-brand-700: #b83212;
 
   /* Neutral Colors — kept as the app's existing literal utility scale
@@ -37,8 +37,8 @@
   --color-surface-secondary: #faf7f3;
 
   --color-text-primary: #1c1815; /* deep warm charcoal, not pure black */
-  --color-text-secondary: #6b6259;
-  --color-text-tertiary: #a39a8f;
+  --color-text-secondary: #51493f; /* 7.4:1+ on every light surface (AAA) */
+  --color-text-tertiary: #6f665c; /* muted + placeholder: 4.7:1+ (AA); was 2.3-2.8:1 */
   --color-text-inverse: #fdfbf8;
   --color-text-link: var(--color-brand-600);
   --color-text-link-hover: var(--color-brand-700);
@@ -47,13 +47,19 @@
   --color-border-medium: #d8cec0;
   --color-border-focus: var(--color-brand-500);
 
+  /* Form-control boundaries (WCAG 1.4.11 needs 3:1 against the surface; the
+     decorative border-light/medium above are intentionally softer). */
+  --color-border-control: #857b70;
+  /* Text/icon colour on a solid brand fill (primary buttons). */
+  --color-on-brand: #ffffff;
+
   /* Status Colors */
   --color-success-50: #f0fdf4;
   --color-success-500: #22c55e;
-  --color-success-600: #16a34a;
+  --color-success-600: #167a3c; /* text on light surfaces: 4.6:1+ (was 3.2:1) */
   --color-warning-50: #fffbeb;
   --color-warning-500: #f59e0b;
-  --color-warning-600: #d97706;
+  --color-warning-600: #a14a08; /* text on light surfaces: 5.0:1+ (was 3.1:1) */
   --color-error-50: #fef2f2;
   --color-error-500: #ef4444;
   --color-error-600: #dc2626;
@@ -174,7 +180,7 @@
 
     --color-text-primary: #f3ede4;
     --color-text-secondary: #b3a89b;
-    --color-text-tertiary: #7d7466;
+    --color-text-tertiary: #968c7e;
     --color-text-inverse: #1c1815;
     --color-text-link: var(--color-brand-600);
     --color-text-link-hover: var(--color-brand-700);
@@ -182,6 +188,11 @@
     --color-border-light: #322b22;
     --color-border-medium: #433a2e;
     --color-border-focus: var(--color-brand-500);
+    --color-border-control: #847b6d;
+    --color-on-brand: #1c1815; /* white on the lighter dark-mode brand fills is only 2.4:1 */
+    --color-error-600: #f87171; /* red-600 is 3.5:1 on dark surfaces; this is 5.6:1+ */
+    --color-success-600: #16a34a; /* the light-mode values are tuned for light surfaces */
+    --color-warning-600: #d97706;
   }
 }
 
@@ -201,7 +212,7 @@
 
   --color-text-primary: #f3ede4;
   --color-text-secondary: #b3a89b;
-  --color-text-tertiary: #7d7466;
+  --color-text-tertiary: #968c7e;
   --color-text-inverse: #1c1815;
   --color-text-link: var(--color-brand-600);
   --color-text-link-hover: var(--color-brand-700);
@@ -209,6 +220,11 @@
   --color-border-light: #322b22;
   --color-border-medium: #433a2e;
   --color-border-focus: var(--color-brand-500);
+  --color-border-control: #847b6d;
+  --color-on-brand: #1c1815; /* white on the lighter dark-mode brand fills is only 2.4:1 */
+  --color-error-600: #f87171; /* red-600 is 3.5:1 on dark surfaces; this is 5.6:1+ */
+  --color-success-600: #16a34a; /* the light-mode values are tuned for light surfaces */
+  --color-warning-600: #d97706;
 }
 
 @theme inline {
@@ -248,6 +264,8 @@
   --color-border-light: var(--color-border-light);
   --color-border-medium: var(--color-border-medium);
   --color-border-focus: var(--color-border-focus);
+  --color-border-control: var(--color-border-control);
+  --color-on-brand: var(--color-on-brand);
 
   --color-success-50: var(--color-success-50);
   --color-success-500: var(--color-success-500);
@@ -639,7 +657,6 @@ body {
   border-color: var(--color-border-medium);
 }
 
-
 /* Click ripple — spawned by MagneticButton. */
 .btn-ripple {
   width: 12px;
@@ -648,8 +665,14 @@ body {
   animation: btn-ripple 600ms var(--ease-out-expo) forwards;
 }
 @keyframes btn-ripple {
-  from { transform: scale(1); opacity: 0.6; }
-  to { transform: scale(24); opacity: 0; }
+  from {
+    transform: scale(1);
+    opacity: 0.6;
+  }
+  to {
+    transform: scale(24);
+    opacity: 0;
+  }
 }
 
 /* Border tracing — a conic highlight sweeps the outline on hover/focus. */
@@ -664,8 +687,14 @@ body {
   inset: 0;
   border-radius: inherit;
   padding: 1.5px;
-  background: conic-gradient(from var(--trace-angle), transparent 70%, var(--color-brand-500, #e84d1a) 100%);
-  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  background: conic-gradient(
+    from var(--trace-angle),
+    transparent 70%,
+    var(--color-brand-500, #e84d1a) 100%
+  );
+  -webkit-mask:
+    linear-gradient(#000 0 0) content-box,
+    linear-gradient(#000 0 0);
   -webkit-mask-composite: xor;
   mask-composite: exclude;
   opacity: 0;
@@ -678,7 +707,9 @@ body {
   animation: border-trace 1.6s linear infinite;
 }
 @keyframes border-trace {
-  to { --trace-angle: 360deg; }
+  to {
+    --trace-angle: 360deg;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -698,8 +729,12 @@ body {
   animation: page-enter var(--duration-normal) var(--ease-out-expo) both;
 }
 @keyframes page-enter {
-  from { opacity: 0; }
-  to { opacity: 1; }
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
 }
 @media (prefers-reduced-motion: reduce) {
   .page-enter > * {

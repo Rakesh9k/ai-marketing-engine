@@ -26,7 +26,7 @@ export default function NewProductPage() {
       }
     }
     if (user) {
-      loadUserBusiness();
+      void loadUserBusiness();
     }
   }, [user]);
 

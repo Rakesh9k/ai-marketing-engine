@@ -2,7 +2,6 @@
 
 import { useState, useEffect, useMemo } from 'react';
 import Link from 'next/link';
-import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import { motion, useReducedMotion } from 'motion/react';
 import {
@@ -36,7 +35,7 @@ export function CreativeStudioDashboard({ userId }: CreativeStudioDashboardProps
   const [magicPrompt, setMagicPrompt] = useState('');
   const [isGenerating, setIsGenerating] = useState(false);
 
-  const business = useMemo(
+  const _business = useMemo(
     () => businesses.find((b) => b.businessId === businessId) || businesses[0] || null,
     [businesses, businessId]
   );
@@ -425,16 +424,16 @@ export function CreativeStudioDashboard({ userId }: CreativeStudioDashboardProps
               <Mascot state="proud" size="md" shadow animated />
               <div>
                 <span className="text-[10px] font-bold tracking-wider text-purple-600 uppercase dark:text-purple-400">
-                  ✨ Need something else?
+                  🚀 Launch a Campaign
                 </span>
                 <h4 className="text-base font-bold text-slate-900 dark:text-white">
-                  Try our AI Assistant to create custom designs or explore more formats.
+                  Build a complete multi-asset ad campaign for your business offer.
                 </h4>
               </div>
             </div>
-            <Link href="/assistant" className="shrink-0">
+            <Link href="/campaigns/new" className="shrink-0">
               <Button className="rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 px-5 py-2.5 text-xs font-bold text-slate-950 shadow-md hover:from-amber-600 hover:to-orange-600">
-                Chat with Mitra →
+                Create Campaign →
               </Button>
             </Link>
           </div>

@@ -15,12 +15,28 @@ interface PersistentMitraDrawerProps {
 }
 
 const DRAWER_QUICK_PROMPTS = [
-  { icon: '✍️', label: 'Festival Caption', prompt: 'Write 3 festive captions for my current page offer.' },
-  { icon: '📢', label: 'Weekend Ad Idea', prompt: 'Give me a weekend promotional campaign for this page context.' },
-  { icon: '💬', label: 'WhatsApp Script', prompt: 'Draft a polite WhatsApp message to send to repeat clients.' },
+  {
+    icon: '✍️',
+    label: 'Festival Caption',
+    prompt: 'Write 3 festive captions for my current page offer.',
+  },
+  {
+    icon: '📢',
+    label: 'Weekend Ad Idea',
+    prompt: 'Give me a weekend promotional campaign for this page context.',
+  },
+  {
+    icon: '💬',
+    label: 'WhatsApp Script',
+    prompt: 'Draft a polite WhatsApp message to send to repeat clients.',
+  },
 ];
 
-export function PersistentMitraDrawer({ isOpen, onClose, pageContext }: PersistentMitraDrawerProps) {
+export function PersistentMitraDrawer({
+  isOpen,
+  onClose,
+  pageContext,
+}: PersistentMitraDrawerProps) {
   const pathname = usePathname();
   const [messages, setMessages] = useState<AssistantMessage[]>([
     {
@@ -62,7 +78,8 @@ export function PersistentMitraDrawer({ isOpen, onClose, pageContext }: Persiste
     setIsTyping(true);
 
     setTimeout(() => {
-      const responseText = `I've processed your query for **${pathname}**:\n\n` +
+      const responseText =
+        `I've processed your query for **${pathname}**:\n\n` +
         `"✨ **Mitra Recommendation**: Focus on high visual appeal & a clear CTA."\n\n` +
         `1. **Instagram Caption**: "Make your celebrations special with our exclusive offers! Tap to order now."\n` +
         `2. **CTA**: "Limited slots available — Book today!"`;
@@ -75,8 +92,18 @@ export function PersistentMitraDrawer({ isOpen, onClose, pageContext }: Persiste
         type: 'text',
         createdAt: new Date().toISOString(),
         actions: [
-          { id: 'act-c1', label: '🚀 Open Campaign Studio', url: '/campaigns/new', type: 'create_campaign' },
-          { id: 'act-c2', label: '🎨 Open Creative Studio', url: '/creative', type: 'create_creative' },
+          {
+            id: 'act-c1',
+            label: '🚀 Open Campaign Studio',
+            url: '/campaigns/new',
+            type: 'create_campaign',
+          },
+          {
+            id: 'act-c2',
+            label: '🎨 Open Creative Studio',
+            url: '/creative',
+            type: 'create_creative',
+          },
         ],
       };
 
@@ -95,21 +122,21 @@ export function PersistentMitraDrawer({ isOpen, onClose, pageContext }: Persiste
 
       {/* Drawer Panel */}
       <div className="fixed inset-y-0 right-0 flex max-w-full pl-10">
-        <div className="flex w-screen max-w-md flex-col bg-white border-l border-neutral-200 shadow-2xl">
+        <div className="flex w-screen max-w-md flex-col border-l border-neutral-200 bg-white shadow-2xl">
           {/* Drawer Header */}
           <div className="flex items-center justify-between border-b border-neutral-200 bg-neutral-50 px-5 py-4">
             <div className="flex items-center gap-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-brand-100 border border-brand-200">
+              <div className="bg-brand-100 border-brand-200 flex h-10 w-10 items-center justify-center rounded-2xl border">
                 <MitraMascot pose="explain" size="sm" />
               </div>
               <div>
                 <div className="flex items-center gap-1.5">
                   <h2 className="text-base font-bold text-neutral-900">Mitra Assistant</h2>
-                  <span className="rounded-md bg-brand-100 text-brand-700 px-1.5 py-0.5 text-[10px] font-extrabold">
+                  <span className="bg-brand-100 text-brand-700 rounded-md px-1.5 py-0.5 text-[10px] font-extrabold">
                     PRO
                   </span>
                 </div>
-                <p className="text-xs text-neutral-500 font-medium truncate max-w-[200px]">
+                <p className="max-w-[200px] truncate text-xs font-medium text-neutral-500">
                   Context: {pageContext?.pageTitle || pathname}
                 </p>
               </div>
@@ -120,7 +147,7 @@ export function PersistentMitraDrawer({ isOpen, onClose, pageContext }: Persiste
                 <button
                   type="button"
                   title="Expand to Full Assistant Hub"
-                  className="rounded-lg p-1.5 text-neutral-400 hover:bg-neutral-200 hover:text-neutral-700 transition-colors"
+                  className="rounded-lg p-1.5 text-neutral-400 transition-colors hover:bg-neutral-200 hover:text-neutral-700"
                 >
                   ↗️
                 </button>
@@ -129,7 +156,7 @@ export function PersistentMitraDrawer({ isOpen, onClose, pageContext }: Persiste
                 type="button"
                 onClick={onClose}
                 aria-label="Close Assistant Drawer"
-                className="rounded-lg p-1.5 text-neutral-400 hover:bg-neutral-200 hover:text-neutral-700 transition-colors"
+                className="rounded-lg p-1.5 text-neutral-400 transition-colors hover:bg-neutral-200 hover:text-neutral-700"
               >
                 ✕
               </button>
@@ -137,7 +164,7 @@ export function PersistentMitraDrawer({ isOpen, onClose, pageContext }: Persiste
           </div>
 
           {/* Messages Body */}
-          <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-neutral-50/40">
+          <div className="flex-1 space-y-4 overflow-y-auto bg-neutral-50/40 p-4">
             {messages.map((msg) => (
               <AssistantMessageItem key={msg.id} message={msg} />
             ))}
@@ -151,14 +178,14 @@ export function PersistentMitraDrawer({ isOpen, onClose, pageContext }: Persiste
           </div>
 
           {/* Quick Prompts Bar */}
-          <div className="border-t border-neutral-100 bg-white p-3 space-y-2">
-            <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none">
+          <div className="space-y-2 border-t border-neutral-100 bg-white p-3">
+            <div className="flex scrollbar-none items-center gap-1.5 overflow-x-auto pb-1">
               {DRAWER_QUICK_PROMPTS.map((qp, idx) => (
                 <button
                   key={idx}
                   type="button"
                   onClick={() => handleSend(qp.prompt)}
-                  className="flex shrink-0 items-center gap-1 rounded-xl border border-neutral-200 bg-neutral-50 px-2.5 py-1 text-[11px] font-semibold text-neutral-700 hover:bg-brand-50 hover:text-brand-700 hover:border-brand-300 transition-colors"
+                  className="hover:bg-brand-50 hover:text-brand-700 hover:border-brand-300 flex shrink-0 items-center gap-1 rounded-xl border border-neutral-200 bg-neutral-50 px-2.5 py-1 text-[11px] font-semibold text-neutral-700 transition-colors"
                 >
                   <span>{qp.icon}</span>
                   <span>{qp.label}</span>
@@ -174,13 +201,13 @@ export function PersistentMitraDrawer({ isOpen, onClose, pageContext }: Persiste
                 onChange={(e) => setInputValue(e.target.value)}
                 onKeyDown={(e) => e.key === 'Enter' && handleSend()}
                 placeholder="Ask Mitra on this page..."
-                className="flex-1 rounded-xl border border-neutral-200 px-3 py-2 text-xs text-neutral-900 placeholder:text-neutral-400 focus:border-brand-500 focus:outline-none"
+                className="focus:border-brand-500 flex-1 rounded-xl border border-neutral-200 px-3 py-2 text-xs text-neutral-900 placeholder:text-neutral-400 focus:outline-none"
               />
               <Button
                 onClick={() => handleSend()}
                 disabled={!inputValue.trim() || isTyping}
                 size="sm"
-                className="font-bold rounded-xl text-xs"
+                className="rounded-xl text-xs font-bold"
               >
                 Send
               </Button>

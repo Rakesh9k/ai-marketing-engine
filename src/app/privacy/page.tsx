@@ -1,11 +1,13 @@
 import type { Metadata } from 'next';
+import { pageMetadata } from '@/lib/seo';
 import Link from 'next/link';
 import { MitraLogo } from '@/components/ui/MitraLogo';
 
-export const metadata: Metadata = {
+export const metadata: Metadata = pageMetadata({
   title: 'Privacy Policy — Mitra',
   description: 'Privacy Policy for Mitra, the AI marketing engine by Brainwise.',
-};
+  path: '/privacy',
+});
 
 const EFFECTIVE_DATE = '2026-10-02';
 

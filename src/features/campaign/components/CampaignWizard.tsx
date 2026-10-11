@@ -3,6 +3,8 @@
 import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { v4 as uuidv4 } from 'uuid';
+import Link from 'next/link';
+import { computeCreditsRemaining } from '@/lib/credits';
 import { motion, AnimatePresence, useReducedMotion } from 'motion/react';
 import {
   businessService,
@@ -17,6 +19,7 @@ import { Button } from '@/components/ui/Button';
 import { ImageUploader } from '@/features/asset/components/ImageUploader';
 import type { Asset } from '@/features/asset/services/assetService';
 import { GenerationProgress } from './GenerationProgress';
+import { ConceptSelectorModal, type SelectedConcept } from './ConceptSelectorModal';
 import { trackCreativeEvent } from '@/lib/analytics/trackEvent';
 import type { CampaignWizardState } from '../types';
 import { createInitialWizardState } from '../types';
@@ -28,19 +31,27 @@ import {
   LANGUAGES,
   REGIONAL_STYLES,
   CAMPAIGN_STYLES,
-  OCCASIONS,
   TOTAL_STEPS,
   ESTIMATED_CAMPAIGN_GENERATION_CREDITS,
   VERTICAL_OBJECTIVES,
   VERTICAL_CTAS,
   VERTICAL_OFFER_TYPES,
 } from '../constants';
-import type { Business, Product, Campaign, LanguageCode, RegionalStyle } from '@/types';
+import type { Business, Product, Campaign } from '@/types';
 import { MascotScene } from '@/components/mascot/MascotScene';
 import { MitraMark } from '@/components/ui/MitraMark';
 import { PageSkeleton } from '@/components/motion/PageSkeleton';
 import { MagneticWrap } from '@/components/motion/MagneticWrap';
 import { SavedStylePicker } from '@/features/style/components/SavedStylePicker';
+import { describeError } from '@/lib/errors/classifyError';
+import { applyQuickIdea, quickIdeasFor, type QuickIdea } from '../quickIdeas';
+import {
+  defaultLocalizationFor,
+  normalizeRegionalStyle,
+  isPlaceholderAgeRange,
+  ownerStatedLocalization,
+  regionalStylesFor,
+} from '../localizationDefaults';
 
 const STEP_TITLES = [
   'Creative Type',
@@ -71,16 +82,6 @@ const MASCOT_MESSAGES: Record<
   10: { pose: 'cheer', text: 'Almost ready. Review your campaign details before launch!' },
 };
 
-function normalizeLanguage(value: LanguageCode | undefined): LanguageCode {
-  if (value === 'en' || value === 'te' || value === 'te_en') return value;
-  return 'en';
-}
-
-function normalizeRegionalStyle(value: RegionalStyle | undefined): RegionalStyle {
-  if (value === 'neutral' || value === 'hyderabadi') return value;
-  return 'neutral';
-}
-
 interface CampaignWizardProps {
   userId: string;
 }
@@ -105,6 +106,8 @@ export function CampaignWizard({ userId }: CampaignWizardProps) {
 
   const [state, setState] = useState<CampaignWizardState>(createInitialWizardState());
   const [stepError, setStepError] = useState<string | null>(null);
+  const [isConceptModalOpen, setIsConceptModalOpen] = useState(false);
+  const [selectedConcept, setSelectedConcept] = useState<SelectedConcept | null>(null);
 
   const [phase, setPhase] = useState<'form' | 'submitting' | 'generating' | 'failed'>(
     initialGeneratingId ? 'generating' : 'form'
@@ -147,9 +150,7 @@ export function CampaignWizard({ userId }: CampaignWizardProps) {
         subscriptionService.getByUserId(userId).catch(() => null),
         usageService.getCurrentPeriod(userId).catch(() => null),
       ]);
-      const creditsIncluded = subscription?.creditsIncluded ?? 100;
-      const creditsUsed = usage?.creditsUsed ?? 0;
-      setCreditsRemaining(creditsIncluded - creditsUsed);
+      setCreditsRemaining(computeCreditsRemaining(subscription, usage));
     } catch (err) {
       console.error('Failed to refresh credit balance:', err);
     }
@@ -206,15 +207,26 @@ export function CampaignWizard({ userId }: CampaignWizardProps) {
             : bb?.audience?.localities?.length
               ? bb.audience.localities
               : [business.location.locality || business.location.city],
-        ageMin: bb?.audience?.ageRange?.min
-          ? String(bb.audience.ageRange.min)
-          : prev.audience.ageMin,
-        ageMax: bb?.audience?.ageRange?.max
-          ? String(bb.audience.ageRange.max)
-          : prev.audience.ageMax,
+        // The Brain's 18-65 is the placeholder Mitra stores for a new Brain, not an audience the owner chose.
+        ageMin:
+          bb?.audience?.ageRange?.min && !isPlaceholderAgeRange(bb.audience.ageRange)
+            ? String(bb.audience.ageRange.min)
+            : prev.audience.ageMin,
+        ageMax:
+          bb?.audience?.ageRange?.max && !isPlaceholderAgeRange(bb.audience.ageRange)
+            ? String(bb.audience.ageRange.max)
+            : prev.audience.ageMax,
       },
-      primaryLanguage: prev.primaryLanguage ?? normalizeLanguage(bb?.localization?.primaryLanguage),
-      regionalStyle: prev.regionalStyle ?? normalizeRegionalStyle(bb?.localization?.regionalStyle),
+      // What the owner stored is kept as it is (hi_en stays hi_en); only a missing preference falls
+      // back to the default for the business's own place.
+      primaryLanguage:
+        prev.primaryLanguage ??
+        ownerStatedLocalization(bb).primaryLanguage ??
+        defaultLocalizationFor(business.location).primaryLanguage,
+      regionalStyle:
+        prev.regionalStyle ??
+        ownerStatedLocalization(bb).regionalStyle ??
+        defaultLocalizationFor(business.location).regionalStyle,
     }));
 
     return () => {
@@ -232,7 +244,9 @@ export function CampaignWizard({ userId }: CampaignWizardProps) {
           functionName: 'listCreativeTemplates',
           data: {
             type: state.type || 'post',
-            objective: state.objective || undefined,
+            // NOT the wizard's campaign objective: its values (weekend_offer, new_dish, ...) are not
+            // the creative objectives this callable validates (awareness, promotion, ...), so sending it
+            // made every request 400 and left the template list empty.
             vertical: business!.category,
             businessId: business!.businessId,
           },
@@ -252,7 +266,7 @@ export function CampaignWizard({ userId }: CampaignWizardProps) {
       cancelled = true;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [business?.businessId, business?.category, state.type, state.objective]);
+  }, [business?.businessId, business?.category, state.type]);
 
   const goNext = useCallback(() => {
     setStepError(null);
@@ -273,11 +287,14 @@ export function CampaignWizard({ userId }: CampaignWizardProps) {
       case 3:
         if (!s.templateId) return setStepError('Please select a creative template.');
         break;
-      case 4:
+      case 4: {
         if (!s.selectedProductId) return setStepError('Please select a product.');
-        if (s.photos.length < 1) return setStepError('Please upload at least 1 photo.');
+        const chosen = products.find((p) => p.productId === s.selectedProductId);
+        const hasPhoto = s.photos.length > 0 || Boolean(chosen?.images?.[0]?.url);
+        if (!hasPhoto) return setStepError('Please upload at least 1 photo.');
         if (s.photos.length > 5) return setStepError('You can upload up to 5 photos.');
         break;
+      }
       case 5: {
         if (!s.offer.headline.trim()) return setStepError('Please enter an offer headline.');
         if (!s.offer.type) return setStepError('Please select an offer type.');
@@ -306,6 +323,14 @@ export function CampaignWizard({ userId }: CampaignWizardProps) {
           return setStepError('Please select a start and end date.');
         if (new Date(s.duration.end) < new Date(s.duration.start)) {
           return setStepError('End date must be on or after the start date.');
+        }
+        if (s.offer.validity?.mode === 'custom') {
+          if (!s.offer.validity.start || !s.offer.validity.end)
+            return setStepError(
+              'Please enter the offer start and end dates, or choose "No specific offer dates".'
+            );
+          if (new Date(s.offer.validity.end) < new Date(s.offer.validity.start))
+            return setStepError('The offer end date must be on or after the offer start date.');
         }
         break;
       }
@@ -336,7 +361,7 @@ export function CampaignWizard({ userId }: CampaignWizardProps) {
     }
     goNext();
     return undefined;
-  }, [state, goNext]);
+  }, [state, goNext, products]);
 
   const handlePhotoUploaded = (asset: Asset) => {
     if (!asset.previewUrl) {
@@ -422,6 +447,13 @@ export function CampaignWizard({ userId }: CampaignWizardProps) {
       } else if (message.toLowerCase().includes('subscription')) {
         friendly =
           'Your current plan doesn’t support this action. Please choose a plan or credit pack on the Billing page.';
+      } else {
+        // Say what actually happened (offline / server / session / rate limit) rather than a
+        // generic failure. The form state is kept, and reserved credits are returned.
+        const copy = describeError(err, 'start this campaign', { workKept: true });
+        if (copy.kind !== 'unknown' && copy.kind !== 'validation') {
+          friendly = `${copy.message} Any reserved credits have been returned.`;
+        }
       }
       setSubmitError(friendly);
       setPhase('failed');
@@ -451,63 +483,9 @@ export function CampaignWizard({ userId }: CampaignWizardProps) {
     [router, refreshCredits]
   );
 
-  // Quick preset loader for suggestion pills
-  const applyQuickPreset = (preset: 'lunch' | 'combo' | 'festive') => {
-    const today = new Date().toISOString().split('T')[0]!;
-    const nextWeek = new Date(Date.now() + 7 * 86400000).toISOString().split('T')[0]!;
-
-    if (preset === 'lunch') {
-      setState((prev) => ({
-        ...prev,
-        type: 'post',
-        objective: 'weekend_offer',
-        offer: {
-          ...prev.offer,
-          type: 'percentage',
-          headline: 'Lunch Special 15% OFF',
-          originalPrice: '350',
-          price: '295',
-          description:
-            'Special lunch combo for tech park & office goers. Free delivery within 3km.',
-        },
-        duration: { start: today, end: nextWeek },
-        step: 4,
-      }));
-    } else if (preset === 'combo') {
-      setState((prev) => ({
-        ...prev,
-        type: 'post',
-        objective: 'weekend_offer',
-        offer: {
-          ...prev.offer,
-          type: 'fixed',
-          headline: 'Weekend Family Biryani Feast',
-          originalPrice: '799',
-          price: '599',
-          description: 'Serves 3-4 people. Includes 2 Special Biryanis + 2 Drinks + Dessert.',
-        },
-        duration: { start: today, end: nextWeek },
-        step: 4,
-      }));
-    } else if (preset === 'festive') {
-      setState((prev) => ({
-        ...prev,
-        type: 'post',
-        objective: 'festival',
-        offer: {
-          ...prev.offer,
-          type: 'percentage',
-          headline: 'Festive Season Celebration Offer',
-          originalPrice: '999',
-          price: '799',
-          description:
-            'Celebrate the festive season with authentic delights and special discounts.',
-        },
-        duration: { start: today, end: nextWeek },
-        step: 4,
-      }));
-    }
-  };
+  // Quick ideas start a campaign; they never create a fact (see quickIdeas.ts).
+  const startFromIdea = (idea: QuickIdea) =>
+    setState((prev) => applyQuickIdea(prev, idea, defaultLocalizationFor(business?.location)));
 
   if (loading) {
     return <PageSkeleton variant="form" />;
@@ -548,11 +526,19 @@ export function CampaignWizard({ userId }: CampaignWizardProps) {
 
   const currentCTAObj = CTA_OPTIONS.find((c) => c.value === state.cta);
 
+  // The preview must only state a discount the owner's own prices support (no invented "20% OFF").
+  const previewPrice = Number(state.offer.price);
+  const previewOriginal = Number(state.offer.originalPrice);
+  const previewDiscountLabel =
+    previewOriginal > 0 && previewPrice > 0 && previewPrice < previewOriginal
+      ? `${Math.round((1 - previewPrice / previewOriginal) * 100)}% OFF`
+      : 'SPECIAL OFFER';
+
   const workflowStages = [
     { label: '1. Create', active: state.step <= 3 },
     { label: '2. Customize', active: state.step >= 4 && state.step <= 6 },
     { label: '3. Preview', active: state.step >= 7 && state.step <= 9 },
-    { label: '4. Publish', active: state.step === 10 },
+    { label: '4. Generate', active: state.step === 10 },
   ];
 
   const optionCardClass = (isSelected: boolean) =>
@@ -569,7 +555,7 @@ export function CampaignWizard({ userId }: CampaignWizardProps) {
         <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
           <div>
             <div className="flex items-center gap-2">
-              <h1 className="text-2xl font-bold tracking-tight text-white">AI Campaign Studio</h1>
+              <h1 className="text-2xl font-bold tracking-tight text-white">Create Campaign</h1>
               <span className="rounded-full border border-amber-500/30 bg-amber-500/20 px-2.5 py-0.5 text-xs font-semibold text-amber-400">
                 Mitra 3.1 Pro Live
               </span>
@@ -607,27 +593,16 @@ export function CampaignWizard({ userId }: CampaignWizardProps) {
         {/* Quick Campaign Starter Pills */}
         <div className="mt-4 flex flex-wrap items-center gap-2 border-t border-slate-800/80 pt-3">
           <span className="text-xs font-medium text-slate-400">Quick Ideas:</span>
-          <button
-            type="button"
-            onClick={() => applyQuickPreset('lunch')}
-            className="rounded-full border border-slate-700 bg-slate-800/80 px-3 py-1 text-xs text-slate-300 transition-colors hover:border-amber-500/50 hover:bg-slate-700 hover:text-white"
-          >
-            🍱 Lunch Special 15% OFF
-          </button>
-          <button
-            type="button"
-            onClick={() => applyQuickPreset('combo')}
-            className="rounded-full border border-slate-700 bg-slate-800/80 px-3 py-1 text-xs text-slate-300 transition-colors hover:border-amber-500/50 hover:bg-slate-700 hover:text-white"
-          >
-            🍛 Weekend Biryani Combo
-          </button>
-          <button
-            type="button"
-            onClick={() => applyQuickPreset('festive')}
-            className="rounded-full border border-slate-700 bg-slate-800/80 px-3 py-1 text-xs text-slate-300 transition-colors hover:border-amber-500/50 hover:bg-slate-700 hover:text-white"
-          >
-            🎉 Festive Season Special
-          </button>
+          {quickIdeasFor(business?.category).map((idea) => (
+            <button
+              key={idea.id}
+              type="button"
+              onClick={() => startFromIdea(idea)}
+              className="rounded-full border border-slate-700 bg-slate-800/80 px-3 py-1 text-xs text-slate-300 transition-colors hover:border-amber-500/50 hover:bg-slate-700 hover:text-white"
+            >
+              {idea.label}
+            </button>
+          ))}
         </div>
 
         {/* Horizontal Workflow Stepper */}
@@ -888,7 +863,23 @@ export function CampaignWizard({ userId }: CampaignWizardProps) {
                                 key={p.productId}
                                 type="button"
                                 onClick={() =>
-                                  setState((prev) => ({ ...prev, selectedProductId: p.productId }))
+                                  setState((prev) => {
+                                    const newPhotos =
+                                      prev.photos.length === 0 && p.images?.[0]
+                                        ? [
+                                            {
+                                              assetId: p.productId,
+                                              url: p.images[0].url,
+                                              storagePath: p.images[0].storagePath || '',
+                                            },
+                                          ]
+                                        : prev.photos;
+                                    return {
+                                      ...prev,
+                                      selectedProductId: p.productId,
+                                      photos: newPhotos,
+                                    };
+                                  })
                                 }
                                 aria-pressed={isSelected}
                                 className={`flex items-center gap-2.5 ${optionCardClass(isSelected)}`}
@@ -1075,7 +1066,7 @@ export function CampaignWizard({ userId }: CampaignWizardProps) {
                     <div className="grid grid-cols-1 gap-3 pt-2 sm:grid-cols-2">
                       <div>
                         <label className="text-text-primary block text-xs font-semibold">
-                          Start date *
+                          Campaign start date *
                         </label>
                         <input
                           value={state.duration.start}
@@ -1091,7 +1082,7 @@ export function CampaignWizard({ userId }: CampaignWizardProps) {
                       </div>
                       <div>
                         <label className="text-text-primary block text-xs font-semibold">
-                          End date *
+                          Campaign end date *
                         </label>
                         <input
                           value={state.duration.end}
@@ -1106,6 +1097,78 @@ export function CampaignWizard({ userId }: CampaignWizardProps) {
                         />
                       </div>
                     </div>
+
+                    <fieldset className="space-y-2 pt-2">
+                      <legend className="text-text-primary block text-xs font-semibold">
+                        Offer dates
+                      </legend>
+                      <p className="text-text-secondary text-xs">
+                        The campaign dates above are when Mitra runs the campaign. They are not the
+                        dates your offer is valid. Say so only if it is true.
+                      </p>
+                      {(
+                        [
+                          ['none', 'No specific offer dates'],
+                          ['whole_campaign', 'The offer is valid for the whole campaign'],
+                          ['custom', 'The offer has its own dates'],
+                        ] as const
+                      ).map(([mode, label]) => (
+                        <label
+                          key={mode}
+                          className="text-text-primary flex items-center gap-2 text-xs"
+                        >
+                          <input
+                            type="radio"
+                            name="offer-validity-mode"
+                            checked={(state.offer.validity?.mode ?? 'none') === mode}
+                            onChange={() =>
+                              setState((prev) => ({
+                                ...prev,
+                                offer: {
+                                  ...prev.offer,
+                                  validity: {
+                                    start: prev.offer.validity?.start ?? '',
+                                    end: prev.offer.validity?.end ?? '',
+                                    mode,
+                                  },
+                                },
+                              }))
+                            }
+                          />
+                          {label}
+                        </label>
+                      ))}
+                      {state.offer.validity?.mode === 'custom' && (
+                        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                          {(['start', 'end'] as const).map((edge) => (
+                            <div key={edge}>
+                              <label className="text-text-primary block text-xs font-semibold">
+                                {edge === 'start' ? 'Offer start date *' : 'Offer end date *'}
+                              </label>
+                              <input
+                                value={state.offer.validity?.[edge] ?? ''}
+                                onChange={(e) =>
+                                  setState((prev) => ({
+                                    ...prev,
+                                    offer: {
+                                      ...prev.offer,
+                                      validity: {
+                                        mode: 'custom',
+                                        start: prev.offer.validity?.start ?? '',
+                                        end: prev.offer.validity?.end ?? '',
+                                        [edge]: e.target.value,
+                                      },
+                                    },
+                                  }))
+                                }
+                                type="date"
+                                className="border-border-medium bg-surface text-text-primary focus:ring-brand-500 mt-1 w-full rounded-lg border px-3 py-2 text-xs focus:outline-none"
+                              />
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </fieldset>
                   </div>
                 )}
 
@@ -1225,7 +1288,22 @@ export function CampaignWizard({ userId }: CampaignWizardProps) {
                               key={l.value}
                               type="button"
                               onClick={() =>
-                                setState((prev) => ({ ...prev, primaryLanguage: l.value }))
+                                setState((prev) => ({
+                                  ...prev,
+                                  primaryLanguage: l.value,
+                                  // Keep the style while it still fits; otherwise Neutral.
+                                  regionalStyle:
+                                    prev.regionalStyle &&
+                                    regionalStylesFor({
+                                      language: l.value,
+                                      location: business?.location,
+                                      stored: normalizeRegionalStyle(
+                                        business?.businessBrain?.localization?.regionalStyle
+                                      ),
+                                    }).includes(prev.regionalStyle)
+                                      ? prev.regionalStyle
+                                      : 'neutral',
+                                }))
                               }
                               aria-pressed={isSelected}
                               className={`flex items-center justify-between ${optionCardClass(isSelected)}`}
@@ -1248,29 +1326,38 @@ export function CampaignWizard({ userId }: CampaignWizardProps) {
                         Regional style
                       </h3>
                       <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-                        {REGIONAL_STYLES.map((r) => {
-                          const isSelected = state.regionalStyle === r.value;
-                          return (
-                            <button
-                              key={r.value}
-                              type="button"
-                              onClick={() =>
-                                setState((prev) => ({ ...prev, regionalStyle: r.value }))
-                              }
-                              aria-pressed={isSelected}
-                              className={`flex items-center justify-between ${optionCardClass(isSelected)}`}
-                            >
-                              <span className="text-text-primary text-xs font-medium">
-                                {r.label}
-                              </span>
-                              {isSelected && (
-                                <span className="bg-brand-600 flex h-4 w-4 items-center justify-center rounded-full text-xs font-bold text-white">
-                                  ✓
+                        {regionalStylesFor({
+                          language: state.primaryLanguage ?? undefined,
+                          location: business?.location,
+                          stored: normalizeRegionalStyle(
+                            business?.businessBrain?.localization?.regionalStyle
+                          ),
+                        })
+                          .map((value) => REGIONAL_STYLES.find((r) => r.value === value))
+                          .filter((r): r is NonNullable<typeof r> => Boolean(r))
+                          .map((r) => {
+                            const isSelected = state.regionalStyle === r.value;
+                            return (
+                              <button
+                                key={r.value}
+                                type="button"
+                                onClick={() =>
+                                  setState((prev) => ({ ...prev, regionalStyle: r.value }))
+                                }
+                                aria-pressed={isSelected}
+                                className={`flex items-center justify-between ${optionCardClass(isSelected)}`}
+                              >
+                                <span className="text-text-primary text-xs font-medium">
+                                  {r.label}
                                 </span>
-                              )}
-                            </button>
-                          );
-                        })}
+                                {isSelected && (
+                                  <span className="bg-brand-600 flex h-4 w-4 items-center justify-center rounded-full text-xs font-bold text-white">
+                                    ✓
+                                  </span>
+                                )}
+                              </button>
+                            );
+                          })}
                       </div>
                     </div>
                   </div>
@@ -1320,6 +1407,37 @@ export function CampaignWizard({ userId }: CampaignWizardProps) {
                       </p>
                     </div>
 
+                    {/* Strategic Creative Concept Route Card */}
+                    <div className="rounded-xl border border-amber-500/30 bg-slate-800/80 p-3.5 text-white">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <span className="text-base">✨</span>
+                          <span className="font-semibold text-white">Strategic Creative Route</span>
+                        </div>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setIsConceptModalOpen(true)}
+                          className="border-amber-500/50 text-xs text-amber-300 hover:bg-amber-500/20"
+                        >
+                          {selectedConcept ? 'Change Concept Angle' : 'Select Creative Route'}
+                        </Button>
+                      </div>
+                      {selectedConcept ? (
+                        <div className="mt-2 text-xs">
+                          <p className="font-bold text-amber-400">{selectedConcept.title}</p>
+                          <p className="mt-0.5 text-slate-300 italic">"{selectedConcept.hook}"</p>
+                          <p className="mt-1 text-slate-400">{selectedConcept.reasoning}</p>
+                        </div>
+                      ) : (
+                        <p className="mt-2 text-xs text-slate-400">
+                          Mitra has 3 strategic creative routes prepared for your business. Click
+                          "Select Creative Route" to review and customize.
+                        </p>
+                      )}
+                    </div>
+
                     <div className="text-text-secondary grid grid-cols-2 gap-2">
                       <div className="bg-bg-secondary rounded-lg p-2.5">
                         <span className="text-text-primary block font-semibold">Business:</span>
@@ -1345,6 +1463,16 @@ export function CampaignWizard({ userId }: CampaignWizardProps) {
                         Current: {creditsRemaining ?? '—'} credits | Cost:{' '}
                         {ESTIMATED_CAMPAIGN_GENERATION_CREDITS} credits
                       </p>
+                      {creditsRemaining !== null &&
+                        creditsRemaining < ESTIMATED_CAMPAIGN_GENERATION_CREDITS && (
+                          <p className="text-error-600 mt-1.5 font-medium" role="alert">
+                            You need {ESTIMATED_CAMPAIGN_GENERATION_CREDITS - creditsRemaining} more
+                            credits to generate this campaign.{' '}
+                            <Link href="/billing" className="underline">
+                              Buy credits or upgrade
+                            </Link>
+                          </p>
+                        )}
                     </div>
 
                     {submitError && <p className="text-error-600 font-medium">{submitError}</p>}
@@ -1379,19 +1507,21 @@ export function CampaignWizard({ userId }: CampaignWizardProps) {
                 </Button>
               ) : (
                 <MagneticWrap className="flex-1" strength={5}>
-                <Button
-                  type="button"
-                  fullWidth
-                  onClick={handleGenerate}
-                  loading={phase === 'submitting'}
-                  disabled={
-                    phase === 'submitting' ||
-                    (creditsRemaining !== null &&
-                      creditsRemaining < ESTIMATED_CAMPAIGN_GENERATION_CREDITS)
-                  }
-                >
-                  {phase === 'submitting' ? 'Starting generation...' : 'Generate Campaign Strategy'}
-                </Button>
+                  <Button
+                    type="button"
+                    fullWidth
+                    onClick={handleGenerate}
+                    loading={phase === 'submitting'}
+                    disabled={
+                      phase === 'submitting' ||
+                      (creditsRemaining !== null &&
+                        creditsRemaining < ESTIMATED_CAMPAIGN_GENERATION_CREDITS)
+                    }
+                  >
+                    {phase === 'submitting'
+                      ? 'Starting generation...'
+                      : 'Generate Campaign Strategy'}
+                  </Button>
                 </MagneticWrap>
               )}
             </div>
@@ -1519,18 +1649,18 @@ export function CampaignWizard({ userId }: CampaignWizardProps) {
               {/* Offer Badge Top Left */}
               <div className="relative z-10 self-start">
                 <span className="rounded-full bg-amber-500 px-3 py-1 text-xs font-bold tracking-wider text-slate-950 uppercase shadow-lg">
-                  {state.offer.type === 'percentage' ? '20% OFF' : 'SPECIAL OFFER'}
+                  {previewDiscountLabel}
                 </span>
               </div>
 
               {/* Offer Details Overlay Bottom */}
               <div className="relative z-10 space-y-1.5 rounded-lg border border-slate-800 bg-slate-950/80 p-3 shadow-lg backdrop-blur-md">
                 <h4 className="text-sm leading-tight font-extrabold text-white">
-                  {state.offer.headline || 'Weekend Biryani Special'}
+                  {state.offer.headline || 'Your offer headline'}
                 </h4>
                 <div className="flex items-center gap-2">
                   <span className="text-base font-bold text-amber-400">
-                    ₹{state.offer.price || '299'}
+                    {state.offer.price ? `₹${state.offer.price}` : '₹ —'}
                   </span>
                   {state.offer.originalPrice && (
                     <span className="text-xs text-slate-400 line-through">
@@ -1579,6 +1709,14 @@ export function CampaignWizard({ userId }: CampaignWizardProps) {
           </div>
         </div>
       </div>
+
+      {/* Concept Selector & Mixing Modal */}
+      <ConceptSelectorModal
+        isOpen={isConceptModalOpen}
+        onClose={() => setIsConceptModalOpen(false)}
+        businessId={business?.businessId || ''}
+        onSelectConcept={(concept) => setSelectedConcept(concept)}
+      />
     </div>
   );
 }

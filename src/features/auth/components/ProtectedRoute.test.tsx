@@ -1,5 +1,5 @@
 import React from 'react';
-import { render, screen, waitFor } from '@testing-library/react';
+import { act, render, screen, waitFor } from '@testing-library/react';
 
 const useAuthStatusMock = jest.fn();
 jest.mock('@/features/auth/hooks/useAuth', () => ({
@@ -7,12 +7,21 @@ jest.mock('@/features/auth/hooks/useAuth', () => ({
 }));
 
 const pushMock = jest.fn();
+const replaceMock = jest.fn();
+const resolveMock = jest.fn();
+jest.mock('@/features/auth/utils/postAuthRouting', () => ({
+  resolvePostAuthDestination: (...args: unknown[]) => resolveMock(...args),
+}));
+jest.mock('@/features/auth/services/authService', () => ({
+  getCurrentUser: () => ({ uid: 'u1' }),
+}));
 jest.mock('next/navigation', () => ({
-  useRouter: () => ({ push: pushMock }),
+  useRouter: () => ({ push: pushMock, replace: replaceMock }),
   usePathname: () => '/dashboard',
 }));
 
 import { ProtectedRoute, PublicOnlyRoute } from './ProtectedRoute';
+import { beginAuthFlow } from '@/features/auth/authFlowState';
 
 /**
  * Phase 35 — Priority 1 (Auth): unauthorized route access and auth loading
@@ -89,5 +98,39 @@ describe('PublicOnlyRoute', () => {
       </PublicOnlyRoute>
     );
     expect(screen.getByText('Login form')).toBeInTheDocument();
+  });
+
+  it('smartRedirect sends the user wherever the post-auth resolver says, passing the ?redirect value', async () => {
+    useAuthStatusMock.mockReturnValue('authenticated');
+    resolveMock.mockResolvedValue('/onboarding');
+    render(
+      <PublicOnlyRoute smartRedirect redirectParam="/campaigns/new">
+        <div>Signup form</div>
+      </PublicOnlyRoute>
+    );
+    await waitFor(() => expect(replaceMock).toHaveBeenCalledWith('/onboarding'));
+    expect(resolveMock).toHaveBeenCalledWith({ uid: 'u1' }, '/campaigns/new');
+    expect(pushMock).not.toHaveBeenCalled();
+    expect(screen.queryByText('Signup form')).not.toBeInTheDocument();
+  });
+
+  it('does not redirect or unmount while a sign-in is still mid-flight (new Google user consent)', async () => {
+    useAuthStatusMock.mockReturnValue('authenticated');
+    resolveMock.mockResolvedValue('/onboarding');
+    let release!: () => void;
+    act(() => {
+      release = beginAuthFlow();
+    });
+    render(
+      <PublicOnlyRoute smartRedirect>
+        <div>Consent card</div>
+      </PublicOnlyRoute>
+    );
+    await new Promise((r) => setTimeout(r, 0));
+    expect(screen.getByText('Consent card')).toBeInTheDocument();
+    expect(replaceMock).not.toHaveBeenCalled();
+
+    act(() => release());
+    await waitFor(() => expect(replaceMock).toHaveBeenCalledWith('/onboarding'));
   });
 });

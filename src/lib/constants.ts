@@ -69,8 +69,4 @@ export const CAMPAIGN_STYLES = [
 // Plan prices/credits live in functions/src/config/pricing.ts (mirrored for display in
 // src/lib/config/pricing.ts). A stale duplicate used to live here and was removed.
 
-export const CREDIT_COSTS = {
-  BASE_CAMPAIGN: 100,
-  REGENERATION: 10,
-  IMAGE_GENERATION: 20,
-} as const;
+// Credit costs live in src/lib/config/pricing.ts (CREDIT_COSTS); a stale duplicate was removed.

@@ -8,7 +8,7 @@ import { Mascot } from '../mascot/Mascot';
 interface CommandItem {
   id: string;
   title: string;
-  category: 'Campaign' | 'Assistant' | 'Settings' | 'Business';
+  category: 'Campaign' | 'Settings' | 'Business';
   icon: string;
   href: string;
   description: string;
@@ -24,28 +24,12 @@ const COMMAND_ITEMS: CommandItem[] = [
     description: 'Launch AI ad campaign generator for your business',
   },
   {
-    id: 'cmd_2',
-    title: 'Generate Social Post',
-    category: 'Campaign',
-    icon: '✨',
-    href: '/creative/image',
-    description: 'Design brand-consistent visual post with localized copy',
-  },
-  {
     id: 'cmd_3',
     title: 'Create Marketing Reel',
     category: 'Campaign',
     icon: '🎬',
-    href: '/creative/reel',
-    description: 'Build short video storyboard and scene direction',
-  },
-  {
-    id: 'cmd_4',
-    title: 'Ask Mitra Assistant',
-    category: 'Assistant',
-    icon: '💬',
-    href: '/assistant',
-    description: 'Get AI recommendations & marketing strategy advice',
+    href: '/reels/new',
+    description: 'Make a short video reel from your clips',
   },
   {
     id: 'cmd_5',
@@ -98,8 +82,8 @@ export function CommandPalette() {
         className="flex items-center gap-2 rounded-xl border border-neutral-200 bg-neutral-100/80 px-3 py-1.5 text-xs font-medium text-neutral-600 transition hover:bg-neutral-200 dark:border-neutral-800 dark:bg-neutral-900 dark:text-neutral-400 dark:hover:bg-neutral-800"
       >
         <span className="text-sm">⚡</span>
-        <span className="hidden sm:inline">Ask Mitra Quick Action</span>
-        <kbd className="rounded bg-neutral-200 px-1.5 py-0.5 text-[10px] font-mono font-bold text-neutral-500 dark:bg-neutral-800 dark:text-neutral-400">
+        <span className="hidden sm:inline">Quick Actions</span>
+        <kbd className="rounded bg-neutral-200 px-1.5 py-0.5 font-mono text-[10px] font-bold text-neutral-500 dark:bg-neutral-800 dark:text-neutral-400">
           ⌘K
         </kbd>
       </button>
@@ -107,7 +91,7 @@ export function CommandPalette() {
       {/* Modal Surface */}
       <AnimatePresence>
         {open && (
-          <div className="fixed inset-0 z-50 flex items-start justify-center pt-20 px-4">
+          <div className="fixed inset-0 z-50 flex items-start justify-center px-4 pt-20">
             {/* Backdrop */}
             <motion.div
               initial={{ opacity: 0 }}
@@ -123,7 +107,7 @@ export function CommandPalette() {
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.95, y: -10 }}
               transition={{ type: 'spring', stiffness: 400, damping: 26 }}
-              className="relative w-full max-w-xl overflow-hidden rounded-3xl border border-neutral-800 bg-neutral-900 text-white shadow-2xl z-10"
+              className="relative z-10 w-full max-w-xl overflow-hidden rounded-3xl border border-neutral-800 bg-neutral-900 text-white shadow-2xl"
             >
               {/* Header with Search Input & Mascot */}
               <div className="flex items-center gap-3 border-b border-neutral-800 px-4 py-3.5">
@@ -131,15 +115,15 @@ export function CommandPalette() {
                 <input
                   type="text"
                   autoFocus
-                  placeholder="Type a command or ask Mitra..."
+                  placeholder="Type a command or action..."
                   value={query}
                   onChange={(e) => {
                     setQuery(e.target.value);
                     setSelectedIndex(0);
                   }}
-                  className="w-full bg-transparent text-sm text-white placeholder-neutral-500 focus:outline-none font-medium"
+                  className="w-full bg-transparent text-sm font-medium text-white placeholder-neutral-500 focus:outline-none"
                 />
-                <kbd className="rounded bg-neutral-800 px-2 py-0.5 text-[10px] font-mono text-neutral-400">
+                <kbd className="rounded bg-neutral-800 px-2 py-0.5 font-mono text-[10px] text-neutral-400">
                   ESC
                 </kbd>
               </div>
@@ -148,7 +132,8 @@ export function CommandPalette() {
               <div className="max-h-80 overflow-y-auto p-2">
                 {filtered.length === 0 ? (
                   <div className="py-8 text-center text-xs text-neutral-500">
-                    No matching actions found. Try searching &quot;campaign&quot; or &quot;post&quot;.
+                    No matching actions found. Try searching &quot;campaign&quot; or
+                    &quot;post&quot;.
                   </div>
                 ) : (
                   filtered.map((item, idx) => (
@@ -165,9 +150,9 @@ export function CommandPalette() {
                       <div className="flex items-center gap-3">
                         <span className="text-lg">{item.icon}</span>
                         <div>
-                          <p className="text-xs font-bold leading-tight">{item.title}</p>
+                          <p className="text-xs leading-tight font-bold">{item.title}</p>
                           <p
-                            className={`text-[11px] leading-tight mt-0.5 ${
+                            className={`mt-0.5 text-[11px] leading-tight ${
                               selectedIndex === idx ? 'text-white/80' : 'text-neutral-400'
                             }`}
                           >
@@ -176,7 +161,7 @@ export function CommandPalette() {
                         </div>
                       </div>
                       <span
-                        className={`text-[10px] font-semibold uppercase tracking-wider rounded px-2 py-0.5 ${
+                        className={`rounded px-2 py-0.5 text-[10px] font-semibold tracking-wider uppercase ${
                           selectedIndex === idx
                             ? 'bg-white/20 text-white'
                             : 'bg-neutral-800 text-neutral-400'

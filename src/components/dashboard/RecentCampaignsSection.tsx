@@ -1,7 +1,6 @@
 'use client';
 
 import Link from 'next/link';
-import Image from 'next/image';
 import { InteractiveCard } from '@/components/motion/InteractiveCard';
 import type { Campaign } from '@/types';
 
@@ -10,14 +9,6 @@ interface RecentCampaignsSectionProps {
 }
 
 export function RecentCampaignsSection({ campaigns }: RecentCampaignsSectionProps) {
-  // Fallback demo visuals for rich display if campaign has no assets
-  const fallbackImages: string[] = [
-    'https://images.unsplash.com/photo-1563379091339-03b21ab4a4f8?auto=format&fit=crop&w=400&q=80',
-    'https://images.unsplash.com/photo-1560066984-138dadb4c035?auto=format&fit=crop&w=400&q=80',
-    'https://images.unsplash.com/photo-1600585154340-be6161a56a0c?auto=format&fit=crop&w=400&q=80',
-    'https://images.unsplash.com/photo-1546833999-b9f581a1996d?auto=format&fit=crop&w=400&q=80',
-  ];
-
   return (
     <div className="space-y-3">
       <div className="flex items-center justify-between">
@@ -61,17 +52,22 @@ export function RecentCampaignsSection({ campaigns }: RecentCampaignsSectionProp
         </div>
       ) : (
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          {campaigns.map((campaign, idx) => {
+          {campaigns.map((campaign) => {
+            const inProgress = !['draft', 'completed', 'verified', 'generated', 'failed'].includes(
+              campaign.status
+            );
             const statusConfig =
               campaign.status === 'completed' || campaign.status === 'verified'
-                ? { label: '✓ Completed', badgeClass: 'bg-emerald-500 text-white' }
-                : campaign.status === 'draft'
-                  ? { label: 'Draft', badgeClass: 'bg-neutral-500 text-white' }
-                  : campaign.status === 'failed'
-                    ? { label: 'Failed', badgeClass: 'bg-red-500 text-white' }
-                    : { label: '+ Live', badgeClass: 'bg-emerald-500 text-white' };
-
-            const bgImage = fallbackImages[idx % fallbackImages.length] || fallbackImages[0]!;
+                ? { label: '✓ Ready', badgeClass: 'bg-emerald-600 text-white' }
+                : campaign.status === 'generated'
+                  ? { label: 'Review needed', badgeClass: 'bg-amber-600 text-white' }
+                  : campaign.status === 'draft'
+                    ? { label: 'Draft', badgeClass: 'bg-neutral-500 text-white' }
+                    : campaign.status === 'failed'
+                      ? { label: 'Failed', badgeClass: 'bg-red-600 text-white' }
+                      : inProgress
+                        ? { label: 'Generating…', badgeClass: 'bg-sky-600 text-white' }
+                        : { label: campaign.status, badgeClass: 'bg-neutral-500 text-white' };
 
             return (
               <Link key={campaign.campaignId} href={`/campaigns/${campaign.campaignId}`}>
@@ -80,50 +76,18 @@ export function RecentCampaignsSection({ campaigns }: RecentCampaignsSectionProp
                   maxTilt={4}
                   className="group flex flex-col overflow-hidden rounded-2xl border border-[#F0EBE1] bg-white shadow-2xs transition-shadow hover:shadow-md"
                 >
-                  {/* Image Card Header with Status Badge */}
-                  <div className="relative h-40 w-full overflow-hidden bg-neutral-100">
-                    <Image
-                      src={bgImage}
-                      alt={campaign.offer.headline}
-                      fill
-                      className="object-cover transition-transform duration-300 group-hover:scale-105"
-                      sizes="(max-width: 640px) 100vw, 250px"
-                    />
-                    <div className="absolute top-2.5 left-2.5">
-                      <span
-                        className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-bold shadow-xs ${statusConfig.badgeClass}`}
-                      >
-                        {statusConfig.label}
-                      </span>
-                    </div>
-                  </div>
-
-                  {/* Body Content */}
-                  <div className="flex flex-1 flex-col justify-between p-4">
-                    <div>
-                      <h3 className="truncate text-sm font-bold text-[#1A1A1E] transition-colors group-hover:text-[#E84D1A]">
-                        {campaign.offer.headline}
-                      </h3>
-                      <p className="mt-0.5 text-xs text-[#757580] capitalize">
-                        {campaign.objective.replace('_', ' ')} • WhatsApp + Social Media
-                      </p>
-                    </div>
-
-                    {/* Metrics Footer */}
-                    <div className="mt-4 grid grid-cols-3 border-t border-[#F0EBE1] pt-3 text-center text-xs">
-                      <div>
-                        <p className="font-bold text-[#1A1A1E]">1.2K</p>
-                        <p className="text-[10px] text-[#757580]">Views</p>
-                      </div>
-                      <div>
-                        <p className="font-bold text-[#1A1A1E]">342</p>
-                        <p className="text-[10px] text-[#757580]">Clicks</p>
-                      </div>
-                      <div>
-                        <p className="font-bold text-[#1A1A1E]">28</p>
-                        <p className="text-[10px] text-[#757580]">Orders</p>
-                      </div>
-                    </div>
+                  <div className="p-4">
+                    <span
+                      className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-bold shadow-xs ${statusConfig.badgeClass}`}
+                    >
+                      {statusConfig.label}
+                    </span>
+                    <h3 className="mt-3 line-clamp-2 text-sm font-bold text-[#1A1A1E] transition-colors group-hover:text-[#E84D1A]">
+                      {campaign.offer.headline}
+                    </h3>
+                    <p className="mt-0.5 text-xs text-[#757580] capitalize">
+                      {campaign.objective.replace('_', ' ')}
+                    </p>
                   </div>
                 </InteractiveCard>
               </Link>

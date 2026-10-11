@@ -17,13 +17,5 @@ export function MitraMascot({
   alt = 'Mitra AI Assistant',
   ...rest
 }: MitraMascotProps) {
-  return (
-    <Mascot
-      state={pose}
-      size={size}
-      className={className}
-      alt={alt}
-      {...rest}
-    />
-  );
+  return <Mascot state={pose} size={size} className={className} alt={alt} {...rest} />;
 }

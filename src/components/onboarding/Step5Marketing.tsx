@@ -1,6 +1,5 @@
 'use client';
 
-import Image from 'next/image';
 import { motion, useReducedMotion } from 'motion/react';
 import { Button } from '@/components/ui/Button';
 import { Mascot } from '@/components/mascot/Mascot';
@@ -34,7 +33,7 @@ const GOAL_OPTIONS = [
 export function Step5Marketing({
   form,
   setForm,
-  errors,
+  errors: _errors,
   onNext,
   onBack,
 }: Step5MarketingProps) {
@@ -67,37 +66,38 @@ export function Step5Marketing({
   };
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+    <div className="grid grid-cols-1 items-start gap-8 lg:grid-cols-12">
       {/* Left Mascot & Signal Visual Column */}
-      <div className="lg:col-span-5 flex flex-col gap-4">
-        <div className="inline-flex items-center gap-2 self-start px-3.5 py-1.5 rounded-full bg-orange-50 border border-orange-200/80 text-[#E84D1A] text-xs font-extrabold uppercase tracking-wider">
+      <div className="flex flex-col gap-4 lg:col-span-5">
+        <div className="inline-flex items-center gap-2 self-start rounded-full border border-orange-200/80 bg-orange-50 px-3.5 py-1.5 text-xs font-extrabold tracking-wider text-[#E84D1A] uppercase">
           <span>CHAPTER 5 — Marketing Brain</span>
         </div>
 
-        <h1 className="text-2xl sm:text-3xl font-black text-[#1A1A1E] tracking-tight">
+        <h1 className="text-2xl font-black tracking-tight text-[#1A1A1E] sm:text-3xl">
           What kind of marketing works best for you?
         </h1>
-        <p className="text-sm text-neutral-600 leading-relaxed">
-          Tell Mitra your target goals and dialect so your AI marketing engine learns how to speak to your customers.
+        <p className="text-sm leading-relaxed text-neutral-600">
+          Tell Mitra your target goals and dialect so your AI marketing engine learns how to speak
+          to your customers.
         </p>
 
         {/* Hand-drawn style note */}
-        <div className="relative inline-flex items-center gap-2 text-xs font-bold text-amber-900 bg-amber-50/90 border border-amber-200/60 px-3.5 py-2 rounded-2xl w-fit">
+        <div className="relative inline-flex w-fit items-center gap-2 rounded-2xl border border-amber-200/60 bg-amber-50/90 px-3.5 py-2 text-xs font-bold text-amber-900">
           <span>🎯</span>
           <span>Your business. Your goals.</span>
         </div>
 
         {/* Mascot Pose Scene with Floating Signals */}
-        <div className="mt-1 p-5 bg-white/80 backdrop-blur-sm border border-neutral-200/80 rounded-3xl shadow-sm relative overflow-hidden text-center flex flex-col items-center">
+        <div className="relative mt-1 flex flex-col items-center overflow-hidden rounded-3xl border border-neutral-200/80 bg-white/80 p-5 text-center shadow-sm backdrop-blur-sm">
           {/* Signal labels drifting toward Mitra */}
-          <div className="w-full relative h-12 flex items-center justify-center gap-2 flex-wrap overflow-hidden">
+          <div className="relative flex h-12 w-full flex-wrap items-center justify-center gap-2 overflow-hidden">
             {(form.goals || []).map((goal, idx) => (
               <motion.span
                 key={goal}
                 initial={{ opacity: 0, scale: 0.8, y: 10 }}
                 animate={{ opacity: 1, scale: 1, y: 0 }}
                 transition={{ duration: 0.3, delay: idx * 0.1 }}
-                className="text-[10px] font-bold px-2.5 py-1 rounded-full bg-[#E84D1A] text-white shadow-2xs"
+                className="rounded-full bg-[#E84D1A] px-2.5 py-1 text-[10px] font-bold text-white shadow-2xs"
               >
                 ✓ {goal}
               </motion.span>
@@ -106,15 +106,15 @@ export function Step5Marketing({
 
           <Mascot state="curious" size="xl" shadow animated />
 
-          <div className="mt-2 p-3 rounded-xl bg-orange-50/70 border border-orange-200/50 text-xs font-semibold text-orange-950 text-left w-full">
-            🧠 <strong>Mitra is learning:</strong> Collecting your signal preferences to customize ad
-            copy, posters, and WhatsApp automation!
+          <div className="mt-2 w-full rounded-xl border border-orange-200/50 bg-orange-50/70 p-3 text-left text-xs font-semibold text-orange-950">
+            🧠 <strong>Mitra is learning:</strong> Collecting your signal preferences to customize
+            ad copy, images, reels, and WhatsApp messages!
           </div>
         </div>
       </div>
 
       {/* Right Form Column */}
-      <div className="lg:col-span-7 bg-white rounded-3xl border border-neutral-200/90 p-6 sm:p-8 shadow-sm">
+      <div className="rounded-3xl border border-neutral-200/90 bg-white p-6 shadow-sm sm:p-8 lg:col-span-7">
         <div className="mb-6">
           <h2 className="text-xl font-extrabold text-[#1A1A1E]">Marketing Preferences</h2>
           <p className="text-sm text-neutral-500">
@@ -125,7 +125,7 @@ export function Step5Marketing({
         <form onSubmit={onNext} className="space-y-6">
           {/* Preferred Language Selection */}
           <div>
-            <label className="block text-sm font-bold text-[#1A1A1E] mb-2">
+            <label className="mb-2 block text-sm font-bold text-[#1A1A1E]">
               Preferred Languages *
             </label>
             <div className="flex flex-wrap gap-2.5">
@@ -142,9 +142,9 @@ export function Step5Marketing({
                         language: lang.id as OnboardingFormData['language'],
                       }))
                     }
-                    className={`px-4 py-2.5 rounded-2xl text-xs font-extrabold transition-all cursor-pointer ${
+                    className={`cursor-pointer rounded-2xl px-4 py-2.5 text-xs font-extrabold transition-all ${
                       isSelected
-                        ? 'bg-[#E84D1A] text-white shadow-md shadow-orange-500/20 scale-105'
+                        ? 'scale-105 bg-[#E84D1A] text-white shadow-md shadow-orange-500/20'
                         : 'bg-neutral-100 text-neutral-700 hover:bg-neutral-200/70'
                     }`}
                   >
@@ -160,21 +160,19 @@ export function Step5Marketing({
             key={form.language}
             initial={reduceMotion ? undefined : { opacity: 0, y: 6 }}
             animate={{ opacity: 1, y: 0 }}
-            className="p-4 rounded-2xl bg-orange-50/80 border border-orange-200/70 space-y-1"
+            className="space-y-1 rounded-2xl border border-orange-200/70 bg-orange-50/80 p-4"
           >
-            <span className="text-[11px] font-extrabold uppercase tracking-wider text-[#E84D1A] block">
+            <span className="block text-[11px] font-extrabold tracking-wider text-[#E84D1A] uppercase">
               Live Dialect Preview
             </span>
-            <p className="text-xs font-semibold text-neutral-800 italic leading-relaxed">
+            <p className="text-xs leading-relaxed font-semibold text-neutral-800 italic">
               &quot;{getPreviewSentence()}&quot;
             </p>
           </motion.div>
 
           {/* Campaign Goals Checkboxes */}
           <div>
-            <label className="block text-sm font-bold text-[#1A1A1E] mb-2">
-              Campaign Goals *
-            </label>
+            <label className="mb-2 block text-sm font-bold text-[#1A1A1E]">Campaign Goals *</label>
             <div className="space-y-2.5">
               {GOAL_OPTIONS.map((goal) => {
                 const isChecked = (form.goals || []).includes(goal);
@@ -183,10 +181,10 @@ export function Step5Marketing({
                   <label
                     key={goal}
                     onClick={() => toggleGoal(goal)}
-                    className={`flex items-center justify-between p-3.5 rounded-2xl border transition-all cursor-pointer ${
+                    className={`flex cursor-pointer items-center justify-between rounded-2xl border p-3.5 transition-all ${
                       isChecked
-                        ? 'bg-orange-50/70 border-[#E84D1A] text-orange-950 font-bold'
-                        : 'bg-white border-neutral-200 text-neutral-700 hover:bg-neutral-50'
+                        ? 'border-[#E84D1A] bg-orange-50/70 font-bold text-orange-950'
+                        : 'border-neutral-200 bg-white text-neutral-700 hover:bg-neutral-50'
                     }`}
                   >
                     <span className="text-sm">{goal}</span>
@@ -194,7 +192,7 @@ export function Step5Marketing({
                       type="checkbox"
                       checked={isChecked}
                       onChange={() => {}}
-                      className="w-4 h-4 rounded text-[#E84D1A] focus:ring-[#E84D1A] accent-[#E84D1A]"
+                      className="h-4 w-4 rounded text-[#E84D1A] accent-[#E84D1A] focus:ring-[#E84D1A]"
                     />
                   </label>
                 );
@@ -203,15 +201,15 @@ export function Step5Marketing({
           </div>
 
           {/* Regional & Content Style Selectors */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2">
+          <div className="grid grid-cols-1 gap-4 pt-2 sm:grid-cols-2">
             <div>
-              <label className="block text-sm font-bold text-[#1A1A1E] mb-1">
+              <label className="mb-1 block text-sm font-bold text-[#1A1A1E]">
                 Regional Style *
               </label>
               <select
                 value={form.regionalStyle}
                 onChange={(e) => setForm((prev) => ({ ...prev, regionalStyle: e.target.value }))}
-                className="w-full rounded-2xl border border-neutral-300 bg-white px-4 py-3 text-sm text-[#1A1A1E] focus:border-[#E84D1A] outline-none"
+                className="w-full rounded-2xl border border-neutral-300 bg-white px-4 py-3 text-sm text-[#1A1A1E] outline-none focus:border-[#E84D1A]"
               >
                 {REGIONAL_STYLES.map((style) => (
                   <option key={style.value} value={style.value}>
@@ -222,13 +220,11 @@ export function Step5Marketing({
             </div>
 
             <div>
-              <label className="block text-sm font-bold text-[#1A1A1E] mb-1">
-                Content Style *
-              </label>
+              <label className="mb-1 block text-sm font-bold text-[#1A1A1E]">Content Style *</label>
               <select
                 value={form.contentStyle}
                 onChange={(e) => setForm((prev) => ({ ...prev, contentStyle: e.target.value }))}
-                className="w-full rounded-2xl border border-neutral-300 bg-white px-4 py-3 text-sm text-[#1A1A1E] focus:border-[#E84D1A] outline-none"
+                className="w-full rounded-2xl border border-neutral-300 bg-white px-4 py-3 text-sm text-[#1A1A1E] outline-none focus:border-[#E84D1A]"
               >
                 {CAMPAIGN_STYLES.map((style) => (
                   <option key={style.value} value={style.value}>
@@ -240,18 +236,18 @@ export function Step5Marketing({
           </div>
 
           {/* Action Buttons */}
-          <div className="pt-6 flex items-center justify-between gap-4 border-t border-neutral-100">
+          <div className="flex items-center justify-between gap-4 border-t border-neutral-100 pt-6">
             <Button
               type="button"
               variant="secondary"
               onClick={onBack}
-              className="px-6 py-3 rounded-2xl border border-neutral-200 text-neutral-700 hover:bg-neutral-50 font-bold"
+              className="rounded-2xl border border-neutral-200 px-6 py-3 font-bold text-neutral-700 hover:bg-neutral-50"
             >
               Back
             </Button>
             <Button
               type="submit"
-              className="px-8 py-3.5 rounded-2xl bg-[#E84D1A] hover:bg-[#d03f10] text-white font-bold shadow-md shadow-orange-600/20"
+              className="rounded-2xl bg-[#E84D1A] px-8 py-3.5 font-bold text-white shadow-md shadow-orange-600/20 hover:bg-[#d03f10]"
             >
               Continue →
             </Button>

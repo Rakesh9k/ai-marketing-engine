@@ -9,14 +9,16 @@ interface CategoryManagerProps {
   categories?: string[];
 }
 
-export function CategoryManager({ categories: initialCategories = [
-  'Biryani & Rice',
-  'Starters & Tandoor',
-  'Main Course',
-  'Combos & Thalis',
-  'Beverages & Drinks',
-  'Desserts & Sweets',
-] }: CategoryManagerProps) {
+export function CategoryManager({
+  categories: initialCategories = [
+    'Biryani & Rice',
+    'Starters & Tandoor',
+    'Main Course',
+    'Combos & Thalis',
+    'Beverages & Drinks',
+    'Desserts & Sweets',
+  ],
+}: CategoryManagerProps) {
   const [categoryList, setCategoryList] = useState<string[]>(initialCategories);
   const [newCatName, setNewCatName] = useState('');
 
@@ -39,7 +41,9 @@ export function CategoryManager({ categories: initialCategories = [
     <div className="mx-auto max-w-4xl space-y-6 pb-12">
       <div className="flex items-center justify-between border-b border-neutral-200 pb-4">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight text-neutral-900">Category Management</h1>
+          <h1 className="text-2xl font-bold tracking-tight text-neutral-900">
+            Category Management
+          </h1>
           <p className="mt-1 text-sm text-neutral-500">
             Organize products and services into structured marketing categories.
           </p>
@@ -50,7 +54,10 @@ export function CategoryManager({ categories: initialCategories = [
       </div>
 
       {/* Add New Category Form */}
-      <form onSubmit={handleAddCategory} className="flex gap-3 rounded-2xl border border-neutral-200 bg-white p-5 shadow-sm">
+      <form
+        onSubmit={handleAddCategory}
+        className="flex gap-3 rounded-2xl border border-neutral-200 bg-white p-5 shadow-sm"
+      >
         <div className="flex-1">
           <Input
             value={newCatName}

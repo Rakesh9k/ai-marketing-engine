@@ -27,12 +27,7 @@ const CATEGORY_OPTIONS = [
   'Other',
 ];
 
-export function ProductForm({
-  businessId,
-  initialProduct,
-  onSuccess,
-  onCancel,
-}: ProductFormProps) {
+export function ProductForm({ businessId, initialProduct, onSuccess, onCancel }: ProductFormProps) {
   const router = useRouter();
   const isEditing = Boolean(initialProduct);
 
@@ -83,9 +78,7 @@ export function ProductForm({
     if (isBestseller) tags.push('Bestseller');
     if (isPopular) tags.push('Popular');
 
-    const images = imageUrl
-      ? [{ url: imageUrl, storagePath: '', isPrimary: true }]
-      : [];
+    const images = imageUrl ? [{ url: imageUrl, storagePath: '', isPrimary: true }] : [];
 
     try {
       if (isEditing && initialProduct) {
@@ -133,7 +126,8 @@ export function ProductForm({
         else router.push('/products');
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to save product.');
+      console.error('Failed to save product:', err);
+      setError("We couldn't save this product. Please check the details and try again.");
     } finally {
       setSaving(false);
     }
@@ -148,7 +142,8 @@ export function ProductForm({
             {isEditing ? 'Edit Product' : 'Add something Mitra can market'}
           </h1>
           <p className="mt-1 text-sm text-neutral-500">
-            Tell Mitra about this item once. Mitra will use it in campaign copy, poster visual generation, and AI recommendations.
+            Tell Mitra about this item once. Mitra will use it in campaign copy, poster visual
+            generation, and AI recommendations.
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -164,49 +159,54 @@ export function ProductForm({
       </div>
 
       {error && (
-        <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700" role="alert">
+        <div
+          className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700"
+          role="alert"
+        >
           {error}
         </div>
       )}
 
       {/* Marketing Readiness Progress Card */}
-      <div className="rounded-2xl border border-neutral-200 bg-gradient-to-r from-neutral-50 to-brand-50/40 p-5 space-y-3">
+      <div className="to-brand-50/40 space-y-3 rounded-2xl border border-neutral-200 bg-gradient-to-r from-neutral-50 p-5">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             <span className="text-lg">✨</span>
-            <h3 className="font-bold text-sm text-neutral-900">Marketing Readiness Indicator</h3>
+            <h3 className="text-sm font-bold text-neutral-900">Marketing Readiness Indicator</h3>
           </div>
-          <span className="rounded-full bg-brand-600 px-3 py-1 text-xs font-bold text-white">
+          <span className="bg-brand-600 rounded-full px-3 py-1 text-xs font-bold text-white">
             {readinessScore}% Ready
           </span>
         </div>
 
         <div className="h-2 w-full overflow-hidden rounded-full bg-neutral-200">
           <div
-            className="h-full bg-brand-500 transition-all duration-300"
+            className="bg-brand-500 h-full transition-all duration-300"
             style={{ width: `${readinessScore}%` }}
           />
         </div>
 
-        <div className="grid grid-cols-2 gap-2 text-xs font-medium sm:grid-cols-4 pt-1">
-          <span className={readiness.hasName ? 'text-emerald-700 font-bold' : 'text-neutral-400'}>
+        <div className="grid grid-cols-2 gap-2 pt-1 text-xs font-medium sm:grid-cols-4">
+          <span className={readiness.hasName ? 'font-bold text-emerald-700' : 'text-neutral-400'}>
             {readiness.hasName ? '✓ Name' : '○ Name'}
           </span>
-          <span className={readiness.hasPrice ? 'text-emerald-700 font-bold' : 'text-neutral-400'}>
+          <span className={readiness.hasPrice ? 'font-bold text-emerald-700' : 'text-neutral-400'}>
             {readiness.hasPrice ? '✓ Price' : '○ Price'}
           </span>
-          <span className={readiness.hasDescription ? 'text-emerald-700 font-bold' : 'text-neutral-400'}>
+          <span
+            className={readiness.hasDescription ? 'font-bold text-emerald-700' : 'text-neutral-400'}
+          >
             {readiness.hasDescription ? '✓ Description' : '○ Description'}
           </span>
-          <span className={readiness.hasImage ? 'text-emerald-700 font-bold' : 'text-neutral-400'}>
+          <span className={readiness.hasImage ? 'font-bold text-emerald-700' : 'text-neutral-400'}>
             {readiness.hasImage ? '✓ Photo' : '○ Photo'}
           </span>
         </div>
       </div>
 
       {/* 1. Product Identity */}
-      <div className="rounded-2xl border border-neutral-200 bg-white p-6 shadow-sm space-y-4">
-        <h2 className="text-lg font-bold text-neutral-900 border-b border-neutral-100 pb-3">
+      <div className="space-y-4 rounded-2xl border border-neutral-200 bg-white p-6 shadow-sm">
+        <h2 className="border-b border-neutral-100 pb-3 text-lg font-bold text-neutral-900">
           1. Product Identity
         </h2>
 
@@ -224,7 +224,7 @@ export function ProductForm({
             <select
               value={category}
               onChange={(e) => setCategory(e.target.value)}
-              className="w-full rounded-lg border border-neutral-300 px-4 py-2.5 text-sm text-neutral-900 focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 focus:outline-none"
+              className="focus:border-brand-500 focus:ring-brand-500/20 w-full rounded-lg border border-neutral-300 px-4 py-2.5 text-sm text-neutral-900 focus:ring-2 focus:outline-none"
             >
               {CATEGORY_OPTIONS.map((cat) => (
                 <option key={cat} value={cat}>
@@ -244,14 +244,14 @@ export function ProductForm({
             onChange={(e) => setDescription(e.target.value)}
             rows={3}
             placeholder="Describe it the way you'd explain it to a customer. Mitra uses this in campaign captions..."
-            className="w-full rounded-lg border border-neutral-300 px-4 py-2.5 text-sm text-neutral-900 focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 focus:outline-none"
+            className="focus:border-brand-500 focus:ring-brand-500/20 w-full rounded-lg border border-neutral-300 px-4 py-2.5 text-sm text-neutral-900 focus:ring-2 focus:outline-none"
           />
         </div>
       </div>
 
       {/* 2. Pricing */}
-      <div className="rounded-2xl border border-neutral-200 bg-white p-6 shadow-sm space-y-4">
-        <h2 className="text-lg font-bold text-neutral-900 border-b border-neutral-100 pb-3">
+      <div className="space-y-4 rounded-2xl border border-neutral-200 bg-white p-6 shadow-sm">
+        <h2 className="border-b border-neutral-100 pb-3 text-lg font-bold text-neutral-900">
           2. Pricing & Offers
         </h2>
 
@@ -275,8 +275,8 @@ export function ProductForm({
       </div>
 
       {/* 3. Product Photo */}
-      <div className="rounded-2xl border border-neutral-200 bg-white p-6 shadow-sm space-y-4">
-        <h2 className="text-lg font-bold text-neutral-900 border-b border-neutral-100 pb-3">
+      <div className="space-y-4 rounded-2xl border border-neutral-200 bg-white p-6 shadow-sm">
+        <h2 className="border-b border-neutral-100 pb-3 text-lg font-bold text-neutral-900">
           3. Product Photo & Visuals
         </h2>
 
@@ -293,18 +293,19 @@ export function ProductForm({
             <img src={imageUrl} alt="Preview" className="h-full w-full object-cover" />
           </div>
         ) : (
-          <div className="rounded-xl border border-dashed border-neutral-300 p-8 text-center bg-neutral-50/50">
+          <div className="rounded-xl border border-dashed border-neutral-300 bg-neutral-50/50 p-8 text-center">
             <CameraIllustration size={36} className="mx-auto text-neutral-400" />
             <p className="mt-2 text-xs text-neutral-500">
-              Provide an image URL above to display product photos in social posters and campaign creatives.
+              Provide an image URL above to display product photos in social posters and campaign
+              creatives.
             </p>
           </div>
         )}
       </div>
 
       {/* 4. Product Attributes & Tags */}
-      <div className="rounded-2xl border border-neutral-200 bg-white p-6 shadow-sm space-y-4">
-        <h2 className="text-lg font-bold text-neutral-900 border-b border-neutral-100 pb-3">
+      <div className="space-y-4 rounded-2xl border border-neutral-200 bg-white p-6 shadow-sm">
+        <h2 className="border-b border-neutral-100 pb-3 text-lg font-bold text-neutral-900">
           4. Attributes & Marketing Tags
         </h2>
 
@@ -334,7 +335,7 @@ export function ProductForm({
               type="checkbox"
               checked={isPopular}
               onChange={(e) => setIsPopular(e.target.checked)}
-              className="h-4 w-4 rounded border-neutral-300 text-brand-600 focus:ring-brand-500"
+              className="text-brand-600 focus:ring-brand-500 h-4 w-4 rounded border-neutral-300"
             />
             <span className="text-sm font-semibold text-neutral-900">Mark as Popular</span>
           </label>
@@ -342,8 +343,8 @@ export function ProductForm({
       </div>
 
       {/* 5. Marketing Notes */}
-      <div className="rounded-2xl border border-neutral-200 bg-white p-6 shadow-sm space-y-4">
-        <h2 className="text-lg font-bold text-neutral-900 border-b border-neutral-100 pb-3">
+      <div className="space-y-4 rounded-2xl border border-neutral-200 bg-white p-6 shadow-sm">
+        <h2 className="border-b border-neutral-100 pb-3 text-lg font-bold text-neutral-900">
           5. Marketing Notes for Mitra AI
         </h2>
 
@@ -356,7 +357,7 @@ export function ProductForm({
             onChange={(e) => setMarketingNote(e.target.value)}
             rows={2}
             placeholder="e.g. Always emphasize slow cooked authenticity and royal Hyderabadi recipe..."
-            className="w-full rounded-lg border border-neutral-300 px-4 py-2.5 text-sm text-neutral-900 focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 focus:outline-none"
+            className="focus:border-brand-500 focus:ring-brand-500/20 w-full rounded-lg border border-neutral-300 px-4 py-2.5 text-sm text-neutral-900 focus:ring-2 focus:outline-none"
           />
         </div>
       </div>

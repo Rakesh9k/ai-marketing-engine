@@ -173,4 +173,55 @@ describeIfEmulator('Storage Security Rules', () => {
     const fileRef = ref(agencyUser.storage(), 'businesses/biz_unmanaged/assets/a1/test.jpg');
     await expect(getMetadata(fileRef)).rejects.toThrow();
   });
+
+  // Phase 4 (production reels): rendered output lives under businesses/{businessId}/reels/{reelId}/
+  // output/. The renderer and generateReel write it with the Admin SDK (bypasses rules), so the
+  // rules must make it readable only by the owning business and never client-writable.
+  describe('rendered reel output (businesses/{id}/reels/{reelId}/output)', () => {
+    const REEL_A = 'businesses/bizA/reels/reel1/output/reel.mp4';
+    const REEL_B = 'businesses/bizB/reels/reel1/output/reel.mp4';
+
+    const seedReels = async () => {
+      await testEnv!.withSecurityRulesDisabled(async (context) => {
+        await uploadString(ref(context.storage(), REEL_A), 'mp4-a');
+        await uploadString(ref(context.storage(), REEL_B), 'mp4-b');
+      });
+    };
+
+    test('owner can read own reel; cannot read another tenant reel', async () => {
+      await seedReels();
+      const userA = testEnv!.authenticatedContext('userA', { businessIds: ['bizA'] });
+      await expect(getMetadata(ref(userA.storage(), REEL_A))).resolves.toBeDefined();
+      await expect(getMetadata(ref(userA.storage(), REEL_B))).rejects.toThrow();
+    });
+
+    test('anonymous visitor cannot read any reel', async () => {
+      await seedReels();
+      const anon = testEnv!.unauthenticatedContext();
+      await expect(getMetadata(ref(anon.storage(), REEL_A))).rejects.toThrow();
+    });
+
+    test('no client can write, overwrite or impersonate the renderer on any reel path', async () => {
+      await seedReels();
+      const userA = testEnv!.authenticatedContext('userA', { businessIds: ['bizA'] });
+      await expect(uploadString(ref(userA.storage(), REEL_A), 'fake')).rejects.toThrow();
+      await expect(uploadString(ref(userA.storage(), REEL_B), 'fake')).rejects.toThrow();
+      await expect(
+        uploadString(ref(userA.storage(), 'businesses/bizA/reels/reelNew/output/reel.mp4'), 'fake')
+      ).rejects.toThrow();
+    });
+
+    test('the shared reel music library is readable by signed-in users but never client-writable', async () => {
+      await testEnv!.withSecurityRulesDisabled(async (context) => {
+        await uploadString(ref(context.storage(), 'shared/reel-music/energetic_01.mp3'), 'x');
+      });
+      const userA = testEnv!.authenticatedContext('userA', { businessIds: ['bizA'] });
+      await expect(
+        getMetadata(ref(userA.storage(), 'shared/reel-music/energetic_01.mp3'))
+      ).resolves.toBeDefined();
+      await expect(
+        uploadString(ref(userA.storage(), 'shared/reel-music/energetic_01.mp3'), 'tone')
+      ).rejects.toThrow();
+    });
+  });
 });

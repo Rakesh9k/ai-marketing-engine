@@ -4,6 +4,7 @@ import React, { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { format, parseISO } from 'date-fns';
+import { useToast } from '@/hooks/useToast';
 import type { MarketingPlan, MarketingCalendarItem } from '@/types';
 import { EditCalendarItemModal } from './EditCalendarItemModal';
 import { calendarService } from '../services/calendarService';
@@ -22,6 +23,7 @@ export function MarketingCalendarView({
   onRefresh,
 }: MarketingCalendarViewProps) {
   const router = useRouter();
+  const { showToast } = useToast();
   const [editingItem, setEditingItem] = useState<MarketingCalendarItem | null>(null);
   const [skippingId, setSkippingId] = useState<string | null>(null);
   const [creatingId, setCreatingId] = useState<string | null>(null);
@@ -70,7 +72,7 @@ export function MarketingCalendarView({
       }
     } catch (err) {
       console.error('Failed to create content from calendar item:', err);
-      alert('Failed to generate campaign. Please check your credits or try again.');
+      showToast('Failed to generate campaign. Please check your credits or try again.', 'error');
     } finally {
       setCreatingId(null);
     }

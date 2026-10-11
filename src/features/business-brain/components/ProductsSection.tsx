@@ -13,7 +13,12 @@ interface ProductsSectionProps {
   onCancel?: () => void;
 }
 
-export function ProductsSection({ businessId, products: initialProducts, onSaved, onCancel }: ProductsSectionProps) {
+export function ProductsSection({
+  businessId,
+  products: initialProducts,
+  onSaved,
+  onCancel,
+}: ProductsSectionProps) {
   const [productsList, setProductsList] = useState<Product[]>(initialProducts);
   const [editingId, setEditingId] = useState<string | null>(null);
 
@@ -134,7 +139,10 @@ export function ProductsSection({ businessId, products: initialProducts, onSaved
       </div>
 
       {error && (
-        <div className="rounded-lg bg-red-50 p-4 text-sm text-red-700 border border-red-200" role="alert">
+        <div
+          className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700"
+          role="alert"
+        >
           {error}
         </div>
       )}
@@ -152,7 +160,7 @@ export function ProductsSection({ businessId, products: initialProducts, onSaved
           productsList.map((prod) => (
             <div
               key={prod.productId}
-              className="flex items-center justify-between rounded-xl border border-neutral-200 bg-neutral-50/50 p-4 transition-hover hover:border-neutral-300"
+              className="transition-hover flex items-center justify-between rounded-xl border border-neutral-200 bg-neutral-50/50 p-4 hover:border-neutral-300"
             >
               <div>
                 <div className="flex items-center gap-2">
@@ -161,11 +169,15 @@ export function ProductsSection({ businessId, products: initialProducts, onSaved
                     {prod.category}
                   </span>
                 </div>
-                {prod.description && <p className="mt-1 text-sm text-neutral-500">{prod.description}</p>}
-                <div className="mt-2 flex items-center gap-2 text-sm font-bold text-brand-600">
+                {prod.description && (
+                  <p className="mt-1 text-sm text-neutral-500">{prod.description}</p>
+                )}
+                <div className="text-brand-600 mt-2 flex items-center gap-2 text-sm font-bold">
                   <span>₹{prod.price}</span>
                   {prod.originalPrice && (
-                    <span className="text-xs text-neutral-400 line-through">₹{prod.originalPrice}</span>
+                    <span className="text-xs text-neutral-400 line-through">
+                      ₹{prod.originalPrice}
+                    </span>
                   )}
                 </div>
               </div>
@@ -189,7 +201,10 @@ export function ProductsSection({ businessId, products: initialProducts, onSaved
 
       {/* Edit/Create Form Modal inline */}
       {editingId && (
-        <form onSubmit={handleSaveProduct} className="mt-6 space-y-4 rounded-xl border border-brand-200 bg-brand-50/30 p-5">
+        <form
+          onSubmit={handleSaveProduct}
+          className="border-brand-200 bg-brand-50/30 mt-6 space-y-4 rounded-xl border p-5"
+        >
           <h3 className="font-semibold text-neutral-900">
             {editingId === 'new' ? 'Add New Product / Service' : 'Edit Item'}
           </h3>
@@ -217,7 +232,7 @@ export function ProductsSection({ businessId, products: initialProducts, onSaved
               onChange={(e) => setDescription(e.target.value)}
               rows={2}
               placeholder="Delicious fragrant rice cooked with aromatic spices..."
-              className="w-full rounded-lg border border-neutral-300 px-4 py-2.5 text-sm text-neutral-900 focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 focus:outline-none"
+              className="focus:border-brand-500 focus:ring-brand-500/20 w-full rounded-lg border border-neutral-300 px-4 py-2.5 text-sm text-neutral-900 focus:ring-2 focus:outline-none"
             />
           </div>
 
@@ -234,7 +249,9 @@ export function ProductsSection({ businessId, products: initialProducts, onSaved
               label="Original / MRP Price (₹) Optional"
               type="number"
               value={originalPrice || ''}
-              onChange={(e) => setOriginalPrice(e.target.value ? Number(e.target.value) : undefined)}
+              onChange={(e) =>
+                setOriginalPrice(e.target.value ? Number(e.target.value) : undefined)
+              }
               placeholder="449"
             />
           </div>

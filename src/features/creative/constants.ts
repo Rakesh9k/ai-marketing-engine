@@ -24,7 +24,8 @@ export const POPULAR_TEMPLATES: CreativeTemplate[] = [
     format: 'instagram_post',
     vertical: 'restaurant',
     category: 'offer',
-    previewUrl: 'https://images.unsplash.com/photo-1563379091339-03b21ab4a4f8?w=600&auto=format&fit=crop&q=80',
+    previewUrl:
+      'https://images.unsplash.com/photo-1563379091339-03b21ab4a4f8?w=600&auto=format&fit=crop&q=80',
     description: 'High-converting weekend combo discount layout.',
     badge: 'Popular',
     defaultHeadline: 'Weekend Special Family Biryani',
@@ -37,7 +38,8 @@ export const POPULAR_TEMPLATES: CreativeTemplate[] = [
     format: 'instagram_story',
     vertical: 'restaurant',
     category: 'product',
-    previewUrl: 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=600&auto=format&fit=crop&q=80',
+    previewUrl:
+      'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=600&auto=format&fit=crop&q=80',
     description: 'Vibrant product aesthetic featuring fresh dishes.',
     badge: 'Trending',
     defaultHeadline: 'Good Food Good Mood',
@@ -49,7 +51,8 @@ export const POPULAR_TEMPLATES: CreativeTemplate[] = [
     format: 'whatsapp_status',
     vertical: 'restaurant',
     category: 'product',
-    previewUrl: 'https://images.unsplash.com/photo-1512621776951-a57141f2eefd?w=600&auto=format&fit=crop&q=80',
+    previewUrl:
+      'https://images.unsplash.com/photo-1512621776951-a57141f2eefd?w=600&auto=format&fit=crop&q=80',
     description: 'Clean green theme highlighting organic ingredients.',
     defaultHeadline: 'Taste the Freshness Today',
   },
@@ -60,7 +63,8 @@ export const POPULAR_TEMPLATES: CreativeTemplate[] = [
     format: 'facebook_post',
     vertical: 'restaurant',
     category: 'announcement',
-    previewUrl: 'https://images.unsplash.com/photo-1555396273-367ea4eb4db5?w=600&auto=format&fit=crop&q=80',
+    previewUrl:
+      'https://images.unsplash.com/photo-1555396273-367ea4eb4db5?w=600&auto=format&fit=crop&q=80',
     description: 'Bold promotional poster for launches and expansions.',
     badge: 'New',
     defaultHeadline: 'Grand Opening Special Offers',
@@ -73,7 +77,8 @@ export const POPULAR_TEMPLATES: CreativeTemplate[] = [
     format: 'festival',
     vertical: 'restaurant',
     category: 'festival',
-    previewUrl: 'https://images.unsplash.com/photo-1610057099443-fde8c4d50f91?w=600&auto=format&fit=crop&q=80',
+    previewUrl:
+      'https://images.unsplash.com/photo-1610057099443-fde8c4d50f91?w=600&auto=format&fit=crop&q=80',
     description: 'Traditional festive poster with festive greetings.',
     badge: 'Festive',
     defaultHeadline: 'Happy Ugadi & Festive Delights',
@@ -85,7 +90,8 @@ export const POPULAR_TEMPLATES: CreativeTemplate[] = [
     format: 'menu',
     vertical: 'restaurant',
     category: 'menu',
-    previewUrl: 'https://images.unsplash.com/photo-1504674900247-0877df9cc836?w=600&auto=format&fit=crop&q=80',
+    previewUrl:
+      'https://images.unsplash.com/photo-1504674900247-0877df9cc836?w=600&auto=format&fit=crop&q=80',
     description: 'Editorial menu layout highlighting chef specials.',
     defaultHeadline: 'Our Bestseller Specials',
   },

@@ -26,7 +26,10 @@ export function useMagnetic({ strength = 6, disabled = false }: MagneticOptions 
       const moveX = (distanceX / (width / 2)) * strength;
       const moveY = (distanceY / (height / 2)) * strength;
 
-      setPosition({ x: Math.max(-strength, Math.min(strength, moveX)), y: Math.max(-strength, Math.min(strength, moveY)) });
+      setPosition({
+        x: Math.max(-strength, Math.min(strength, moveX)),
+        y: Math.max(-strength, Math.min(strength, moveY)),
+      });
     },
     [disabled, reduceMotion, strength]
   );

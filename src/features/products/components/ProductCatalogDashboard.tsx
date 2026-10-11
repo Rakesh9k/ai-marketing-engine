@@ -45,7 +45,7 @@ export function ProductCatalogDashboard({ userId }: ProductCatalogDashboardProps
   // Filter & Search states
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategoryFilter, setSelectedCategoryFilter] = useState('all');
-  const [selectedTagFilter, setSelectedTagFilter] = useState('all');
+  const [selectedTagFilter, _setSelectedTagFilter] = useState('all');
   const [sortBy, setSortBy] = useState<'popularity' | 'price_asc' | 'price_desc' | 'name'>(
     'popularity'
   );
@@ -74,7 +74,7 @@ export function ProductCatalogDashboard({ userId }: ProductCatalogDashboardProps
         setLoading(false);
       }
     }
-    loadBusinesses();
+    void loadBusinesses();
   }, [userId]);
 
   const handleSelectBusiness = async (bId: string) => {
@@ -129,7 +129,7 @@ export function ProductCatalogDashboard({ userId }: ProductCatalogDashboardProps
   }, [products]);
 
   const handleCreateCreative = (product: Product) => {
-    router.push(`/creative?productId=${product.productId}`);
+    router.push(`/campaigns/new?productId=${product.productId}`);
   };
 
   const handleCreateCampaign = (product: Product) => {
@@ -174,9 +174,6 @@ export function ProductCatalogDashboard({ userId }: ProductCatalogDashboardProps
               selectedBusinessId={selectedBusinessId}
               onSelect={handleSelectBusiness}
             />
-          </div>
-          <div className="flex items-center gap-1.5 rounded-full border border-amber-200 bg-amber-50 px-3.5 py-1.5 text-xs font-semibold text-amber-700">
-            <span>⚡ Credits: 320</span>
           </div>
         </div>
       </div>

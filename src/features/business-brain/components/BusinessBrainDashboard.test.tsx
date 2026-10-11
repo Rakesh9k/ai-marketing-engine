@@ -1,7 +1,7 @@
 import React from 'react';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import type { Business, BrandKit, Product } from '@/types';
+import type { Business } from '@/types';
 import { BusinessBrainDashboard } from './BusinessBrainDashboard';
 
 const getByUserIdMock = jest.fn();

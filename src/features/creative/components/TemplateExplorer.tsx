@@ -11,7 +11,7 @@ interface TemplateExplorerProps {
   userId: string;
 }
 
-export function TemplateExplorer({ userId }: TemplateExplorerProps) {
+export function TemplateExplorer({ userId: _userId }: TemplateExplorerProps) {
   const router = useRouter();
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
 

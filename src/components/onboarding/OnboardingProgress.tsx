@@ -28,28 +28,28 @@ export function OnboardingProgress({
   const progressPercent = Math.min(100, Math.round((currentStep / totalSteps) * 100));
 
   return (
-    <header className="sticky top-3 z-40 px-4 sm:px-6 max-w-6xl mx-auto w-full">
-      <nav className="bg-white/90 backdrop-blur-md border border-amber-100/80 rounded-full px-5 py-3 shadow-lg shadow-amber-950/5 flex items-center justify-between transition-all">
+    <header className="sticky top-3 z-40 mx-auto w-full max-w-6xl px-4 sm:px-6">
+      <nav className="flex items-center justify-between rounded-full border border-amber-100/80 bg-white/90 px-5 py-3 shadow-lg shadow-amber-950/5 backdrop-blur-md transition-all">
         {/* Mitra Brand Identifier */}
         <div className="flex items-center gap-2.5">
           <MitraShortLogo size="md" decorative />
           <div className="flex items-baseline gap-1.5">
-            <span className="font-extrabold text-lg tracking-tight text-[#1A1A1E]">Mitra</span>
-            <span className="hidden sm:inline text-[11px] px-2 py-0.5 rounded-full bg-orange-50 text-[#E84D1A] font-semibold border border-orange-200/60">
+            <span className="text-lg font-extrabold tracking-tight text-[#1A1A1E]">Mitra</span>
+            <span className="hidden rounded-full border border-orange-200/60 bg-orange-50 px-2 py-0.5 text-[11px] font-semibold text-[#E84D1A] sm:inline">
               by Brainwise
             </span>
           </div>
         </div>
 
         {/* Desktop Stepper Navigation */}
-        <div className="hidden lg:flex items-center gap-3">
-          <div className="flex items-center gap-2 relative">
+        <div className="hidden items-center gap-3 lg:flex">
+          <div className="relative flex items-center gap-2">
             {/* Background connecting bar */}
-            <div className="absolute left-3 right-3 top-1/2 -translate-y-1/2 h-0.5 bg-neutral-100 -z-10" />
+            <div className="absolute top-1/2 right-3 left-3 -z-10 h-0.5 -translate-y-1/2 bg-neutral-100" />
 
             {/* Active connecting fill bar */}
             <motion.div
-              className="absolute left-3 top-1/2 -translate-y-1/2 h-0.5 bg-[#E84D1A] -z-10"
+              className="absolute top-1/2 left-3 -z-10 h-0.5 -translate-y-1/2 bg-[#E84D1A]"
               initial={false}
               animate={{
                 width: `${((currentStep - 1) / (totalSteps - 1)) * 100}%`,
@@ -70,16 +70,16 @@ export function OnboardingProgress({
                   disabled={!isCompleted}
                   title={`Step ${stepNum}: ${label}`}
                   aria-label={`Step ${stepNum}: ${label}`}
-                  className={`group relative flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold transition-all ${
+                  className={`group relative flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold transition-all ${
                     isActive
-                      ? 'bg-[#E84D1A] text-white shadow-sm shadow-orange-500/25 scale-105'
+                      ? 'scale-105 bg-[#E84D1A] text-white shadow-sm shadow-orange-500/25'
                       : isCompleted
-                        ? 'bg-orange-50 text-[#E84D1A] hover:bg-orange-100/80 cursor-pointer'
-                        : 'bg-neutral-100 text-neutral-400 cursor-not-allowed'
+                        ? 'cursor-pointer bg-orange-50 text-[#E84D1A] hover:bg-orange-100/80'
+                        : 'cursor-not-allowed bg-neutral-100 text-neutral-400'
                   }`}
                 >
                   <span
-                    className={`w-4 h-4 rounded-full flex items-center justify-center text-[10px] font-bold ${
+                    className={`flex h-4 w-4 items-center justify-center rounded-full text-[10px] font-bold ${
                       isActive
                         ? 'bg-white text-[#E84D1A]'
                         : isCompleted
@@ -96,13 +96,13 @@ export function OnboardingProgress({
         </div>
 
         {/* Mobile / Tablet Compact Counter & Progress Bar */}
-        <div className="flex lg:hidden items-center gap-3">
+        <div className="flex items-center gap-3 lg:hidden">
           <span className="text-xs font-extrabold text-[#1A1A1E]">
             <span className="text-[#E84D1A]">{currentStep}</span> / {totalSteps}
           </span>
-          <div className="w-20 sm:w-28 h-2 bg-neutral-100 rounded-full overflow-hidden p-0.5 border border-neutral-200/50">
+          <div className="h-2 w-20 overflow-hidden rounded-full border border-neutral-200/50 bg-neutral-100 p-0.5 sm:w-28">
             <motion.div
-              className="h-full bg-gradient-to-r from-[#E84D1A] to-amber-500 rounded-full"
+              className="h-full rounded-full bg-gradient-to-r from-[#E84D1A] to-amber-500"
               initial={false}
               animate={{ width: `${progressPercent}%` }}
               transition={{ duration: 0.35, ease: 'easeOut' }}

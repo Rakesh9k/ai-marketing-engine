@@ -91,7 +91,9 @@ function makeProduct(): Product {
     category: 'Biryani & Rice',
     tags: ['Bestseller', 'Popular'],
     variants: [],
-    images: [{ url: 'https://images.unsplash.com/photo-biryani.jpg', storagePath: '', isPrimary: true }],
+    images: [
+      { url: 'https://images.unsplash.com/photo-biryani.jpg', storagePath: '', isPrimary: true },
+    ],
     attributes: { veg: false },
     status: 'active',
     sortOrder: 0,

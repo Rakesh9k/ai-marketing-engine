@@ -80,9 +80,13 @@ test.describe('MVP Golden Path — fresh customer journey (Phase 16)', () => {
 
     // ---- Step 2: Signup ---------------------------------------------------
     await page.goto('/signup');
+    // Firebase's emulator-mode warning bar is fixed over the bottom of the page and swallows clicks.
+    await page.addStyleTag({ content: '.firebase-emulator-warning { display: none !important; }' });
     await page.getByLabel('Email').fill(identity.email);
     await page.getByLabel('Password', { exact: true }).fill(identity.password);
     await page.getByLabel('Confirm Password').fill(identity.password);
+    // Sign-up requires accepting the Terms of Service and Privacy Policy.
+    await page.getByRole('checkbox', { name: /agree to the terms/i }).check();
     await page.getByRole('button', { name: /sign up|create account/i }).click();
 
     // A fresh account must land authenticated, not on an error state.

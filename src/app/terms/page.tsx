@@ -1,11 +1,13 @@
 import type { Metadata } from 'next';
+import { pageMetadata } from '@/lib/seo';
 import Link from 'next/link';
 import { MitraLogo } from '@/components/ui/MitraLogo';
 
-export const metadata: Metadata = {
+export const metadata: Metadata = pageMetadata({
   title: 'Terms of Service — Mitra',
   description: 'Terms of Service for Mitra, the AI marketing engine by Brainwise.',
-};
+  path: '/terms',
+});
 
 const EFFECTIVE_DATE = '2026-10-02';
 
@@ -141,8 +143,8 @@ export default function TermsPage() {
         </p>
         <p className="text-body text-text-secondary mt-2">
           Paddle, as Merchant of Record, issues the invoice or receipt for your payment, and handles
-          sales tax on it. Billing, transaction, accounting, tax, and related business records may be
-          retained for as long as required by applicable law and legitimate accounting/business
+          sales tax on it. Billing, transaction, accounting, tax, and related business records may
+          be retained for as long as required by applicable law and legitimate accounting/business
           purposes, subject to our{' '}
           <Link href="/privacy" className="text-brand-600 hover:underline">
             Privacy Policy

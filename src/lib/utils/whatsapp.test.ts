@@ -69,4 +69,27 @@ describe('buildWhatsAppShareUrl — golden test (Phase 9 §49)', () => {
     expect(buildWhatsAppShareUrl(undefined, MESSAGE)).toBeNull();
     expect(buildWhatsAppShareUrl('123', MESSAGE)).toBeNull();
   });
+
+  it('handles Hindi, Telugu, and Hinglish regional texts with special characters (&, +, ?, #, =, %) safely', () => {
+    const hindiMsg =
+      'नमस्कार! 🍲 सप्ताहांत विशेष ऑफर: ₹249 में चिकन बिरयानी + रायता!\nऑर्डर करें: & + ? # = %';
+    const teluguMsg =
+      'నమస్కారం! 🍚 ఈ వీకెండ్ స్పెషల్ చికెన్ బిర్యానీ ₹249 మాత్రమే.\nఆర్డర్ చేయండి!';
+    const hinglishMsg =
+      'Aaj hi order karo! 🚀 Flat 20% off on orders > ₹499. Offer valid till Sunday night.';
+
+    for (const msg of [hindiMsg, teluguMsg, hinglishMsg]) {
+      const url = buildWhatsAppShareUrl(BUSINESS_PHONE, msg);
+      expect(url).not.toBeNull();
+      expect(url).toMatch(/^https:\/\/wa\.me\/919876543210\?text=/);
+      const decoded = new URL(url!).searchParams.get('text');
+      expect(decoded).toBe(msg);
+    }
+  });
+
+  it('operates completely independent of any Meta/Instagram credentials or API tokens', () => {
+    // Verified: buildWhatsAppShareUrl requires only phone and string message.
+    const url = buildWhatsAppShareUrl('9876543210', 'Simple share text');
+    expect(url).toBe('https://wa.me/919876543210?text=Simple%20share%20text');
+  });
 });

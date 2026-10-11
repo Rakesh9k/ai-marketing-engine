@@ -1,4 +1,4 @@
-import type { TargetAndTransition, Transition } from 'motion/react';
+import type { Transition } from 'motion/react';
 
 export const DURATION = {
   instant: 0.1,

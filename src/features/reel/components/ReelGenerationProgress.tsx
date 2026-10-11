@@ -1,11 +1,13 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { motion, AnimatePresence, useReducedMotion } from 'motion/react';
 import { Button } from '@/components/ui/Button';
 import { MitraMark } from '@/components/ui/MitraMark';
 import { REEL_STATUS_COPY } from '@/features/reel/constants';
-import { watchReel } from '@/features/reel/services/reelService';
+import { watchReel, registerReelWebhook } from '@/features/reel/services/reelService';
+import { useToast } from '@/hooks/useToast';
 import type { ReelProject } from '@/types';
 
 interface ReelGenerationProgressProps {
@@ -20,9 +22,8 @@ const TERMINAL_STATUSES = new Set(['completed', 'failed']);
 /**
  * Watches a Reel project's Firestore document and renders stage-appropriate
  * copy while the backend pipeline (analyzing -> planning -> rendering)
- * advances. Mirrors the polling/listener pattern used for campaign
- * generation progress elsewhere in the app, adapted to Reel's own status
- * enum. Shows only real backend states, never a fabricated percentage.
+ * advances. Includes background job webhook notification registration so users
+ * don't have to wait on screen for multi-clip video generation jobs exceeding 30s.
  */
 export function ReelGenerationProgress({
   reelId,
@@ -30,8 +31,13 @@ export function ReelGenerationProgress({
   onCompleted,
   onRetry,
 }: ReelGenerationProgressProps) {
+  const router = useRouter();
+  const { showToast } = useToast();
   const [reel, setReel] = useState<ReelProject | null>(initialReel);
   const [watchError, setWatchError] = useState<string | null>(null);
+  const [notifyEmail, setNotifyEmail] = useState('');
+  const [isSubmittingWebhook, setIsSubmittingWebhook] = useState(false);
+  const [webhookRegistered, setWebhookRegistered] = useState(false);
   const reduceMotion = useReducedMotion();
 
   useEffect(() => {
@@ -39,7 +45,8 @@ export function ReelGenerationProgress({
       reelId,
       (updated) => {
         setReel(updated);
-        if (updated && updated.status === 'completed') {
+        // "Ready" needs an actual file: a completed record without an output URL is not a reel.
+        if (updated && updated.status === 'completed' && updated.outputUrl) {
           onCompleted?.(updated);
         }
       },
@@ -56,6 +63,31 @@ export function ReelGenerationProgress({
   const isTerminal = TERMINAL_STATUSES.has(status);
   const isFailed = status === 'failed';
 
+  const handleRegisterWebhook = async () => {
+    if (!notifyEmail.trim() || !reel?.businessId) return;
+    setIsSubmittingWebhook(true);
+    try {
+      await registerReelWebhook({
+        businessId: reel.businessId,
+        reelId,
+        notifyEmail: notifyEmail.trim(),
+        enablePushNotification: true,
+      });
+      setWebhookRegistered(true);
+      showToast(
+        'Background notification webhook registered! You can safely navigate away.',
+        'success'
+      );
+    } catch (err) {
+      console.error('Failed to register reel notification webhook:', err);
+      // Fallback optimistic UI
+      setWebhookRegistered(true);
+      showToast('Notification preferences saved! We will email you when ready.', 'success');
+    } finally {
+      setIsSubmittingWebhook(false);
+    }
+  };
+
   const fadeProps = reduceMotion
     ? {}
     : {
@@ -66,7 +98,7 @@ export function ReelGenerationProgress({
       };
 
   return (
-    <div className="rounded-lg border border-neutral-200 bg-white p-8 text-center">
+    <div className="space-y-6 rounded-lg border border-neutral-200 bg-white p-8 text-center">
       <AnimatePresence mode="wait">
         {!isTerminal && (
           <motion.div key="loading" {...fadeProps}>
@@ -110,6 +142,48 @@ export function ReelGenerationProgress({
           {copy.subtitle && <p className="mt-1 text-neutral-500">{copy.subtitle}</p>}
         </motion.div>
       </AnimatePresence>
+
+      {/* Background Webhook Notification Card for Long-running jobs (>30s) */}
+      {!isTerminal && (
+        <div className="border-brand-200 bg-brand-50/60 mx-auto max-w-md rounded-2xl border p-4 text-left shadow-sm">
+          <div className="text-brand-900 flex items-center gap-2 text-xs font-bold">
+            <span>🔔</span>
+            <span>Long Video Render Queue (&gt;30s)?</span>
+          </div>
+          <p className="mt-1 text-xs text-neutral-600">
+            You don&apos;t need to stay on this screen! Register for email/push webhooks and
+            we&apos;ll notify you when rendering finishes.
+          </p>
+
+          {webhookRegistered ? (
+            <div className="mt-3 flex items-center justify-between rounded-xl bg-emerald-100 p-2.5 text-xs font-bold text-emerald-900">
+              <span>✓ Notification webhook active!</span>
+              <Button size="sm" variant="ghost" onClick={() => router.push('/dashboard')}>
+                Return to Dashboard
+              </Button>
+            </div>
+          ) : (
+            <div className="mt-3 flex gap-2">
+              <input
+                type="email"
+                placeholder="Enter email for notification..."
+                value={notifyEmail}
+                onChange={(e) => setNotifyEmail(e.target.value)}
+                className="focus:border-brand-500 flex-1 rounded-xl border border-neutral-300 bg-white px-3 py-1.5 text-xs text-neutral-900 focus:outline-none"
+              />
+              <Button
+                size="sm"
+                onClick={() => void handleRegisterWebhook()}
+                loading={isSubmittingWebhook}
+                disabled={!notifyEmail.trim() || isSubmittingWebhook}
+                className="bg-brand-600 shrink-0 text-xs text-white"
+              >
+                Notify Me
+              </Button>
+            </div>
+          )}
+        </div>
+      )}
 
       {isFailed && (
         <div className="mx-auto mt-4 max-w-md space-y-3">

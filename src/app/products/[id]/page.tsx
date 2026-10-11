@@ -14,7 +14,7 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
   const resolvedParams = use(params);
   const productId = resolvedParams.id;
   const router = useRouter();
-  const { user, status } = useAuth();
+  const { status } = useAuth();
 
   const [product, setProduct] = useState<Product | null>(null);
   const [loading, setLoading] = useState(true);
@@ -37,7 +37,7 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
       }
     }
     if (productId) {
-      loadProduct();
+      void loadProduct();
     }
   }, [productId]);
 
@@ -75,7 +75,7 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
       <ProductInspectorPanel
         product={product}
         onEdit={() => router.push(`/products/${product.productId}/edit`)}
-        onCreateCreative={() => router.push(`/creative?productId=${product.productId}`)}
+        onCreateCreative={() => router.push(`/campaigns/new?productId=${product.productId}`)}
         onCreateCampaign={() => router.push(`/campaigns/new?productId=${product.productId}`)}
       />
     </div>

@@ -1,116 +1,183 @@
 'use client';
 
-import { useState } from 'react';
 import Link from 'next/link';
-import Image from 'next/image';
 import { Button } from '@/components/ui/Button';
+import { useDraftAutoSave } from '@/hooks/useDraftAutoSave';
+import { SideBySideHookABGenerator } from './SideBySideHookABGenerator';
 
 interface PosterGeneratorStudioProps {
   userId: string;
 }
 
-export function PosterGeneratorStudio({ userId }: PosterGeneratorStudioProps) {
-  const [headline, setHeadline] = useState('Weekend Biryani Feast');
-  const [discountTag, setDiscountTag] = useState('20% OFF');
-  const [price, setPrice] = useState('299');
-  const [originalPrice, setOriginalPrice] = useState('349');
-  const [terms, setTerms] = useState('Valid on dine-in & takeaway');
-  const [ctaText, setCtaText] = useState('Order on WhatsApp 💬');
+interface PosterDraftState {
+  headline: string;
+  discountTag: string;
+  price: string;
+  originalPrice: string;
+  terms: string;
+  ctaText: string;
+}
+
+const INITIAL_POSTER_DRAFT: PosterDraftState = {
+  headline: 'Weekend Biryani Feast',
+  discountTag: '20% OFF',
+  price: '299',
+  originalPrice: '349',
+  terms: 'Valid on dine-in & takeaway',
+  ctaText: 'Order on WhatsApp 💬',
+};
+
+export function PosterGeneratorStudio({ userId: _userId }: PosterGeneratorStudioProps) {
+  const { draft, updateField, isRestored, clearDraft, dismissRestoredNotice, lastSavedAt } =
+    useDraftAutoSave<PosterDraftState>({
+      draftKey: 'poster-generator-studio',
+      initialState: INITIAL_POSTER_DRAFT,
+    });
 
   return (
-    <div className="mx-auto max-w-[1600px] space-y-6 p-4 sm:p-6 text-slate-900 dark:text-slate-100">
-      <div className="flex items-center gap-3 border-b border-slate-200 dark:border-slate-800 pb-4">
-        <Link href="/creative" className="text-xs font-bold text-amber-600 dark:text-amber-400 hover:underline">
-          ← Creative Studio
-        </Link>
-        <span className="text-slate-300 dark:text-slate-700">/</span>
-        <h1 className="text-xl font-bold tracking-tight text-slate-900 dark:text-white">
-          Poster Generator Studio
-        </h1>
+    <div className="mx-auto max-w-[1600px] space-y-6 p-4 text-slate-900 sm:p-6 dark:text-slate-100">
+      {/* Restored Draft Auto-Save Notification */}
+      {isRestored && (
+        <div className="flex items-center justify-between rounded-2xl border border-amber-300 bg-amber-50 p-4 text-xs text-amber-900 shadow-sm dark:border-amber-800 dark:bg-amber-950/70 dark:text-amber-200">
+          <div className="flex items-center gap-2">
+            <span>💾</span>
+            <span>
+              <strong>Restored unsaved poster draft!</strong>
+              {lastSavedAt && (
+                <span className="ml-1 text-[11px] opacity-75">
+                  (Auto-saved at {lastSavedAt.toLocaleTimeString()})
+                </span>
+              )}
+            </span>
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={dismissRestoredNotice}
+              className="rounded-lg px-2.5 py-1 font-semibold hover:bg-amber-100 dark:hover:bg-amber-900"
+            >
+              Keep Draft
+            </button>
+            <button
+              onClick={clearDraft}
+              className="rounded-lg bg-amber-200 px-2.5 py-1 font-bold text-amber-950 hover:bg-amber-300 dark:bg-amber-800 dark:text-amber-100"
+            >
+              Discard & Reset
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Header Bar */}
+      <div className="flex items-center justify-between border-b border-slate-200 pb-4 dark:border-slate-800">
+        <div className="flex items-center gap-3">
+          <Link
+            href="/creative"
+            className="text-xs font-bold text-amber-600 hover:underline dark:text-amber-400"
+          >
+            ← Creative Studio
+          </Link>
+          <span className="text-slate-300 dark:text-slate-700">/</span>
+          <h1 className="text-xl font-bold tracking-tight text-slate-900 dark:text-white">
+            Poster Generator Studio
+          </h1>
+        </div>
+
+        {lastSavedAt && (
+          <span className="text-[11px] font-medium text-emerald-600 dark:text-emerald-400">
+            ✓ Auto-saved
+          </span>
+        )}
       </div>
+
+      {/* Side-by-Side Hook A/B Generator */}
+      <SideBySideHookABGenerator
+        topicPrompt={draft.headline}
+        currentHeadline={draft.headline}
+        onSelectHook={(newHeadline) => updateField('headline', newHeadline)}
+      />
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-12">
         {/* Left Form Inputs */}
-        <div className="lg:col-span-5 space-y-4">
-          <div className="rounded-3xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-5 shadow-sm space-y-3">
-            <h3 className="font-bold text-sm text-slate-900 dark:text-white border-b border-slate-100 dark:border-slate-800 pb-2">
+        <div className="space-y-4 lg:col-span-5">
+          <div className="space-y-3 rounded-3xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+            <h3 className="border-b border-slate-100 pb-2 text-sm font-bold text-slate-900 dark:border-slate-800 dark:text-white">
               Poster Details & Copy
             </h3>
 
             <div>
-              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+              <label className="mb-1 block text-xs font-semibold text-slate-700 dark:text-slate-300">
                 Headline
               </label>
               <input
-                value={headline}
-                onChange={(e) => setHeadline(e.target.value)}
-                className="w-full rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 p-2.5 text-xs text-slate-900 dark:text-slate-100"
+                value={draft.headline}
+                onChange={(e) => updateField('headline', e.target.value)}
+                className="w-full rounded-xl border border-slate-200 bg-slate-50 p-2.5 text-xs text-slate-900 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-100"
               />
             </div>
 
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                <label className="mb-1 block text-xs font-semibold text-slate-700 dark:text-slate-300">
                   Discount Tag
                 </label>
                 <input
-                  value={discountTag}
-                  onChange={(e) => setDiscountTag(e.target.value)}
-                  className="w-full rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 p-2.5 text-xs text-slate-900 dark:text-slate-100"
+                  value={draft.discountTag}
+                  onChange={(e) => updateField('discountTag', e.target.value)}
+                  className="w-full rounded-xl border border-slate-200 bg-slate-50 p-2.5 text-xs text-slate-900 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-100"
                 />
               </div>
               <div>
-                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                <label className="mb-1 block text-xs font-semibold text-slate-700 dark:text-slate-300">
                   Offer Price (₹)
                 </label>
                 <input
-                  value={price}
-                  onChange={(e) => setPrice(e.target.value)}
-                  className="w-full rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 p-2.5 text-xs text-slate-900 dark:text-slate-100"
+                  value={draft.price}
+                  onChange={(e) => updateField('price', e.target.value)}
+                  className="w-full rounded-xl border border-slate-200 bg-slate-50 p-2.5 text-xs text-slate-900 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-100"
                 />
               </div>
             </div>
 
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                <label className="mb-1 block text-xs font-semibold text-slate-700 dark:text-slate-300">
                   Original Price (₹)
                 </label>
                 <input
-                  value={originalPrice}
-                  onChange={(e) => setOriginalPrice(e.target.value)}
-                  className="w-full rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 p-2.5 text-xs text-slate-900 dark:text-slate-100"
+                  value={draft.originalPrice}
+                  onChange={(e) => updateField('originalPrice', e.target.value)}
+                  className="w-full rounded-xl border border-slate-200 bg-slate-50 p-2.5 text-xs text-slate-900 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-100"
                 />
               </div>
               <div>
-                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                <label className="mb-1 block text-xs font-semibold text-slate-700 dark:text-slate-300">
                   CTA Badge
                 </label>
                 <input
-                  value={ctaText}
-                  onChange={(e) => setCtaText(e.target.value)}
-                  className="w-full rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 p-2.5 text-xs text-slate-900 dark:text-slate-100"
+                  value={draft.ctaText}
+                  onChange={(e) => updateField('ctaText', e.target.value)}
+                  className="w-full rounded-xl border border-slate-200 bg-slate-50 p-2.5 text-xs text-slate-900 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-100"
                 />
               </div>
             </div>
 
             <div>
-              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+              <label className="mb-1 block text-xs font-semibold text-slate-700 dark:text-slate-300">
                 Terms / Notes
               </label>
               <input
-                value={terms}
-                onChange={(e) => setTerms(e.target.value)}
-                className="w-full rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 p-2.5 text-xs text-slate-900 dark:text-slate-100"
+                value={draft.terms}
+                onChange={(e) => updateField('terms', e.target.value)}
+                className="w-full rounded-xl border border-slate-200 bg-slate-50 p-2.5 text-xs text-slate-900 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-100"
               />
             </div>
           </div>
         </div>
 
         {/* Center Visual Live Poster Canvas */}
-        <div className="lg:col-span-7 space-y-4">
-          <div className="rounded-3xl border border-slate-800 bg-slate-950 p-6 shadow-xl flex flex-col items-center justify-center">
-            <div className="relative w-full max-w-md aspect-square rounded-2xl overflow-hidden bg-gradient-to-br from-amber-600/40 via-slate-900 to-black border border-slate-800 p-6 flex flex-col justify-between shadow-2xl">
+        <div className="space-y-4 lg:col-span-7">
+          <div className="flex flex-col items-center justify-center rounded-3xl border border-slate-800 bg-slate-950 p-6 shadow-xl">
+            <div className="relative flex aspect-square w-full max-w-md flex-col justify-between overflow-hidden rounded-2xl border border-slate-800 bg-gradient-to-br from-amber-600/40 via-slate-900 to-black p-6 shadow-2xl">
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
                 src="https://images.unsplash.com/photo-1563379091339-03b21ab4a4f8?w=800&auto=format&fit=crop&q=80"
@@ -119,29 +186,31 @@ export function PosterGeneratorStudio({ userId }: PosterGeneratorStudioProps) {
               />
 
               <div className="relative z-10 self-start">
-                <span className="rounded-full bg-amber-500 px-3 py-1 text-xs font-black text-slate-950 uppercase tracking-wider">
-                  {discountTag}
+                <span className="rounded-full bg-amber-500 px-3 py-1 text-xs font-black tracking-wider text-slate-950 uppercase">
+                  {draft.discountTag}
                 </span>
               </div>
 
-              <div className="relative z-10 bg-slate-950/80 backdrop-blur-md p-4 rounded-xl border border-slate-800 space-y-2 text-white">
-                <h3 className="font-extrabold text-lg leading-tight">{headline}</h3>
+              <div className="relative z-10 space-y-2 rounded-xl border border-slate-800 bg-slate-950/80 p-4 text-white backdrop-blur-md">
+                <h3 className="text-lg leading-tight font-extrabold">{draft.headline}</h3>
                 <div className="flex items-center gap-2">
-                  <span className="text-amber-400 font-extrabold text-xl">₹{price}</span>
-                  {originalPrice && (
-                    <span className="text-slate-400 line-through text-xs">₹{originalPrice}</span>
+                  <span className="text-xl font-extrabold text-amber-400">₹{draft.price}</span>
+                  {draft.originalPrice && (
+                    <span className="text-xs text-slate-400 line-through">
+                      ₹{draft.originalPrice}
+                    </span>
                   )}
                 </div>
-                <p className="text-[10px] text-slate-400">{terms}</p>
-                <div className="pt-2 border-t border-slate-800 flex items-center justify-between text-xs text-amber-300 font-bold">
-                  <span>{ctaText}</span>
-                  <span className="text-slate-400 text-[10px]">Hyderabad Biryani House</span>
+                <p className="text-[10px] text-slate-400">{draft.terms}</p>
+                <div className="flex items-center justify-between border-t border-slate-800 pt-2 text-xs font-bold text-amber-300">
+                  <span>{draft.ctaText}</span>
+                  <span className="text-[10px] text-slate-400">Hyderabad Biryani House</span>
                 </div>
               </div>
             </div>
 
             <div className="mt-4 flex gap-3">
-              <Button className="bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold text-xs px-6 py-2.5 rounded-xl">
+              <Button className="rounded-xl bg-amber-500 px-6 py-2.5 text-xs font-bold text-slate-950 hover:bg-amber-600">
                 ✓ Approve Poster
               </Button>
             </div>

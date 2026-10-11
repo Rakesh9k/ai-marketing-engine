@@ -7,7 +7,7 @@ export default function PublishingDashboardPage() {
   const router = useRouter();
 
   useEffect(() => {
-    router.replace('/creative');
+    router.replace('/dashboard');
   }, [router]);
 
   return null;

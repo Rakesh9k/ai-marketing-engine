@@ -19,6 +19,8 @@ import {
   type FirestoreDataConverter,
 } from 'firebase/firestore';
 import { getFirebaseDb } from '@/lib/firebase/client';
+
+import { stripUndefined } from '@/lib/stripUndefined';
 import type {
   User,
   Business,
@@ -191,12 +193,12 @@ export const productService = {
 
   async create(product: Product): Promise<void> {
     const ref = getDocRef<Product>('products', product.productId, productConverter);
-    await setDoc(ref, product);
+    await setDoc(ref, stripUndefined(product));
   },
 
   async update(productId: string, data: Partial<Product>): Promise<void> {
     const ref = getDocRef<Product>('products', productId, productConverter);
-    await updateDoc(ref, { ...data, updatedAt: serverTimestamp() });
+    await updateDoc(ref, { ...stripUndefined(data), updatedAt: serverTimestamp() });
   },
 
   async archive(productId: string): Promise<void> {

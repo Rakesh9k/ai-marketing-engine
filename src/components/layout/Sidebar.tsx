@@ -10,8 +10,7 @@ import { usageService, subscriptionService } from '@/services/database';
 import { MitraShortLogo } from '@/components/ui/MitraShortLogo';
 import { ThemeToggle } from '@/components/ui/ThemeToggle';
 import { CommandPalette } from '@/components/motion/CommandPalette';
-
-import { MitraAssistantDrawer } from '@/components/ui/MitraAssistantDrawer';
+import { computeCreditsRemaining } from '@/lib/credits';
 
 interface SidebarProps {
   children: ReactNode;
@@ -22,35 +21,26 @@ interface SidebarProps {
  * 1. Home (/dashboard)
  * 2. Create (/campaigns/new)
  * 3. Campaigns (/campaigns)
- * 4. Creative Studio (/creative)
- * 5. Calendar (/calendar)
- * 6. Business Brain (/business)
- * 7. Analytics (/analytics)
- * Plus More dropdown (Products, Content, WhatsApp, Billing, Settings, Assistant, Help)
+ * 4. Business Brain (/business)
+ * Plus More dropdown (Products, Billing, Settings, Help). Deferred features are
+ * intentionally absent — see src/lib/config/launchScope.ts.
  */
 const PRIMARY_NAV = [
   { name: 'Home', href: '/dashboard', icon: HomeIcon },
   { name: 'Create', href: '/campaigns/new', icon: CreateIcon },
   { name: 'Campaigns', href: '/campaigns', icon: CampaignsIcon },
-  { name: 'Creative Studio', href: '/creative', icon: StudioIcon },
   { name: 'Business Brain', href: '/business', icon: BusinessBrainIcon },
-  { name: 'Analytics', href: '/analytics', icon: AnalyticsIcon },
 ] as const;
 
 const MORE_NAV = [
   { name: 'Products Catalog', href: '/products', icon: '🛍️' },
-  { name: 'Instant Content', href: '/content', icon: '✍️' },
-  { name: 'WhatsApp Hub', href: '/whatsapp', icon: '💬' },
   { name: 'Billing & Plans', href: '/billing', icon: '💳' },
   { name: 'Settings & Accounts', href: '/settings', icon: '⚙️' },
-  { name: 'Mitra Assistant', href: '/assistant', icon: '🤖' },
   { name: 'Help & Guides', href: '/help', icon: '❓' },
 ] as const;
 
 const ACCOUNT_NAV = [
-  { name: 'Instant Content', href: '/content' },
   { name: 'Business Brain', href: '/business' },
-  { name: 'Analytics', href: '/analytics' },
   { name: 'Usage & credits', href: '/usage' },
   { name: 'Billing', href: '/billing' },
 ] as const;
@@ -94,53 +84,11 @@ function CampaignsIcon({ className }: { className?: string }) {
   );
 }
 
-function StudioIcon({ className }: { className?: string }) {
-  return (
-    <svg className={className} viewBox="0 0 24 24" fill="none" aria-hidden="true">
-      <path
-        d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"
-        stroke="currentColor"
-        strokeWidth="1.75"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-    </svg>
-  );
-}
-
-function CalendarIcon({ className }: { className?: string }) {
-  return (
-    <svg className={className} viewBox="0 0 24 24" fill="none" aria-hidden="true">
-      <rect x="3" y="4" width="18" height="18" rx="2" stroke="currentColor" strokeWidth="1.75" />
-      <path
-        d="M16 2v4M8 2v4M3 10h18"
-        stroke="currentColor"
-        strokeWidth="1.75"
-        strokeLinecap="round"
-      />
-    </svg>
-  );
-}
-
 function BusinessBrainIcon({ className }: { className?: string }) {
   return (
     <svg className={className} viewBox="0 0 24 24" fill="none" aria-hidden="true">
       <circle cx="12" cy="12" r="7.5" stroke="currentColor" strokeWidth="1.75" />
       <path d="M12 8v4l3 2" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" />
-    </svg>
-  );
-}
-
-function AnalyticsIcon({ className }: { className?: string }) {
-  return (
-    <svg className={className} viewBox="0 0 24 24" fill="none" aria-hidden="true">
-      <path
-        d="M18 20V10M12 20V4M6 20v-6"
-        stroke="currentColor"
-        strokeWidth="1.75"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
     </svg>
   );
 }
@@ -169,9 +117,7 @@ function useCredits(userId: string | undefined) {
           subscriptionService.getByUserId(userId),
         ]);
         if (cancelled) return;
-        const included = subscription?.creditsIncluded ?? 100;
-        const used = usage?.creditsUsed ?? 0;
-        setCreditsRemaining(Math.max(0, included - used));
+        setCreditsRemaining(computeCreditsRemaining(subscription, usage));
       } catch {
         // Quiet failure — the credits pill just doesn't render.
       }
@@ -410,9 +356,6 @@ export function Sidebar({ children }: SidebarProps) {
           </AnimatePresence>
         </div>
       </nav>
-
-      {/* Floating AI Assistant Drawer */}
-      <MitraAssistantDrawer />
     </div>
   );
 }

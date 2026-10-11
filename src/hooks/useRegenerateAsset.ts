@@ -6,6 +6,7 @@ import { httpsCallable } from 'firebase/functions';
 import { getFirebaseFunctions } from '@/lib/firebase/client';
 import type { CampaignAsset, AssetType } from '@/types';
 import { useToast } from '@/hooks/useToast';
+import { describeError } from '@/lib/errors/classifyError';
 
 interface RegenerateAssetOptions {
   campaignId: string;
@@ -79,7 +80,10 @@ export function useRegenerateAsset() {
         if (err.code === 'failed-precondition' || err.code === 'resource-exhausted') {
           showToast('Insufficient credits to regenerate this asset', 'error');
         } else {
-          showToast(errorMessage, 'error');
+          const copy = describeError(err, 'regenerate this asset');
+          // Only a recognised failure gets the explanatory copy; anything else keeps the
+          // server-provided message so no detail is lost.
+          showToast(copy.kind === 'unknown' ? errorMessage : copy.message, 'error');
         }
         return null;
       } finally {

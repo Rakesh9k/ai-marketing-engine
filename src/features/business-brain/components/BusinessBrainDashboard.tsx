@@ -64,7 +64,7 @@ export function BusinessBrainDashboard({
   const [business, setBusiness] = useState<Business | null>(null);
   const [brandKit, setBrandKit] = useState<BrandKit | null>(null);
   const [products, setProducts] = useState<Product[]>([]);
-  const [brainContext, setBrainContext] = useState<BusinessBrainContext | null>(null);
+  const [_brainContext, setBrainContext] = useState<BusinessBrainContext | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -99,7 +99,7 @@ export function BusinessBrainDashboard({
         setLoading(false);
       }
     }
-    loadData();
+    void loadData();
   }, [userId]);
 
   // Handle business change
@@ -179,9 +179,6 @@ export function BusinessBrainDashboard({
               onSelect={handleSelectBusiness}
             />
           </div>
-          <div className="flex items-center gap-1.5 rounded-full border border-amber-200 bg-amber-50 px-3.5 py-1.5 text-xs font-semibold text-amber-700">
-            <span>⚡ Credits: 320</span>
-          </div>
         </div>
       </div>
 
@@ -207,14 +204,6 @@ export function BusinessBrainDashboard({
               <div className="flex items-center gap-2 rounded-xl border border-white/10 bg-white/10 px-4 py-2 text-xs font-semibold backdrop-blur-sm">
                 <span className="text-emerald-400">●</span>
                 <span>Complete Profile {completionScore}%</span>
-              </div>
-              <div className="flex items-center gap-2 rounded-xl border border-white/10 bg-white/10 px-4 py-2 text-xs font-semibold backdrop-blur-sm">
-                <span className="text-brand-400">📈</span>
-                <span>Better Campaigns +60%</span>
-              </div>
-              <div className="flex items-center gap-2 rounded-xl border border-white/10 bg-white/10 px-4 py-2 text-xs font-semibold backdrop-blur-sm">
-                <span className="text-amber-400">🎯</span>
-                <span>More Customers +45%</span>
               </div>
             </div>
           </div>
@@ -406,7 +395,9 @@ export function BusinessBrainDashboard({
                     <p className="mt-3 text-xs text-neutral-700">
                       Delivery Radius:{' '}
                       <span className="font-semibold text-neutral-900">
-                        {business.businessBrain?.businessRules?.deliveryRadiusKm || 10} km
+                        {business.businessBrain?.businessRules?.deliveryRadiusKm
+                          ? `${business.businessBrain.businessRules.deliveryRadiusKm} km`
+                          : 'Not set'}
                       </span>
                     </p>
                   </div>
@@ -526,7 +517,7 @@ export function BusinessBrainDashboard({
                       Language mix, regional slang & festive tone
                     </p>
                     <p className="mt-3 text-xs text-neutral-700 capitalize">
-                      Dialect: {business.businessBrain?.localization?.regionalStyle || 'Hyderabadi'}
+                      Dialect: {business.businessBrain?.localization?.regionalStyle || 'Neutral'}
                     </p>
                   </div>
                   <Button
@@ -735,13 +726,13 @@ export function BusinessBrainDashboard({
             <div className="mx-auto flex justify-center">
               <MitraMascot pose="curious" size="lg" />
             </div>
-            <h4 className="text-sm font-bold text-neutral-900">Need to update something?</h4>
+            <h4 className="text-sm font-bold text-neutral-900">Ready to launch your campaign?</h4>
             <p className="text-xs text-neutral-500">
-              You can update your business rules anytime or ask Mitra for assistance.
+              Use your updated Business Brain context to generate localized marketing content.
             </p>
-            <Link href="/assistant" className="inline-block w-full">
-              <Button size="sm" variant="outline" className="w-full">
-                Ask Mitra Assistant
+            <Link href="/campaigns/new" className="inline-block w-full">
+              <Button size="sm" variant="primary" className="w-full">
+                Create Campaign
               </Button>
             </Link>
           </div>

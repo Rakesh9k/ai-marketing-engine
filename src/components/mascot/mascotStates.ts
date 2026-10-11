@@ -53,7 +53,8 @@ export interface MascotStateMeta {
   width: number;
   height: number;
   alt: string;
-  defaultVariant: 'floating' | 'breathing' | 'popIn' | 'celebrate' | 'thinking' | 'success' | 'error' | 'static';
+  defaultVariant:
+    'floating' | 'breathing' | 'popIn' | 'celebrate' | 'thinking' | 'success' | 'error' | 'static';
   meaning: string;
 }
 

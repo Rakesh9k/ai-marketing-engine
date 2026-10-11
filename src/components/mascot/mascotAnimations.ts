@@ -57,11 +57,11 @@ export const MASCOT_ANIMATION_VARIANTS: Record<MascotAnimationVariant, MascotAni
     initial: { opacity: 0, scale: 0.9, y: 10 },
     animate: {
       opacity: 1,
-      scale: [1, 1.05, 1],
-      y: [0, -8, 0],
-      rotate: [0, -2, 2, 0],
+      // One composed lift-and-settle. No wobble: celebration should read as pleased, not hyper.
+      scale: [1, 1.04, 1],
+      y: [0, -5, 0],
       transition: {
-        duration: 0.8,
+        duration: 0.7,
         ease: 'easeOut',
       },
     },
@@ -96,9 +96,9 @@ export const MASCOT_ANIMATION_VARIANTS: Record<MascotAnimationVariant, MascotAni
     animate: {
       opacity: 1,
       scale: 1,
-      x: [0, -4, 4, -3, 3, 0],
+      x: [0, -3, 3, -2, 2, 0],
       transition: {
-        duration: 0.5,
+        duration: 0.45,
         ease: 'easeInOut',
       },
     },
@@ -106,10 +106,10 @@ export const MASCOT_ANIMATION_VARIANTS: Record<MascotAnimationVariant, MascotAni
   attention: {
     initial: { scale: 1 },
     animate: {
-      scale: [1, 1.04, 1],
-      rotate: [0, -3, 3, -2, 2, 0],
+      // A single soft pulse to draw the eye once; no shaking.
+      scale: [1, 1.03, 1],
       transition: {
-        duration: 0.7,
+        duration: 0.6,
         ease: 'easeInOut',
       },
     },

@@ -69,12 +69,12 @@ export function MascotScene({
       </div>
 
       {/* Narrative Speech / Copy Container */}
-      <div className={align === 'center' ? 'max-w-xl' : 'pt-2 max-w-lg'}>
+      <div className={align === 'center' ? 'max-w-xl' : 'max-w-lg pt-2'}>
         <p className="text-text-primary text-xl font-bold tracking-tight text-neutral-900 dark:text-white">
           {message}
         </p>
         {supporting && (
-          <p className="text-text-secondary mt-1.5 text-sm font-medium text-neutral-600 dark:text-neutral-400 leading-relaxed">
+          <p className="text-text-secondary mt-1.5 text-sm leading-relaxed font-medium text-neutral-600 dark:text-neutral-400">
             {supporting}
           </p>
         )}

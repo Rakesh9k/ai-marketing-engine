@@ -1,12 +1,14 @@
 import { headers } from 'next/headers';
 import type { Metadata } from 'next';
+import { pageMetadata } from '@/lib/seo';
 import { countryFromHeaders } from '@/lib/paddle/config';
 import PricingPageClient from './PricingPageClient';
 
-export const metadata: Metadata = {
+export const metadata: Metadata = pageMetadata({
   title: 'Pricing | Mitra',
   description: 'Simple, clear pricing for Mitra, your AI marketing partner.',
-};
+  path: '/pricing',
+});
 
 /**
  * Server component: reads the visitor's country from the CDN geo header and hands it to the

@@ -61,7 +61,7 @@ describe('customer-facing billing copy', () => {
     expect(CREDIT_COSTS.REGENERATION).toBe(num('regenerationCredits'));
     expect(CREDIT_COSTS.IMAGE_GENERATION).toBe(20);
     expect(CREDIT_COSTS.REEL_GENERATION).toBe(80);
-    expect(CAMPAIGN_GENERATION_COST).toBe(140);
+    expect(CAMPAIGN_GENERATION_COST).toBe(100);
   });
 });
 
@@ -72,7 +72,9 @@ describe('Help page', () => {
     await userEvent.click(screen.getByText(/how are credits consumed for different generations/i));
     expect(await screen.findByText(/poster image costs 20 credits/i)).toBeInTheDocument();
     expect(screen.getByText(/reel costs 80 credits/i)).toBeInTheDocument();
-    expect(screen.getByText(/campaign costs 140 credits/i)).toBeInTheDocument();
+    expect(
+      screen.getByText(new RegExp(`campaign costs ${CAMPAIGN_GENERATION_COST} credits`, 'i'))
+    ).toBeInTheDocument();
 
     await userEvent.click(screen.getByText(/what happens when i run out of credits/i));
     expect(await screen.findByText(/do not roll over into the next month/i)).toBeInTheDocument();

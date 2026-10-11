@@ -13,25 +13,11 @@ const ACTIONS = [
     color: 'bg-orange-50 text-orange-600 border-orange-200/60',
   },
   {
-    title: 'Use Templates',
-    subtitle: 'Ready-to-edit templates for your business',
-    icon: '📋',
-    href: '/creative',
-    color: 'bg-amber-50 text-amber-600 border-amber-200/60',
-  },
-  {
     title: 'Generate Reel',
     subtitle: 'Short videos for social media',
     icon: '🎬',
     href: '/reels/new',
     color: 'bg-[#FFF5F0] text-[#E84D1A] border-orange-200/60',
-  },
-  {
-    title: 'Design Poster',
-    subtitle: 'Stunning posters for print & digital',
-    icon: '🎨',
-    href: '/create',
-    color: 'bg-emerald-50 text-emerald-600 border-emerald-200/60',
   },
   {
     title: 'Business Brain',
@@ -51,10 +37,10 @@ export function QuickActionsGrid() {
           <span>⚡ Quick Actions</span>
         </h2>
         <Link
-          href="/create"
+          href="/campaigns/new"
           className="text-xs font-semibold text-[#E84D1A] hover:underline sm:text-sm"
         >
-          View all tools &rarr;
+          Create a campaign &rarr;
         </Link>
       </div>
 

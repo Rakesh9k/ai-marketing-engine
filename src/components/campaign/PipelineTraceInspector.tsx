@@ -13,7 +13,7 @@ interface PipelineTraceInspectorProps {
   truthCheckResult?: TruthCheckResult;
 }
 
-export function PipelineTraceInspector({ trace, truthCheckResult }: PipelineTraceInspectorProps) {
+export function PipelineTraceInspector({ trace }: PipelineTraceInspectorProps) {
   const [selectedStageKey, setSelectedStageKey] = useState<string | null>('userRequest');
   const [isExpanded, setIsExpanded] = useState<boolean>(true);
 
@@ -417,7 +417,7 @@ export function PipelineTraceInspector({ trace, truthCheckResult }: PipelineTrac
                   </h4>
                   <div className="grid grid-cols-2 gap-2 rounded bg-neutral-800 p-3 text-xs">
                     {Object.entries(activeStage.step.data.selectedContext || {}).map(
-                      ([ctxKey, val]) => (
+                      ([ctxKey, _val]) => (
                         <div key={ctxKey} className="flex items-center gap-2">
                           <span className="text-success-400">✓</span>
                           <span className="text-neutral-200 capitalize">

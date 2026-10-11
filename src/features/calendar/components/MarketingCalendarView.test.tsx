@@ -9,6 +9,11 @@ jest.mock('next/navigation', () => ({
   useRouter: () => ({ push: mockPush }),
 }));
 
+const mockShowToast = jest.fn();
+jest.mock('@/hooks/useToast', () => ({
+  useToast: () => ({ showToast: mockShowToast }),
+}));
+
 jest.mock('../services/calendarService', () => ({
   calendarService: {
     skipCalendarItem: jest.fn(),

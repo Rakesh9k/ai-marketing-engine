@@ -1,7 +1,6 @@
 'use client';
 
 import { useState } from 'react';
-import Link from 'next/link';
 import type { Product } from '@/types';
 import { Button } from '@/components/ui/Button';
 import { CameraIllustration } from '@/components/illustrations/Illustrations';
@@ -34,11 +33,7 @@ export function ProductInspectorPanel({
       <div className="relative aspect-[4/3] w-full overflow-hidden rounded-2xl bg-neutral-100">
         {primaryImage ? (
           // eslint-disable-next-line @next/next/no-img-element
-          <img
-            src={primaryImage}
-            alt={product.name}
-            className="h-full w-full object-cover"
-          />
+          <img src={primaryImage} alt={product.name} className="h-full w-full object-cover" />
         ) : (
           <div className="flex h-full w-full flex-col items-center justify-center bg-neutral-50 text-neutral-400">
             <CameraIllustration size={40} />
@@ -47,7 +42,7 @@ export function ProductInspectorPanel({
         )}
 
         {isBestseller && (
-          <span className="absolute left-3 top-3 inline-flex items-center gap-1 rounded-full bg-amber-500 px-3 py-1 text-xs font-bold text-white shadow-md">
+          <span className="absolute top-3 left-3 inline-flex items-center gap-1 rounded-full bg-amber-500 px-3 py-1 text-xs font-bold text-white shadow-md">
             🔥 Bestseller
           </span>
         )}
@@ -77,7 +72,7 @@ export function ProductInspectorPanel({
 
         <h2 className="mt-2 text-xl font-extrabold text-neutral-900">{product.name}</h2>
         <div className="mt-1 flex items-baseline gap-2">
-          <span className="text-2xl font-black text-brand-600">
+          <span className="text-brand-600 text-2xl font-black">
             ₹{product.price.toLocaleString('en-IN')}
           </span>
           {product.originalPrice && (
@@ -93,7 +88,7 @@ export function ProductInspectorPanel({
       </div>
 
       {/* Offer Eligibility Box */}
-      <div className="rounded-2xl border border-emerald-200 bg-emerald-50/60 p-4 space-y-1.5">
+      <div className="space-y-1.5 rounded-2xl border border-emerald-200 bg-emerald-50/60 p-4">
         <div className="flex items-center gap-2 text-xs font-bold text-emerald-900">
           <span className="text-emerald-600">✓</span>
           <span>Offer Eligibility</span>
@@ -101,7 +96,7 @@ export function ProductInspectorPanel({
         <p className="text-xs text-emerald-800">
           Included in Weekend Special (20% OFF) • Valid: Sat - Sun
         </p>
-        <p className="text-[11px] text-emerald-600 font-medium">Auto-applies to all customers</p>
+        <p className="text-[11px] font-medium text-emerald-600">Auto-applies to all customers</p>
       </div>
 
       {/* Action Buttons */}
@@ -115,7 +110,7 @@ export function ProductInspectorPanel({
       </div>
 
       {/* Accordion / Collapsible Info Sections */}
-      <div className="space-y-3 pt-2 border-t border-neutral-100">
+      <div className="space-y-3 border-t border-neutral-100 pt-2">
         {/* Product Details Accordion */}
         <div className="border-b border-neutral-100 pb-3">
           <button
@@ -128,9 +123,16 @@ export function ProductInspectorPanel({
           </button>
           {detailsOpen && (
             <div className="mt-2 space-y-1 text-xs text-neutral-600">
-              <p><span className="font-semibold text-neutral-800">Status:</span> {product.status}</p>
-              <p><span className="font-semibold text-neutral-800">Currency:</span> {product.currency}</p>
-              <p><span className="font-semibold text-neutral-800">Product ID:</span> {product.productId}</p>
+              <p>
+                <span className="font-semibold text-neutral-800">Status:</span> {product.status}
+              </p>
+              <p>
+                <span className="font-semibold text-neutral-800">Currency:</span> {product.currency}
+              </p>
+              <p>
+                <span className="font-semibold text-neutral-800">Product ID:</span>{' '}
+                {product.productId}
+              </p>
             </div>
           )}
         </div>
@@ -153,7 +155,11 @@ export function ProductInspectorPanel({
                   className="h-12 w-12 overflow-hidden rounded-xl border border-neutral-200 bg-neutral-100"
                 >
                   {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={img.url} alt={`Preview ${idx}`} className="h-full w-full object-cover" />
+                  <img
+                    src={img.url}
+                    alt={`Preview ${idx}`}
+                    className="h-full w-full object-cover"
+                  />
                 </div>
               ))}
               {(!product.images || product.images.length === 0) && (
@@ -178,7 +184,7 @@ export function ProductInspectorPanel({
               {product.tags?.map((t) => (
                 <span
                   key={t}
-                  className="rounded-full bg-brand-50 px-2.5 py-0.5 text-[11px] font-semibold text-brand-700"
+                  className="bg-brand-50 text-brand-700 rounded-full px-2.5 py-0.5 text-[11px] font-semibold"
                 >
                   {t}
                 </span>
@@ -204,16 +210,17 @@ export function ProductInspectorPanel({
       </div>
 
       {/* AI Insight Box */}
-      <div className="rounded-2xl border border-amber-200 bg-gradient-to-br from-amber-50 to-orange-50 p-4 space-y-2">
+      <div className="space-y-2 rounded-2xl border border-amber-200 bg-gradient-to-br from-amber-50 to-orange-50 p-4">
         <div className="flex items-center gap-1.5 text-xs font-bold text-amber-900">
           <span>✨ AI Insight</span>
         </div>
-        <p className="text-xs text-amber-800 leading-relaxed">
-          This is your top performing product! It drives 32% of total sales and has the highest engagement rate on social posters.
+        <p className="text-xs leading-relaxed text-amber-800">
+          This is your top performing product! It drives 32% of total sales and has the highest
+          engagement rate on social posters.
         </p>
         <Button
           size="sm"
-          className="w-full bg-brand-600 hover:bg-brand-700 text-white text-xs font-bold"
+          className="bg-brand-600 hover:bg-brand-700 w-full text-xs font-bold text-white"
           onClick={() => onCreateCampaign(product)}
         >
           Create Campaign →

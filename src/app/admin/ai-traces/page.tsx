@@ -3,7 +3,6 @@
 import React, { useState, useMemo } from 'react';
 import Link from 'next/link';
 import { INITIAL_AI_TRACES, type AiTraceRecord } from '@/services/aiTraceService';
-import type { PipelineTrace } from '@/types';
 
 export default function AdminAiTracesPage() {
   const [traces] = useState<AiTraceRecord[]>(INITIAL_AI_TRACES);
@@ -217,7 +216,6 @@ export default function AdminAiTracesPage() {
 
           <div className="space-y-4">
             {filteredTraces.map((record) => {
-              const { trace } = record;
               return (
                 <div
                   key={record.id}

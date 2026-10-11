@@ -187,7 +187,7 @@ export function TransformationSection() {
               <div className="mt-6 space-y-3">
                 <div className="bg-surface border-success-100 flex items-center justify-between rounded-2xl border p-3.5 text-xs shadow-xs">
                   <span className="text-text-primary flex items-center gap-2 font-bold">
-                    <span className="text-success-600">✓</span> Verified Social Posters & Reels
+                    <span className="text-success-600">✓</span> Verified Social Visuals & Reels
                   </span>
                   <span className="text-text-tertiary text-[10px]">Fact-Checked</span>
                 </div>
@@ -196,21 +196,14 @@ export function TransformationSection() {
                   <span className="text-text-primary flex items-center gap-2 font-bold">
                     <span className="text-success-600">✓</span> Local Telugu & Hinglish Copy
                   </span>
-                  <span className="text-text-tertiary text-[10px]">High Engagement</span>
+                  <span className="text-text-tertiary text-[10px]">Localised</span>
                 </div>
 
                 <div className="bg-surface border-success-100 flex items-center justify-between rounded-2xl border p-3.5 text-xs shadow-xs">
                   <span className="text-text-primary flex items-center gap-2 font-bold">
-                    <span className="text-success-600">✓</span> WhatsApp Broadcast Templates
+                    <span className="text-success-600">✓</span> WhatsApp Message Ready to Share
                   </span>
                   <span className="text-text-tertiary text-[10px]">Direct Reach</span>
-                </div>
-
-                <div className="bg-surface border-success-100 flex items-center justify-between rounded-2xl border p-3.5 text-xs shadow-xs">
-                  <span className="text-text-primary flex items-center gap-2 font-bold">
-                    <span className="text-success-600">✓</span> 30-Day Automated Calendar
-                  </span>
-                  <span className="text-text-tertiary text-[10px]">Zero Hassle</span>
                 </div>
               </div>
             </div>

@@ -133,11 +133,11 @@ export default function WelcomePage() {
           </>
         ) : confirmation.status === 'delayed' ? (
           <>
-            <h1 className="text-3xl font-black">Payment received.</h1>
+            <h1 className="text-3xl font-black">Still confirming your payment.</h1>
             <p className="text-text-secondary mt-3 text-sm">
-              Your plan or credits are applied as soon as our payment partner confirms the payment —
-              usually within a minute. Check Billing to see them; if they&apos;re still missing
-              after a few minutes, contact support.
+              If you just paid, your plan or credits are applied as soon as our payment partner
+              confirms the payment — usually within a minute. Check Billing to see them; if
+              they&apos;re still missing after a few minutes, contact support.
             </p>
           </>
         ) : (

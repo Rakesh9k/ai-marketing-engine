@@ -1,33 +1,29 @@
 'use client';
 
-import { useRouter } from 'next/navigation';
+import { useCallback, useState } from 'react';
 import { LandingNav } from './components/LandingNav';
 import { HeroSection } from './components/HeroSection';
-import { LiveImpactSection } from './components/LiveImpactSection';
-import { LiveMitraDemo } from './components/LiveMitraDemo';
 import { WhatMitraDoes } from './components/WhatMitraDoes';
 import { CreateContentSection } from './components/CreateContentSection';
 import { LanguageSection } from './components/LanguageSection';
 import { TransformationSection } from './components/TransformationSection';
-import { PublishingSection } from './components/PublishingSection';
-import { AnalyticsSection } from './components/AnalyticsSection';
 import { JournalResourceSection } from './components/JournalResourceSection';
 import { PersonalitySection } from './components/PersonalitySection';
 import { FinalCTASection } from './components/FinalCTASection';
 import { LandingFooter } from './components/LandingFooter';
 import { AmbientBackground } from './components/AmbientBackground';
+import { AuthNudge } from './components/AuthNudge';
 
 export function LandingPage() {
-  const router = useRouter();
-
-  const handleGetStarted = () => {
-    router.push('/signup');
-  };
+  // "Try Mitra" / "Start for Free" open a value-led nudge instead of bouncing straight to /signup.
+  const [nudgeOpen, setNudgeOpen] = useState(false);
+  const handleGetStarted = () => setNudgeOpen(true);
+  const closeNudge = useCallback(() => setNudgeOpen(false), []);
 
   return (
     <div
       id="top"
-      className="relative bg-bg-primary text-text-primary selection:bg-brand-100 selection:text-brand-700 min-h-screen font-sans antialiased overflow-x-hidden"
+      className="bg-bg-primary text-text-primary selection:bg-brand-100 selection:text-brand-700 relative min-h-screen overflow-x-hidden font-sans antialiased"
     >
       {/* CONTINUOUS AMBIENT LIQUID FLUID BACKGROUND */}
       <AmbientBackground />
@@ -38,12 +34,6 @@ export function LandingPage() {
       <main className="relative z-10">
         {/* SECTION 2 — HERO */}
         <HeroSection onGetStarted={handleGetStarted} />
-
-        {/* SECTION 3 — LIVE MITRA DEMONSTRATION */}
-        <LiveMitraDemo onGetStarted={handleGetStarted} />
-
-        {/* SECTION 4 — LIVE IMPACT */}
-        <LiveImpactSection />
 
         {/* SECTION 4 — WHAT MITRA DOES (INTERACTIVE STEP-BY-STEP GRID + 3D DEVICE MOCKUP) */}
         <WhatMitraDoes />
@@ -57,13 +47,7 @@ export function LandingPage() {
         {/* SECTION 7 — CAMPAIGN TRANSFORMATION & STYLE INTELLIGENCE */}
         <TransformationSection />
 
-        {/* SECTION 8 — PUBLISHING / SOCIAL CONNECTIONS */}
-        <PublishingSection />
-
-        {/* SECTION 9 — BUSINESS INTELLIGENCE / ANALYTICS */}
-        <AnalyticsSection />
-
-        {/* SECTION 10 — DYNAMIC JOURNAL & RESOURCE SECTION (TAG FILTERS + MINI AI CHAT) */}
+        {/* SECTION 10 — DYNAMIC JOURNAL & RESOURCE SECTION (TAG FILTERS + CAMPAIGN ENGINE BANNER) */}
         <JournalResourceSection />
 
         {/* SECTION 11 — MASCOT / PERSONALITY MOMENT */}
@@ -75,6 +59,8 @@ export function LandingPage() {
 
       {/* SECTION 13 — FOOTER */}
       <LandingFooter />
+
+      <AuthNudge open={nudgeOpen} onClose={closeNudge} />
     </div>
   );
 }

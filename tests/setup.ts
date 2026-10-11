@@ -1,11 +1,94 @@
 import '@testing-library/jest-dom';
 import { assertSucceeds, assertFails } from '@firebase/rules-unit-testing';
 
+if (typeof Headers !== 'undefined' && !(Headers.prototype as any).getSetCookie) {
+  (Headers.prototype as any).getSetCookie = function () {
+    return [];
+  };
+}
+
 if (typeof global.fetch === 'undefined') {
   global.fetch = jest.fn() as any;
-  global.Headers = class Headers {} as any;
-  global.Request = class Request {} as any;
-  global.Response = class Response {} as any;
+  global.Headers = class Headers {
+    private _map = new Map<string, string>();
+    constructor(init?: any) {
+      if (init) {
+        if (typeof init.forEach === 'function') {
+          init.forEach((v: string, k: string) => this._map.set(k.toLowerCase(), v));
+        } else if (typeof init === 'object') {
+          Object.entries(init).forEach(([k, v]) => this._map.set(k.toLowerCase(), String(v)));
+        }
+      }
+    }
+    get(key: string) {
+      return this._map.get(key.toLowerCase()) || null;
+    }
+    getSetCookie() {
+      return [];
+    }
+    append(k: string, v: string) {
+      this._map.set(k.toLowerCase(), v);
+    }
+    set(k: string, v: string) {
+      this._map.set(k.toLowerCase(), v);
+    }
+    delete(k: string) {
+      this._map.delete(k.toLowerCase());
+    }
+    has(k: string) {
+      return this._map.has(k.toLowerCase());
+    }
+    forEach(cb: any) {
+      this._map.forEach(cb);
+    }
+  } as any;
+  global.Request = class Request {
+    url: string;
+    method: string;
+    headers: any;
+    body: any;
+    constructor(input: any, init?: any) {
+      this.url = typeof input === 'string' ? input : input?.url || '';
+      this.method = init?.method || 'GET';
+      this.headers = new (global.Headers as any)(init?.headers);
+      this.body = init?.body;
+    }
+    json() {
+      return Promise.resolve(
+        typeof this.body === 'string' ? JSON.parse(this.body) : this.body || {}
+      );
+    }
+  } as any;
+  global.Response = class Response {
+    headers: any;
+    status: number;
+    _body: any;
+    constructor(body?: any, init?: any) {
+      this._body = body;
+      this.status = init?.status ?? 200;
+      this.headers = new (global.Headers as any)(init?.headers);
+    }
+    json() {
+      return Promise.resolve(
+        typeof this._body === 'string' ? JSON.parse(this._body) : this._body || {}
+      );
+    }
+    text() {
+      return Promise.resolve(
+        typeof this._body === 'string' ? this._body : JSON.stringify(this._body || '')
+      );
+    }
+  } as any;
+}
+
+if (typeof (global.Response as any).json !== 'function') {
+  (global.Response as any).json = function (data: any, init?: any) {
+    const res = new (global.Response as any)();
+    (res as any).status = init?.status ?? 200;
+    (res as any).json = () => Promise.resolve(data);
+    (res as any).headers = init?.headers || {};
+    return res;
+  };
 }
 
 process.env['NEXT_PUBLIC_FIREBASE_API_KEY'] = 'test-api-key';

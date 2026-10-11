@@ -1,12 +1,5 @@
-'use client';
-
-import { Sidebar } from '@/components/layout/Sidebar';
-import { AssistantHistoryView } from '@/features/assistant/components/AssistantHistoryView';
+import { redirect } from 'next/navigation';
 
 export default function AssistantHistoryPage() {
-  return (
-    <Sidebar>
-      <AssistantHistoryView />
-    </Sidebar>
-  );
+  redirect('/dashboard');
 }

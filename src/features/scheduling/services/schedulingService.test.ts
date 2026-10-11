@@ -7,12 +7,11 @@ import {
 } from './schedulingService';
 import { httpsCallable } from 'firebase/functions';
 
-jest.mock('firebase/app', () => ({
-  getApp: jest.fn(),
+jest.mock('@/lib/firebase/client', () => ({
+  getFirebaseFunctions: jest.fn(() => ({})),
 }));
 
 jest.mock('firebase/functions', () => ({
-  getFunctions: jest.fn(),
   httpsCallable: jest.fn(),
 }));
 

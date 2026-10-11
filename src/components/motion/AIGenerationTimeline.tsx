@@ -11,11 +11,27 @@ export interface GenerationStage {
 }
 
 const DEFAULT_STAGES: GenerationStage[] = [
-  { id: '1', label: 'Understanding Offer', sublabel: 'Analyzing target audience & regional context...' },
+  {
+    id: '1',
+    label: 'Understanding Offer',
+    sublabel: 'Analyzing target audience & regional context...',
+  },
   { id: '2', label: 'Shaping Strategy', sublabel: 'Selecting high-conversion marketing angle...' },
-  { id: '3', label: 'Writing Copy & Hook', sublabel: 'Generating localized caption & call to action...' },
-  { id: '4', label: 'Crafting Visual Assets', sublabel: 'Building brand-consistent poster layout...' },
-  { id: '5', label: 'Preparing Campaign', sublabel: 'Finalizing formatting for instant publishing...' },
+  {
+    id: '3',
+    label: 'Writing Copy & Hook',
+    sublabel: 'Generating localized caption & call to action...',
+  },
+  {
+    id: '4',
+    label: 'Crafting Visual Assets',
+    sublabel: 'Building brand-consistent poster layout...',
+  },
+  {
+    id: '5',
+    label: 'Preparing Campaign',
+    sublabel: 'Finalizing formatting for instant publishing...',
+  },
 ];
 
 interface AIGenerationTimelineProps {
@@ -55,19 +71,14 @@ export function AIGenerationTimeline({
   const isFinished = currentIndex === stages.length - 1;
 
   return (
-    <div className={`flex flex-col items-center justify-center p-6 text-center ${className}`.trim()}>
+    <div
+      className={`flex flex-col items-center justify-center p-6 text-center ${className}`.trim()}
+    >
       {/* Mascot State Reaction */}
-      <Mascot
-        state={isFinished ? 'success' : 'creating'}
-        size="xl"
-        glow
-        shadow
-        animated
-        priority
-      />
+      <Mascot state={isFinished ? 'success' : 'creating'} size="xl" glow shadow animated priority />
 
       {/* Stage Headline & Sublabel */}
-      <div className="mt-6 max-w-md h-16 flex flex-col items-center justify-center">
+      <div className="mt-6 flex h-16 max-w-md flex-col items-center justify-center">
         <AnimatePresence mode="wait">
           <motion.div
             key={currentStage?.id || 'stage'}
@@ -80,7 +91,7 @@ export function AIGenerationTimeline({
             <h3 className="text-lg font-bold text-neutral-900 dark:text-white">
               {currentStage?.label}
             </h3>
-            <p className="mt-1 text-xs text-neutral-500 dark:text-neutral-400 font-medium">
+            <p className="mt-1 text-xs font-medium text-neutral-500 dark:text-neutral-400">
               {currentStage?.sublabel}
             </p>
           </motion.div>
@@ -88,7 +99,7 @@ export function AIGenerationTimeline({
       </div>
 
       {/* Visual Multi-step Timeline Checkmarks */}
-      <div className="mt-6 flex items-center justify-center gap-2 w-full max-w-sm">
+      <div className="mt-6 flex w-full max-w-sm items-center justify-center gap-2">
         {stages.map((stage, idx) => {
           const isDone = idx < currentIndex;
           const isCurrent = idx === currentIndex;
@@ -101,7 +112,7 @@ export function AIGenerationTimeline({
                     isDone
                       ? 'bg-emerald-500 text-white'
                       : isCurrent
-                        ? 'bg-[#E84D1A] text-white ring-4 ring-[#E84D1A]/20 scale-110'
+                        ? 'scale-110 bg-[#E84D1A] text-white ring-4 ring-[#E84D1A]/20'
                         : 'bg-neutral-200 text-neutral-500 dark:bg-neutral-800 dark:text-neutral-400'
                   }`}
                 >

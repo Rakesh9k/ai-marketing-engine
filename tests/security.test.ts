@@ -257,12 +257,19 @@ describeIfEmulator('Firestore Security Rules', () => {
     test('Owner cannot directly set campaign status to "completed" via Firestore write', async () => {
       const user = testEnv!.authenticatedContext('user1', { businessIds: ['biz1'] });
       const campaign = user.firestore().collection('campaigns').doc('camp1');
-      await campaign.set({
-        userId: 'user1',
-        businessId: 'biz1',
-        status: 'draft',
-        creditsReserved: 140,
-        offer: { headline: 'Test Offer' },
+      // Campaigns are server-created only (client create is denied), so seed via the Admin path.
+      await testEnv!.withSecurityRulesDisabled(async (context) => {
+        await context
+          .firestore()
+          .collection('campaigns')
+          .doc('camp1')
+          .set({
+            userId: 'user1',
+            businessId: 'biz1',
+            status: 'draft',
+            creditsReserved: 140,
+            offer: { headline: 'Test Offer' },
+          });
       });
       await expect(campaign.update({ status: 'completed' }))['toDeny']();
     });
@@ -270,12 +277,19 @@ describeIfEmulator('Firestore Security Rules', () => {
     test('Owner cannot forge metadata.truthCheckStatus from FAIL to PASS via Firestore write', async () => {
       const user = testEnv!.authenticatedContext('user1', { businessIds: ['biz1'] });
       const campaign = user.firestore().collection('campaigns').doc('camp2');
-      await campaign.set({
-        userId: 'user1',
-        businessId: 'biz1',
-        status: 'failed',
-        creditsReserved: 140,
-        metadata: { idempotencyKey: 'key-1', truthCheckStatus: 'FAIL' },
+      // Campaigns are server-created only (client create is denied), so seed via the Admin path.
+      await testEnv!.withSecurityRulesDisabled(async (context) => {
+        await context
+          .firestore()
+          .collection('campaigns')
+          .doc('camp2')
+          .set({
+            userId: 'user1',
+            businessId: 'biz1',
+            status: 'failed',
+            creditsReserved: 140,
+            metadata: { idempotencyKey: 'key-1', truthCheckStatus: 'FAIL' },
+          });
       });
       await expect(campaign.update({ 'metadata.truthCheckStatus': 'PASS' }))['toDeny']();
     });
@@ -283,12 +297,15 @@ describeIfEmulator('Firestore Security Rules', () => {
     test('Owner cannot alter creditsReserved/creditsUsed via Firestore write', async () => {
       const user = testEnv!.authenticatedContext('user1', { businessIds: ['biz1'] });
       const campaign = user.firestore().collection('campaigns').doc('camp3');
-      await campaign.set({
-        userId: 'user1',
-        businessId: 'biz1',
-        status: 'draft',
-        creditsReserved: 140,
-        creditsUsed: 0,
+      // Campaigns are server-created only (client create is denied), so seed via the Admin path.
+      await testEnv!.withSecurityRulesDisabled(async (context) => {
+        await context.firestore().collection('campaigns').doc('camp3').set({
+          userId: 'user1',
+          businessId: 'biz1',
+          status: 'draft',
+          creditsReserved: 140,
+          creditsUsed: 0,
+        });
       });
       await expect(campaign.update({ creditsReserved: 1 }))['toDeny']();
       await expect(campaign.update({ creditsUsed: 0 - 140 }))['toDeny']();
@@ -297,12 +314,19 @@ describeIfEmulator('Firestore Security Rules', () => {
     test('Owner CAN still update ordinary editable campaign fields (status/credits untouched)', async () => {
       const user = testEnv!.authenticatedContext('user1', { businessIds: ['biz1'] });
       const campaign = user.firestore().collection('campaigns').doc('camp4');
-      await campaign.set({
-        userId: 'user1',
-        businessId: 'biz1',
-        status: 'draft',
-        creditsReserved: 140,
-        offer: { headline: 'Old Headline' },
+      // Campaigns are server-created only (client create is denied), so seed via the Admin path.
+      await testEnv!.withSecurityRulesDisabled(async (context) => {
+        await context
+          .firestore()
+          .collection('campaigns')
+          .doc('camp4')
+          .set({
+            userId: 'user1',
+            businessId: 'biz1',
+            status: 'draft',
+            creditsReserved: 140,
+            offer: { headline: 'Old Headline' },
+          });
       });
       await expect(campaign.update({ offer: { headline: 'New Headline' } }))['toSucceed']();
     });

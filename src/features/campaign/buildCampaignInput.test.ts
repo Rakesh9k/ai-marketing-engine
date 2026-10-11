@@ -115,6 +115,14 @@ describe('buildCampaignInput', () => {
     expect(input1!.idempotencyKey).toBe('key-one');
     expect(input2!.idempotencyKey).toBe('key-two');
   });
+
+  it('builds a complete campaign payload when user has no Meta/Instagram/Facebook connection', () => {
+    const disconnectedBusiness = makeBusiness();
+    const input = buildCampaignInput(disconnectedBusiness, validState(), 'idem_meta_free');
+    expect(input).not.toBeNull();
+    expect(input!.businessId).toBe('biz_1');
+    expect(input!.idempotencyKey).toBe('idem_meta_free');
+  });
 });
 
 describe('toIsoDateTime', () => {

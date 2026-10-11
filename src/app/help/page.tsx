@@ -7,7 +7,7 @@ import { CAMPAIGN_GENERATION_COST, CREDIT_COSTS } from '@/lib/config/pricing';
 
 interface FAQItem {
   id: string;
-  category: 'onboarding' | 'campaigns' | 'social' | 'billing';
+  category: 'onboarding' | 'campaigns' | 'billing';
   question: string;
   answer: string;
 }
@@ -16,9 +16,9 @@ const FAQS: FAQItem[] = [
   {
     id: '1',
     category: 'onboarding',
-    question: "How does the 'One photo, 30 days of marketing' concept work?",
+    question: 'How does Mitra create a campaign?',
     answer:
-      "Mitra's AI analyzes a single photo of your product or storefront, reads your Business Brain profile (name, industry, location, tone), and generates a complete 30-day marketing calendar with ready-to-publish images, captions, hashtags, and WhatsApp messages.",
+      "Tell Mitra what you're promoting: pick a product, add your offer, and upload a photo if you have one. Mitra reads your Business Brain (name, industry, location, tone) and generates ad copy, images, a reel and a WhatsApp message. Truth Check then compares prices, offers and contact details against what you entered before you review the result.",
   },
   {
     id: '2',
@@ -36,16 +36,16 @@ const FAQS: FAQItem[] = [
   {
     id: '4',
     category: 'campaigns',
-    question: 'Can I edit generated images and captions before publishing?',
+    question: 'Can I change a generated image or caption?',
     answer:
-      'Yes! Every generated creative can be edited in the Creative Studio (/creative) or Content workspace (/content). You can modify text, change background styles, adjust hashtags, or regenerate alternative variations.',
+      'You can regenerate any image or text from the campaign page, copy the text, and download the images. Regenerating uses credits as listed under credit costs.',
   },
   {
     id: '5',
-    category: 'social',
-    question: 'How do I connect my Instagram and Facebook business pages?',
+    category: 'campaigns',
+    question: 'How do I share or download my campaign?',
     answer:
-      "Go to Settings → Social Connections (/settings/social). Click 'Connect Meta Account' and follow the OAuth prompt to grant page management permissions. Once linked, you can schedule and publish directly from Mitra.",
+      'Open the campaign and tap Share on WhatsApp to send the generated message to your customers, or download the images, reel and text to post wherever you like. Mitra does not currently post to Instagram or Facebook for you.',
   },
   {
     id: '6',
@@ -87,10 +87,10 @@ export default function HelpPage() {
 
           <div className="flex items-center gap-3">
             <Link
-              href="/assistant"
+              href="/campaigns/new"
               className="border-brand-300 bg-brand-50 text-brand-600 hover:bg-brand-100 rounded-xl border px-4 py-2 text-sm font-semibold transition-colors"
             >
-              💬 Ask AI Assistant
+              🚀 Create Campaign
             </Link>
             <Link
               href="/dashboard"
@@ -120,7 +120,7 @@ export default function HelpPage() {
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Search guides, credit rules, Instagram setup..."
+              placeholder="Search guides and credit rules..."
               className="border-border-light bg-surface text-text-primary placeholder:text-text-tertiary focus:border-brand-500 focus:ring-brand-500/20 w-full rounded-2xl border px-5 py-4 pl-12 text-base shadow-sm focus:ring-2 focus:outline-none"
             />
             <svg
@@ -143,25 +143,19 @@ export default function HelpPage() {
       {/* Main Container */}
       <main className="mx-auto max-w-6xl space-y-12 px-4 py-12 sm:px-6">
         {/* Topic Cards */}
-        <section className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4">
+        <section className="grid grid-cols-1 gap-6 sm:grid-cols-3">
           {[
             {
               icon: '🚀',
               title: 'Getting Started',
-              desc: 'Onboarding, 1-photo setup, Business Brain setup',
+              desc: 'Onboarding and Business Brain setup',
               link: '/onboarding',
             },
             {
-              icon: '🎨',
-              title: 'Creative Studio',
-              desc: 'Generating images, reels, posters & copy',
-              link: '/creative',
-            },
-            {
-              icon: '📲',
-              title: 'Social & WhatsApp',
-              desc: 'Connecting Instagram, Meta pages & WhatsApp broadcasts',
-              link: '/whatsapp',
+              icon: '🎯',
+              title: 'Campaigns',
+              desc: 'Creating posts, reels and WhatsApp messages',
+              link: '/campaigns/new',
             },
             {
               icon: '💳',
@@ -200,7 +194,6 @@ export default function HelpPage() {
                 { id: 'all', label: 'All FAQs' },
                 { id: 'onboarding', label: 'Onboarding' },
                 { id: 'campaigns', label: 'Campaigns' },
-                { id: 'social', label: 'Social & WA' },
                 { id: 'billing', label: 'Billing' },
               ].map((cat) => (
                 <button

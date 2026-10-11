@@ -5,6 +5,7 @@ import {
   type SnapshotOptions,
   Timestamp,
 } from 'firebase/firestore';
+import { stripUndefined } from '@/lib/stripUndefined';
 import type {
   User,
   Business,
@@ -38,7 +39,7 @@ function getData<T>(snapshot: QueryDocumentSnapshot): T {
   return snapshot.data() as T;
 }
 
-export const userConverter: FirestoreDataConverter<User> = {
+const userConverterRaw: FirestoreDataConverter<User> = {
   toFirestore(user: User): DocumentData {
     return {
       userId: user.userId,
@@ -86,7 +87,7 @@ export const userConverter: FirestoreDataConverter<User> = {
   },
 };
 
-export const businessConverter: FirestoreDataConverter<Business> = {
+const businessConverterRaw: FirestoreDataConverter<Business> = {
   toFirestore(business: Business): DocumentData {
     return {
       businessId: business.businessId,
@@ -126,7 +127,7 @@ export const businessConverter: FirestoreDataConverter<Business> = {
   },
 };
 
-export const brandKitConverter: FirestoreDataConverter<BrandKit> = {
+const brandKitConverterRaw: FirestoreDataConverter<BrandKit> = {
   toFirestore(brandKit: BrandKit): DocumentData {
     return {
       businessId: brandKit.businessId,
@@ -174,7 +175,7 @@ export const brandKitConverter: FirestoreDataConverter<BrandKit> = {
   },
 };
 
-export const productConverter: FirestoreDataConverter<Product> = {
+const productConverterRaw: FirestoreDataConverter<Product> = {
   toFirestore(product: Product): DocumentData {
     return {
       productId: product.productId,
@@ -218,7 +219,7 @@ export const productConverter: FirestoreDataConverter<Product> = {
   },
 };
 
-export const campaignConverter: FirestoreDataConverter<Campaign> = {
+const campaignConverterRaw: FirestoreDataConverter<Campaign> = {
   toFirestore(campaign: Campaign): DocumentData {
     return {
       campaignId: campaign.campaignId,
@@ -235,6 +236,7 @@ export const campaignConverter: FirestoreDataConverter<Campaign> = {
         type: campaign.offer.type,
         validityStart: isoToTimestamp(campaign.offer.validityStart),
         validityEnd: isoToTimestamp(campaign.offer.validityEnd),
+        validitySource: campaign.offer.validitySource,
         terms: campaign.offer.terms,
       },
       duration: {
@@ -269,8 +271,9 @@ export const campaignConverter: FirestoreDataConverter<Campaign> = {
         price: data.offer.price,
         originalPrice: data.offer.originalPrice,
         type: data.offer.type,
-        validityStart: serverTimestampToISO(data.offer.validityStart)!,
-        validityEnd: serverTimestampToISO(data.offer.validityEnd)!,
+        validityStart: serverTimestampToISO(data.offer.validityStart),
+        validityEnd: serverTimestampToISO(data.offer.validityEnd),
+        validitySource: data.offer.validitySource,
         terms: data.offer.terms,
       },
       duration: {
@@ -292,7 +295,7 @@ export const campaignConverter: FirestoreDataConverter<Campaign> = {
   },
 };
 
-export const campaignAssetConverter: FirestoreDataConverter<CampaignAsset> = {
+const campaignAssetConverterRaw: FirestoreDataConverter<CampaignAsset> = {
   toFirestore(asset: CampaignAsset): DocumentData {
     return {
       assetId: asset.assetId,
@@ -334,7 +337,7 @@ export const campaignAssetConverter: FirestoreDataConverter<CampaignAsset> = {
   },
 };
 
-export const subscriptionConverter: FirestoreDataConverter<Subscription> = {
+const subscriptionConverterRaw: FirestoreDataConverter<Subscription> = {
   toFirestore(subscription: Subscription): DocumentData {
     return {
       subscriptionId: subscription.subscriptionId,
@@ -374,7 +377,7 @@ export const subscriptionConverter: FirestoreDataConverter<Subscription> = {
   },
 };
 
-export const usageConverter: FirestoreDataConverter<Usage> = {
+const usageConverterRaw: FirestoreDataConverter<Usage> = {
   toFirestore(usage: Usage): DocumentData {
     return {
       usageId: usage.usageId,
@@ -412,7 +415,7 @@ export const usageConverter: FirestoreDataConverter<Usage> = {
   },
 };
 
-export const transactionConverter: FirestoreDataConverter<Transaction> = {
+const transactionConverterRaw: FirestoreDataConverter<Transaction> = {
   toFirestore(transaction: Transaction): DocumentData {
     return {
       transactionId: transaction.transactionId,
@@ -448,7 +451,7 @@ export const transactionConverter: FirestoreDataConverter<Transaction> = {
   },
 };
 
-export const analyticsEventConverter: FirestoreDataConverter<AnalyticsEvent> = {
+const analyticsEventConverterRaw: FirestoreDataConverter<AnalyticsEvent> = {
   toFirestore(event: AnalyticsEvent): DocumentData {
     return {
       eventId: event.eventId,
@@ -476,7 +479,7 @@ export const analyticsEventConverter: FirestoreDataConverter<AnalyticsEvent> = {
   },
 };
 
-export const generationLogConverter: FirestoreDataConverter<GenerationLog> = {
+const generationLogConverterRaw: FirestoreDataConverter<GenerationLog> = {
   toFirestore(log: GenerationLog): DocumentData {
     return {
       logId: log.logId,
@@ -518,7 +521,7 @@ export const generationLogConverter: FirestoreDataConverter<GenerationLog> = {
   },
 };
 
-export const assetConverter: FirestoreDataConverter<Asset> = {
+const assetConverterRaw: FirestoreDataConverter<Asset> = {
   toFirestore(asset: Asset): DocumentData {
     return {
       assetId: asset.assetId,
@@ -562,7 +565,7 @@ export const assetConverter: FirestoreDataConverter<Asset> = {
   },
 };
 
-export const reelConverter: FirestoreDataConverter<ReelProject> = {
+const reelConverterRaw: FirestoreDataConverter<ReelProject> = {
   toFirestore(reel: ReelProject): DocumentData {
     return {
       reelId: reel.reelId,
@@ -612,7 +615,7 @@ export const reelConverter: FirestoreDataConverter<ReelProject> = {
   },
 };
 
-export const scheduledPostConverter: FirestoreDataConverter<ScheduledPost> = {
+const scheduledPostConverterRaw: FirestoreDataConverter<ScheduledPost> = {
   toFirestore(post: ScheduledPost): DocumentData {
     return {
       scheduledPostId: post.scheduledPostId,
@@ -680,7 +683,7 @@ export const scheduledPostConverter: FirestoreDataConverter<ScheduledPost> = {
   },
 };
 
-export const publishJobConverter: FirestoreDataConverter<PublishJob> = {
+const publishJobConverterRaw: FirestoreDataConverter<PublishJob> = {
   toFirestore(job: PublishJob): DocumentData {
     return {
       jobId: job.jobId,
@@ -758,3 +761,45 @@ export type {
   BusinessSettings,
   LocalizationProfile,
 } from '@/types';
+
+/**
+ * Firestore rejects `undefined` values, and every optional field in these documents (a product's
+ * compare-at price, a description, a sort order...) is undefined when left blank. Every write goes
+ * through toFirestore, so cleaning here fixes it for all collections instead of one form at a time.
+ */
+function cleanWrites<T>(converter: FirestoreDataConverter<T>): FirestoreDataConverter<T> {
+  return {
+    toFirestore: (value: T, ...rest: never[]) =>
+      stripUndefined(
+        (converter.toFirestore as (v: T, ...r: never[]) => DocumentData)(value, ...rest)
+      ),
+    fromFirestore: converter.fromFirestore.bind(converter),
+  };
+}
+
+export const userConverter: FirestoreDataConverter<User> = cleanWrites(userConverterRaw);
+export const businessConverter: FirestoreDataConverter<Business> =
+  cleanWrites(businessConverterRaw);
+export const brandKitConverter: FirestoreDataConverter<BrandKit> =
+  cleanWrites(brandKitConverterRaw);
+export const productConverter: FirestoreDataConverter<Product> = cleanWrites(productConverterRaw);
+export const campaignConverter: FirestoreDataConverter<Campaign> =
+  cleanWrites(campaignConverterRaw);
+export const campaignAssetConverter: FirestoreDataConverter<CampaignAsset> =
+  cleanWrites(campaignAssetConverterRaw);
+export const subscriptionConverter: FirestoreDataConverter<Subscription> =
+  cleanWrites(subscriptionConverterRaw);
+export const usageConverter: FirestoreDataConverter<Usage> = cleanWrites(usageConverterRaw);
+export const transactionConverter: FirestoreDataConverter<Transaction> =
+  cleanWrites(transactionConverterRaw);
+export const analyticsEventConverter: FirestoreDataConverter<AnalyticsEvent> = cleanWrites(
+  analyticsEventConverterRaw
+);
+export const generationLogConverter: FirestoreDataConverter<GenerationLog> =
+  cleanWrites(generationLogConverterRaw);
+export const assetConverter: FirestoreDataConverter<Asset> = cleanWrites(assetConverterRaw);
+export const reelConverter: FirestoreDataConverter<ReelProject> = cleanWrites(reelConverterRaw);
+export const scheduledPostConverter: FirestoreDataConverter<ScheduledPost> =
+  cleanWrites(scheduledPostConverterRaw);
+export const publishJobConverter: FirestoreDataConverter<PublishJob> =
+  cleanWrites(publishJobConverterRaw);

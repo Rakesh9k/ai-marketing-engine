@@ -5,6 +5,7 @@ import { useAuth } from '@/features/auth/hooks/useAuth';
 import { usageService, subscriptionService } from '@/services/database';
 import type { Usage, Subscription, SubscriptionPlan } from '@/types';
 import { formatINR } from '@/lib/utils';
+import { PLAN_DETAILS } from '@/features/billing/planDetails';
 import { PageSkeleton } from '@/components/motion/PageSkeleton';
 
 function ProgressBar({ value, max, label }: { value: number; max: number; label: string }) {
@@ -59,24 +60,21 @@ function StatCard({
 }
 
 function PlanDetails({ subscription }: { subscription: Subscription | null }) {
-  const planNames: Record<SubscriptionPlan, string> = {
-    free: 'Free',
-    starter: 'Starter',
-    business: 'Business',
-    pro: 'Pro',
-    agency: 'Agency',
+  // Campaigns per month mirrors PLAN_ENTITLEMENTS.campaignsPerMonth in
+  // functions/src/services/entitlements.ts (the server-enforced quota; pinned by
+  // entitlements.pricingParity.test.ts in functions). Names, prices and credits come from
+  // PLAN_DETAILS.
+  const planCampaigns: Record<SubscriptionPlan, number> = {
+    free: 1,
+    starter: 5,
+    business: 12,
+    pro: 25,
+    agency: 50,
   };
 
-  const planLimits: Record<SubscriptionPlan, { campaigns: number; credits: number }> = {
-    free: { campaigns: 1, credits: 100 },
-    starter: { campaigns: 5, credits: 500 },
-    business: { campaigns: 12, credits: 1200 },
-    pro: { campaigns: 20, credits: 2500 },
-    agency: { campaigns: 40, credits: 6000 },
-  };
-
-  const currentPlan = subscription?.planId || 'free';
-  const limits = planLimits[currentPlan] ?? planLimits.free;
+  const currentPlan: SubscriptionPlan = subscription?.planId || 'free';
+  const planDetails = PLAN_DETAILS[currentPlan] ?? PLAN_DETAILS.free;
+  const limits = { campaigns: planCampaigns[currentPlan] ?? 1, credits: planDetails.credits };
 
   return (
     <div className="rounded-lg border border-neutral-200 bg-white p-6">
@@ -85,24 +83,12 @@ function PlanDetails({ subscription }: { subscription: Subscription | null }) {
         <div className="flex items-center justify-between">
           <div>
             <p className="text-brand-700 text-sm">Current Plan</p>
-            <p className="text-brand-900 text-2xl font-bold">
-              {planNames[subscription?.planId || 'free']}
-            </p>
+            <p className="text-brand-900 text-2xl font-bold">{planDetails.name}</p>
           </div>
           <div className="text-right">
             <p className="text-brand-700 text-sm">Monthly Price</p>
             <p className="text-brand-900 text-xl font-bold">
-              {subscription?.planId === 'free'
-                ? 'Free'
-                : formatINR(
-                    subscription?.planId === 'starter'
-                      ? 999
-                      : subscription?.planId === 'business'
-                        ? 1699
-                        : subscription?.planId === 'pro'
-                          ? 2999
-                          : 4999
-                  )}
+              {currentPlan === 'free' ? 'Free' : formatINR(planDetails.price)}
             </p>
           </div>
         </div>
@@ -271,7 +257,7 @@ export default function UsagePage() {
 
   const currentUsage = usage;
   const currentSubscription = subscription;
-  const creditsIncluded = currentSubscription?.creditsIncluded || 100;
+  const creditsIncluded = currentSubscription?.creditsIncluded || PLAN_DETAILS.free.credits;
   const creditsUsed = currentUsage?.creditsUsed || 0;
   const creditsRemaining = creditsIncluded - creditsUsed;
   const __campaignsCreated = currentUsage?.campaignsCreated || 0;

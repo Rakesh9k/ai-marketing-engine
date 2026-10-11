@@ -67,7 +67,7 @@ export default function WhatsAppHubPage() {
 
   const handleCopy = () => {
     if (!message) return;
-    copyToClipboard(message, 'whatsapp_msg');
+    void copyToClipboard(message, 'whatsapp_msg');
     showToast('Copied WhatsApp message to clipboard!', 'info');
   };
 
@@ -83,12 +83,12 @@ export default function WhatsAppHubPage() {
                   WhatsApp Marketing Hub
                 </h1>
                 <span className="rounded-full bg-emerald-600 px-2.5 py-0.5 text-xs font-semibold text-white">
-                  Active Gateway
+                  Share Link Gateway
                 </span>
               </div>
               <p className="text-text-secondary mt-1 text-sm">
-                Create 1-click customer broadcasts, pre-formatted promotional messages, and WhatsApp
-                Web click-to-chat links.
+                Create 1-click customer share links, pre-formatted promotional messages, and
+                WhatsApp Web click-to-chat links.
               </p>
             </div>
 
@@ -126,15 +126,15 @@ export default function WhatsAppHubPage() {
               className="border-border-light bg-surface space-y-6 rounded-2xl border p-6 shadow-xs lg:col-span-7"
             >
               <h2 className="text-text-primary flex items-center justify-between text-lg font-bold">
-                <span>WhatsApp Broadcast Composer</span>
+                <span>WhatsApp Campaign Composer</span>
                 <span className="rounded-md border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-xs font-normal text-emerald-600">
-                  Ready to Dispatch
+                  Ready to Share
                 </span>
               </h2>
 
               <div>
                 <label className="text-text-secondary mb-2 block text-xs font-semibold uppercase">
-                  Target Customer / Group Phone Number
+                  Target Customer / Business Phone Number
                 </label>
                 <input
                   type="tel"
@@ -152,7 +152,7 @@ export default function WhatsAppHubPage() {
               <div>
                 <div className="mb-2 flex items-center justify-between">
                   <label className="text-text-secondary block text-xs font-semibold uppercase">
-                    Broadcast Message / Offer Copy
+                    Promotional Message / Offer Copy
                   </label>
                   <button
                     type="button"
@@ -178,7 +178,7 @@ export default function WhatsAppHubPage() {
                   disabled={!message.trim()}
                   className="flex-1 rounded-xl bg-emerald-600 px-5 py-3 text-sm font-bold text-white shadow-xs transition-colors hover:bg-emerald-700 disabled:opacity-50"
                 >
-                  🚀 Dispatch to WhatsApp
+                  🚀 Share on WhatsApp
                 </button>
               </div>
             </form>

@@ -3,7 +3,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
-import Image from 'next/image';
 import { motion, AnimatePresence, useReducedMotion } from 'motion/react';
 import { businessService, productService } from '@/services/database';
 import { Button } from '@/components/ui/Button';
@@ -12,10 +11,26 @@ import { Mascot } from '@/components/mascot/Mascot';
 import type { Business, Product } from '@/types';
 import { CREATIVE_FORMATS } from '../constants';
 import type { CreativeFormat } from '../types';
+import { useDraftAutoSave } from '@/hooks/useDraftAutoSave';
+import { SideBySideHookABGenerator } from './SideBySideHookABGenerator';
 
 interface ImageGeneratorStudioProps {
   userId: string;
 }
+
+interface ImageStudioDraftState {
+  prompt: string;
+  format: CreativeFormat;
+  language: string;
+  selectedProductId: string | null;
+}
+
+const INITIAL_IMAGE_DRAFT: ImageStudioDraftState = {
+  prompt: 'Weekend family combo biryani offer',
+  format: 'instagram_post',
+  language: 'te_en',
+  selectedProductId: null,
+};
 
 export function ImageGeneratorStudio({ userId }: ImageGeneratorStudioProps) {
   const searchParams = useSearchParams();
@@ -23,14 +38,18 @@ export function ImageGeneratorStudio({ userId }: ImageGeneratorStudioProps) {
 
   const initialPrompt = searchParams.get('prompt') || '';
 
+  const { draft, updateField, isRestored, clearDraft, dismissRestoredNotice, lastSavedAt } =
+    useDraftAutoSave<ImageStudioDraftState>({
+      draftKey: 'image-generator-studio',
+      initialState: {
+        ...INITIAL_IMAGE_DRAFT,
+        prompt: initialPrompt || INITIAL_IMAGE_DRAFT.prompt,
+      },
+    });
+
   const [businesses, setBusinesses] = useState<Business[]>([]);
   const [businessId, setBusinessId] = useState<string | null>(null);
   const [products, setProducts] = useState<Product[]>([]);
-  const [selectedProductId, setSelectedProductId] = useState<string | null>(null);
-
-  const [prompt, setPrompt] = useState(initialPrompt || 'Weekend family combo biryani offer');
-  const [format, setFormat] = useState<CreativeFormat>('instagram_post');
-  const [language, setLanguage] = useState('te_en');
   const [refinementText, setRefinementText] = useState('');
 
   const [isGenerating, setIsGenerating] = useState(false);
@@ -46,8 +65,8 @@ export function ImageGeneratorStudio({ userId }: ImageGeneratorStudioProps) {
   );
 
   const selectedProduct = useMemo(
-    () => products.find((p) => p.productId === selectedProductId) || null,
-    [products, selectedProductId]
+    () => products.find((p) => p.productId === draft.selectedProductId) || null,
+    [products, draft.selectedProductId]
   );
 
   useEffect(() => {
@@ -74,7 +93,7 @@ export function ImageGeneratorStudio({ userId }: ImageGeneratorStudioProps) {
   }, [userId]);
 
   const handleGenerate = () => {
-    if (!prompt.trim()) return;
+    if (!draft.prompt.trim()) return;
     setIsGenerating(true);
     setGenerationStep(1);
 
@@ -83,7 +102,6 @@ export function ImageGeneratorStudio({ userId }: ImageGeneratorStudioProps) {
     const timer3 = setTimeout(() => {
       setGenerationStep(4);
       setIsGenerating(false);
-      // Sample alternative image URL
       setGeneratedImageUrl(
         'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=800&auto=format&fit=crop&q=80'
       );
@@ -109,11 +127,45 @@ export function ImageGeneratorStudio({ userId }: ImageGeneratorStudioProps) {
   };
 
   return (
-    <div className="mx-auto max-w-[1600px] space-y-6 p-4 sm:p-6 text-slate-900 dark:text-slate-100">
+    <div className="mx-auto max-w-[1600px] space-y-6 p-4 text-slate-900 sm:p-6 dark:text-slate-100">
+      {/* Restored Draft Auto-Save Notification */}
+      {isRestored && (
+        <div className="flex items-center justify-between rounded-2xl border border-amber-300 bg-amber-50 p-4 text-xs text-amber-900 shadow-sm dark:border-amber-800 dark:bg-amber-950/70 dark:text-amber-200">
+          <div className="flex items-center gap-2">
+            <span>💾</span>
+            <span>
+              <strong>Restored unsaved image studio draft!</strong>
+              {lastSavedAt && (
+                <span className="ml-1 text-[11px] opacity-75">
+                  (Auto-saved at {lastSavedAt.toLocaleTimeString()})
+                </span>
+              )}
+            </span>
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={dismissRestoredNotice}
+              className="rounded-lg px-2.5 py-1 font-semibold hover:bg-amber-100 dark:hover:bg-amber-900"
+            >
+              Keep Draft
+            </button>
+            <button
+              onClick={clearDraft}
+              className="rounded-lg bg-amber-200 px-2.5 py-1 font-bold text-amber-950 hover:bg-amber-300 dark:bg-amber-800 dark:text-amber-100"
+            >
+              Discard & Reset
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Studio Header Bar */}
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between border-b border-slate-200 dark:border-slate-800 pb-4">
+      <div className="flex flex-col gap-3 border-b border-slate-200 pb-4 sm:flex-row sm:items-center sm:justify-between dark:border-slate-800">
         <div className="flex items-center gap-3">
-          <Link href="/creative" className="text-xs font-bold text-amber-600 dark:text-amber-400 hover:underline">
+          <Link
+            href="/creative"
+            className="text-xs font-bold text-amber-600 hover:underline dark:text-amber-400"
+          >
             ← Creative Studio
           </Link>
           <span className="text-slate-300 dark:text-slate-700">/</span>
@@ -123,48 +175,56 @@ export function ImageGeneratorStudio({ userId }: ImageGeneratorStudioProps) {
         </div>
 
         <div className="flex items-center gap-3 text-xs">
+          {lastSavedAt && (
+            <span className="font-medium text-emerald-600 dark:text-emerald-400">✓ Auto-saved</span>
+          )}
           <span className="text-slate-500">Format:</span>
           <span className="font-semibold text-amber-500 uppercase">
-            {CREATIVE_FORMATS.find((f) => f.value === format)?.label || format}
+            {CREATIVE_FORMATS.find((f) => f.value === draft.format)?.label || draft.format}
           </span>
         </div>
       </div>
 
+      {/* Side-by-Side Hook A/B Generator */}
+      <SideBySideHookABGenerator
+        topicPrompt={draft.prompt}
+        currentHeadline={draft.prompt}
+        onSelectHook={(newHeadline) => updateField('prompt', newHeadline)}
+      />
+
       {/* 3-Column Studio Layout */}
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-12">
-        {/* ============================================================ */}
-        {/* LEFT COLUMN: Controls & Prompt Input (4 cols)                */}
-        {/* ============================================================ */}
-        <div className="lg:col-span-4 space-y-5">
-          <div className="rounded-3xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-5 shadow-sm space-y-4">
-            <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-3">
-              <h2 className="font-bold text-sm text-slate-900 dark:text-white">
+        {/* LEFT COLUMN: Controls & Prompt Input */}
+        <div className="space-y-5 lg:col-span-4">
+          <div className="space-y-4 rounded-3xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3 dark:border-slate-800">
+              <h2 className="text-sm font-bold text-slate-900 dark:text-white">
                 1. Creative Brief & Intent
               </h2>
               <MitraMark size="sm" decorative />
             </div>
 
             <div>
-              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+              <label className="mb-1 block text-xs font-semibold text-slate-700 dark:text-slate-300">
                 What are you creating today?
               </label>
               <textarea
-                value={prompt}
-                onChange={(e) => setPrompt(e.target.value)}
+                value={draft.prompt}
+                onChange={(e) => updateField('prompt', e.target.value)}
                 rows={3}
                 placeholder="e.g. Weekend family biryani combo discount with festive decor..."
-                className="w-full rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 p-3 text-xs text-slate-900 dark:text-slate-100 placeholder:text-slate-400 focus:border-amber-500 focus:outline-none"
+                className="w-full rounded-xl border border-slate-200 bg-slate-50 p-3 text-xs text-slate-900 placeholder:text-slate-400 focus:border-amber-500 focus:outline-none dark:border-slate-800 dark:bg-slate-950 dark:text-slate-100"
               />
             </div>
 
             <div>
-              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+              <label className="mb-1 block text-xs font-semibold text-slate-700 dark:text-slate-300">
                 Format
               </label>
               <select
-                value={format}
-                onChange={(e) => setFormat(e.target.value as CreativeFormat)}
-                className="w-full rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 p-2.5 text-xs text-slate-900 dark:text-slate-100 focus:border-amber-500 focus:outline-none"
+                value={draft.format}
+                onChange={(e) => updateField('format', e.target.value as CreativeFormat)}
+                className="w-full rounded-xl border border-slate-200 bg-white p-2.5 text-xs text-slate-900 focus:border-amber-500 focus:outline-none dark:border-slate-800 dark:bg-slate-950 dark:text-slate-100"
               >
                 {CREATIVE_FORMATS.map((f) => (
                   <option key={f.value} value={f.value}>
@@ -176,13 +236,13 @@ export function ImageGeneratorStudio({ userId }: ImageGeneratorStudioProps) {
 
             {/* Product Catalog Link */}
             <div>
-              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+              <label className="mb-1 block text-xs font-semibold text-slate-700 dark:text-slate-300">
                 Featured Product (Catalog)
               </label>
               <select
-                value={selectedProductId || ''}
-                onChange={(e) => setSelectedProductId(e.target.value || null)}
-                className="w-full rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 p-2.5 text-xs text-slate-900 dark:text-slate-100 focus:border-amber-500 focus:outline-none"
+                value={draft.selectedProductId || ''}
+                onChange={(e) => updateField('selectedProductId', e.target.value || null)}
+                className="w-full rounded-xl border border-slate-200 bg-white p-2.5 text-xs text-slate-900 focus:border-amber-500 focus:outline-none dark:border-slate-800 dark:bg-slate-950 dark:text-slate-100"
               >
                 <option value="">Auto-detect from Business Brain</option>
                 {products.map((p) => (
@@ -194,13 +254,13 @@ export function ImageGeneratorStudio({ userId }: ImageGeneratorStudioProps) {
             </div>
 
             <div>
-              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+              <label className="mb-1 block text-xs font-semibold text-slate-700 dark:text-slate-300">
                 Language & Dialect
               </label>
               <select
-                value={language}
-                onChange={(e) => setLanguage(e.target.value)}
-                className="w-full rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 p-2.5 text-xs text-slate-900 dark:text-slate-100 focus:border-amber-500 focus:outline-none"
+                value={draft.language}
+                onChange={(e) => updateField('language', e.target.value)}
+                className="w-full rounded-xl border border-slate-200 bg-white p-2.5 text-xs text-slate-900 focus:border-amber-500 focus:outline-none dark:border-slate-800 dark:bg-slate-950 dark:text-slate-100"
               >
                 <option value="te_en">Telugu + English (Hyderabadi Style)</option>
                 <option value="en">English (Professional)</option>
@@ -211,28 +271,26 @@ export function ImageGeneratorStudio({ userId }: ImageGeneratorStudioProps) {
             <Button
               onClick={handleGenerate}
               loading={isGenerating}
-              disabled={isGenerating || !prompt.trim()}
-              className="w-full bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-slate-950 font-bold text-xs py-3 rounded-xl shadow-md"
+              disabled={isGenerating || !draft.prompt.trim()}
+              className="w-full rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 py-3 text-xs font-bold text-slate-950 shadow-md hover:from-amber-600 hover:to-orange-600"
             >
               {isGenerating ? 'Mitra is Designing...' : 'Create Image with Mitra'}
             </Button>
           </div>
         </div>
 
-        {/* ============================================================ */}
-        {/* CENTER COLUMN: Large Visual Canvas Preview (5 cols)           */}
-        {/* ============================================================ */}
-        <div className="lg:col-span-5 space-y-4">
-          <div className="rounded-3xl border border-slate-200 dark:border-slate-800 bg-slate-950 p-4 shadow-xl flex flex-col justify-between min-h-[500px]">
-            <div className="flex items-center justify-between pb-2 border-b border-slate-800 text-xs text-slate-400">
-              <span className="font-semibold text-amber-400 uppercase tracking-wider">
+        {/* CENTER COLUMN: Large Visual Canvas Preview */}
+        <div className="space-y-4 lg:col-span-5">
+          <div className="flex min-h-[500px] flex-col justify-between rounded-3xl border border-slate-200 bg-slate-950 p-4 shadow-xl dark:border-slate-800">
+            <div className="flex items-center justify-between border-b border-slate-800 pb-2 text-xs text-slate-400">
+              <span className="font-semibold tracking-wider text-amber-400 uppercase">
                 Visual Canvas Preview
               </span>
               <span>1080 × 1080</span>
             </div>
 
             {/* Generated Image Preview */}
-            <div className="relative overflow-hidden rounded-2xl bg-slate-900 aspect-square flex items-center justify-center border border-slate-800 my-2">
+            <div className="relative my-2 flex aspect-square items-center justify-center overflow-hidden rounded-2xl border border-slate-800 bg-slate-900">
               <AnimatePresence mode="wait">
                 <motion.img
                   key={generatedImageUrl}
@@ -247,7 +305,7 @@ export function ImageGeneratorStudio({ userId }: ImageGeneratorStudioProps) {
               </AnimatePresence>
 
               {isGenerating && (
-                <div className="absolute inset-0 bg-slate-950/80 backdrop-blur-md flex flex-col items-center justify-center p-6 text-center space-y-3">
+                <div className="absolute inset-0 flex flex-col items-center justify-center space-y-3 bg-slate-950/80 p-6 text-center backdrop-blur-md">
                   <MitraMark size="lg" state="loading" decorative />
                   <p className="text-xs font-bold text-amber-400">
                     {generationStep === 1 && 'Understanding brief & brand rules...'}
@@ -260,7 +318,7 @@ export function ImageGeneratorStudio({ userId }: ImageGeneratorStudioProps) {
             </div>
 
             {/* AI Refinement Input Area */}
-            <div className="space-y-2 pt-2 border-t border-slate-800">
+            <div className="space-y-2 border-t border-slate-800 pt-2">
               <label className="block text-[11px] font-semibold text-slate-300">
                 💬 AI Natural Refinement
               </label>
@@ -276,7 +334,7 @@ export function ImageGeneratorStudio({ userId }: ImageGeneratorStudioProps) {
                   loading={isRefining}
                   disabled={!refinementText.trim() || isRefining}
                   size="sm"
-                  className="bg-amber-500 text-slate-950 font-bold text-xs"
+                  className="bg-amber-500 text-xs font-bold text-slate-950"
                 >
                   Refine
                 </Button>
@@ -285,13 +343,11 @@ export function ImageGeneratorStudio({ userId }: ImageGeneratorStudioProps) {
           </div>
         </div>
 
-        {/* ============================================================ */}
-        {/* RIGHT COLUMN: Mitra Business Context & Actions (3 cols)      */}
-        {/* ============================================================ */}
-        <div className="lg:col-span-3 space-y-4">
+        {/* RIGHT COLUMN: Mitra Business Context & Actions */}
+        <div className="space-y-4 lg:col-span-3">
           {/* Mitra Context Card */}
-          <div className="rounded-3xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-5 shadow-sm space-y-3">
-            <div className="flex items-center gap-2 font-bold text-xs text-amber-600 dark:text-amber-400 uppercase tracking-wider">
+          <div className="space-y-3 rounded-3xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+            <div className="flex items-center gap-2 text-xs font-bold tracking-wider text-amber-600 uppercase dark:text-amber-400">
               <span>🧠</span> Mitra Knows Your Business
             </div>
 
@@ -305,7 +361,8 @@ export function ImageGeneratorStudio({ userId }: ImageGeneratorStudioProps) {
                 {business?.location?.city || 'Hyderabad'}
               </p>
               <p>
-                <strong className="text-slate-900 dark:text-white">Brand Voice:</strong> Friendly / Local / Playful
+                <strong className="text-slate-900 dark:text-white">Brand Voice:</strong> Friendly /
+                Local / Playful
               </p>
               <p>
                 <strong className="text-slate-900 dark:text-white">Selected Product:</strong>{' '}
@@ -315,19 +372,19 @@ export function ImageGeneratorStudio({ userId }: ImageGeneratorStudioProps) {
           </div>
 
           {/* Mascot Guidance */}
-          <div className="rounded-3xl border border-slate-200 dark:border-slate-800 bg-gradient-to-r from-amber-500/10 to-orange-500/10 p-4 flex items-center gap-3">
+          <div className="flex items-center gap-3 rounded-3xl border border-slate-200 bg-gradient-to-r from-amber-500/10 to-orange-500/10 p-4 dark:border-slate-800">
             <Mascot state="designer" size="sm" animated />
-            <p className="text-xs text-slate-700 dark:text-slate-300 font-medium">
+            <p className="text-xs font-medium text-slate-700 dark:text-slate-300">
               &quot;I&apos;ve aligned this visual with your Kondapur audience preferences!&quot;
             </p>
           </div>
 
           {/* Quick Actions */}
           <div className="space-y-2 pt-2">
-            <Button className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs py-2.5 rounded-xl">
+            <Button className="w-full rounded-xl bg-emerald-600 py-2.5 text-xs font-bold text-white hover:bg-emerald-700">
               ✓ Approve & Use in Campaign
             </Button>
-            <Button variant="outline" className="w-full text-xs py-2.5 rounded-xl">
+            <Button variant="outline" className="w-full rounded-xl py-2.5 text-xs">
               📥 Download High-Res
             </Button>
           </div>

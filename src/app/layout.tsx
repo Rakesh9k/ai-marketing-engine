@@ -62,9 +62,6 @@ export const metadata: Metadata = {
       "Give Mitra your business and photos and create a month's worth of marketing content.",
     images: ['/og-image.png'],
   },
-  verification: {
-    google: 'google-site-verification-code',
-  },
 };
 
 export const viewport: Viewport = {
@@ -76,6 +73,7 @@ export const viewport: Viewport = {
 };
 
 import { MesurerWrapper } from '@/components/shared/MesurerWrapper';
+import { OfflineBanner } from '@/components/shared/OfflineBanner';
 import { MascotProvider } from '@/components/mascot/MascotProvider';
 import { MascotWidget } from '@/components/mascot/MascotWidget';
 import { AmbientBackground } from '@/components/motion/AmbientBackground';
@@ -84,8 +82,7 @@ export default function RootLayout({ children }: React.PropsWithChildren) {
   return (
     <html lang="en" className={`h-full antialiased ${geistSans.variable}`} suppressHydrationWarning>
       <head>
-        <link rel="preconnect" href="https://fonts.googleapis.com" />
-        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
+        {/* No Google Fonts preconnects: next/font self-hosts Geist from this origin at build time. */}
         <link rel="dns-prefetch" href="https://firebasestorage.googleapis.com" />
         <script dangerouslySetInnerHTML={{ __html: THEME_INIT_SCRIPT }} />
       </head>
@@ -93,10 +90,12 @@ export default function RootLayout({ children }: React.PropsWithChildren) {
         <ThemeProvider>
           <ToastProvider>
             <MascotProvider>
+              <OfflineBanner />
               <AmbientBackground />
               {children}
               <MascotWidget />
-              <MesurerWrapper />
+              {/* Design-inspection overlay with global shortcuts: development only, never shipped to customers. */}
+              {process.env.NODE_ENV === 'development' && <MesurerWrapper />}
             </MascotProvider>
           </ToastProvider>
         </ThemeProvider>

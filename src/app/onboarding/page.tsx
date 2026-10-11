@@ -5,8 +5,9 @@ import { motion, useReducedMotion } from 'motion/react';
 import { useAuth } from '@/features/auth/hooks/useAuth';
 import { businessService } from '@/services/database';
 import { callFunction } from '@/services/api';
+import { getFirebaseAuth } from '@/lib/firebase/client';
 
-import { REGIONAL_STYLES, CAMPAIGN_STYLES } from '@/lib/constants';
+import type { REGIONAL_STYLES, CAMPAIGN_STYLES } from '@/lib/constants';
 
 import { ScrollReactiveBackground } from '@/components/onboarding/ScrollReactiveBackground';
 import { OnboardingProgress } from '@/components/onboarding/OnboardingProgress';
@@ -15,7 +16,6 @@ import { Step2BusinessType } from '@/components/onboarding/Step2BusinessType';
 import { Step3Location } from '@/components/onboarding/Step3Location';
 import { Step4Contact } from '@/components/onboarding/Step4Contact';
 import { Step5Marketing } from '@/components/onboarding/Step5Marketing';
-import { Step6BrandStyle } from '@/components/onboarding/Step6BrandStyle';
 import { Step7Review } from '@/components/onboarding/Step7Review';
 import { Step8Completion } from '@/components/onboarding/Step8Completion';
 
@@ -186,7 +186,7 @@ export default function OnboardingPage() {
       await callFunction<
         {
           name: string;
-          category: 'restaurant' | 'salon' | 'real_estate';
+          category: 'restaurant' | 'salon' | 'real_estate' | 'general';
           description?: string;
           location: { city: string; state: string; locality?: string; address?: string };
           contact: { phone: string; whatsapp: string };
@@ -194,7 +194,8 @@ export default function OnboardingPage() {
           services?: Array<{
             id: string;
             name: string;
-            category: 'hair' | 'skin' | 'nails' | 'makeup' | 'bridal' | 'spa' | 'grooming' | 'other';
+            category:
+              'hair' | 'skin' | 'nails' | 'makeup' | 'bridal' | 'spa' | 'grooming' | 'other';
             price: number;
             active: boolean;
           }>;
@@ -223,7 +224,7 @@ export default function OnboardingPage() {
         functionName: 'createBusiness',
         data: {
           name: form.name.trim(),
-          category: form.category === 'other' ? 'restaurant' : form.category,
+          category: form.category === 'other' ? 'general' : form.category,
           description: form.description?.trim() || undefined,
           location: {
             city: form.city.trim(),
@@ -281,6 +282,12 @@ export default function OnboardingPage() {
           contentStyle: form.contentStyle as (typeof CAMPAIGN_STYLES)[number]['value'],
         },
       });
+      // createBusiness mints the businessIds custom claim server-side. The browser's current ID token
+      // pre-dates it, so without a forced refresh the user's first product/asset writes are denied by
+      // Firestore rules until they happen to sign out and in again.
+      await getFirebaseAuth()
+        ?.currentUser?.getIdToken(true)
+        .catch((tokenError) => console.error('Token refresh after onboarding failed', tokenError));
       setStep(100);
     } catch (err) {
       console.error(err);
@@ -296,7 +303,7 @@ export default function OnboardingPage() {
   if (step === 100) {
     return (
       <ScrollReactiveBackground mousePos={mousePos} scrollVelocity={scrollVelocity}>
-        <div className="py-12 px-4 max-w-5xl mx-auto min-h-screen flex items-center justify-center">
+        <div className="mx-auto flex min-h-screen max-w-5xl items-center justify-center px-4 py-12">
           <Step8Completion />
         </div>
       </ScrollReactiveBackground>
@@ -305,7 +312,7 @@ export default function OnboardingPage() {
 
   return (
     <ScrollReactiveBackground mousePos={mousePos} scrollVelocity={scrollVelocity}>
-      <div ref={containerRef} className="min-h-screen flex flex-col font-sans pb-12">
+      <div ref={containerRef} className="flex min-h-screen flex-col pb-12 font-sans">
         {/* Animated Progress Header */}
         <OnboardingProgress
           currentStep={step}
@@ -314,7 +321,7 @@ export default function OnboardingPage() {
         />
 
         {/* Main Content Area */}
-        <main className="relative z-10 flex-1 max-w-6xl mx-auto w-full px-4 sm:px-6 py-6 sm:py-10 flex flex-col justify-center">
+        <main className="relative z-10 mx-auto flex w-full max-w-6xl flex-1 flex-col justify-center px-4 py-6 sm:px-6 sm:py-10">
           <motion.div
             key={step}
             initial={reduceMotion ? { opacity: 1 } : { opacity: 0, y: 12 }}
@@ -326,9 +333,9 @@ export default function OnboardingPage() {
               <div className="space-y-8">
                 <Step1Welcome onNext={() => handleNext()} mousePos={mousePos} />
 
-                <div className="bg-white rounded-3xl border border-neutral-200/90 p-6 sm:p-8 shadow-sm">
+                <div className="rounded-3xl border border-neutral-200/90 bg-white p-6 shadow-sm sm:p-8">
                   <div className="mb-4">
-                    <span className="text-xs font-extrabold uppercase tracking-wider text-[#E84D1A]">
+                    <span className="text-xs font-extrabold tracking-wider text-[#E84D1A] uppercase">
                       CHAPTER 1 — Business Identity
                     </span>
                     <h2 className="text-xl font-extrabold text-[#1A1A1E]">Business Basics</h2>
@@ -339,7 +346,7 @@ export default function OnboardingPage() {
 
                   <form onSubmit={handleNext} className="space-y-5">
                     <div>
-                      <label className="block text-sm font-bold text-[#1A1A1E] mb-1">
+                      <label className="mb-1 block text-sm font-bold text-[#1A1A1E]">
                         Business Name *
                       </label>
                       <input
@@ -347,34 +354,34 @@ export default function OnboardingPage() {
                         onChange={(e) => setForm({ ...form, name: e.target.value })}
                         type="text"
                         placeholder="e.g., Biryani House"
-                        className="w-full rounded-2xl border border-neutral-300 bg-white px-4 py-3.5 text-sm text-[#1A1A1E] placeholder:text-neutral-400 focus:border-[#E84D1A] focus:ring-2 focus:ring-[#E84D1A]/20 outline-none transition-all"
+                        className="w-full rounded-2xl border border-neutral-300 bg-white px-4 py-3.5 text-sm text-[#1A1A1E] transition-all outline-none placeholder:text-neutral-400 focus:border-[#E84D1A] focus:ring-2 focus:ring-[#E84D1A]/20"
                       />
                       {errors.name && (
-                        <p className="text-red-600 mt-1.5 text-xs font-bold">{errors.name}</p>
+                        <p className="mt-1.5 text-xs font-bold text-red-600">{errors.name}</p>
                       )}
                     </div>
 
                     <div>
-                      <label className="block text-sm font-bold text-[#1A1A1E] mb-2">
+                      <label className="mb-2 block text-sm font-bold text-[#1A1A1E]">
                         Business Type *
                       </label>
-                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
                         {(['restaurant', 'salon', 'real_estate'] as const).map((cat) => (
                           <button
                             key={cat}
                             type="button"
                             onClick={() => setForm({ ...form, category: cat })}
                             aria-pressed={form.category === cat}
-                            className={`rounded-2xl border p-4 text-left capitalize transition-all cursor-pointer ${
+                            className={`cursor-pointer rounded-2xl border p-4 text-left capitalize transition-all ${
                               form.category === cat
-                                ? 'border-[#E84D1A] bg-orange-50/70 text-[#E84D1A] font-extrabold ring-2 ring-[#E84D1A]/20 shadow-xs'
+                                ? 'border-[#E84D1A] bg-orange-50/70 font-extrabold text-[#E84D1A] shadow-xs ring-2 ring-[#E84D1A]/20'
                                 : 'border-neutral-200 text-neutral-700 hover:bg-neutral-50'
                             }`}
                           >
                             <span className="block text-sm font-bold">
                               {cat === 'real_estate' ? 'Real Estate' : cat}
                             </span>
-                            <span className="text-[11px] text-neutral-500 font-normal mt-0.5 block">
+                            <span className="mt-0.5 block text-[11px] font-normal text-neutral-500">
                               {cat === 'restaurant'
                                 ? 'Food & Dining'
                                 : cat === 'salon'
@@ -385,12 +392,12 @@ export default function OnboardingPage() {
                         ))}
                       </div>
                       {errors.category && (
-                        <p className="text-red-600 mt-1.5 text-xs font-bold">{errors.category}</p>
+                        <p className="mt-1.5 text-xs font-bold text-red-600">{errors.category}</p>
                       )}
                     </div>
 
                     <div>
-                      <label className="block text-sm font-bold text-[#1A1A1E] mb-1">
+                      <label className="mb-1 block text-sm font-bold text-[#1A1A1E]">
                         Short Tagline or Description (Optional)
                       </label>
                       <textarea
@@ -400,21 +407,21 @@ export default function OnboardingPage() {
                         }
                         rows={2}
                         placeholder="e.g., Authentic Dum Biryani since 2012"
-                        className="w-full rounded-2xl border border-neutral-300 bg-white px-4 py-3 text-sm text-[#1A1A1E] placeholder:text-neutral-400 focus:border-[#E84D1A] focus:ring-2 focus:ring-[#E84D1A]/20 outline-none transition-all resize-none"
+                        className="w-full resize-none rounded-2xl border border-neutral-300 bg-white px-4 py-3 text-sm text-[#1A1A1E] transition-all outline-none placeholder:text-neutral-400 focus:border-[#E84D1A] focus:ring-2 focus:ring-[#E84D1A]/20"
                       />
                     </div>
 
-                    <div className="pt-4 flex items-center justify-between gap-4 border-t border-neutral-100">
+                    <div className="flex items-center justify-between gap-4 border-t border-neutral-100 pt-4">
                       <button
                         type="button"
                         onClick={handleBack}
-                        className="px-6 py-3 rounded-2xl border border-neutral-200 text-neutral-700 hover:bg-neutral-50 font-bold text-sm"
+                        className="rounded-2xl border border-neutral-200 px-6 py-3 text-sm font-bold text-neutral-700 hover:bg-neutral-50"
                       >
                         Back
                       </button>
                       <button
                         type="submit"
-                        className="px-8 py-3.5 rounded-2xl bg-[#E84D1A] hover:bg-[#d03f10] text-white font-extrabold text-sm shadow-md shadow-orange-600/20 cursor-pointer"
+                        className="cursor-pointer rounded-2xl bg-[#E84D1A] px-8 py-3.5 text-sm font-extrabold text-white shadow-md shadow-orange-600/20 hover:bg-[#d03f10]"
                       >
                         Continue →
                       </button>

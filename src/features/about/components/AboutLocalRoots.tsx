@@ -39,34 +39,35 @@ export function AboutLocalRoots() {
   const current = SECTORS.find((s) => s.id === activeSector) || SECTORS[0]!;
 
   return (
-    <section className="bg-bg-secondary py-20 relative overflow-hidden border-t border-border-light">
-      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 space-y-12">
+    <section className="bg-bg-secondary border-border-light relative overflow-hidden border-t py-20">
+      <div className="mx-auto max-w-7xl space-y-12 px-4 sm:px-6 lg:px-8">
         {/* Header */}
-        <div className="text-center max-w-3xl mx-auto space-y-4">
+        <div className="mx-auto max-w-3xl space-y-4 text-center">
           <div className="inline-flex items-center gap-2 rounded-full border border-orange-200 bg-orange-50 px-3.5 py-1 text-xs font-bold text-orange-800">
             <span>🏛️</span>
             <span>Built for Real Indian Businesses</span>
           </div>
 
-          <h2 className="text-3xl sm:text-4xl lg:text-5xl font-black text-text-primary tracking-tight">
+          <h2 className="text-text-primary text-3xl font-black tracking-tight sm:text-4xl lg:text-5xl">
             Rooted in <span className="text-brand-600">Local Context</span> &amp; Culture
           </h2>
 
-          <p className="text-text-secondary text-base sm:text-lg leading-relaxed">
-            Language matters. Festivals matter. Neighborhoods matter. Mitra understands English, Telugu, Hindi, Hinglish, and Telglish to speak directly to your local market.
+          <p className="text-text-secondary text-base leading-relaxed sm:text-lg">
+            Language matters. Festivals matter. Neighborhoods matter. Mitra understands English,
+            Telugu, Hindi, Hinglish, and Telglish to speak directly to your local market.
           </p>
         </div>
 
         {/* Sector Tabs */}
-        <div className="flex flex-wrap items-center justify-center gap-2 max-w-2xl mx-auto">
+        <div className="mx-auto flex max-w-2xl flex-wrap items-center justify-center gap-2">
           {SECTORS.map((s) => (
             <button
               key={s.id}
               onClick={() => setActiveSector(s.id)}
-              className={`flex items-center gap-2 rounded-2xl px-5 py-3 text-xs font-extrabold transition-all cursor-pointer ${
+              className={`flex cursor-pointer items-center gap-2 rounded-2xl px-5 py-3 text-xs font-extrabold transition-all ${
                 activeSector === s.id
-                  ? 'bg-brand-500 text-white shadow-md shadow-brand-500/20'
-                  : 'bg-surface text-text-secondary border border-border-light hover:bg-bg-secondary hover:text-text-primary'
+                  ? 'bg-brand-500 shadow-brand-500/20 text-white shadow-md'
+                  : 'bg-surface text-text-secondary border-border-light hover:bg-bg-secondary hover:text-text-primary border'
               }`}
             >
               <span>{s.icon}</span>
@@ -81,41 +82,44 @@ export function AboutLocalRoots() {
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.3 }}
-          className="rounded-3xl border border-border-light bg-surface p-8 sm:p-12 shadow-xl max-w-4xl mx-auto"
+          className="border-border-light bg-surface mx-auto max-w-4xl rounded-3xl border p-8 shadow-xl sm:p-12"
         >
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-center">
+          <div className="grid grid-cols-1 items-center gap-8 lg:grid-cols-12">
             <div className="space-y-4 lg:col-span-8">
               <span className="text-4xl">{current.icon}</span>
-              <h3 className="text-2xl font-bold text-text-primary">{current.name}</h3>
-              <p className="text-brand-600 font-extrabold text-sm sm:text-base">
+              <h3 className="text-text-primary text-2xl font-bold">{current.name}</h3>
+              <p className="text-brand-600 text-sm font-extrabold sm:text-base">
                 “{current.tagline}”
               </p>
-              <p className="text-xs sm:text-sm text-text-secondary leading-relaxed">
+              <p className="text-text-secondary text-xs leading-relaxed sm:text-sm">
                 {current.desc}
               </p>
 
               <div className="space-y-2 pt-2">
                 {current.bulletPoints.map((bp, idx) => (
-                  <div key={idx} className="flex items-center gap-2 text-xs font-semibold text-text-primary">
-                    <span className="text-emerald-600 font-bold">✓</span>
+                  <div
+                    key={idx}
+                    className="text-text-primary flex items-center gap-2 text-xs font-semibold"
+                  >
+                    <span className="font-bold text-emerald-600">✓</span>
                     <span>{bp}</span>
                   </div>
                 ))}
               </div>
             </div>
 
-            <div className="flex flex-col items-center justify-center lg:col-span-4 border-t lg:border-t-0 lg:border-l border-border-light pt-6 lg:pt-0 lg:pl-8 space-y-4">
-              <div className="rounded-2xl bg-brand-50 p-4 border border-brand-200 text-center w-full">
-                <span className="text-[11px] font-bold text-brand-800 uppercase tracking-wide">
+            <div className="border-border-light flex flex-col items-center justify-center space-y-4 border-t pt-6 lg:col-span-4 lg:border-t-0 lg:border-l lg:pt-0 lg:pl-8">
+              <div className="bg-brand-50 border-brand-200 w-full rounded-2xl border p-4 text-center">
+                <span className="text-brand-800 text-[11px] font-bold tracking-wide uppercase">
                   Tailored Templates
                 </span>
-                <p className="text-xs text-brand-900 font-semibold mt-1">
+                <p className="text-brand-900 mt-1 text-xs font-semibold">
                   Ready-to-publish campaigns for {current.name}
                 </p>
               </div>
 
               <a href={current.ctaUrl} className="w-full">
-                <Button className="w-full font-bold text-xs rounded-xl py-3">
+                <Button className="w-full rounded-xl py-3 text-xs font-bold">
                   Explore Solutions →
                 </Button>
               </a>

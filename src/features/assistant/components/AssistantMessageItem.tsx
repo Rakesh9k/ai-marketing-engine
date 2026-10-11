@@ -15,9 +15,9 @@ export function AssistantMessageItem({ message, onActionClick }: AssistantMessag
 
   return (
     <div className={`flex flex-col ${isUser ? 'items-end' : 'items-start'} space-y-2`}>
-      <div className="flex items-start gap-3 max-w-[90%] sm:max-w-[80%]">
+      <div className="flex max-w-[90%] items-start gap-3 sm:max-w-[80%]">
         {!isUser && (
-          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-2xl bg-brand-100 border border-brand-200">
+          <div className="bg-brand-100 border-brand-200 flex h-9 w-9 shrink-0 items-center justify-center rounded-2xl border">
             <MitraMascot pose="explain" size="sm" />
           </div>
         )}
@@ -27,20 +27,20 @@ export function AssistantMessageItem({ message, onActionClick }: AssistantMessag
           <div
             className={`rounded-2xl p-4 text-sm leading-relaxed shadow-xs ${
               isUser
-                ? 'bg-brand-600 text-white rounded-br-xs font-medium'
-                : 'bg-white border border-neutral-200/90 text-neutral-900 rounded-bl-xs'
+                ? 'bg-brand-600 rounded-br-xs font-medium text-white'
+                : 'rounded-bl-xs border border-neutral-200/90 bg-white text-neutral-900'
             }`}
           >
             <div className="whitespace-pre-wrap">{message.content}</div>
 
             {/* Rich Progress Steps */}
             {message.progressSteps && message.progressSteps.length > 0 && (
-              <div className="mt-3 space-y-1.5 pt-3 border-t border-neutral-100 text-xs font-semibold">
+              <div className="mt-3 space-y-1.5 border-t border-neutral-100 pt-3 text-xs font-semibold">
                 {message.progressSteps.map((step, idx) => (
                   <div key={idx} className="flex items-center gap-2">
                     {step.status === 'completed' && <span className="text-emerald-600">✓</span>}
                     {step.status === 'running' && (
-                      <span className="h-3 w-3 animate-spin rounded-full border-2 border-brand-500 border-t-transparent" />
+                      <span className="border-brand-500 h-3 w-3 animate-spin rounded-full border-2 border-t-transparent" />
                     )}
                     {step.status === 'pending' && <span className="text-neutral-400">○</span>}
                     {step.status === 'failed' && <span className="text-red-500">✗</span>}
@@ -49,8 +49,8 @@ export function AssistantMessageItem({ message, onActionClick }: AssistantMessag
                         step.status === 'completed'
                           ? 'text-emerald-800'
                           : step.status === 'running'
-                          ? 'text-brand-700 font-bold'
-                          : 'text-neutral-500'
+                            ? 'text-brand-700 font-bold'
+                            : 'text-neutral-500'
                       }
                     >
                       {step.label}
@@ -73,8 +73,12 @@ export function AssistantMessageItem({ message, onActionClick }: AssistantMessag
                     />
                   )}
                   <div>
-                    <h4 className="font-bold text-xs text-neutral-900">{message.productData.name}</h4>
-                    <p className="text-xs font-black text-brand-600">₹{message.productData.price}</p>
+                    <h4 className="text-xs font-bold text-neutral-900">
+                      {message.productData.name}
+                    </h4>
+                    <p className="text-brand-600 text-xs font-black">
+                      ₹{message.productData.price}
+                    </p>
                   </div>
                 </div>
               </div>
@@ -88,7 +92,11 @@ export function AssistantMessageItem({ message, onActionClick }: AssistantMessag
                 if (act.url) {
                   return (
                     <Link key={act.id} href={act.url}>
-                      <Button size="sm" variant="outline" className="text-xs font-bold bg-white shadow-xs">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="bg-white text-xs font-bold shadow-xs"
+                      >
                         {act.label} →
                       </Button>
                     </Link>
@@ -99,7 +107,7 @@ export function AssistantMessageItem({ message, onActionClick }: AssistantMessag
                     key={act.id}
                     size="sm"
                     variant="outline"
-                    className="text-xs font-bold bg-white shadow-xs"
+                    className="bg-white text-xs font-bold shadow-xs"
                     onClick={() => onActionClick?.(act)}
                   >
                     {act.label}
@@ -111,7 +119,7 @@ export function AssistantMessageItem({ message, onActionClick }: AssistantMessag
         </div>
       </div>
 
-      <span className="text-[10px] text-neutral-400 font-medium px-2">
+      <span className="px-2 text-[10px] font-medium text-neutral-400">
         {new Date(message.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
       </span>
     </div>

@@ -39,7 +39,7 @@ describe('VerifyEmailContent', () => {
     expect(await screen.findByText(/verification email sent/i)).toBeInTheDocument();
   });
 
-  it('checks email verification status when clicking I\'ve Verified', async () => {
+  it("checks email verification status when clicking I've Verified", async () => {
     isEmailVerifiedMock.mockReturnValue(true);
     const onVerified = jest.fn();
     const user = userEvent.setup();

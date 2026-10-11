@@ -86,7 +86,7 @@ export function CreativeFeedbackControls({
     const isSubmitting = phase === 'submitting';
     return (
       <div className="mt-6 border-t pt-4 text-left">
-        <p className="mb-3 text-sm font-medium text-neutral-900">What should change?</p>
+        <p className="text-text-primary mb-3 text-sm font-medium">What should change?</p>
         <div className="mb-4 flex flex-wrap gap-2">
           {(
             [
@@ -105,7 +105,7 @@ export function CreativeFeedbackControls({
               className={`rounded-full border px-3 py-1 text-sm transition-colors disabled:opacity-50 ${
                 selectedReason === r
                   ? 'border-brand-600 bg-brand-50 text-brand-700'
-                  : 'border-neutral-200 bg-white text-neutral-700 hover:border-neutral-300'
+                  : 'border-border-light bg-surface text-text-secondary hover:border-border-medium'
               }`}
             >
               {r === 'more_premium' && 'More premium'}
@@ -119,7 +119,7 @@ export function CreativeFeedbackControls({
         </div>
         {selectedReason === 'different' && (
           <textarea
-            className="focus:border-brand-500 focus:ring-brand-500 mb-3 w-full rounded-md border border-neutral-300 p-2 shadow-sm sm:text-sm"
+            className="focus:border-brand-500 focus:ring-brand-500 border-border-medium mb-3 w-full rounded-md border p-2 shadow-sm sm:text-sm"
             placeholder="Tell us what you'd change..."
             rows={2}
             maxLength={500}
@@ -151,7 +151,7 @@ export function CreativeFeedbackControls({
 
   return (
     <div className="mt-6 border-t pt-4 text-left">
-      <p className="mb-3 text-sm font-medium text-neutral-900">How does this feel?</p>
+      <p className="text-text-primary mb-3 text-sm font-medium">How does this feel?</p>
       <div className="flex gap-3">
         <Button
           variant="outline"

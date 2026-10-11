@@ -707,17 +707,12 @@ describe('CampaignDetailContent — Download + WhatsApp (Phase 9)', () => {
   });
 });
 
-describe('CampaignDetailContent — Performance panel (Phase 34)', () => {
+describe('CampaignDetailContent — launch scope (deferred features are not exposed)', () => {
   beforeEach(() => {
     jest.clearAllMocks();
   });
 
-  it('shows a real whatsappClicks count from the backend, never a client-invented number', async () => {
-    callFunctionMock.mockResolvedValueOnce({
-      whatsappClicks: 7,
-      inquiries: null,
-      inquiriesAvailable: false,
-    });
+  it('shows no publish, schedule, performance or pipeline-trace UI and makes no deferred backend calls', () => {
     render(
       <CampaignDetailContent
         campaign={makeCampaign()}
@@ -725,57 +720,10 @@ describe('CampaignDetailContent — Performance panel (Phase 34)', () => {
         truthCheckStatus="PASS"
       />
     );
-    expect(await screen.findByText('7')).toBeInTheDocument();
-    expect(callFunctionMock).toHaveBeenCalledWith({
-      functionName: 'getCampaignPerformance',
-      data: { businessId: 'biz_1', campaignId: 'camp_1' },
-    });
-  });
-
-  it('shows "Not available" for inquiries — never a fabricated 0, and never derived from clicks/downloads', async () => {
-    callFunctionMock.mockResolvedValueOnce({
-      whatsappClicks: 12,
-      inquiries: null,
-      inquiriesAvailable: false,
-    });
-    render(
-      <CampaignDetailContent
-        campaign={makeCampaign()}
-        assets={makeAssets()}
-        truthCheckStatus="PASS"
-      />
-    );
-    expect(await screen.findByText('Not available')).toBeInTheDocument();
-    expect(screen.queryByText('Inquiries')?.parentElement?.textContent).not.toMatch(/\b0\b/);
-  });
-
-  it('shows a real, known zero for whatsappClicks when no click has ever been recorded (not "unknown")', async () => {
-    callFunctionMock.mockResolvedValueOnce({
-      whatsappClicks: 0,
-      inquiries: null,
-      inquiriesAvailable: false,
-    });
-    render(
-      <CampaignDetailContent
-        campaign={makeCampaign()}
-        assets={makeAssets()}
-        truthCheckStatus="PASS"
-      />
-    );
-    expect(await screen.findByText('WhatsApp clicks')).toBeInTheDocument();
-    const clicksValue = await screen.findByText('0');
-    expect(clicksValue).toBeInTheDocument();
-  });
-
-  it('renders no Performance panel at all while the backend call has not resolved (never shows a placeholder 0)', () => {
-    callFunctionMock.mockReturnValue(new Promise(() => {})); // never resolves
-    render(
-      <CampaignDetailContent
-        campaign={makeCampaign()}
-        assets={makeAssets()}
-        truthCheckStatus="PASS"
-      />
-    );
-    expect(screen.queryByText('Performance')).not.toBeInTheDocument();
+    expect(screen.queryByText(/Publish Now/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/^📅 Schedule$/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Performance/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/pipeline/i)).not.toBeInTheDocument();
+    expect(callFunctionMock).not.toHaveBeenCalled();
   });
 });

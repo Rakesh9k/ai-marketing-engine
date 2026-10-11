@@ -23,8 +23,7 @@ export function LandingNav() {
     { label: 'Create Campaign', href: '/signup' },
     { label: 'Pricing', href: '/pricing' },
     { label: 'My Business', href: '/business' },
-    { label: 'Templates', href: '/solutions' },
-    { label: 'Analytics', href: '/analytics' },
+    { label: 'Solutions', href: '/solutions' },
   ];
 
   return (

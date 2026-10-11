@@ -11,7 +11,12 @@ interface FloatingCardProps {
   glow?: boolean;
 }
 
-export function FloatingCard({ children, delay = 0, className = '', glow = false }: FloatingCardProps) {
+export function FloatingCard({
+  children,
+  delay = 0,
+  className = '',
+  glow = false,
+}: FloatingCardProps) {
   const reduceMotion = useReducedMotion();
 
   return (
@@ -59,8 +64,10 @@ export function CampaignCard({
         </span>
         <span className="text-xs font-medium text-emerald-600 dark:text-emerald-400">{status}</span>
       </div>
-      <h4 className="mt-2.5 text-sm font-bold text-neutral-900 dark:text-white line-clamp-1">{title}</h4>
-      <div className="mt-3 flex items-center justify-between text-xs text-neutral-500 dark:text-neutral-400 border-t border-neutral-100 dark:border-neutral-800/60 pt-2">
+      <h4 className="mt-2.5 line-clamp-1 text-sm font-bold text-neutral-900 dark:text-white">
+        {title}
+      </h4>
+      <div className="mt-3 flex items-center justify-between border-t border-neutral-100 pt-2 text-xs text-neutral-500 dark:border-neutral-800/60 dark:text-neutral-400">
         <span>{reach}</span>
         <span className="font-semibold text-[#E84D1A]">Mitra AI</span>
       </div>
@@ -83,7 +90,16 @@ export function InsightCard({
     <FloatingCard delay={delay} className={`w-56 ${className}`}>
       <div className="flex items-center gap-2">
         <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#E84D1A]/10 text-[#E84D1A]">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+          <svg
+            width="18"
+            height="18"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2.5"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
             <polyline points="23 6 13.5 15.5 8.5 10.5 1 18" />
             <polyline points="17 6 23 6 23 12" />
           </svg>
@@ -112,12 +128,14 @@ export function SocialPostCard({
 }) {
   return (
     <FloatingCard delay={delay} className={`w-72 ${className}`}>
-      <div className="flex items-center justify-between text-xs text-neutral-400 mb-2">
+      <div className="mb-2 flex items-center justify-between text-xs text-neutral-400">
         <span className="font-semibold text-neutral-700 dark:text-neutral-300">{platform}</span>
         <span>{time}</span>
       </div>
       <div className="rounded-xl bg-neutral-100 p-3 dark:bg-neutral-800/60">
-        <p className="text-xs text-neutral-800 dark:text-neutral-200 line-clamp-2 leading-snug">{caption}</p>
+        <p className="line-clamp-2 text-xs leading-snug text-neutral-800 dark:text-neutral-200">
+          {caption}
+        </p>
       </div>
     </FloatingCard>
   );

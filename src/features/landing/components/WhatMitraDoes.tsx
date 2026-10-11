@@ -72,7 +72,7 @@ export function WhatMitraDoes() {
       num: '03',
       screenId: 'ai_generation' as ScreenId,
       title: 'Mitra creates the campaign',
-      desc: 'Posters, Instagram Reels scripts, localized captions, and WhatsApp broadcasts generated in seconds.',
+      desc: 'Social ad visuals, Instagram Reels scripts, localized captions, and WhatsApp broadcasts generated in seconds.',
       icon: (
         <svg
           className="h-6 w-6 text-purple-600"
@@ -88,8 +88,8 @@ export function WhatMitraDoes() {
     {
       num: '04',
       screenId: 'multi_publish' as ScreenId,
-      title: 'You publish and grow',
-      desc: 'Approve your ready-to-use marketing content and publish directly to reach local customers.',
+      title: 'You share and grow',
+      desc: 'Review your campaign, then share it on WhatsApp or download your post and reel to use anywhere.',
       icon: (
         <svg
           className="h-6 w-6 text-emerald-600"

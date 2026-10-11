@@ -28,7 +28,7 @@ export default function ProductImagesPage() {
       }
     }
     if (user) {
-      loadProducts();
+      void loadProducts();
     }
   }, [user]);
 

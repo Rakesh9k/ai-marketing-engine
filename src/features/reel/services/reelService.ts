@@ -189,6 +189,9 @@ function putFileWithProgress(
 export interface GenerateReelRequest {
   businessId: string;
   reelId: string;
+  notifyOnCompletion?: boolean;
+  notifyEmail?: string;
+  notifyWebhookUrl?: string;
 }
 
 export interface GenerateReelResponse {
@@ -209,6 +212,31 @@ export async function generateReel(request: GenerateReelRequest): Promise<Genera
   return callFunction<GenerateReelRequest & { idempotencyKey: string }, GenerateReelResponse>({
     functionName: 'generateReel',
     data: { ...request, idempotencyKey: generateUUID() },
+  });
+}
+
+export interface RegisterReelWebhookRequest {
+  businessId: string;
+  reelId: string;
+  notifyEmail?: string;
+  notifyWebhookUrl?: string;
+  enablePushNotification?: boolean;
+}
+
+export interface RegisterReelWebhookResponse {
+  success: boolean;
+  message: string;
+}
+
+/**
+ * Registers a background webhook / email notification listener for video generation jobs.
+ */
+export async function registerReelWebhook(
+  request: RegisterReelWebhookRequest
+): Promise<RegisterReelWebhookResponse> {
+  return callFunction<RegisterReelWebhookRequest, RegisterReelWebhookResponse>({
+    functionName: 'registerReelWebhook',
+    data: request,
   });
 }
 

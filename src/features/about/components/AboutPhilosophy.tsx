@@ -58,25 +58,29 @@ export function AboutPhilosophy() {
   const reduceMotion = useReducedMotion();
 
   return (
-    <section id="philosophy" className="bg-surface py-20 relative overflow-hidden border-t border-border-light">
-      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 space-y-16">
+    <section
+      id="philosophy"
+      className="bg-surface border-border-light relative overflow-hidden border-t py-20"
+    >
+      <div className="mx-auto max-w-7xl space-y-16 px-4 sm:px-6 lg:px-8">
         {/* Main Banner Headline */}
-        <div className="rounded-3xl border border-brand-200 bg-gradient-to-r from-brand-50 via-surface to-amber-50/50 p-8 sm:p-12 shadow-lg">
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-center">
+        <div className="border-brand-200 from-brand-50 via-surface rounded-3xl border bg-gradient-to-r to-amber-50/50 p-8 shadow-lg sm:p-12">
+          <div className="grid grid-cols-1 items-center gap-8 lg:grid-cols-12">
             <div className="space-y-4 lg:col-span-8">
-              <span className="text-xs font-extrabold uppercase tracking-wider text-brand-700 bg-brand-100 px-3 py-1 rounded-full">
+              <span className="text-brand-700 bg-brand-100 rounded-full px-3 py-1 text-xs font-extrabold tracking-wider uppercase">
                 What We Believe
               </span>
-              <h2 className="text-3xl sm:text-4xl lg:text-5xl font-black text-text-primary tracking-tight leading-tight">
+              <h2 className="text-text-primary text-3xl leading-tight font-black tracking-tight sm:text-4xl lg:text-5xl">
                 “We don’t think AI should replace your business brain.{' '}
                 <span className="text-brand-600">We think it should amplify it.”</span>
               </h2>
               <p className="text-text-secondary text-base leading-relaxed">
-                Mitra doesn't try to invent a fake identity for your business. It learns who you are and helps you speak to your customers with authentic impact.
+                Mitra doesn't try to invent a fake identity for your business. It learns who you are
+                and helps you speak to your customers with authentic impact.
               </p>
             </div>
 
-            <div className="flex justify-center lg:col-span-4 shrink-0">
+            <div className="flex shrink-0 justify-center lg:col-span-4">
               <MitraMascot pose="explain" size={180} />
             </div>
           </div>
@@ -84,12 +88,12 @@ export function AboutPhilosophy() {
 
         {/* 5 Product Principles */}
         <div className="space-y-6">
-          <div className="text-center max-w-2xl mx-auto space-y-2">
-            <h3 className="text-2xl font-bold text-text-primary">Our 5 Core Product Principles</h3>
-            <p className="text-xs text-text-secondary">How we design every feature inside Mitra</p>
+          <div className="mx-auto max-w-2xl space-y-2 text-center">
+            <h3 className="text-text-primary text-2xl font-bold">Our 5 Core Product Principles</h3>
+            <p className="text-text-secondary text-xs">How we design every feature inside Mitra</p>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
             {PRINCIPLES.map((p, idx) => (
               <motion.div
                 key={idx}
@@ -97,14 +101,14 @@ export function AboutPhilosophy() {
                 whileInView={{ opacity: 1, y: 0 }}
                 viewport={{ once: true }}
                 transition={{ delay: idx * 0.1, duration: 0.4 }}
-                className="flex flex-col justify-between rounded-2xl border border-border-light bg-bg-secondary p-6 shadow-2xs hover:border-brand-300 transition-colors"
+                className="border-border-light bg-bg-secondary hover:border-brand-300 flex flex-col justify-between rounded-2xl border p-6 shadow-2xs transition-colors"
               >
                 <div className="space-y-3">
-                  <span className="text-xs font-black text-brand-600 bg-brand-100/70 px-2.5 py-1 rounded-md">
+                  <span className="text-brand-600 bg-brand-100/70 rounded-md px-2.5 py-1 text-xs font-black">
                     {p.num}
                   </span>
-                  <h4 className="font-bold text-base text-text-primary">{p.title}</h4>
-                  <p className="text-xs text-text-secondary leading-relaxed">{p.desc}</p>
+                  <h4 className="text-text-primary text-base font-bold">{p.title}</h4>
+                  <p className="text-text-secondary text-xs leading-relaxed">{p.desc}</p>
                 </div>
               </motion.div>
             ))}
@@ -112,25 +116,25 @@ export function AboutPhilosophy() {
         </div>
 
         {/* Core Values Section */}
-        <div className="space-y-6 pt-6 border-t border-border-light">
-          <div className="text-center max-w-2xl mx-auto space-y-2">
-            <span className="text-xs font-bold text-brand-700 bg-brand-50 px-3 py-1 rounded-full">
+        <div className="border-border-light space-y-6 border-t pt-6">
+          <div className="mx-auto max-w-2xl space-y-2 text-center">
+            <span className="text-brand-700 bg-brand-50 rounded-full px-3 py-1 text-xs font-bold">
               Our Values
             </span>
-            <h3 className="text-2xl font-bold text-text-primary">What Drives Us Every Day</h3>
+            <h3 className="text-text-primary text-2xl font-bold">What Drives Us Every Day</h3>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+          <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4">
             {CORE_VALUES.map((val, idx) => (
               <div
                 key={idx}
-                className="flex flex-col items-start rounded-2xl border border-border-light bg-surface p-6 shadow-2xs space-y-3"
+                className="border-border-light bg-surface flex flex-col items-start space-y-3 rounded-2xl border p-6 shadow-2xs"
               >
-                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-brand-50 border border-brand-100 text-xl">
+                <div className="bg-brand-50 border-brand-100 flex h-10 w-10 items-center justify-center rounded-xl border text-xl">
                   {val.icon}
                 </div>
-                <h4 className="font-bold text-sm text-text-primary">{val.title}</h4>
-                <p className="text-xs text-text-tertiary leading-relaxed">{val.desc}</p>
+                <h4 className="text-text-primary text-sm font-bold">{val.title}</h4>
+                <p className="text-text-tertiary text-xs leading-relaxed">{val.desc}</p>
               </div>
             ))}
           </div>

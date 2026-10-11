@@ -1488,24 +1488,6 @@ export default function BusinessProfilePage() {
             })
           }
         />
-
-        <div className="flex flex-col items-start justify-between gap-4 rounded-2xl border border-slate-200 bg-white p-6 shadow-xs sm:flex-row sm:items-center dark:border-slate-800 dark:bg-slate-900">
-          <div>
-            <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-100">
-              Social Media Connections
-            </h3>
-            <p className="text-sm text-slate-500 dark:text-slate-400">
-              Connect your Facebook Pages and Instagram Professional accounts to publish campaigns
-              directly.
-            </p>
-          </div>
-          <Link
-            href="/settings/social"
-            className="shrink-0 rounded-lg bg-blue-600 px-4 py-2 text-xs font-semibold text-white hover:bg-blue-700"
-          >
-            Manage Social Connections →
-          </Link>
-        </div>
       </div>
     </div>
   );

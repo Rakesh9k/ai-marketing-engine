@@ -93,7 +93,8 @@ export function KineticHeadline({ text, highlightWord, className = '' }: Kinetic
   return (
     <h2 className={`font-bold tracking-tight ${className}`}>
       {words.map((word, idx) => {
-        const isHighlight = highlightWord && word.toLowerCase().includes(highlightWord.toLowerCase());
+        const isHighlight =
+          highlightWord && word.toLowerCase().includes(highlightWord.toLowerCase());
 
         return (
           <motion.span
@@ -102,9 +103,9 @@ export function KineticHeadline({ text, highlightWord, className = '' }: Kinetic
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true }}
             transition={{ duration: 0.5, delay: idx * 0.05 }}
-            className={`inline-block mr-[0.25em] transition-transform duration-300 hover:scale-105 ${
+            className={`mr-[0.25em] inline-block transition-transform duration-300 hover:scale-105 ${
               isHighlight
-                ? 'text-brand-600 bg-gradient-to-r from-brand-600 via-brand-500 to-amber-600 bg-clip-text text-transparent'
+                ? 'text-brand-600 from-brand-600 via-brand-500 bg-gradient-to-r to-amber-600 bg-clip-text text-transparent'
                 : 'text-text-primary'
             }`}
           >
@@ -145,18 +146,20 @@ export function RotatingWordHeadline({
   return (
     <div
       ref={containerRef}
-      className="w-full max-w-full flex items-center justify-center overflow-visible py-1 px-1"
+      className="flex w-full max-w-full items-center justify-center overflow-visible px-1 py-1"
     >
       <h1
-        className={`inline-flex flex-nowrap items-center justify-center gap-x-1.5 sm:gap-x-2.5 leading-none font-extrabold tracking-tight whitespace-nowrap ${className}`}
+        className={`inline-flex flex-nowrap items-center justify-center gap-x-1.5 leading-none font-extrabold tracking-tight whitespace-nowrap sm:gap-x-2.5 ${className}`}
       >
         {/* Animated Vertical Text Scroll Slot (Dynamic Width Grid, No Wide Gap) */}
-        <span className="relative inline-grid [grid-template-areas:'stack'] items-center text-left overflow-hidden h-[1.3em] shrink-0">
+        <span className="relative inline-grid h-[1.3em] shrink-0 items-center overflow-hidden text-left [grid-template-areas:'stack']">
           <AnimatePresence mode="popLayout" initial={false}>
             <motion.span
               key={currentWord}
               style={{ gridArea: 'stack' }}
-              initial={reduceMotion ? { opacity: 1 } : { y: '100%', opacity: 0, filter: 'blur(3px)' }}
+              initial={
+                reduceMotion ? { opacity: 1 } : { y: '100%', opacity: 0, filter: 'blur(3px)' }
+              }
               animate={{ y: '0%', opacity: 1, filter: 'blur(0px)' }}
               exit={reduceMotion ? { opacity: 0 } : { y: '-100%', opacity: 0, filter: 'blur(3px)' }}
               transition={{
@@ -164,7 +167,7 @@ export function RotatingWordHeadline({
                 opacity: { duration: 0.25 },
                 filter: { duration: 0.2 },
               }}
-              className="inline-block text-brand-600 font-extrabold select-none whitespace-nowrap"
+              className="text-brand-600 inline-block font-extrabold whitespace-nowrap select-none"
             >
               {currentWord}
             </motion.span>
@@ -172,16 +175,14 @@ export function RotatingWordHeadline({
         </span>
 
         {/* Static Suffix Text: "All with" (Natural Gap) */}
-        <span className="text-text-primary shrink-0 font-extrabold select-none">
-          {suffix}
-        </span>
+        <span className="text-text-primary shrink-0 font-extrabold select-none">{suffix}</span>
 
         {/* Full Mitra Wordmark Logo Image in exact font cap-height alignment */}
-        <span className="inline-flex items-center shrink-0 self-center">
+        <span className="inline-flex shrink-0 items-center self-center">
           <MitraLogo
             variant="wordmark"
             size="sm"
-            className="h-[1.05em] w-auto object-contain translate-y-[-0.04em]"
+            className="h-[1.05em] w-auto translate-y-[-0.04em] object-contain"
             ariaLabel="Mitra"
           />
         </span>
@@ -189,5 +190,3 @@ export function RotatingWordHeadline({
     </div>
   );
 }
-
-

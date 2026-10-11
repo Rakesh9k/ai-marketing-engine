@@ -1,5 +1,5 @@
 import * as Sentry from '@sentry/nextjs';
-import { scrubSentryEvent } from '@/lib/sentryScrub';
+import { scrubSentryBreadcrumb, scrubSentryEvent, scrubSentryTransaction } from '@/lib/sentryScrub';
 
 /**
  * Client-side Sentry init. `NEXT_PUBLIC_SENTRY_DSN` is intentionally unset in
@@ -16,6 +16,8 @@ Sentry.init({
   tracesSampleRate: 0.1,
   sendDefaultPii: false,
   beforeSend: scrubSentryEvent,
+  beforeSendTransaction: scrubSentryTransaction,
+  beforeBreadcrumb: scrubSentryBreadcrumb,
 });
 
 export const onRouterTransitionStart = Sentry.captureRouterTransitionStart;

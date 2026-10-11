@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { Button } from '@/components/ui/Button';
 import { useToast } from '@/hooks/useToast';
 import { useCopyToClipboard } from '@/hooks/useCopyToClipboard';
+import { describeError } from '@/lib/errors/classifyError';
 
 export default function ContentWorkspacePage() {
   const [topic, setTopic] = useState('');
@@ -41,7 +42,8 @@ export default function ContentWorkspacePage() {
       }
     } catch (err: any) {
       console.error(err);
-      showToast(err.message || 'Something went wrong while generating copy.', 'error');
+      const copy = describeError(err, 'generate this copy', { workKept: true });
+      showToast(copy.kind === 'unknown' ? err.message || copy.message : copy.message, 'error');
     } finally {
       setGenerating(false);
     }

@@ -9,16 +9,14 @@ import { MitraMark } from '@/components/ui/MitraMark';
 
 function LoginPageContent() {
   const searchParams = useSearchParams();
-  const redirect = searchParams.get('redirect') || '/dashboard';
+  const redirect = searchParams.get('redirect');
 
+  // Where to go after sign-in is decided once, by PublicOnlyRoute (business? email verified?
+  // safe ?redirect=?), instead of the form hard-navigating to an unvalidated query value.
   return (
-    <PublicOnlyRoute>
-      <AuthLayout
-        mode="login"
-        title="Welcome Back"
-        subtitle="Sign in to your Mitra account"
-      >
-        <LoginForm onSuccess={() => (window.location.href = redirect)} />
+    <PublicOnlyRoute smartRedirect redirectParam={redirect}>
+      <AuthLayout mode="login" title="Welcome Back" subtitle="Sign in to your Mitra account">
+        <LoginForm />
       </AuthLayout>
     </PublicOnlyRoute>
   );

@@ -19,9 +19,13 @@ export function OffersSection({ business, onSaved, onCancel }: OffersSectionProp
   const [pricingRules, setPricingRules] = useState(
     business.businessBrain?.businessRules?.pricingRules || ''
   );
-  const [minimumOrder, setMinimumOrder] = useState<number>(
-    business.businessBrain?.businessRules?.minimumOrder || 0
+  // Unknown is not zero: the field opens empty unless the owner gave a minimum, and an empty field is
+  // never saved (it used to save ₹0, i.e. "no minimum order", on any save).
+  const storedMinimum = business.businessBrain?.businessRules?.minimumOrder;
+  const [minimumOrder, setMinimumOrder] = useState<string>(
+    storedMinimum !== undefined ? String(storedMinimum) : ''
   );
+  const minimum = minimumOrder.trim() === '' ? undefined : Number(minimumOrder);
 
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -41,7 +45,7 @@ export function OffersSection({ business, onSaved, onCancel }: OffersSectionProp
           businessRules: {
             offerValidityRules,
             pricingRules,
-            minimumOrder,
+            ...(minimum !== undefined ? { minimumOrder: minimum } : {}),
           },
         },
       });
@@ -53,7 +57,7 @@ export function OffersSection({ business, onSaved, onCancel }: OffersSectionProp
             ...(business.businessBrain?.businessRules || {}),
             offerValidityRules,
             pricingRules,
-            minimumOrder,
+            ...(minimum !== undefined ? { minimumOrder: minimum } : {}),
           },
         } as any,
       });
@@ -67,22 +71,29 @@ export function OffersSection({ business, onSaved, onCancel }: OffersSectionProp
   };
 
   return (
-    <form onSubmit={handleSave} className="space-y-6 rounded-2xl border border-neutral-200 bg-white p-6 shadow-sm">
+    <form
+      onSubmit={handleSave}
+      className="space-y-6 rounded-2xl border border-neutral-200 bg-white p-6 shadow-sm"
+    >
       <div className="border-b border-neutral-100 pb-4">
         <h2 className="text-xl font-bold text-neutral-900">Offers, Deals & Pricing Rules</h2>
         <p className="mt-1 text-sm text-neutral-500">
-          Set up active promotions, festive combos, discount guidelines, and minimum order requirements.
+          Set up active promotions, festive combos, discount guidelines, and minimum order
+          requirements.
         </p>
       </div>
 
       {error && (
-        <div className="rounded-lg bg-red-50 p-4 text-sm text-red-700 border border-red-200" role="alert">
+        <div
+          className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700"
+          role="alert"
+        >
           {error}
         </div>
       )}
 
       {savedNotice && (
-        <div className="rounded-lg bg-emerald-50 p-4 text-sm text-emerald-700 border border-emerald-200">
+        <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-700">
           ✓ {savedNotice}
         </div>
       )}
@@ -97,7 +108,7 @@ export function OffersSection({ business, onSaved, onCancel }: OffersSectionProp
             onChange={(e) => setOfferValidityRules(e.target.value)}
             rows={3}
             placeholder="e.g. 15% OFF on orders above ₹499 during weekends. Buy 2 Get 1 Free on all Biryani combos on Tuesdays."
-            className="w-full rounded-lg border border-neutral-300 px-4 py-2.5 text-sm text-neutral-900 focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 focus:outline-none"
+            className="focus:border-brand-500 focus:ring-brand-500/20 w-full rounded-lg border border-neutral-300 px-4 py-2.5 text-sm text-neutral-900 focus:ring-2 focus:outline-none"
           />
         </div>
 
@@ -110,15 +121,15 @@ export function OffersSection({ business, onSaved, onCancel }: OffersSectionProp
             onChange={(e) => setPricingRules(e.target.value)}
             rows={3}
             placeholder="e.g. Never discount premium gift packs. Taxes extra. GST included in prices."
-            className="w-full rounded-lg border border-neutral-300 px-4 py-2.5 text-sm text-neutral-900 focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 focus:outline-none"
+            className="focus:border-brand-500 focus:ring-brand-500/20 w-full rounded-lg border border-neutral-300 px-4 py-2.5 text-sm text-neutral-900 focus:ring-2 focus:outline-none"
           />
         </div>
 
         <Input
           label="Minimum Order Amount (₹)"
           type="number"
-          value={minimumOrder || ''}
-          onChange={(e) => setMinimumOrder(Number(e.target.value))}
+          value={minimumOrder}
+          onChange={(e) => setMinimumOrder(e.target.value)}
           placeholder="250"
         />
       </div>

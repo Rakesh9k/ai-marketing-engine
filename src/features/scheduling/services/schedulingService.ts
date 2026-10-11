@@ -1,9 +1,17 @@
-import { httpsCallable, getFunctions } from 'firebase/functions';
-import { getApp } from 'firebase/app';
+import { httpsCallable } from 'firebase/functions';
+import { getFirebaseFunctions } from '@/lib/firebase/client';
 import type { ScheduledPost, CreateScheduleInput, RescheduleInput } from '@/types';
 
+function getFunctionsInstance() {
+  const functions = getFirebaseFunctions();
+  if (!functions) {
+    throw new Error('Firebase Functions not initialized');
+  }
+  return functions;
+}
+
 export async function createSchedule(input: CreateScheduleInput): Promise<ScheduledPost> {
-  const functions = getFunctions(getApp());
+  const functions = getFunctionsInstance();
   const callable = httpsCallable<
     { data: CreateScheduleInput },
     { success: boolean; post: ScheduledPost }
@@ -13,7 +21,7 @@ export async function createSchedule(input: CreateScheduleInput): Promise<Schedu
 }
 
 export async function cancelSchedule(scheduledPostId: string): Promise<ScheduledPost> {
-  const functions = getFunctions(getApp());
+  const functions = getFunctionsInstance();
   const callable = httpsCallable<
     { scheduledPostId: string },
     { success: boolean; post: ScheduledPost }
@@ -23,7 +31,7 @@ export async function cancelSchedule(scheduledPostId: string): Promise<Scheduled
 }
 
 export async function reschedulePost(input: RescheduleInput): Promise<ScheduledPost> {
-  const functions = getFunctions(getApp());
+  const functions = getFunctionsInstance();
   const callable = httpsCallable<RescheduleInput, { success: boolean; post: ScheduledPost }>(
     functions,
     'reschedulePost'
@@ -33,7 +41,7 @@ export async function reschedulePost(input: RescheduleInput): Promise<ScheduledP
 }
 
 export async function retrySchedule(scheduledPostId: string): Promise<ScheduledPost> {
-  const functions = getFunctions(getApp());
+  const functions = getFunctionsInstance();
   const callable = httpsCallable<
     { scheduledPostId: string },
     { success: boolean; post: ScheduledPost }
@@ -43,7 +51,7 @@ export async function retrySchedule(scheduledPostId: string): Promise<ScheduledP
 }
 
 export async function listCampaignScheduledPosts(campaignId: string): Promise<ScheduledPost[]> {
-  const functions = getFunctions(getApp());
+  const functions = getFunctionsInstance();
   const callable = httpsCallable<
     { campaignId: string },
     { success: boolean; posts: ScheduledPost[] }

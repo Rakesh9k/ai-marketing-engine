@@ -14,7 +14,7 @@ export default function EditProductPage({ params }: { params: Promise<{ id: stri
   const resolvedParams = use(params);
   const productId = resolvedParams.id;
   const router = useRouter();
-  const { user, status } = useAuth();
+  const { status } = useAuth();
 
   const [product, setProduct] = useState<Product | null>(null);
   const [loading, setLoading] = useState(true);
@@ -37,7 +37,7 @@ export default function EditProductPage({ params }: { params: Promise<{ id: stri
       }
     }
     if (productId) {
-      loadProduct();
+      void loadProduct();
     }
   }, [productId]);
 

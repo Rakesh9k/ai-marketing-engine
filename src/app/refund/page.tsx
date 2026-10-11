@@ -1,11 +1,13 @@
 import type { Metadata } from 'next';
+import { pageMetadata } from '@/lib/seo';
 import Link from 'next/link';
 import { MitraLogo } from '@/components/ui/MitraLogo';
 
-export const metadata: Metadata = {
+export const metadata: Metadata = pageMetadata({
   title: 'Refund Policy — Mitra',
   description: 'Refund policy for Mitra, the AI marketing engine by Brainwise.',
-};
+  path: '/refund',
+});
 
 const EFFECTIVE_DATE = '2026-10-02';
 
