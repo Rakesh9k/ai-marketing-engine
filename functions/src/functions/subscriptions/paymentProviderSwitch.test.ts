@@ -81,6 +81,7 @@ describeIfEmulator('payment provider switch: Cashfree active, Paddle inert', () 
         userId,
         email: `${userId}@example.com`,
         displayName: 'Test User',
+        billingPhone: '9812345670',
         role: 'owner',
         businessIds: [],
         ...extra,

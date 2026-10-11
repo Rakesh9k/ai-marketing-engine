@@ -11,6 +11,7 @@ import { doc, getDoc } from 'firebase/firestore';
 import { getFirebaseDb } from '@/lib/firebase/client';
 import { PLANS, type SubscriptionPlan, type PlanDefinition } from '@/lib/config/pricing';
 import { useCashfreeCheckout } from '@/features/billing/useCashfreeCheckout';
+import { CheckoutPhonePrompt } from '@/features/billing/CheckoutPhonePrompt';
 import { CreditPackCards } from '@/features/billing/components/CreditPackCards';
 import { useToast } from '@/hooks/useToast';
 
@@ -169,9 +170,13 @@ export default function PricingPageClient({ countryCode: _countryCode }: { count
   const { showToast } = useToast();
   // Paddle's localized, pre-formatted prices. countryCode is undefined when the CDN gave us no
   // usable country - Paddle then auto-detects from the visitor's IP.
-  const { pendingKey, start: startCheckout } = useCashfreeCheckout((message) =>
-    showToast(message, 'error')
-  );
+  const {
+    pendingKey,
+    start: startCheckout,
+    phonePrompt,
+    submitPhone,
+    cancelPhone,
+  } = useCashfreeCheckout((message) => showToast(message, 'error'));
 
   // Default billing cycle is YEARLY as requested
   const [billingCycle, setBillingCycle] = useState<'monthly' | 'yearly'>('yearly');
@@ -287,6 +292,12 @@ export default function PricingPageClient({ countryCode: _countryCode }: { count
   return (
     <div className="bg-bg-primary text-text-primary min-h-screen">
       <LandingNav />
+      <CheckoutPhonePrompt
+        prompt={phonePrompt}
+        busy={pendingKey !== null}
+        onSubmit={submitPhone}
+        onCancel={cancelPhone}
+      />
 
       {/* pt-28: the landing nav is position:fixed, so content must start below it */}
       <main className="mx-auto max-w-7xl px-4 pt-28 pb-12 sm:px-6 lg:pt-32 lg:pb-16">

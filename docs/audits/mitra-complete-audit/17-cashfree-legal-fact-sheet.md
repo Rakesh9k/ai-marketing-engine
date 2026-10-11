@@ -23,7 +23,7 @@
 3. **Refund policy**: eligibility window, full/partial, effect on access and on credits already spent, who processes it (we would, via Cashfree), expected timelines, chargeback handling.
 4. **Credit policy**: expiry of unused monthly credits (current behaviour: monthly allowance resets; top-ups last the calendar month) — confirm this is the intended promise.
 5. **Failed-payment and dispute process** and support SLA.
-6. **Data**: retention periods for transaction records (tax/accounting law), Cashfree as a data processor (what is shared: name, email, phone — we pass `customer_details`; **when the user has no phone on file the code sends a placeholder number (9999999999) because Cashfree requires one**; confirm that is acceptable or collect a real number), cross-border transfer position.
+6. **Data**: retention periods for transaction records (tax/accounting law), Cashfree as a data processor (what is shared: name, email, phone — we pass `customer_details`; **Cashfree requires a mobile number, so checkout now asks the customer for their REAL 10-digit Indian mobile number when none is on file, validates it, and never substitutes a placeholder**; the number is stored on the account as `billingPhone` and reused — the privacy notice must say this is collected, why, and how long it is kept), cross-border transfer position.
 7. **Auto-renewal in future**: if offered later it needs its own consent flow, mandates and notices; out of scope for launch.
 
 ## C. Where the product currently says something about payment (to be reviewed/changed)

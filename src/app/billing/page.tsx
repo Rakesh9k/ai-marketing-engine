@@ -12,6 +12,7 @@ import type { Subscription, SubscriptionPlan, Usage, Transaction, BillingCycle }
 import { PLAN_DETAILS } from '@/features/billing/planDetails';
 import { callFunction } from '@/services/api';
 import { useCashfreeCheckout } from '@/features/billing/useCashfreeCheckout';
+import { CheckoutPhonePrompt } from '@/features/billing/CheckoutPhonePrompt';
 import { CreditPackCards } from '@/features/billing/components/CreditPackCards';
 import { isVisibleTransaction } from '@/features/billing/visibleTransactions';
 import {
@@ -39,9 +40,13 @@ export default function BillingPage() {
   const [autoPlan, setAutoPlan] = useState<{ plan: SubscriptionPlan; cycle: BillingCycle } | null>(
     null
   );
-  const { pendingKey, start: startCheckout } = useCashfreeCheckout((message) =>
-    showToast(message, 'error')
-  );
+  const {
+    pendingKey,
+    start: startCheckout,
+    phonePrompt,
+    submitPhone,
+    cancelPhone,
+  } = useCashfreeCheckout((message) => showToast(message, 'error'));
   const subscriptionRef = useRef<Subscription | null>(null);
   subscriptionRef.current = subscription;
   // Set when the customer returns from Cashfree: the access end date they had BEFORE paying (0 if none).
@@ -212,6 +217,12 @@ export default function BillingPage() {
 
   return (
     <div className="bg-bg-primary min-h-screen pb-12">
+      <CheckoutPhonePrompt
+        prompt={phonePrompt}
+        busy={pendingKey !== null}
+        onSubmit={submitPhone}
+        onCancel={cancelPhone}
+      />
       <div className="mx-auto max-w-5xl px-4 pt-8 sm:px-6">
         <div className="mb-6 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
           <div>

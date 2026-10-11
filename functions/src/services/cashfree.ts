@@ -1,6 +1,7 @@
 import crypto from 'crypto';
 import { getEnvConfig } from '../config/env';
 import type { SubscriptionPlan } from '../config/pricing';
+import { cashfreeCustomerPhone } from './customerPhone';
 import type { CreateCheckoutInput, CreateCheckoutResult, BillingCycle } from './paymentProvider';
 
 export type CashfreeEnvironment = 'sandbox' | 'production';
@@ -83,10 +84,12 @@ export async function createCashfreeOrder(
       ? `Mitra ${input.item.planId.toUpperCase()} Plan (${input.item.billingCycle})`
       : `Mitra ${input.item.credits.toLocaleString('en-IN')} Top-up Credits`;
 
-  // Sanitize phone number (Cashfree requires 10-digit valid Indian phone number string if provided)
-  let phone = input.userPhone?.replace(/\D/g, '') || '9999999999';
-  if (phone.length > 10) phone = phone.slice(-10);
-  if (phone.length < 10) phone = '9999999999';
+  // Cashfree requires the customer's real 10-digit mobile number. Nothing is substituted: a missing or invalid
+  // number is an error, never a placeholder (see services/customerPhone.ts).
+  const phone = cashfreeCustomerPhone(input.userPhone);
+  if (!phone) {
+    throw new Error('A valid customer mobile number is required to create a Cashfree order');
+  }
 
   // Return URL for browser redirect
   const appUrl = getEnvConfig().APP_URL || 'https://mitra-ai.web.app';

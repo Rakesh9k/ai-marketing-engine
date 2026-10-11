@@ -48,3 +48,7 @@ For each row: *automated* = proven today on the emulator with Cashfree's API stu
 
 ## 5. What is deliberately not part of launch
 Automatic renewal / mandates, proration or in-place plan switching, automated refunds that revoke access, a Merchant-of-Record arrangement.
+
+## Customer phone number (added 2026-10-11)
+
+Checkout never sends a fabricated number. Missing -> `PHONE_REQUIRED`, invalid -> `INVALID_PHONE`; in both cases no Cashfree order and no transaction record is created. Covered by `cashfreeCheckoutPhone.test.ts`, `customerPhone.test.ts` and the browser/server parity test. Sandbox journey must include: a first purchase by an account with no phone (prompt appears, number saved), and a repeat purchase (no prompt). If Cashfree later offers an officially supported way to omit the phone, change the rule deliberately; do not reintroduce a default value.

@@ -70,6 +70,7 @@ describeIfEmulator('prepaid fixed-term lifecycle (Cashfree)', () => {
         userId,
         email: `${userId}@example.com`,
         displayName: 'T',
+        billingPhone: '9812345670',
         role: 'owner',
         businessIds: [],
         ...extra,

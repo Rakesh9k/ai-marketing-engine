@@ -15,6 +15,7 @@ import { mapErrorToHttpsError } from '../../utils/errors';
 import { assertProviderActive } from '../../services/activeProvider';
 import { isAllowedReturnUrl } from '../../services/cashfree';
 import { decidePurchase } from '../../services/prepaidTerm';
+import { cashfreeCustomerPhone, PHONE_HELP } from '../../services/customerPhone';
 
 const db = admin.firestore();
 
@@ -26,6 +27,8 @@ const createCashfreeCheckoutSchema = z
     billingCycle: z.enum(['monthly', 'yearly']).default('monthly'),
     creditPack: z.number().int().positive().optional(),
     returnUrl: z.string().url().optional(),
+    /** The customer's mobile number for this payment. Required by Cashfree; asked for when none is on file. */
+    customerPhone: z.string().max(40).optional(),
   })
   .refine((v) => (v.planId === undefined) !== (v.creditPack === undefined), {
     message: 'Provide exactly one of planId or creditPack',
@@ -72,6 +75,28 @@ export const createCashfreeCheckout = onCall(
       const user = await getUserDoc(context.userId);
       if (!user) {
         throw new HttpsError('not-found', 'User not found');
+      }
+
+      // The customer's REAL mobile number (Cashfree requires it). An explicit number from this request wins and
+      // must be valid; otherwise a stored one is used; with neither, the client is asked for it. No placeholder.
+      let customerPhone: string | null;
+      const savePhone = data.customerPhone !== undefined && data.customerPhone.trim() !== '';
+      if (savePhone) {
+        customerPhone = cashfreeCustomerPhone(data.customerPhone);
+        if (!customerPhone) {
+          throw new HttpsError('invalid-argument', PHONE_HELP, { code: 'INVALID_PHONE' });
+        }
+      } else {
+        const stored = user as unknown as { billingPhone?: string; phone?: string };
+        customerPhone =
+          cashfreeCustomerPhone(stored.billingPhone) ?? cashfreeCustomerPhone(stored.phone);
+        if (!customerPhone) {
+          throw new HttpsError(
+            'failed-precondition',
+            'We need your mobile number to take the payment.',
+            { code: 'PHONE_REQUIRED' }
+          );
+        }
       }
 
       const envConfig = getEnvConfig();
@@ -149,10 +174,20 @@ export const createCashfreeCheckout = onCall(
         userId: context.userId,
         userEmail: user.email,
         userName: user.displayName || undefined,
-        userPhone: user.phone || undefined,
+        userPhone: customerPhone,
         item: purchase,
         returnUrl: data.returnUrl,
       });
+
+      if (savePhone) {
+        await db
+          .collection('users')
+          .doc(context.userId)
+          .set(
+            { billingPhone: customerPhone, updatedAt: FieldValue.serverTimestamp() },
+            { merge: true }
+          );
+      }
 
       // Write pending transaction document in Firestore
       await db
