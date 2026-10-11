@@ -327,7 +327,7 @@ describe('Pass 2C scenario matrix (mock mode)', () => {
     expect(honest.r.truth).toBe('PASS');
     expect(wrong.r.truth).toBe('FAIL');
     expect(phone.r.truth).toBe('FAIL');
-    expect(disc.r.truth).toBe('REVIEW_REQUIRED'); // current behaviour: review, not fail (see report)
+    expect(disc.r.truth).toBe('FAIL'); // risk policy: an unsupported discount blocks delivery
     const prompt = copyPrompt(honest.r);
     const ok = prompt.includes('₹299') && /DISCOUNT: none was provided/.test(prompt);
     record(
@@ -368,7 +368,7 @@ describe('Pass 2C scenario matrix (mock mode)', () => {
       'NOT_PASS',
       'FAIL'
     );
-    expect(honest.r.truth).toBe('REVIEW_REQUIRED'); // only because the number is not printed in the copy
+    expect(honest.r.truth).toBe('PASS'); // omitting the phone number is not a claim, so it is not flagged
     expect(sup.r.truth).toBe('FAIL');
     record(
       'S2 Family meal',

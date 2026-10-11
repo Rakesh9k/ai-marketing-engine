@@ -397,11 +397,14 @@ describe("a contact number presented as the business contact must be the busines
     expect(contactClaim(r)!.basis).toBe('not_applicable');
   });
 
-  it('leaving the number out still needs review (existing behaviour: the prompt asks for it)', () => {
+  it('leaving the number out is NOT flagged: honest copy that prints no number makes no contact claim', () => {
     const r = run(input(), copyWith('Order on WhatsApp.'));
-    expect(
-      r.checks.find((c) => c.category === 'contact' && c.expectedValue === '9876543210')!.status
-    ).toBe('REVIEW_REQUIRED');
+    const whatsapp = r.checks.find(
+      (c) => c.category === 'contact' && c.expectedValue === '9876543210'
+    )!;
+    expect(whatsapp.status).toBe('PASS');
+    expect(whatsapp.basis).toBe('not_applicable');
+    expect(r.status).toBe('PASS');
   });
 });
 

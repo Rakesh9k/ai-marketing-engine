@@ -553,7 +553,8 @@ export function runDeterministicTruthCheck(
     allText,
     input.offerType ?? '',
     expectedOfferPrice,
-    input.offerOriginalPrice
+    input.offerOriginalPrice,
+    [input.offerHeadline, input.offerDescription, input.offerTerms].filter(Boolean).join(' ')
   );
   checks.push(unauthorizedDiscountCheck);
   if (unauthorizedDiscountCheck.status === 'FAIL') overallStatus = 'FAIL';
@@ -693,7 +694,12 @@ export function runDeterministicTruthCheck(
   const failCount = checks.filter((c) => c.status === 'FAIL').length;
   const reviewCount = checks.filter((c) => c.status === 'REVIEW_REQUIRED').length;
 
-  const summary = `Truth Check: ${passCount} passed, ${failCount} failed, ${reviewCount} require review. ${failCount > 0 ? 'CRITICAL FAILURES DETECTED.' : reviewCount > 0 ? 'Review recommended before publishing.' : 'All checks passed.'}`;
+  const problems = checks
+    .filter((c) => c.status === 'FAIL' && c.reason)
+    .slice(0, 3)
+    .map((c) => (c.reason as string).replace(/\.$/, '').slice(0, 180))
+    .join('; ');
+  const summary = `Truth Check: ${passCount} passed, ${failCount} failed, ${reviewCount} require review. ${failCount > 0 ? `CRITICAL FAILURES DETECTED: ${problems}.` : reviewCount > 0 ? 'Review recommended before publishing.' : 'All checks passed.'}`;
 
   return {
     status: overallStatus,
@@ -953,9 +959,21 @@ function checkWhatsApp(allText: string, whatsappNumber: string): TruthCheckItem 
   }
 
   const expectedDigits = whatsappNumber.replace(/\D/g, '').slice(-10);
-  const whatsappMatch =
-    allText.includes(expectedDigits) ||
-    extractPresentedContactNumbers(allText).includes(expectedDigits);
+  const presented = extractPresentedContactNumbers(allText);
+  const whatsappMatch = allText.includes(expectedDigits) || presented.includes(expectedDigits);
+
+  // Honest copy that simply does not print the number makes no contact claim: nothing to verify.
+  // (A DIFFERENT number being presented is still caught here as REVIEW and by checkContactNumberClaims as FAIL.)
+  if (!whatsappMatch && presented.length === 0) {
+    return {
+      category: 'contact',
+      status: 'PASS',
+      basis: 'not_applicable',
+      generatedValue: 'NOT_PRESENTED',
+      expectedValue: whatsappNumber,
+      reason: 'The copy does not present a contact number, so there is no contact claim to verify',
+    };
+  }
 
   return {
     category: 'contact',
@@ -1139,6 +1157,23 @@ function checkOffer(
  * directly attached to the number, so it only matches things that actually
  * read as a percentage claim.
  */
+/** Percentages presented as a discount: "20% off", "20 percent discount", "discount of 20%", "flat/upto 20%". */
+export function extractDiscountContextPercentages(text: string): number[] {
+  const after =
+    /(\d{1,3}(?:\.\d+)?)\s*(?:%|percent\b)\s*(?:off|discount|cashback|less|saving|savings)\b/gi;
+  const before =
+    /\b(?:flat|upto|up\s+to|save|saving|discount\s+of|extra)\s*(?:of\s*)?(\d{1,3}(?:\.\d+)?)\s*(?:%|percent\b)/gi;
+  const values: number[] = [];
+  for (const re of [after, before]) {
+    let m: RegExpExecArray | null;
+    while ((m = re.exec(text)) !== null) {
+      const v = parseFloat(m[1]!);
+      if (v > 0 && v <= 100) values.push(v);
+    }
+  }
+  return [...new Set(values)];
+}
+
 function extractExplicitPercentages(text: string): number[] {
   // The \b must apply only to the "percent" alternative — '%' is itself a
   // non-word character, so `(?:%|percent)\b` never matches when a '%' is
@@ -1172,9 +1207,16 @@ function checkUnauthorizedDiscountClaims(
   allText: string,
   offerType: string,
   offerPrice: number,
-  originalPrice?: number
+  originalPrice?: number,
+  ownerStatedText = ''
 ): TruthCheckItem {
   const mentionedPercentages = extractExplicitPercentages(allText);
+  // Risk policy: a percentage presented AS A DISCOUNT ("20% off", "discount of 20%", "flat 20%") that the
+  // offer does not support is a false price claim and blocks delivery (FAIL). A bare "%" with no discount
+  // wording ("100% vegetarian") stays a REVIEW: it is usually not a price claim.
+  const discountPercentages = extractDiscountContextPercentages(allText);
+  // Percentages the owner themself wrote in the offer headline/description/terms are owner-stated.
+  const ownerStated = new Set(extractExplicitPercentages(ownerStatedText.toLowerCase()));
 
   if (mentionedPercentages.length === 0) {
     return {
@@ -1189,7 +1231,9 @@ function checkUnauthorizedDiscountClaims(
       ? Math.round(((originalPrice - offerPrice) / originalPrice) * 100)
       : null;
 
-  const unauthorized = mentionedPercentages.filter((p) => p !== authorizedPercent);
+  const unauthorized = mentionedPercentages.filter(
+    (p) => p !== authorizedPercent && !ownerStated.has(p)
+  );
 
   if (unauthorized.length === 0) {
     return {
@@ -1200,16 +1244,21 @@ function checkUnauthorizedDiscountClaims(
   }
 
   const unauthorizedText = unauthorized.map((p) => `${p}%`).join(', ');
+  const unauthorizedDiscounts = unauthorized.filter((p) => discountPercentages.includes(p));
+  const blocks = authorizedPercent !== null || unauthorizedDiscounts.length > 0;
 
   return {
     category: 'offer',
-    status: authorizedPercent !== null ? 'FAIL' : 'REVIEW_REQUIRED',
+    status: blocks ? 'FAIL' : 'REVIEW_REQUIRED',
+    basis: 'invalid_claim',
     generatedValue: unauthorizedText,
     expectedValue: authorizedPercent !== null ? `${authorizedPercent}%` : 'NO DISCOUNT AUTHORIZED',
     reason:
       authorizedPercent !== null
         ? `Unauthorized discount claim(s) ${unauthorizedText} do not match the authorized discount of ${authorizedPercent}%`
-        : `Discount claim(s) ${unauthorizedText} found but no discount is authorized for this offer (type: ${offerType || 'none'})`,
+        : blocks
+          ? `The ad claims a ${unauthorizedDiscounts.map((p) => `${p}%`).join(', ')} discount, but no discount was provided for this offer (type: ${offerType || 'none'})`
+          : `Percentage claim(s) ${unauthorizedText} found but no discount is authorized for this offer (type: ${offerType || 'none'})`,
   };
 }
 
@@ -1348,6 +1397,7 @@ function checkUnsupportedClaims(
   const claimChecks = getVerticalConfigOrDefault(vertical).truthCheckClaimKeywords;
 
   let hasUnsupportedClaim = false;
+  let hasUnsupportedLegalClaim = false;
   let unsupportedDetails = '';
 
   for (const check of claimChecks) {
@@ -1373,6 +1423,9 @@ function checkUnsupportedClaims(
 
       if (!supportedByRules) {
         hasUnsupportedClaim = true;
+        // Legal/regulatory approvals (RERA, licences...) are never recorded as facts: claiming one is a
+        // material false claim, not something to wave through for review.
+        if (check.factCategory === 'legal') hasUnsupportedLegalClaim = true;
         unsupportedDetails += `${check.keyword} (${check.category}) not supported by Business Brain; `;
       }
     }
@@ -1381,7 +1434,8 @@ function checkUnsupportedClaims(
   if (hasUnsupportedClaim) {
     return {
       category: 'claim',
-      status: 'REVIEW_REQUIRED',
+      status: hasUnsupportedLegalClaim ? 'FAIL' : 'REVIEW_REQUIRED',
+      basis: 'invalid_claim',
       generatedValue: unsupportedDetails.trim(),
       expectedValue: 'Supported by Business Brain',
       reason: `Unsupported claims detected: ${unsupportedDetails.trim()}`,
@@ -1554,61 +1608,103 @@ function checkPropertyFactClaims(
   const allTextLower = allText.toLowerCase();
   const items: TruthCheckItem[] = [];
 
-  const bedroomMatch = allTextLower.match(/(\d+)\s*(?:bhk|bed(?:room)?s?)/);
-  if (bedroomMatch) {
-    const claimed = parseInt(bedroomMatch[1]!, 10);
+  // What the owner themself wrote for this listing (title, headline, description, terms). A spec stated
+  // there is owner-provided, not invented by the model.
+  const ownerText = [
+    input.productName,
+    input.offerHeadline,
+    input.offerDescription,
+    input.offerTerms,
+  ]
+    .filter(Boolean)
+    .join(' ')
+    .toLowerCase();
+  const ownerStates = (re: RegExp) => re.test(ownerText);
+
+  // Every distinct figure the ad states is checked (not just the first mention): "3BHK ... also 5 bedrooms"
+  // must not slip through because the first number happened to be right.
+  const distinct = (re: RegExp, parse: (m: RegExpMatchArray) => number): number[] => [
+    ...new Set([...allTextLower.matchAll(re)].map(parse)),
+  ];
+
+  for (const claimed of distinct(/(\d+)\s*(?:bhk|bed(?:room)?s?)/g, (m) => parseInt(m[1]!, 10))) {
     if (property.bedrooms !== undefined && claimed !== property.bedrooms) {
       items.push({
         category: 'product',
         status: 'FAIL',
+        basis: 'invalid_claim',
         generatedValue: `${claimed} BHK`,
         expectedValue: `${property.bedrooms} BHK`,
         reason: `Generated content claims ${claimed} bedrooms, but this listing has ${property.bedrooms}.`,
       });
-    } else if (property.bedrooms === undefined) {
+    } else if (
+      property.bedrooms === undefined &&
+      !ownerStates(new RegExp(`\\b${claimed}\\s*(?:bhk|bed)`))
+    ) {
+      // A bedroom count is a material property spec. If the owner never recorded it (and did not write it
+      // in the listing title/headline), the ad is inventing it: block, do not just flag.
       items.push({
         category: 'product',
-        status: 'REVIEW_REQUIRED',
+        status: 'FAIL',
+        basis: 'invalid_claim',
         generatedValue: `${claimed} BHK`,
         expectedValue: 'NOT_PROVIDED',
-        reason:
-          'Generated content claims a bedroom count that was never recorded for this listing.',
+        reason: `The ad claims ${claimed} bedrooms, but the bedroom count was never recorded for this listing`,
       });
     }
   }
 
-  const bathroomMatch = allTextLower.match(/(\d+)\s*bathrooms?/);
-  if (bathroomMatch) {
-    const claimed = parseInt(bathroomMatch[1]!, 10);
+  for (const claimed of distinct(/(\d+)\s*bathrooms?/g, (m) => parseInt(m[1]!, 10))) {
     if (property.bathrooms !== undefined && claimed !== property.bathrooms) {
       items.push({
         category: 'product',
         status: 'FAIL',
+        basis: 'invalid_claim',
         generatedValue: `${claimed} bathrooms`,
         expectedValue: `${property.bathrooms} bathrooms`,
         reason: `Generated content claims ${claimed} bathrooms, but this listing has ${property.bathrooms}.`,
       });
+    } else if (
+      property.bathrooms === undefined &&
+      !ownerStates(new RegExp(`\\b${claimed}\\s*bath`))
+    ) {
+      // Previously an unrecorded bathroom count passed silently.
+      items.push({
+        category: 'product',
+        status: 'FAIL',
+        basis: 'invalid_claim',
+        generatedValue: `${claimed} bathrooms`,
+        expectedValue: 'NOT_PROVIDED',
+        reason: `The ad claims ${claimed} bathrooms, but the bathroom count was never recorded for this listing`,
+      });
     }
   }
 
-  const areaMatch = allTextLower.match(/(\d[\d,]*)\s*(?:sq\.?\s?ft|sqft|square\s?feet)/);
-  if (areaMatch) {
-    const claimed = parseInt(areaMatch[1]!.replace(/,/g, ''), 10);
+  for (const claimed of distinct(/(\d[\d,]*)\s*(?:sq\.?\s?ft|sqft|square\s?feet)/g, (m) =>
+    parseInt(m[1]!.replace(/,/g, ''), 10)
+  )) {
     if (property.areaSqft !== undefined && claimed !== property.areaSqft) {
       items.push({
         category: 'product',
         status: 'FAIL',
+        basis: 'invalid_claim',
         generatedValue: `${claimed} sqft`,
         expectedValue: `${property.areaSqft} sqft`,
         reason: `Generated content claims ${claimed} sqft, but this listing is ${property.areaSqft} sqft.`,
       });
-    } else if (property.areaSqft === undefined) {
+    } else if (
+      property.areaSqft === undefined &&
+      !ownerStates(
+        new RegExp(`${String(claimed).replace(/\B(?=(\d{3})+(?!\d))/g, ',?')}\\s*(?:sq|square)`)
+      )
+    ) {
       items.push({
         category: 'product',
-        status: 'REVIEW_REQUIRED',
+        status: 'FAIL',
+        basis: 'invalid_claim',
         generatedValue: `${claimed} sqft`,
         expectedValue: 'NOT_PROVIDED',
-        reason: 'Generated content claims an area that was never recorded for this listing.',
+        reason: `The ad claims an area of ${claimed} sqft, but no area was recorded for this listing`,
       });
     }
   }
@@ -1632,7 +1728,7 @@ function checkPropertyFactClaims(
   if (possessionDateClaim(allText)) {
     items.push({
       category: 'claim',
-      status: 'REVIEW_REQUIRED',
+      status: 'FAIL',
       basis: 'invalid_claim',
       generatedValue: 'possession date',
       expectedValue: 'NOT_RECORDED',

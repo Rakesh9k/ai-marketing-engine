@@ -103,8 +103,10 @@ describe('real estate: facts come from the listing, and no possession date can b
       'Possession expected 2028',
     ]) {
       const r = run(re, `${RE_BASE} ${claim}.`);
-      expect(dateItem(r)!.status).toBe('REVIEW_REQUIRED');
+      // A possession date is a material property commitment nobody recorded: it blocks delivery.
+      expect(dateItem(r)!.status).toBe('FAIL');
       expect(dateItem(r)!.basis).toBe('invalid_claim');
+      expect(r.status).toBe('FAIL');
     }
   });
 
