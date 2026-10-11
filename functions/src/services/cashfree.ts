@@ -1,0 +1,242 @@
+import crypto from 'crypto';
+import { getEnvConfig } from '../config/env';
+import type { SubscriptionPlan } from '../config/pricing';
+import type { CreateCheckoutInput, CreateCheckoutResult, BillingCycle } from './paymentProvider';
+
+export type CashfreeEnvironment = 'sandbox' | 'production';
+
+export interface CashfreeConfig {
+  appId: string;
+  secretKey: string;
+  webhookSecret: string;
+  environment: CashfreeEnvironment;
+  apiVersion: string;
+  baseUrl: string;
+}
+
+export function getCashfreeConfig(): CashfreeConfig {
+  const env = getEnvConfig();
+  const appId = env.CASHFREE_APP_ID;
+  const secretKey = env.CASHFREE_SECRET_KEY;
+
+  if (!appId || !secretKey) {
+    throw new Error('Cashfree credentials not configured (CASHFREE_APP_ID or CASHFREE_SECRET_KEY missing)');
+  }
+
+  const environment: CashfreeEnvironment = env.CASHFREE_ENVIRONMENT === 'production' ? 'production' : 'sandbox';
+  const baseUrl =
+    environment === 'production'
+      ? 'https://api.cashfree.com/pg'
+      : 'https://sandbox.cashfree.com/pg';
+
+  return {
+    appId,
+    secretKey,
+    webhookSecret: env.CASHFREE_WEBHOOK_SECRET || secretKey,
+    environment,
+    apiVersion: env.CASHFREE_API_VERSION || '2023-08-01',
+    baseUrl,
+  };
+}
+
+/**
+ * Verifies a Cashfree webhook's HMAC-SHA256 signature over (x-webhook-timestamp + rawBody).
+ */
+export function verifyCashfreeWebhookSignature(
+  rawBody: string,
+  signature: string,
+  timestamp: string,
+  secretKey?: string
+): boolean {
+  if (!signature || !timestamp || !rawBody) {
+    return false;
+  }
+
+  const key = secretKey || getCashfreeConfig().webhookSecret;
+  const signedPayload = timestamp + rawBody;
+  const expectedSignature = crypto
+    .createHmac('sha256', key)
+    .update(signedPayload)
+    .digest('base64');
+
+  return crypto.timingSafeEqual(Buffer.from(signature), Buffer.from(expectedSignature));
+}
+
+/**
+ * Creates a Cashfree payment order via Cashfree PG API.
+ */
+export async function createCashfreeOrder(input: CreateCheckoutInput): Promise<CreateCheckoutResult> {
+  const config = getCashfreeConfig();
+  const orderId = `mitra_ord_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+
+  const description =
+    input.item.kind === 'subscription'
+      ? `Mitra ${input.item.planId.toUpperCase()} Plan (${input.item.billingCycle})`
+      : `Mitra ${input.item.credits.toLocaleString('en-IN')} Top-up Credits`;
+
+  // Sanitize phone number (Cashfree requires 10-digit valid Indian phone number string if provided)
+  let phone = input.userPhone?.replace(/\D/g, '') || '9999999999';
+  if (phone.length > 10) phone = phone.slice(-10);
+  if (phone.length < 10) phone = '9999999999';
+
+  // Return URL for browser redirect
+  const appUrl = getEnvConfig().APP_URL || 'https://mitra-ai.web.app';
+  const defaultReturnUrl = `${appUrl}/billing?cashfree_order_id={order_id}`;
+  const returnUrl = input.returnUrl || defaultReturnUrl;
+
+  const payload = {
+    order_id: orderId,
+    order_amount: input.item.priceINR,
+    order_currency: 'INR',
+    customer_details: {
+      customer_id: input.userId,
+      customer_email: input.userEmail,
+      customer_phone: phone,
+      customer_name: input.userName || 'Valued Customer',
+    },
+    order_meta: {
+      return_url: returnUrl,
+    },
+    order_note: description,
+    order_tags: {
+      firebaseUid: input.userId,
+      kind: input.item.kind,
+      planId: input.item.kind === 'subscription' ? input.item.planId : '',
+      billingCycle: input.item.kind === 'subscription' ? input.item.billingCycle : '',
+      credits: input.item.kind === 'credit_pack' ? String(input.item.credits) : '',
+    },
+  };
+
+  const response = await fetch(`${config.baseUrl}/orders`, {
+    method: 'POST',
+    headers: {
+      'x-client-id': config.appId,
+      'x-client-secret': config.secretKey,
+      'x-api-version': config.apiVersion,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(payload),
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(`Cashfree order creation failed (${response.status}): ${errorText}`);
+  }
+
+  const data = (await response.json()) as {
+    order_id: string;
+    payment_session_id: string;
+    order_status: string;
+    payments?: { url?: string };
+  };
+
+  return {
+    orderId: data.order_id,
+    paymentSessionId: data.payment_session_id,
+    environment: config.environment,
+    amountINR: input.item.priceINR,
+    currency: 'INR',
+  };
+}
+
+/**
+ * Fetches order details directly from Cashfree server-to-server for verification.
+ */
+export async function getCashfreeOrderStatus(orderId: string): Promise<{
+  orderId: string;
+  orderStatus: string;
+  orderAmount: number;
+  orderCurrency: string;
+  paymentSessionId: string;
+}> {
+  const config = getCashfreeConfig();
+  const response = await fetch(`${config.baseUrl}/orders/${orderId}`, {
+    method: 'GET',
+    headers: {
+      'x-client-id': config.appId,
+      'x-client-secret': config.secretKey,
+      'x-api-version': config.apiVersion,
+    },
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(`Cashfree order status fetch failed (${response.status}): ${errorText}`);
+  }
+
+  const data = (await response.json()) as {
+    order_id: string;
+    order_status: string;
+    order_amount: number;
+    order_currency: string;
+    payment_session_id: string;
+  };
+
+  return {
+    orderId: data.order_id,
+    orderStatus: data.order_status,
+    orderAmount: data.order_amount,
+    orderCurrency: data.order_currency,
+    paymentSessionId: data.payment_session_id,
+  };
+}
+
+/**
+ * Initiates a refund for a Cashfree order/payment.
+ */
+export async function refundCashfreePayment(
+  orderId: string,
+  amountINR: number,
+  refundReason?: string
+): Promise<{ refundId: string; status: string }> {
+  const config = getCashfreeConfig();
+  const refundId = `ref_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
+
+  const payload = {
+    refund_id: refundId,
+    refund_amount: amountINR,
+    refund_note: refundReason || 'Requested refund',
+  };
+
+  const response = await fetch(`${config.baseUrl}/orders/${orderId}/refunds`, {
+    method: 'POST',
+    headers: {
+      'x-client-id': config.appId,
+      'x-client-secret': config.secretKey,
+      'x-api-version': config.apiVersion,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(payload),
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(`Cashfree refund failed (${response.status}): ${errorText}`);
+  }
+
+  const data = (await response.json()) as {
+    refund_id: string;
+    refund_status: string;
+  };
+
+  return {
+    refundId: data.refund_id,
+    status: data.refund_status,
+  };
+}
+
+export function describeCashfreePurchase(
+  kind: 'subscription' | 'credit_pack',
+  planId?: SubscriptionPlan,
+  cycle?: BillingCycle,
+  credits?: number
+): string {
+  if (kind === 'subscription' && planId) {
+    const name = planId.charAt(0).toUpperCase() + planId.slice(1);
+    return `Mitra ${name} Plan (${cycle || 'monthly'}) — Cashfree Subscription`;
+  }
+  if (kind === 'credit_pack' && credits) {
+    return `${credits.toLocaleString('en-IN')} credit top-up pack — Cashfree`;
+  }
+  return 'Mitra Payment — Cashfree';
+}
