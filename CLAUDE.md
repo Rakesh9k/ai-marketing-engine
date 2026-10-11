@@ -4,12 +4,12 @@
 
 Before each phase, record:
 
-Baseline (verified 2026-10-11 on a clean checkout of commit e8b5e23, Node 24, Windows; replaces the obsolete 38 suites / 687 tests figure):
+Baseline (verified 2026-10-11 on a clean checkout of commit e6a8d32, Node 24, Windows; replaces the obsolete 38 suites / 687 tests figure):
 
 Full run, emulators on (`npx firebase emulators:exec --project demo-mitra-audit --only auth,firestore,storage "<cmd>"`).
 This is the authoritative baseline; skipped tests are never counted as passing.
-- functions (`cd functions && npx jest --maxWorkers=50%`): 256 suites passed, 7 skipped (live-provider); 2680 tests passed, 0 failed, 50 skipped
-- frontend/root (`npx jest`): 117 suites passed, 0 failed; 1643 tests passed, 0 failed, 7 skipped (5 for unimplemented agency/bulk features, 1 browser-only, 1 other)
+- functions (`cd functions && npx jest --maxWorkers=50%`): 259 suites passed, 7 skipped (live-provider); 2732 tests passed, 0 failed, 50 skipped
+- frontend/root (`npx jest`): 117 suites passed, 0 failed; 1651 tests passed, 0 failed, 7 skipped, 4 todo (legal-review markers) (5 for unimplemented agency/bulk features, 1 browser-only, 1 other)
 
 Plain run, no emulators (emulator-gated tests skip, so this under-reports):
 - functions: ~210 suites / ~2350 tests passed, 0 failed, ~286 skipped

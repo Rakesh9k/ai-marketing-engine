@@ -46,3 +46,8 @@ The wizard enforces the callable's rules with field-level errors; a synced copy 
 
 ## F. Final verification of HEAD `e8b5e23` (clean worktree, LF, 0 uncommitted files)
 tsc root 0 / functions 0 errors · `eslint --max-warnings 0` exit 0 · root jest 117 suites, 1643 passed, 0 failed, 7 skipped · functions jest (all emulators, `--no-cache`, `--maxWorkers=50%`) 256 suites passed, 7 skipped, 2680 passed, 0 failed, 50 skipped. An earlier run showed the first test of `creativeBrain.e2eValidation` exceeding the 30 s default on a cold Jest cache; its timeout (and the integration suite's) was raised to 120 s with no assertion changed (`e8b5e23`).
+
+## G. Update 2026-10-11 (later): prepaid terms, usage meter, final verification
+- Decision: **fixed-term prepaid access, no auto-renewal** (monthly 30 days, yearly 365 days). Implemented and tested end to end on the emulator (`7ee373e`, `f14399c`); rules, UI behaviour and the gaps found while doing it (expiry job index, blocked renewals, mid-month paid credits) are in the commit messages. Legal pages remain unchanged pending adviser wording: `17-cashfree-legal-fact-sheet.md`. Cutover preconditions, real-sandbox journey and rollback: `18-cashfree-cutover-gate.md`.
+- Usage meter for live runs built and unit-tested (`8f48cf6`): reserves worst-case cost before every paid call, measures from provider usage, never treats unreported calls as free, stops safely. **Still not run live.** Price assumptions remain to be verified before the INR 300 ceiling is approved.
+- Clean-checkout verification of `e6a8d32`: tsc 0/0, eslint exit 0, root jest 117 suites 1651 passed 0 failed 7 skipped 4 todo, functions jest (emulators, `--maxWorkers=50%`) 259 suites 2732 passed 0 failed 50 skipped.
