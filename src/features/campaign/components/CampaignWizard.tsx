@@ -44,6 +44,7 @@ import { PageSkeleton } from '@/components/motion/PageSkeleton';
 import { MagneticWrap } from '@/components/motion/MagneticWrap';
 import { SavedStylePicker } from '@/features/style/components/SavedStylePicker';
 import { describeError } from '@/lib/errors/classifyError';
+import { computeOfferFieldErrors } from '../offerFieldErrors';
 import { applyQuickIdea, quickIdeasFor, type QuickIdea } from '../quickIdeas';
 import {
   defaultLocalizationFor,
@@ -86,6 +87,15 @@ interface CampaignWizardProps {
   userId: string;
 }
 
+function FieldError({ id, errors }: { id: string; errors?: string[] }) {
+  if (!errors || errors.length === 0) return null;
+  return (
+    <p id={id} role="alert" className="text-error-600 mt-1 text-xs font-medium">
+      {errors[0]}
+    </p>
+  );
+}
+
 export function CampaignWizard({ userId }: CampaignWizardProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -106,6 +116,8 @@ export function CampaignWizard({ userId }: CampaignWizardProps) {
 
   const [state, setState] = useState<CampaignWizardState>(createInitialWizardState());
   const [stepError, setStepError] = useState<string | null>(null);
+  // Offer-step field errors appear after the first failed attempt, then follow the inputs live.
+  const [offerErrorsShown, setOfferErrorsShown] = useState(false);
   const [isConceptModalOpen, setIsConceptModalOpen] = useState(false);
   const [selectedConcept, setSelectedConcept] = useState<SelectedConcept | null>(null);
 
@@ -268,6 +280,15 @@ export function CampaignWizard({ userId }: CampaignWizardProps) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [business?.businessId, business?.category, state.type]);
 
+  const chosenProductPrice = useMemo(
+    () => products.find((p) => p.productId === state.selectedProductId)?.price,
+    [products, state.selectedProductId]
+  );
+  const offerErrors = useMemo(
+    () => (offerErrorsShown ? computeOfferFieldErrors(state, chosenProductPrice) : {}),
+    [offerErrorsShown, state, chosenProductPrice]
+  );
+
   const goNext = useCallback(() => {
     setStepError(null);
     setState((prev) => ({ ...prev, step: Math.min(TOTAL_STEPS, prev.step + 1) }));
@@ -298,40 +319,16 @@ export function CampaignWizard({ userId }: CampaignWizardProps) {
       case 5: {
         if (!s.offer.headline.trim()) return setStepError('Please enter an offer headline.');
         if (!s.offer.type) return setStepError('Please select an offer type.');
-        const price = Number(s.offer.price);
-        if (!s.offer.price || Number.isNaN(price) || price <= 0) {
-          return setStepError('Please enter a valid price.');
+        // The same rules the callable enforces (shared validator), shown next to the offending field.
+        const fieldErrors = computeOfferFieldErrors(
+          s,
+          products.find((p) => p.productId === s.selectedProductId)?.price
+        );
+        if (Object.keys(fieldErrors).length > 0) {
+          setOfferErrorsShown(true);
+          return setStepError(Object.values(fieldErrors)[0]![0]!);
         }
-        if (s.offer.originalPrice) {
-          const original = Number(s.offer.originalPrice);
-          if (Number.isNaN(original) || original <= 0) {
-            return setStepError('Please enter a valid original price.');
-          }
-          if ((s.offer.type === 'percentage' || s.offer.type === 'fixed') && original <= price) {
-            return setStepError('Original price must be higher than the discounted price.');
-          }
-          if (s.offer.type === 'percentage') {
-            const pct = ((original - price) / original) * 100;
-            if (pct <= 0 || pct > 100) {
-              return setStepError('Discount percentage must be between 1% and 100%.');
-            }
-          }
-        } else if (s.offer.type === 'percentage' || s.offer.type === 'fixed') {
-          return setStepError('Please enter the original price to calculate the discount.');
-        }
-        if (!s.duration.start || !s.duration.end)
-          return setStepError('Please select a start and end date.');
-        if (new Date(s.duration.end) < new Date(s.duration.start)) {
-          return setStepError('End date must be on or after the start date.');
-        }
-        if (s.offer.validity?.mode === 'custom') {
-          if (!s.offer.validity.start || !s.offer.validity.end)
-            return setStepError(
-              'Please enter the offer start and end dates, or choose "No specific offer dates".'
-            );
-          if (new Date(s.offer.validity.end) < new Date(s.offer.validity.start))
-            return setStepError('The offer end date must be on or after the offer start date.');
-        }
+        setOfferErrorsShown(false);
         break;
       }
       case 6: {
@@ -1031,6 +1028,12 @@ export function CampaignWizard({ userId }: CampaignWizardProps) {
                         </label>
                         <input
                           value={state.offer.originalPrice}
+                          aria-invalid={Boolean(offerErrors['offer.originalPrice'])}
+                          aria-describedby={
+                            offerErrors['offer.originalPrice']
+                              ? 'offer-original-price-error'
+                              : undefined
+                          }
                           onChange={(e) =>
                             setState((prev) => ({
                               ...prev,
@@ -1042,6 +1045,10 @@ export function CampaignWizard({ userId }: CampaignWizardProps) {
                           placeholder="e.g., 349"
                           className="border-border-medium bg-surface text-text-primary placeholder:text-text-tertiary focus:ring-brand-500 mt-1 w-full rounded-lg border px-3 py-2 text-xs focus:outline-none"
                         />
+                        <FieldError
+                          id="offer-original-price-error"
+                          errors={offerErrors['offer.originalPrice']}
+                        />
                       </div>
                       <div>
                         <label className="text-text-primary block text-xs font-semibold">
@@ -1049,6 +1056,10 @@ export function CampaignWizard({ userId }: CampaignWizardProps) {
                         </label>
                         <input
                           value={state.offer.price}
+                          aria-invalid={Boolean(offerErrors['offer.price'])}
+                          aria-describedby={
+                            offerErrors['offer.price'] ? 'offer-price-error' : undefined
+                          }
                           onChange={(e) =>
                             setState((prev) => ({
                               ...prev,
@@ -1060,6 +1071,7 @@ export function CampaignWizard({ userId }: CampaignWizardProps) {
                           placeholder="e.g., 299"
                           className="border-border-medium bg-surface text-text-primary placeholder:text-text-tertiary focus:ring-brand-500 mt-1 w-full rounded-lg border px-3 py-2 text-xs focus:outline-none"
                         />
+                        <FieldError id="offer-price-error" errors={offerErrors['offer.price']} />
                       </div>
                     </div>
 
@@ -1070,6 +1082,10 @@ export function CampaignWizard({ userId }: CampaignWizardProps) {
                         </label>
                         <input
                           value={state.duration.start}
+                          aria-invalid={Boolean(offerErrors['duration.start'])}
+                          aria-describedby={
+                            offerErrors['duration.start'] ? 'campaign-start-error' : undefined
+                          }
                           onChange={(e) =>
                             setState((prev) => ({
                               ...prev,
@@ -1079,6 +1095,10 @@ export function CampaignWizard({ userId }: CampaignWizardProps) {
                           type="date"
                           className="border-border-medium bg-surface text-text-primary focus:ring-brand-500 mt-1 w-full rounded-lg border px-3 py-2 text-xs focus:outline-none"
                         />
+                        <FieldError
+                          id="campaign-start-error"
+                          errors={offerErrors['duration.start']}
+                        />
                       </div>
                       <div>
                         <label className="text-text-primary block text-xs font-semibold">
@@ -1086,6 +1106,10 @@ export function CampaignWizard({ userId }: CampaignWizardProps) {
                         </label>
                         <input
                           value={state.duration.end}
+                          aria-invalid={Boolean(offerErrors['duration.end'])}
+                          aria-describedby={
+                            offerErrors['duration.end'] ? 'campaign-end-error' : undefined
+                          }
                           onChange={(e) =>
                             setState((prev) => ({
                               ...prev,
@@ -1095,6 +1119,7 @@ export function CampaignWizard({ userId }: CampaignWizardProps) {
                           type="date"
                           className="border-border-medium bg-surface text-text-primary focus:ring-brand-500 mt-1 w-full rounded-lg border px-3 py-2 text-xs focus:outline-none"
                         />
+                        <FieldError id="campaign-end-error" errors={offerErrors['duration.end']} />
                       </div>
                     </div>
 
@@ -1147,6 +1172,18 @@ export function CampaignWizard({ userId }: CampaignWizardProps) {
                               </label>
                               <input
                                 value={state.offer.validity?.[edge] ?? ''}
+                                aria-invalid={Boolean(
+                                  offerErrors[
+                                    edge === 'start' ? 'offer.validityStart' : 'offer.validityEnd'
+                                  ]
+                                )}
+                                aria-describedby={
+                                  offerErrors[
+                                    edge === 'start' ? 'offer.validityStart' : 'offer.validityEnd'
+                                  ]
+                                    ? `offer-validity-error-${edge}`
+                                    : undefined
+                                }
                                 onChange={(e) =>
                                   setState((prev) => ({
                                     ...prev,
@@ -1163,6 +1200,14 @@ export function CampaignWizard({ userId }: CampaignWizardProps) {
                                 }
                                 type="date"
                                 className="border-border-medium bg-surface text-text-primary focus:ring-brand-500 mt-1 w-full rounded-lg border px-3 py-2 text-xs focus:outline-none"
+                              />
+                              <FieldError
+                                id={`offer-validity-error-${edge}`}
+                                errors={
+                                  offerErrors[
+                                    edge === 'start' ? 'offer.validityStart' : 'offer.validityEnd'
+                                  ]
+                                }
                               />
                             </div>
                           ))}

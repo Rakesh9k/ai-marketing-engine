@@ -7,6 +7,7 @@ import path from 'path';
  * buildCampaignInput.validity.test.ts, which is the single place the payload is built).
  */
 const wizard = fs.readFileSync(path.join(__dirname, 'CampaignWizard.tsx'), 'utf8');
+const offerFieldErrors = fs.readFileSync(path.join(__dirname, '..', 'offerFieldErrors.ts'), 'utf8');
 const builder = fs.readFileSync(path.join(__dirname, '..', 'buildCampaignInput.ts'), 'utf8');
 
 describe('CampaignWizard offer dates', () => {
@@ -20,8 +21,9 @@ describe('CampaignWizard offer dates', () => {
   });
 
   it('validates custom offer dates', () => {
-    expect(wizard).toMatch(/offer start and end dates/);
-    expect(wizard).toMatch(/offer end date must be on or after/);
+    expect(offerFieldErrors).toMatch(/offer start date/);
+    expect(offerFieldErrors).toMatch(/offer end date/);
+    expect(wizard).toMatch(/computeOfferFieldErrors/);
   });
 
   it('the payload builder never copies the campaign dates into the offer by default', () => {
