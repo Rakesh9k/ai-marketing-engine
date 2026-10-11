@@ -37,3 +37,30 @@ Side effect already visible: my committed tests (`pipeline.scenarioMatrix`, `cre
 
 ## Cleanup note
 `../_clean_head` is a git worktree with directory junctions to `node_modules`. Remove with: delete the two junctions first (`cmd /c rmdir <junction>` — never recursive delete), then `git worktree remove ../_clean_head`.
+
+---
+
+# Update — dependency-ordered consolidation completed and verified (2026-10-11)
+
+Commits (all on `consolidate/phases-and-paddle-billing`, none rewritten): `c7c8443` (1: shared types/config/entitlements/AI/callables), `61cf2ac` (2: remaining backend + tests), `f698463` (3: index exports), `1b8ec70` (4: deps/CI/config/infra/docs), `ea2b3b9` (scratch-file deletions), `6eb90b3` (5: frontend + tests), `490558d` (style fixes). Each of 1 and 5 was verified in an isolated worktree; the final head `490558d` was verified in full.
+
+## Results on a clean checkout of `490558d` (worktree, 0 uncommitted files, LF endings)
+| Check | Result |
+|---|---|
+| `tsc --noEmit` root | 0 errors (was 482) |
+| `tsc --noEmit` functions | 0 errors (was 23) |
+| `eslint . --max-warnings 0` | exit 0 (was 10,959 on the CRLF working copy; 76 before the final style commit) |
+| Root jest, all emulators | 113 suites passed, 0 failed; 1626 tests passed, 0 failed, 7 skipped |
+| Functions jest, all emulators | 250 suites passed, 7 skipped; 2607 tests passed, 0 failed, 50 skipped |
+| `next build --webpack` (local `.env.local`) | exit 0. Default Turbopack could not be tested: it rejects the junctioned `node_modules` of the temporary worktree (environment, not code) |
+Skipped tests are not counted as passing. The build used the developer's local env file, not production secrets.
+
+## Deliberately NOT committed (needs your decision)
+- **Cashfree-era billing UI** (working-tree versions of `src/app/billing/page.tsx`, `billing/page.test.tsx`, `pricing/PricingPageClient.tsx`, `pricing/pricing.test.tsx`, `features/billing/components/CreditPackCards.tsx`) — they replace the Paddle checkout with hardcoded ₹ prices, `useCashfreeCheckout` and `cancelCashfreeSubscription`. Committed HEAD keeps the Paddle UI (formatted + unused import removed). Which provider the UI should drive is a product decision.
+- **`functions/src/config/env.ts` working-tree version** (rewrites Paddle comments to "legacy / being migrated", calls Cashfree "Primary"). Committed: HEAD + only the CASHFREE_* variables.
+- **`functions/src/index.ts`**: committed with the exports but a corrected payments comment; the working-tree comment ("Cashfree Primary") differs. **Deploying from HEAD now exports Cashfree, onboarding and the 8 Creative Brain callables.**
+- Binary icons `src/app/icon.png`, `apple-icon.png`, `icon.svg`; untracked mascot images, `filelist.txt`, `functions/nul`.
+The working-tree files above remain exactly as they were; nothing was discarded.
+
+## Cleanup
+`../_clean_head` still exists (kept for verification). Remove junctions first with `cmd /c rmdir`, then `git worktree remove`.
