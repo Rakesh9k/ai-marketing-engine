@@ -57,3 +57,4 @@ Checkout never sends a fabricated number. Missing -> `PHONE_REQUIRED`, invalid -
 * `customer_details.customer_phone` is **required** and exactly **10 characters** in the Create Order API (current documented version `2026-01-01`; the same rule applied in `2023-08-01`). Our validator sends 10 national digits for Indian mobiles only.
 * **API version:** the code defaults to `2023-08-01` (`CASHFREE_API_VERSION`). Cashfree's docs now describe `2026-01-01`. Decide deliberately before the sandbox journey which version to pin; the webhook payload version is also configured in the Cashfree dashboard and must match what the handlers were written and tested against. Not changed here.
 * Refund and dispute webhook shapes: see doc 20 (docs-derived; replay real sandbox deliveries to confirm).
+* **Decision (doc 21): API version pinned to 2023-08-01 in code and enforced by test; do not upgrade silently.**

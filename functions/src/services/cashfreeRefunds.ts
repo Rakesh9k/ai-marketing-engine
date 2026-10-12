@@ -48,7 +48,8 @@ export type AuditKind =
   | 'refund_needs_review'
   | 'dispute'
   | 'refund_requested'
-  | 'payment_flag_resolved';
+  | 'payment_flag_resolved'
+  | 'review_accessed';
 
 /** Append-only audit trail. Deterministic ids make a repeated event a no-op rather than a duplicate entry. */
 function writeAudit(

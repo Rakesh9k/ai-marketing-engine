@@ -15,6 +15,14 @@ export interface CashfreeConfig {
   baseUrl: string;
 }
 
+/**
+ * The ONE Cashfree API version this integration was written and tested against (see
+ * docs/audits/mitra-complete-audit/21-cashfree-api-version-decision.md). It is pinned in code: configuration may
+ * restate it but can never silently change it. Moving to another version is a deliberate change that needs a new
+ * compatibility check, a matching webhook version in the Cashfree dashboard, and updated tests.
+ */
+export const CASHFREE_API_VERSION = '2023-08-01';
+
 export function getCashfreeConfig(): CashfreeConfig {
   const env = getEnvConfig();
   const appId = env.CASHFREE_APP_ID;
@@ -23,6 +31,12 @@ export function getCashfreeConfig(): CashfreeConfig {
   if (!appId || !secretKey) {
     throw new Error(
       'Cashfree credentials not configured (CASHFREE_APP_ID or CASHFREE_SECRET_KEY missing)'
+    );
+  }
+
+  if (env.CASHFREE_API_VERSION && env.CASHFREE_API_VERSION !== CASHFREE_API_VERSION) {
+    throw new Error(
+      `CASHFREE_API_VERSION=${env.CASHFREE_API_VERSION} does not match the pinned version ${CASHFREE_API_VERSION}; change the pin in code deliberately instead`
     );
   }
 
@@ -38,7 +52,7 @@ export function getCashfreeConfig(): CashfreeConfig {
     secretKey,
     webhookSecret: env.CASHFREE_WEBHOOK_SECRET || secretKey,
     environment,
-    apiVersion: env.CASHFREE_API_VERSION || '2023-08-01',
+    apiVersion: CASHFREE_API_VERSION,
     baseUrl,
   };
 }
