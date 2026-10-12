@@ -287,7 +287,7 @@ describeIfEmulator('prepaid fixed-term lifecycle (Cashfree)', () => {
       expect((await subOf(userId)).data['planId']).toBe('starter');
     });
 
-    it('a refund is recorded but never changes the paid-through date or status', async () => {
+    it('a FULL refund of the only term ends paid access (baseline rule); the detail is in refundDisputes tests', async () => {
       const userId = uniq('u');
       await seedUser(userId);
       const co = await buy(userId, 'starter', 'monthly');
@@ -304,12 +304,13 @@ describeIfEmulator('prepaid fixed-term lifecycle (Cashfree)', () => {
           },
         },
       });
-      expect(
-        (await db.collection('cashfree_refunds').doc(refundId).get()).data()!['needsManualReview']
-      ).toBe(true);
+      const refund = (await db.collection('cashfree_refunds').doc(refundId).get()).data()!;
+      expect(refund['adjustment']).toMatchObject({ action: 'end_term' });
       const after = (await subOf(userId)).data;
-      expect(after['currentPeriodEnd']).toBe(before['currentPeriodEnd']);
-      expect(after['status']).toBe('active');
+      expect(after['status']).toBe('refunded');
+      expect(new Date(after['currentPeriodEnd']).getTime()).toBeLessThan(
+        new Date(before['currentPeriodEnd']).getTime()
+      );
     });
   });
 

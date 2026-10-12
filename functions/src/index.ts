@@ -68,6 +68,8 @@ export { paddleWebhook } from './functions/webhooks/paddleWebhook';
 
 export { createCashfreeCheckout } from './functions/subscriptions/createCashfreeCheckout';
 export { cancelCashfreeSubscription } from './functions/subscriptions/cancelCashfreeSubscription';
+export { requestRefund } from './functions/subscriptions/requestRefund';
+export { getBillingReview } from './functions/subscriptions/getBillingReview';
 export { cashfreeWebhook } from './functions/webhooks/cashfreeWebhook';
 // PayU is kept in the repo for migration/rollback but deliberately NOT exported, so the
 // app can never present two competing payment flows. To roll back, re-enable these and

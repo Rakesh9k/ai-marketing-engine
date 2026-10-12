@@ -299,8 +299,8 @@ describeIfEmulator('payment provider switch: Cashfree active, Paddle inert', () 
     });
   });
 
-  describe('4. refunds are recorded, never silently revoke credits', () => {
-    it('records the refund for manual review and leaves the granted credits alone', async () => {
+  describe('4. a full refund removes the unspent pack credits (baseline rule)', () => {
+    it('records the refund and reverses the unspent pack credits exactly once', async () => {
       const userId = uniq('u');
       await seedUser(userId);
       const pack = PRICING.topUpPacks[0]!;
@@ -321,11 +321,12 @@ describeIfEmulator('payment provider switch: Cashfree active, Paddle inert', () 
         })
       ).toBe(200);
       const refund = (await db.collection('cashfree_refunds').doc(refundId).get()).data()!;
-      expect(refund['needsManualReview']).toBe(true);
+      expect(refund['needsManualReview']).toBe(false);
+      expect(refund['adjustment']).toMatchObject({ action: 'revoke_credits' });
       expect(
         (await db.collection('transactions').doc(checkout.orderId).get()).data()!['reconciliation']
       ).toMatchObject({ state: 'refunded' });
-      expect((await usageOf(userId))['bonusCredits']).toBe(pack.credits); // not revoked automatically
+      expect((await usageOf(userId))['bonusCredits']).toBe(0); // unspent pack credits removed
     });
   });
 

@@ -19,6 +19,12 @@ import { getMonthlyCredits, type SubscriptionPlan } from '../../config/pricing';
 import type { PaidPlan, BillingCycle } from '../../services/paymentProvider';
 import { isProviderActive, recordIgnoredProviderEvent } from '../../services/activeProvider';
 import { decidePurchase, isTermLive } from '../../services/prepaidTerm';
+import {
+  applyCashfreeRefund,
+  recordCashfreeDispute,
+  type CashfreeDisputeEvent,
+  type CashfreeRefundEvent,
+} from '../../services/cashfreeRefunds';
 
 const db = admin.firestore();
 const webhookLogger = createLogger({ function: 'cashfreeWebhook' });
@@ -56,11 +62,9 @@ export interface CashfreeWebhookPayload {
       current_period_start?: string;
       current_period_end?: string;
     };
-    refund?: {
-      refund_id: string;
-      refund_status: string;
-      refund_amount: number;
-    };
+    refund?: CashfreeRefundEvent;
+    dispute?: CashfreeDisputeEvent;
+    order_details?: { order_id: string };
   };
 }
 
@@ -114,7 +118,11 @@ export const cashfreeWebhook = onRequest(
       ) as CashfreeWebhookPayload;
 
       if (!isProviderActive('cashfree')) {
-        const o = payload.data?.order?.order_id ?? payload.data?.refund?.refund_id ?? 'unknown';
+        const o =
+          payload.data?.order?.order_id ??
+          payload.data?.refund?.refund_id ??
+          (payload.data?.dispute ? String(payload.data.dispute.dispute_id) : undefined) ??
+          'unknown';
         await recordIgnoredProviderEvent('cashfree', `${payload.type}_${o}`, payload.type, {
           orderId: payload.data?.order?.order_id ?? null,
         });
@@ -165,6 +173,14 @@ export async function processCashfreeEvent(payload: CashfreeWebhookPayload): Pro
 
     case 'REFUND_STATUS_WEBHOOK':
       await handleRefundStatusChange(payload);
+      break;
+
+    case 'DISPUTE_CREATED':
+    case 'DISPUTE_UPDATED':
+    case 'DISPUTE_CLOSED':
+      if (payload.data?.dispute?.dispute_id !== undefined) {
+        await recordCashfreeDispute(payload.data.dispute, payload.data.order_details?.order_id);
+      }
       break;
 
     default:
@@ -473,32 +489,11 @@ async function handleSubscriptionStatusChange(payload: CashfreeWebhookPayload) {
 async function handleRefundStatusChange(payload: CashfreeWebhookPayload) {
   const refund = payload.data?.refund;
   if (!refund?.refund_id) return;
-
-  const orderId = payload.data?.order?.order_id;
-  await db
-    .collection('cashfree_refunds')
-    .doc(refund.refund_id)
-    .set(
-      {
-        refundId: refund.refund_id,
-        orderId: orderId ?? null,
-        status: refund.refund_status,
-        amount: refund.refund_amount ?? null,
-        // Whether a refund removes credits/entitlement is a business-policy decision that is not defined, so
-        // an operator reviews every successful refund; nothing is revoked automatically.
-        needsManualReview: refund.refund_status === 'SUCCESS',
-        updatedAt: FieldValue.serverTimestamp(),
-      },
-      { merge: true }
-    );
-  if (orderId && refund.refund_status === 'SUCCESS') {
-    await db
-      .collection('transactions')
-      .doc(orderId)
-      .set({ reconciliation: { state: 'refunded', refundId: refund.refund_id } }, { merge: true });
-  }
-  webhookLogger.info('cashfreeWebhook: refund status recorded', {
+  // Cashfree puts order_id inside data.refund; older fixtures put it in data.order.
+  const { outcome } = await applyCashfreeRefund(refund, payload.data?.order?.order_id);
+  webhookLogger.info('cashfreeWebhook: refund processed', {
     refundId: refund.refund_id,
     status: refund.refund_status,
+    outcome,
   });
 }
