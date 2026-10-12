@@ -96,12 +96,14 @@ export const ASSUMED_LIVE_PRICES: MeterConfig = {
     // GEMINI_DISCOVERY_MODEL to an exact id first.
     // Image models: $30 (lite) / $60 (flash) per 1M image output tokens; a 1K image is 1,120 tokens = $0.0336 /
     // $0.067. All reported output tokens are charged at the image rate (conservative: text tokens cost less).
-    // Resolution is not set in our request, so the ceiling assumes the LARGEST output (4K, ~2,520 image tokens,
-    // UNVERIFIED token count): 2,520 x $30/1e6 = $0.076 (+ prompt). Measured 1K is ~$0.034.
+    // Google's image-generation guide (read 2026-10-12): gemini-3.1-flash-lite-image supports 1K ONLY and the Gemini 3
+    // image models default to 1K, so a 1K image (1,120 tokens = $0.034) is its largest output; ceiling $0.05 allows
+    // for accompanying text. gemini-3.1-flash-image also supports 2K/4K; we do not set a size, so it uses 1K, but
+    // its ceiling assumes a 4K output (~2,520 tokens, UNVERIFIED count) in case that ever changes.
     'gemini-3.1-flash-lite-image': {
       inputPerMTokUsd: 0.25,
       outputPerMTokUsd: 30,
-      maxCallUsd: 0.08,
+      maxCallUsd: 0.05,
     },
     'gemini-3.1-flash-image': { inputPerMTokUsd: 0.5, outputPerMTokUsd: 60, maxCallUsd: 0.16 },
   },

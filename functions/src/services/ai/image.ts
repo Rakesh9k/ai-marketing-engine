@@ -19,8 +19,11 @@ import { DEFAULT_IMAGE_MODEL, imageModel } from '../../config/geminiModels';
  */
 const GEMINI_API_BASE = 'https://generativelanguage.googleapis.com/v1beta/models';
 export const DEFAULT_GEMINI_IMAGE_MODEL = DEFAULT_IMAGE_MODEL;
-/** Image output tokens the reservation allows for: the largest (4K) output; resolution is not set in the request. UNVERIFIED count. */
-const IMAGE_OUTPUT_TOKEN_CEILING = 2520;
+/**
+ * Image output tokens the reservation allows for. The lite model supports 1K only (1,120 tokens; ceiling leaves room
+ * for accompanying text). Other image models could return up to 4K (~2,520 tokens, UNVERIFIED count).
+ */
+const imageOutputTokenCeiling = (model: string): number => (model.includes('lite') ? 1500 : 2520);
 const MAX_REFERENCE_IMAGE_BYTES = 7 * 1024 * 1024;
 const SUPPORTED_REFERENCE_MIME = ['image/jpeg', 'image/png', 'image/webp'];
 
@@ -143,7 +146,7 @@ export class GeminiImageProvider {
           (request.negativePrompt?.length ?? 0) +
           200 +
           (request.sourceImageUrl ? 2000 : 0),
-        outputTokenCeiling: IMAGE_OUTPUT_TOKEN_CEILING,
+        outputTokenCeiling: imageOutputTokenCeiling(model),
       });
       let response: Response;
       try {

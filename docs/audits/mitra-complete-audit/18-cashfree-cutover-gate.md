@@ -52,3 +52,8 @@ Automatic renewal / mandates, proration or in-place plan switching, automated re
 ## Customer phone number (added 2026-10-11)
 
 Checkout never sends a fabricated number. Missing -> `PHONE_REQUIRED`, invalid -> `INVALID_PHONE`; in both cases no Cashfree order and no transaction record is created. Covered by `cashfreeCheckoutPhone.test.ts`, `customerPhone.test.ts` and the browser/server parity test. Sandbox journey must include: a first purchase by an account with no phone (prompt appears, number saved), and a repeat purchase (no prompt). If Cashfree later offers an officially supported way to omit the phone, change the rule deliberately; do not reintroduce a default value.
+
+## Cashfree configuration facts checked 2026-10-12 (docs only; no sandbox account used)
+* `customer_details.customer_phone` is **required** and exactly **10 characters** in the Create Order API (current documented version `2026-01-01`; the same rule applied in `2023-08-01`). Our validator sends 10 national digits for Indian mobiles only.
+* **API version:** the code defaults to `2023-08-01` (`CASHFREE_API_VERSION`). Cashfree's docs now describe `2026-01-01`. Decide deliberately before the sandbox journey which version to pin; the webhook payload version is also configured in the Cashfree dashboard and must match what the handlers were written and tested against. Not changed here.
+* Refund and dispute webhook shapes: see doc 20 (docs-derived; replay real sandbox deliveries to confirm).

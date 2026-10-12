@@ -49,3 +49,16 @@ The gap raised in review is closed in code (`usageMeter.ts`, `liveBudget.ts`), c
 5. **Live gate.** `installLiveBudgetOrThrow()` has no default budget: `LIVE_BUDGET_INR` must be set, ≤ ₹100 (the ₹300 batch is not approved), a key present and models pinned. It is wired into `creativeBrain.live.test.ts` (images are stubbed in that harness, so image spend is not exercised there).
 
 Residual risk, stated plainly: a pre-call reservation can only cover what we can bound. Text input is bounded by prompt length, output by `maxOutputTokens`; if the provider's thinking tokens exceed the 2× allowance, the first such call is detected (incident) but already billed. Not yet verified live: thinking-token behaviour on `gemini-3.1-flash-lite`, and the image token count at default resolution. The first ₹100 scenario is also the test of these two assumptions.
+
+## 6. Independent verification against Google's docs (2026-10-12)
+
+Read from ai.google.dev (thinking guide, image-generation guide); still **no live call made**.
+
+| Assumption | Finding | Effect |
+|---|---|---|
+| Do thinking tokens count against the output limit? | The thinking guide says the max-output-tokens setting includes thought tokens, and that thinking is billed as output (and still billed when a response is cut off). That page documents the Interactions API, so it is **not confirmed for `generateContent`**. | Reservation keeps 2× `maxOutputTokens` as margin (1× would suffice if it applies). |
+| Default thinking | `gemini-3.5-flash-lite` and `gemini-3.1-flash-lite-image` default to *minimal* thinking. The default for `gemini-3.1-flash-lite` (our text model) was not shown on the page: **unverified**. | The first live scenario must record `thoughtsTokenCount` for the text model. |
+| Image resolution | Gemini 3 image models default to 1K. `gemini-3.1-flash-lite-image` supports **1K only**; `gemini-3.1-flash-image` also 512/2K/4K. | Lite-image ceiling lowered back to $0.05 (1,500 tokens reserved). `gemini-3.1-flash-image` still reserves a 4K ceiling (token count for 2K/4K not stated on the page: unverified). |
+| Alias target | Not verifiable from docs; remains refused until pinned. | No change. |
+
+Prices themselves (section 1) were read from the pricing page on 2026-10-11 and should be re-read on the day of any approved run. Reminder: **live AI remains on hold; the first scenario needs a separate approval.**

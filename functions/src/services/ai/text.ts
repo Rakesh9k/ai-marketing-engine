@@ -6,7 +6,11 @@ import { schemaInstruction } from './schemaPrompt';
 import { recordAiCall } from './aiCallLog';
 import { estimateInputTokens, meteredCall } from './usageMeter';
 
-/** Thinking tokens bill as output; allow as many again as maxOutputTokens (UNVERIFIED how the API caps them). */
+/**
+ * Thinking tokens bill as output. Google's thinking guide (read 2026-10-12) says max output tokens INCLUDES thought
+ * tokens, so 1x would bound it; 2x is kept as margin because that page documents the Interactions API, not
+ * generateContent (UNVERIFIED for generateContent).
+ */
 const textLimits = (prompt: string, maxOutputTokens: number) => ({
   estInputTokens: estimateInputTokens(prompt),
   outputTokenCeiling: maxOutputTokens * 2,
