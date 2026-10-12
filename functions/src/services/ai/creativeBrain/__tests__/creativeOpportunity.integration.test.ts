@@ -1,3 +1,44 @@
+/**
+ * Hermetic: the text model is replaced by a canned answer. This suite used to call the REAL Gemini whenever a key
+ * was present in the environment, spending money on every full test run. Where the canned answer does not fit the
+ * requested schema (e.g. the concept stage) the call fails exactly as a provider outage would, and the service
+ * falls back deterministically.
+ */
+jest.mock('../../index', () => {
+  const actual = jest.requireActual('../../index');
+  const canned = {
+    opportunityId: 'opp-100',
+    vertical: 'restaurant',
+    problem: 'Weekend diners face long waiting times at biryani spots',
+    tension: 'Craving authentic biryani vs reluctance to stand in long queues',
+    motivation: 'Convenient weekend dining at home or reserved tables',
+    occasion: 'Sunday Family Feast',
+    audienceInsight: 'Families in Hyderabad want a proper biryani lunch without the hassle',
+    opportunityStatement:
+      'Leverage the weekend combo and instant WhatsApp ordering for biryani lovers.',
+    desiredBusinessOutcome: 'More WhatsApp orders on weekends',
+    desiredAudienceResponse: 'Eagerness to order biryani for family lunch immediately',
+    supportingSignals: ['Verified price of 399'],
+    constraints: {
+      maxTextDensity: 'medium',
+      toneBoundary: 'friendly',
+      factualLimits: ['Price: 399'],
+    },
+    confidence: 88,
+    rationale: 'Strong alignment between customer craving and WhatsApp ordering.',
+  };
+  return {
+    ...actual,
+    generateStructuredText: async (
+      _prompt: string,
+      schema: { safeParse: (v: unknown) => { success: boolean } }
+    ) => {
+      if (schema.safeParse(canned).success) return canned;
+      throw new Error('mocked text model: no canned answer for this schema');
+    },
+  };
+});
+
 import { creativeBrainService } from '../../creativeBrainService';
 import { AdaptiveCreativeBrainStateMachine } from '../adaptiveStateMachine';
 import { creativeBrainSessionService } from '../session/creativeBrainSession.service';
@@ -20,7 +61,10 @@ describe('Phase 8 — Creative Opportunity Integration & Session Persistence', (
         contact: { phone: '+919876543210' },
       },
       brand: { tone: 'friendly' },
-      audience: { targetCustomer: 'Biryani enthusiasts', preferences: 'Authentic Hyderabadi spice' },
+      audience: {
+        targetCustomer: 'Biryani enthusiasts',
+        preferences: 'Authentic Hyderabadi spice',
+      },
       products: [{ id: 'prod_01', name: 'Hyderabadi Chicken Biryani', price: 399 }],
     } as any,
     vertical: 'restaurant',
@@ -78,13 +122,18 @@ describe('Phase 8 — Creative Opportunity Integration & Session Persistence', (
     });
 
     const opportunity = await creativeBrainService.discoverOpportunity(sampleInput);
-    const sessionWithOpp = await creativeBrainSessionService.saveOpportunity(session.sessionId, opportunity);
+    const sessionWithOpp = await creativeBrainSessionService.saveOpportunity(
+      session.sessionId,
+      opportunity
+    );
 
     expect(sessionWithOpp.creativeOpportunity).toBeDefined();
     expect(sessionWithOpp.creativeOpportunity?.opportunityId).toBe(opportunity.opportunityId);
 
     const resumeResult = await creativeBrainSessionService.resumeSession(session.sessionId);
-    expect(resumeResult.session.creativeOpportunity?.opportunityStatement).toBe(opportunity.opportunityStatement);
+    expect(resumeResult.session.creativeOpportunity?.opportunityStatement).toBe(
+      opportunity.opportunityStatement
+    );
   });
 
   test('3. Adaptive State Machine transitions through OPPORTUNITY state before blueprint locking', async () => {
@@ -105,6 +154,8 @@ describe('Phase 8 — Creative Opportunity Integration & Session Persistence', (
 
     expect(result.success).toBe(true);
     expect(result.blueprint.opportunity).toBeDefined();
-    expect(result.blueprint.winningConcept.opportunityId).toBe(result.blueprint.opportunity.opportunityId);
+    expect(result.blueprint.winningConcept.opportunityId).toBe(
+      result.blueprint.opportunity.opportunityId
+    );
   });
 });

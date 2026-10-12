@@ -67,3 +67,11 @@ if (admin.apps.length === 0) {
 // values — no real provider call succeeds with them — set only so module
 // import doesn't crash in a test process with no credentials configured.
 process.env['GEMINI_API_KEY'] ||= 'test-fake-gemini-key-for-unit-tests-only';
+
+// Unit/integration tests must NEVER spend real money. The line above keeps a real key when one is present in the
+// shell or .env.local, which let tests that do not mock the provider (creativeOpportunity.integration) make real,
+// billed Gemini calls on every full run. Unless a live harness is explicitly opted into (LIVE_GEMINI=1, which also
+// requires LIVE_BUDGET_INR and the spend meter), the key is replaced by an obviously fake one.
+if (process.env['LIVE_GEMINI'] !== '1') {
+  process.env['GEMINI_API_KEY'] = 'test-fake-gemini-key-for-unit-tests-only';
+}
