@@ -19,6 +19,8 @@ import { DEFAULT_IMAGE_MODEL, imageModel } from '../../config/geminiModels';
  */
 const GEMINI_API_BASE = 'https://generativelanguage.googleapis.com/v1beta/models';
 export const DEFAULT_GEMINI_IMAGE_MODEL = DEFAULT_IMAGE_MODEL;
+/** Image output tokens the reservation allows for: the largest (4K) output; resolution is not set in the request. UNVERIFIED count. */
+const IMAGE_OUTPUT_TOKEN_CEILING = 2520;
 const MAX_REFERENCE_IMAGE_BYTES = 7 * 1024 * 1024;
 const SUPPORTED_REFERENCE_MIME = ['image/jpeg', 'image/png', 'image/webp'];
 
@@ -135,7 +137,14 @@ export class GeminiImageProvider {
       const body = await this.buildRequestBody(request);
 
       // Live-run budget: reserve this call's worst case first (a no-op unless a harness installed a meter).
-      const ticket = beginMeteredCall('image', model);
+      const ticket = beginMeteredCall('image', model, {
+        estInputTokens:
+          request.prompt.length +
+          (request.negativePrompt?.length ?? 0) +
+          200 +
+          (request.sourceImageUrl ? 2000 : 0),
+        outputTokenCeiling: IMAGE_OUTPUT_TOKEN_CEILING,
+      });
       let response: Response;
       try {
         response = await fetch(`${GEMINI_API_BASE}/${model}:generateContent`, {

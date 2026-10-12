@@ -37,3 +37,15 @@ Known limit: a single call that reports **more** than its reserved maximum is st
 3. Confirm you accept the discovery alias being priced by assumption, or exclude discovery from the first scenario.
 
 Needed from you: (a) approve prices as stated, (b) the cap and the number of scenarios, (c) permission to wire the meter into the live harness. Nothing live runs before that.
+
+## 5. Update 2026-10-12 — reservation / overrun gap closed (code only; nothing run live)
+
+The gap raised in review is closed in code (`usageMeter.ts`, `liveBudget.ts`), covered by tests:
+
+1. **Alias no longer assumed.** `gemini-flash-lite-latest` has no price; `liveRunModelProblems()` refuses a live run while any configured model is an alias (`*-latest`) or unpriced. Set `GEMINI_DISCOVERY_MODEL` to an exact id (e.g. `gemini-3.5-flash-lite`) before a run. Whether the alias resolves to that model is still unverified.
+2. **Reservation comes from the request.** Text calls reserve `max(flat max, prompt chars × input price + 2 × maxOutputTokens × output price)` (one token per character over-counts; doubling output allows for thinking tokens, whose cap by the API is UNVERIFIED). Image calls reserve the 4K ceiling (≈2,520 image tokens, UNVERIFIED count): ₹7.2 for the lite image model (was ₹4.5) — resolution is still not set in our request, so we reserve for the largest possible output instead of assuming 1K.
+3. **Overrun = incident.** If a call bills more than it reserved, the run stops (no further provider call), the incident (seq, scenario, model, reserved, measured, excess) is recorded, and the live test fails.
+4. **Report separates** configured cap, peak reserved, measured spend, fallback (assumed) spend, overrun amount and incident list.
+5. **Live gate.** `installLiveBudgetOrThrow()` has no default budget: `LIVE_BUDGET_INR` must be set, ≤ ₹100 (the ₹300 batch is not approved), a key present and models pinned. It is wired into `creativeBrain.live.test.ts` (images are stubbed in that harness, so image spend is not exercised there).
+
+Residual risk, stated plainly: a pre-call reservation can only cover what we can bound. Text input is bounded by prompt length, output by `maxOutputTokens`; if the provider's thinking tokens exceed the 2× allowance, the first such call is detected (incident) but already billed. Not yet verified live: thinking-token behaviour on `gemini-3.1-flash-lite`, and the image token count at default resolution. The first ₹100 scenario is also the test of these two assumptions.

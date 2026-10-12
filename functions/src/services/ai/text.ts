@@ -4,7 +4,13 @@ import { getEnvConfig } from '../../config/env';
 import { textModel } from '../../config/geminiModels';
 import { schemaInstruction } from './schemaPrompt';
 import { recordAiCall } from './aiCallLog';
-import { meteredCall } from './usageMeter';
+import { estimateInputTokens, meteredCall } from './usageMeter';
+
+/** Thinking tokens bill as output; allow as many again as maxOutputTokens (UNVERIFIED how the API caps them). */
+const textLimits = (prompt: string, maxOutputTokens: number) => ({
+  estInputTokens: estimateInputTokens(prompt),
+  outputTokenCeiling: maxOutputTokens * 2,
+});
 
 /** Max extra model calls spent repairing a response that failed schema validation. */
 export const MAX_SCHEMA_REPAIRS = 2;
@@ -126,7 +132,11 @@ export class GeminiTextProvider {
         async (p) =>
           (
             await meteredCall(
-              { kind: 'text', model: modelName },
+              {
+                kind: 'text',
+                model: modelName,
+                limits: textLimits(p, options?.maxTokens ?? 8192),
+              },
               () => model.generateContent(p),
               (r) => r.response.usageMetadata
             )
@@ -163,7 +173,7 @@ export class GeminiTextProvider {
 
     try {
       const genResult = await meteredCall(
-        { kind: 'text', model: modelName },
+        { kind: 'text', model: modelName, limits: textLimits(prompt, options?.maxTokens ?? 4096) },
         () => model.generateContent(prompt),
         (r) => r.response.usageMetadata
       );

@@ -29,6 +29,17 @@ export interface GeminiUsage {
   totalTokenCount?: number;
 }
 
+/**
+ * What the request itself bounds, so the reservation covers THIS call's true worst case rather than a flat figure.
+ * reservedUsd = max(price.maxCallUsd, estInputTokens x input price + outputTokenCeiling x output price).
+ */
+export interface CallLimits {
+  /** Upper estimate of input tokens (callers use 1 token per character, which over-counts for English). */
+  estInputTokens?: number;
+  /** Most tokens the call can bill as output: maxOutputTokens plus any thinking allowance, or an image's tokens. */
+  outputTokenCeiling?: number;
+}
+
 export interface ModelPrice {
   inputPerMTokUsd: number;
   outputPerMTokUsd: number;
@@ -48,6 +59,16 @@ export interface MeterConfig {
   failedCallChargeFraction: number;
   /** Stop the whole run after this many provider failures in a row. */
   maxConsecutiveFailures: number;
+}
+
+/** A budget-control incident: a call billed more than was reserved for it. Always stops the run. */
+export interface OverrunIncident {
+  seq: number;
+  scenario: string;
+  model: string;
+  reservedInr: number;
+  measuredInr: number;
+  excessInr: number;
 }
 
 /**
@@ -70,16 +91,19 @@ export const ASSUMED_LIVE_PRICES: MeterConfig = {
     'gemini-3.1-flash-lite': { inputPerMTokUsd: 0.25, outputPerMTokUsd: 1.5, maxCallUsd: 0.02 },
     // $0.30 in / $2.50 out. 30k x 0.30/1e6 + 8192 x 2.5/1e6 = $0.0295
     'gemini-3.5-flash-lite': { inputPerMTokUsd: 0.3, outputPerMTokUsd: 2.5, maxCallUsd: 0.03 },
-    // Alias NOT listed on the price page; the 2026-10-05 benchmark found it resolves to gemini-3.5-flash-lite.
-    'gemini-flash-lite-latest': { inputPerMTokUsd: 0.3, outputPerMTokUsd: 2.5, maxCallUsd: 0.03 },
+    // 'gemini-flash-lite-latest' is deliberately NOT priced: it is an alias that is not on the price page, so it
+    // falls to defaultPrice and liveRunModelProblems() refuses a live run that would use it. Pin
+    // GEMINI_DISCOVERY_MODEL to an exact id first.
     // Image models: $30 (lite) / $60 (flash) per 1M image output tokens; a 1K image is 1,120 tokens = $0.0336 /
     // $0.067. All reported output tokens are charged at the image rate (conservative: text tokens cost less).
+    // Resolution is not set in our request, so the ceiling assumes the LARGEST output (4K, ~2,520 image tokens,
+    // UNVERIFIED token count): 2,520 x $30/1e6 = $0.076 (+ prompt). Measured 1K is ~$0.034.
     'gemini-3.1-flash-lite-image': {
       inputPerMTokUsd: 0.25,
       outputPerMTokUsd: 30,
-      maxCallUsd: 0.05,
+      maxCallUsd: 0.08,
     },
-    'gemini-3.1-flash-image': { inputPerMTokUsd: 0.5, outputPerMTokUsd: 60, maxCallUsd: 0.1 },
+    'gemini-3.1-flash-image': { inputPerMTokUsd: 0.5, outputPerMTokUsd: 60, maxCallUsd: 0.16 },
   },
   // Anything not listed above (including a shut-down or unknown model) is priced pessimistically.
   defaultPrice: { inputPerMTokUsd: 1.25, outputPerMTokUsd: 10, maxCallUsd: 0.1 },
@@ -143,7 +167,9 @@ export class UsageMeter {
   private consecutiveFailures = 0;
   private seq = 0;
   private stopReason: string | null = null;
+  private peakReserved = 0;
   readonly ledger: LedgerEntry[] = [];
+  readonly overruns: OverrunIncident[] = [];
 
   constructor(readonly config: MeterConfig) {}
 
@@ -160,19 +186,29 @@ export class UsageMeter {
   private price(model: string): ModelPrice {
     return this.config.prices[model] ?? this.config.defaultPrice;
   }
-  private maxCostInr(model: string): number {
-    return this.price(model).maxCallUsd * this.config.usdToInr;
+  private maxCostInr(model: string, limits?: CallLimits): number {
+    const p = this.price(model);
+    let usd = p.maxCallUsd;
+    if (limits && (limits.estInputTokens != null || limits.outputTokenCeiling != null)) {
+      const fromRequest =
+        ((limits.estInputTokens ?? 0) * p.inputPerMTokUsd +
+          (limits.outputTokenCeiling ?? 0) * p.outputPerMTokUsd) /
+        1e6;
+      usd = Math.max(usd, fromRequest);
+    }
+    return usd * this.config.usdToInr;
   }
 
   /** Reserve a call's worst case, or refuse. Never contacts the provider. */
-  begin(kind: CallKind, model: string): CallTicket {
+  begin(kind: CallKind, model: string, limits?: CallLimits): CallTicket {
     if (this.stopReason) throw new RunStoppedError(this.stopReason);
-    const max = this.maxCostInr(model);
+    const max = this.maxCostInr(model, limits);
     if (this.spent + this.reserved + max > this.config.budgetInr + 1e-9) {
       this.stopReason = `budget of ₹${this.config.budgetInr} would be exceeded (spent ₹${this.spent.toFixed(2)}, reserved ₹${this.reserved.toFixed(2)}, next call may cost up to ₹${max.toFixed(2)})`;
       throw new BudgetExceededError(this.stopReason, this.spent, this.config.budgetInr);
     }
     this.reserved += max;
+    this.peakReserved = Math.max(this.peakReserved, this.reserved);
     return new CallTicket(this, kind, model, max, Date.now());
   }
 
@@ -209,6 +245,19 @@ export class UsageMeter {
 
     const costInr = costUsd * this.config.usdToInr;
     this.spent += costInr;
+    // The reservation is supposed to be a ceiling. A call that billed more than it reserved means the ceiling was
+    // wrong: stop every further provider call, and report it (the cap itself may now be exceeded by the excess).
+    if (costInr > t.max + 1e-9) {
+      this.overruns.push({
+        seq: this.seq + 1,
+        scenario: ctx?.scenario ?? 'unattributed',
+        model: t.model,
+        reservedInr: t.max,
+        measuredInr: costInr,
+        excessInr: costInr - t.max,
+      });
+      this.stopReason = `BUDGET-CONTROL INCIDENT: a ${t.model} call cost ₹${costInr.toFixed(2)} but only ₹${t.max.toFixed(2)} was reserved`;
+    }
     this.consecutiveFailures = ok ? 0 : this.consecutiveFailures + 1;
     if (this.consecutiveFailures >= this.config.maxConsecutiveFailures && !this.stopReason) {
       this.stopReason = `${this.consecutiveFailures} consecutive provider failures`;
@@ -269,7 +318,17 @@ export class UsageMeter {
     }
     const latencies = this.ledger.map((e) => e.ms).sort((a, b) => a - b);
     return {
+      configuredCapInr: this.config.budgetInr,
       budgetInr: this.config.budgetInr,
+      peakReservedInr: this.peakReserved,
+      measuredSpendInr: this.ledger
+        .filter((e) => e.costSource === 'measured')
+        .reduce((a, e) => a + e.costInr, 0),
+      fallbackSpendInr: this.ledger
+        .filter((e) => e.costSource === 'fallback')
+        .reduce((a, e) => a + e.costInr, 0),
+      overrunInr: Math.max(0, this.spent - this.config.budgetInr),
+      overrunIncidents: this.overruns,
       totalSpentInr: this.spent,
       totalCalls: this.ledger.length,
       failedCalls: this.ledger.filter((e) => !e.ok).length,
@@ -321,17 +380,21 @@ export function getUsageMeter(): UsageMeter | null {
 }
 
 /** Begin a metered call, or return null when no meter is installed (production path: zero overhead). */
-export function beginMeteredCall(kind: CallKind, model: string): CallTicket | null {
-  return active ? active.begin(kind, model) : null;
+export function beginMeteredCall(
+  kind: CallKind,
+  model: string,
+  limits?: CallLimits
+): CallTicket | null {
+  return active ? active.begin(kind, model, limits) : null;
 }
 
 /** Wrap one provider call. Passes straight through when no meter is installed. */
 export async function meteredCall<T>(
-  spec: { kind: CallKind; model: string },
+  spec: { kind: CallKind; model: string; limits?: CallLimits },
   fn: () => Promise<T>,
   usageOf: (result: T) => GeminiUsage | undefined
 ): Promise<T> {
-  const ticket = beginMeteredCall(spec.kind, spec.model);
+  const ticket = beginMeteredCall(spec.kind, spec.model, spec.limits);
   if (!ticket) return fn();
   try {
     const result = await fn();
@@ -362,6 +425,27 @@ export function liveRunEnvironmentProblems(env: NodeJS.ProcessEnv): string[] {
   if (env['NODE_ENV'] === 'production') problems.push('NODE_ENV is production');
   return problems;
 }
+
+/**
+ * Every model the live run could call must be an exact, priced id. An alias (e.g. *-latest) or an unlisted id can
+ * point at a dearer model without notice, so the run is refused until it is pinned and priced.
+ */
+export function liveRunModelProblems(
+  models: Record<string, string>,
+  config: MeterConfig = ASSUMED_LIVE_PRICES
+): string[] {
+  const problems: string[] = [];
+  for (const [role, id] of Object.entries(models)) {
+    if (/-latest$/.test(id))
+      problems.push(`${role} model "${id}" is an alias; pin an exact model id`);
+    else if (!config.prices[id]) problems.push(`${role} model "${id}" has no verified price`);
+  }
+  return problems;
+}
+
+/** A conservative token estimate for a prompt: one token per character (over-counts for English). */
+export const estimateInputTokens = (...texts: string[]): number =>
+  texts.reduce((n, t) => n + t.length, 0);
 
 export type ScenarioStatus = 'completed' | 'incomplete' | 'skipped' | 'failed';
 export interface ScenarioOutcome {

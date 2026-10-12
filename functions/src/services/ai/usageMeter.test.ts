@@ -17,6 +17,7 @@ import {
   withMeterContext,
   runScenariosUnderBudget,
   liveRunEnvironmentProblems,
+  liveRunModelProblems,
   ASSUMED_LIVE_PRICES,
   type MeterConfig,
 } from './usageMeter';
@@ -346,12 +347,7 @@ describe('safety preconditions for a live run', () => {
 
 describe('the price table covers every model Mitra uses by default', () => {
   it('each default model has an explicit price (none silently falls to the pessimistic default)', () => {
-    for (const model of [
-      DEFAULT_TEXT_MODEL,
-      DEFAULT_VISION_MODEL,
-      DEFAULT_DISCOVERY_MODEL,
-      DEFAULT_IMAGE_MODEL,
-    ]) {
+    for (const model of [DEFAULT_TEXT_MODEL, DEFAULT_VISION_MODEL, DEFAULT_IMAGE_MODEL]) {
       expect(ASSUMED_LIVE_PRICES.prices[model]).toBeDefined();
     }
   });
@@ -510,5 +506,118 @@ describe('wired into the real providers', () => {
     } finally {
       global.fetch = realFetch;
     }
+  });
+});
+
+describe('the discovery alias is not silently priced', () => {
+  it('gemini-flash-lite-latest has no price, and a live run using it is refused until it is pinned', () => {
+    expect(ASSUMED_LIVE_PRICES.prices[DEFAULT_DISCOVERY_MODEL]).toBeUndefined();
+    expect(liveRunModelProblems({ discovery: DEFAULT_DISCOVERY_MODEL })[0]).toMatch(/alias/);
+    expect(liveRunModelProblems({ discovery: 'gemini-3.5-flash-lite' })).toEqual([]);
+    expect(liveRunModelProblems({ text: 'gemini-9-imaginary' })[0]).toMatch(/no verified price/);
+    expect(
+      liveRunModelProblems({
+        text: DEFAULT_TEXT_MODEL,
+        vision: DEFAULT_VISION_MODEL,
+        image: DEFAULT_IMAGE_MODEL,
+      })
+    ).toEqual([]);
+  });
+});
+
+describe('the reservation is derived from the request, not a flat guess', () => {
+  it('a large prompt with a large output ceiling reserves more than the flat per-call maximum', () => {
+    const m = new UsageMeter(cfg({ budgetInr: 1000 }));
+    // m: $1 in / $10 out per 1M, ₹100 per $. 100k in + 100k out = $0.1 + $1.0 = $1.10 = ₹110 (flat max is ₹2)
+    m.begin('text', 'm', { estInputTokens: 100_000, outputTokenCeiling: 100_000 });
+    expect(m.remainingInr).toBeCloseTo(1000 - 110, 5);
+  });
+  it('never reserves less than the flat maximum', () => {
+    const m = new UsageMeter(cfg({ budgetInr: 1000 }));
+    m.begin('text', 'm', { estInputTokens: 10, outputTokenCeiling: 10 });
+    expect(m.remainingInr).toBeCloseTo(1000 - 2, 5);
+  });
+  it('refuses a call whose request-derived worst case cannot fit the budget (provider never contacted)', async () => {
+    installUsageMeter(new UsageMeter(cfg({ budgetInr: 50 })));
+    const fn = jest.fn();
+    await expect(
+      meteredCall(
+        {
+          kind: 'text',
+          model: 'm',
+          limits: { estInputTokens: 100_000, outputTokenCeiling: 100_000 },
+        },
+        fn,
+        () => undefined
+      )
+    ).rejects.toBeInstanceOf(BudgetExceededError);
+    expect(fn).not.toHaveBeenCalled();
+  });
+});
+
+describe('a call that bills more than it reserved is a budget-control incident', () => {
+  it('stops further provider calls, is reported, and the summary separates cap / reserved / measured / overrun', async () => {
+    const m = new UsageMeter(cfg({ budgetInr: 10 }));
+    installUsageMeter(m);
+    // reserved ₹2, but reports 1M output tokens = $10 = ₹1000
+    await meteredCall(
+      { kind: 'text', model: 'm' },
+      async () => 'x',
+      () => usage(0, 1_000_000)
+    );
+    expect(m.stopped).toMatch(/BUDGET-CONTROL INCIDENT/);
+    expect(m.overruns).toHaveLength(1);
+    expect(m.overruns[0]!.excessInr).toBeCloseTo(998, 3);
+    const fn = jest.fn();
+    await expect(
+      meteredCall({ kind: 'text', model: 'm' }, fn, () => undefined)
+    ).rejects.toBeInstanceOf(RunStoppedError);
+    expect(fn).not.toHaveBeenCalled();
+    const sum = m.summary();
+    expect(sum.configuredCapInr).toBe(10);
+    expect(sum.peakReservedInr).toBeCloseTo(2, 5);
+    expect(sum.measuredSpendInr).toBeCloseTo(1000, 3);
+    expect(sum.fallbackSpendInr).toBe(0);
+    expect(sum.overrunInr).toBeCloseTo(990, 3);
+    expect(sum.overrunIncidents).toHaveLength(1);
+  });
+  it('a normal run has no incident and no overrun', async () => {
+    const m = new UsageMeter(cfg());
+    installUsageMeter(m);
+    await meteredCall(
+      { kind: 'text', model: 'm' },
+      async () => 'x',
+      () => usage(1000, 100)
+    );
+    expect(m.overruns).toHaveLength(0);
+    expect(m.summary().overrunInr).toBe(0);
+    expect(m.stopped).toBeNull();
+  });
+});
+
+describe('the real providers pass request limits to the meter', () => {
+  it('text: reserves from prompt length and maxOutputTokens (x2 for thinking)', async () => {
+    const m = new UsageMeter({ ...ASSUMED_LIVE_PRICES, budgetInr: 10_000 });
+    installUsageMeter(m);
+    generateContentMock.mockResolvedValue({
+      response: {
+        text: () => 'ok',
+        usageMetadata: { promptTokenCount: 10, candidatesTokenCount: 5 },
+      },
+    });
+    let reservedDuring = 0;
+    generateContentMock.mockImplementationOnce(async () => {
+      reservedDuring = 10_000 - m.remainingInr;
+      return {
+        response: {
+          text: () => 'ok',
+          usageMetadata: { promptTokenCount: 10, candidatesTokenCount: 5 },
+        },
+      };
+    });
+    process.env['GEMINI_API_KEY'] = 'k';
+    await new GeminiTextProvider().generateText('x'.repeat(100_000), { maxTokens: 8192 });
+    // 100k x $0.25/1M + 16,384 x $1.5/1M = 0.025 + 0.0246 = $0.0496 -> ₹4.46 (flat max would be ₹1.8)
+    expect(reservedDuring).toBeGreaterThan(4);
   });
 });
