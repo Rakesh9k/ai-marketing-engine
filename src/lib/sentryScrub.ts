@@ -7,12 +7,12 @@ import type { Breadcrumb, ErrorEvent, Event, EventHint } from '@sentry/nextjs';
  *
  * Mitra handles Firebase ID tokens, App Check tokens, Firebase email-action codes
  * (`oobCode` in /reset-password and /verify-email URLs), signed Storage URLs, OAuth codes,
- * Paddle keys, and customers' phone/e-mail/WhatsApp numbers. None of that may leave the
+ * payment-provider credentials, and customers' phone/e-mail/WhatsApp numbers. None of that may leave the
  * browser/server in an event. This mirrors functions/src/utils/logging.ts's redactSecrets().
  *
  * Deliberately KEPT for debugging: error types/messages (with secrets masked), stack traces,
- * HTTP method, URL path, status codes, route/transaction names, Firebase uid, Paddle
- * subscription/transaction ids, plan ids, campaign/business ids, error codes, and token
+ * HTTP method, URL path, status codes, route/transaction names, Firebase uid, payment
+ * reference ids, plan ids, campaign/business ids, error codes, and token
  * *counts* (`inputTokens`, `outputTokens`, ...).
  *
  * Fail closed: if scrubbing itself throws, the event is dropped (returns null) rather than
@@ -37,13 +37,11 @@ const SECRET_PATTERNS: Array<[RegExp, string | ((...m: string[]) => string)]> = 
   [/\bsk-[A-Za-z0-9_-]{16,}\b/g, REDACTED], // OpenAI-style
   [/\bAIza[0-9A-Za-z_-]{20,}\b/g, REDACTED], // Google / Firebase web & Gemini keys
   [/\brzp_(?:live|test)_[A-Za-z0-9]{10,}\b/g, REDACTED], // Razorpay (legacy)
-  [/\bpdl_[A-Za-z0-9_]{16,}\b/g, REDACTED], // Paddle API keys + notification secrets
-  [/\b(?:live|test)_[a-f0-9]{20,}\b/g, REDACTED], // Paddle client-side tokens
+  [/\bcf(?:sk|wh)_[A-Za-z0-9_-]{8,}\b/g, REDACTED], // Cashfree API and webhook credentials
+  [/\b(?:live|test)_[a-f0-9]{20,}\b/g, REDACTED],
   [/\bGOCSPX-[A-Za-z0-9_-]{16,}\b/g, REDACTED], // Google OAuth client secret
   [/\bEAA[A-Za-z0-9]{20,}\b/g, REDACTED], // Meta access tokens
-  // Paddle personal-data ids (customer / address / business). Subscription (sub_) and
-  // transaction (txn_) ids are kept: they identify a payment, not a person, and support
-  // needs them.
+  // Payment customer / address / business ids can identify a person; order references remain useful for support.
   [/\b(ctm|add|biz)_[0-9a-z]{20,}\b/g, `$1_${REDACTED}`],
   // Personal data
   [/[A-Za-z0-9._%+-]+@[A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)*\.[A-Za-z]{2,}/g, '[EMAIL]'],

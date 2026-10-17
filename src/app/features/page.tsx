@@ -19,7 +19,7 @@ export default function FeaturesPage() {
     {
       title: 'One Photo to Full Campaign',
       description:
-        'Upload a single photo of your product, dish, or venue. Mitra generates headlines, captions, stories, reel concepts, visual creatives, and WhatsApp messages in seconds.',
+        'Upload a single photo of your product, dish, or venue. Mitra generates headlines, captions, stories, reel concepts, visual creatives, and WhatsApp messages.',
       icon: (
         <svg
           className="text-brand-600 h-6 w-6"
@@ -59,7 +59,7 @@ export default function FeaturesPage() {
     {
       title: 'Regional Languages & Hyderabadi Style',
       description:
-        'Market in the language your local customers actually speak. Generate content in English, Telugu, or Hinglish/Telglish with authentic regional tone options.',
+        'Market in the language your local customers actually speak. Generate content in English or Hinglish, with Telugu and Hindi available in beta, and regional tone options.',
       icon: (
         <svg
           className="text-brand-600 h-6 w-6"
@@ -180,7 +180,7 @@ export default function FeaturesPage() {
             Ready to transform your business marketing?
           </h2>
           <p className="text-text-secondary mx-auto mt-3 max-w-xl">
-            Start free today and create your first complete marketing campaign in under two minutes.
+            Start free today and create your first complete marketing campaign.
           </p>
           <div className="mt-8 flex justify-center gap-4">
             <Link href="/signup">

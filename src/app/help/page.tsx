@@ -52,7 +52,7 @@ const FAQS: FAQItem[] = [
     category: 'billing',
     question: 'What happens when I run out of credits?',
     answer:
-      'You can buy a credit top-up pack anytime from the Billing & Plans page (/billing), or wait for your credits to refresh at the start of the next calendar month. Credits are valid only through the current calendar month: unused plan credits do not roll over into the next month, and top-up pack credits are likewise valid only for the month you buy them in.',
+      "You can buy a credit top-up pack anytime from the Billing & Plans page (/billing), or buy your plan again when its term ends. A plan's credits belong to the period you paid for: a 30-day plan's credits last for its 30 days, and a yearly plan adds that month's credits at the start of each monthly period of the year (not all at once). Credits you have not used when a period ends do not roll over into the next one. Top-up pack credits are valid only for the calendar month you buy them in. Your one-time free starter credits are different: they do not expire, and whatever you have not used stays available.",
   },
   {
     id: '7',

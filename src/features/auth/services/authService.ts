@@ -118,5 +118,5 @@ export function createRecaptchaVerifier(
   options?: { size?: 'normal' | 'compact'; callback?: () => void; 'expired-callback'?: () => void }
 ): RecaptchaVerifier {
   const auth = getAuthInstance();
-  return new RecaptchaVerifier(auth, containerId, options);
+  return new RecaptchaVerifier(containerId, options || {}, auth);
 }

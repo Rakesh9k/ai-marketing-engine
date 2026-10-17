@@ -82,7 +82,8 @@ export function ProductForm({ businessId, initialProduct, onSuccess, onCancel }:
 
     try {
       if (isEditing && initialProduct) {
-        const updateData: Partial<Product> = {
+        const updateData: Partial<Product> & { businessId?: string } = {
+          businessId,
           name,
           category,
           price,
@@ -94,21 +95,18 @@ export function ProductForm({ businessId, initialProduct, onSuccess, onCancel }:
             ...initialProduct.attributes,
             veg: isVeg,
           },
-          updatedAt: new Date().toISOString(),
         };
-        await productService.update(initialProduct.productId, updateData);
-        const saved = { ...initialProduct, ...updateData };
+        const saved = await productService.update(initialProduct.productId, updateData);
         if (onSuccess) onSuccess(saved);
         else router.push('/products');
       } else {
-        const newProduct: Product = {
-          productId: `prod_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+        const productInput = {
           businessId,
           name,
           category,
           price,
           originalPrice,
-          currency: 'INR',
+          currency: 'INR' as const,
           description,
           tags,
           variants: [],
@@ -116,13 +114,11 @@ export function ProductForm({ businessId, initialProduct, onSuccess, onCancel }:
           attributes: {
             veg: isVeg,
           },
-          status: 'active',
+          status: 'active' as const,
           sortOrder: 0,
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString(),
         };
-        await productService.create(newProduct);
-        if (onSuccess) onSuccess(newProduct);
+        const saved = await productService.create(productInput);
+        if (onSuccess) onSuccess(saved);
         else router.push('/products');
       }
     } catch (err) {

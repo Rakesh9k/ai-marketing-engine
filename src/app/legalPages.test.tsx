@@ -44,22 +44,23 @@ describe('legal pages', () => {
     }
   });
 
-  it('does not describe PayU as the current payment provider; Paddle is', () => {
-    // D4: 0 active PayU / 0 active Razorpay subscribers, so neither is named on customer pages.
+  it('describes Cashfree prepaid checkout without obsolete provider or recurring-billing claims', () => {
     for (const t of all) {
-      expect(t).not.toMatch(/PayU|Razorpay/i);
+      expect(t).not.toMatch(/renews automatically until you cancel|Merchant of Record/i);
     }
-    expect(terms).toContain(
-      'Our order process is conducted by our online reseller Paddle.com. Paddle.com is the Merchant of Record for all our orders. Paddle provides all customer service inquiries and handles returns'
+    expect(terms).toMatch(/hosted checkout of Cashfree Payments, our payment gateway/i);
+    expect(terms).toMatch(
+      /prepaid for a fixed term of 30 days \(monthly\) or 365 days \(yearly\)/i
     );
-    expect(terms).not.toMatch(/payment provider|payment processor/i);
-    expect(privacy).not.toMatch(/payment provider|payment processor/i);
-    expect(privacy).toMatch(/Merchant of Record/);
+    expect(terms).toMatch(/Plans do not renew automatically/i);
+    expect(terms).not.toMatch(/cancel your subscription|Merchant of Record/i);
+    expect(privacy).toMatch(/Cashfree Payments/i);
+    expect(privacy).not.toMatch(/Merchant of Record/i);
     expect(privacy).toMatch(/subprocessor DPA status: not verified/);
     expect(privacy).toMatch(/Re-acceptance: users may be required to acknowledge or consent/);
     expect(privacy).not.toMatch(/founder decision required/i);
-    expect(privacy).toMatch(/Paddle/);
-    expect(refund).toMatch(/Paddle.com is the Merchant of Record/);
+    expect(refund).toMatch(/Payments are processed through Cashfree Payments/i);
+    expect(cancellation).toMatch(/Nothing renews by itself/i);
   });
 
   it('publishes no retention number of years/months and uses the generic D5 wording', () => {
@@ -72,24 +73,25 @@ describe('legal pages', () => {
     expect(privacy).toContain(d5);
   });
 
-  it('states the D1 refund policy', () => {
-    expect(refund).toMatch(/First-time subscription purchase: refundable within 7 days/);
+  it('states the published refund policy for prepaid plan terms and credit packs', () => {
+    expect(refund).toMatch(/First-time paid plan purchase: refundable within 7 days/);
     expect(refund).toMatch(/credits associated with that purchase have not been used/);
     expect(refund).toMatch(
       /Credit packs: refundable within 7 days .* none of the purchased credits/
     );
-    expect(refund).toMatch(/Subscription renewals: generally not refundable/);
+    expect(refund).toMatch(/Other purchases: refund requests are reviewed individually/);
     expect(refund).toMatch(/billing errors, duplicate charges/);
     expect(refund).toMatch(/reviewed manually/);
-    expect(refund).toMatch(/applicable law and Paddle's terms take precedence/i);
+    expect(refund).toMatch(/Applicable law takes precedence/i);
   });
 
   it('states the D6 renewal/cancellation policy and makes no forbidden promises', () => {
-    expect(terms).toMatch(/renew automatically/);
-    expect(terms).toMatch(/Cancelling stops future renewal/);
-    expect(terms).toMatch(/no automatic refund or credit reversal/);
-    expect(terms).toMatch(/Plans cannot be switched in place/);
-    expect(cancellation).toMatch(/does not reverse or remove credits/);
+    expect(terms).toMatch(/do not renew automatically/i);
+    expect(terms).toMatch(/term ending does not by itself trigger a refund or credit reversal/i);
+    expect(terms).toMatch(
+      /A different plan or term can be purchased after your current access ends/i
+    );
+    expect(cancellation).toMatch(/At the end of that term, your account moves to the Free plan/i);
     for (const t of all) {
       expect(t).not.toMatch(
         /upgrade anytime|change plans? anytime|one[- ]click|GST invoices|free trial (?!\.)|credits? (will )?roll over(?! into)/i

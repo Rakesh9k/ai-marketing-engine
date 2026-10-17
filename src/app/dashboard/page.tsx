@@ -18,6 +18,15 @@ import { PosterIllustration, SparkIllustration } from '@/components/illustration
 import { MarketingCommandCenter } from '@/components/dashboard/MarketingCommandCenter';
 import { QuickActionsGrid } from '@/components/dashboard/QuickActionsGrid';
 import { RecentCampaignsSection } from '@/components/dashboard/RecentCampaignsSection';
+import { WelcomeCreditsCard } from '@/components/dashboard/WelcomeCreditsCard';
+import { FirstCampaignGuide } from '@/features/activation/FirstCampaignGuide';
+import {
+  WELCOME_CLAIM_SESSION_KEY,
+  shouldClaimWelcomeCredits,
+  welcomeCardState,
+  type ClaimOutcome,
+} from '@/features/billing/welcomeCredits';
+import { callFunction } from '@/services/api';
 
 function EmptyState({
   title,
@@ -98,7 +107,8 @@ export default function DashboardPage() {
   const { user } = useAuth();
   const [businesses, setBusinesses] = useState<Business[]>([]);
   const [selectedBusinessId, setSelectedBusinessId] = useState<string | null>(null);
-  const [_usage, setUsage] = useState<Usage | null>(null);
+  const [usage, setUsage] = useState<Usage | null>(null);
+  const [claim, setClaim] = useState<ClaimOutcome>(null);
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
   const [_subscription, setSubscription] = useState<Subscription | null>(null);
   const [loading, setLoading] = useState(true);
@@ -106,7 +116,10 @@ export default function DashboardPage() {
 
   useEffect(() => {
     async function loadData() {
-      if (!user) return;
+      if (!user) {
+        setLoading(false);
+        return;
+      }
       try {
         setLoading(true);
         const [businessesData, subscriptionData] = await Promise.all([
@@ -139,6 +152,38 @@ export default function DashboardPage() {
     }
     void loadData();
   }, [user, selectedBusinessId]);
+
+  // A new account whose free credits have not been added yet asks the SERVER to grant them (once per session; the
+  // server decides eligibility and is idempotent, so this can never grant twice or grant an amount of our choosing).
+  useEffect(() => {
+    if (!user || !shouldClaimWelcomeCredits(usage)) return;
+    try {
+      if (sessionStorage.getItem(WELCOME_CLAIM_SESSION_KEY) === user.uid) return;
+      sessionStorage.setItem(WELCOME_CLAIM_SESSION_KEY, user.uid);
+    } catch {
+      /* storage unavailable: the server is idempotent anyway */
+    }
+    let cancelled = false;
+    void (async () => {
+      try {
+        const result = await callFunction<Record<string, never>, NonNullable<ClaimOutcome>>({
+          functionName: 'claimWelcomeCredits',
+          data: {},
+        });
+        if (cancelled) return;
+        setClaim(result);
+        if (result.status === 'granted') {
+          const fresh = await usageService.getCurrentPeriod(user.uid).catch(() => null);
+          if (!cancelled && fresh) setUsage(fresh);
+        }
+      } catch (err) {
+        console.error('Could not check free credits:', err);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [user, usage]);
 
   if (loading) {
     return <PageSkeleton variant="cards" />;
@@ -205,6 +250,19 @@ export default function DashboardPage() {
           rendered (see docs/LAUNCH_SCOPE.md). */}
       <div className="space-y-8">
         <MarketingCommandCenter business={selectedBusiness} />
+        <FirstCampaignGuide
+          facts={{
+            hasBusiness: businesses.length > 0,
+            campaignCount: campaigns.length,
+            hasFinishedCampaign: campaigns.some((c) =>
+              ['generated', 'verified', 'completed'].includes(c.status)
+            ),
+          }}
+        />
+        <WelcomeCreditsCard
+          state={welcomeCardState(usage, claim)}
+          hasCampaigns={campaigns.length > 0}
+        />
         <QuickActionsGrid />
         <RecentCampaignsSection campaigns={campaigns} />
       </div>

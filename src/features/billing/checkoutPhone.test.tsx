@@ -95,6 +95,6 @@ describe('checkout asks for a real phone number instead of inventing one', () =>
     await userEvent.click(screen.getByText('Cancel'));
     expect(screen.queryByLabelText('Mobile number')).toBeNull();
     await userEvent.click(screen.getByText('buy'));
-    await waitFor(() => expect(onError).toHaveBeenCalledWith('boom'));
+    await waitFor(() => expect(onError).toHaveBeenCalledWith('boom', 'error'));
   });
 });

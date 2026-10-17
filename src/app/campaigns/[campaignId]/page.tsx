@@ -4,7 +4,15 @@ import React, { useState, useEffect } from 'react';
 import { useParams, useSearchParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useAuth } from '@/features/auth/hooks/useAuth';
-import { campaignService, campaignAssetService, businessService } from '@/services/database';
+import {
+  campaignService,
+  campaignAssetService,
+  businessService,
+  subscriptionService,
+  usageService,
+} from '@/services/database';
+import { computeCreditsRemaining } from '@/lib/credits';
+import { CampaignNextSteps } from '@/features/activation/CampaignNextSteps';
 import { callFunction } from '@/services/api';
 import type { Business, Campaign, CampaignAsset } from '@/types';
 import { CampaignDetailContent } from '@/components/campaign/CampaignDetailContent';
@@ -44,6 +52,7 @@ export default function CampaignDetailPage({ params: _params }: CampaignDetailPa
   // stale campaign is never re-verified automatically — it only changes
   // how its EXISTING (historical) Truth Check result is displayed.
   const [isVerificationStale, setIsVerificationStale] = useState(false);
+  const [creditsRemaining, setCreditsRemaining] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
   // Distinguishes "doesn't exist / not yours" (Firestore rules deny reads
   // for campaigns you don't own — see firestore.rules — so a denied read
@@ -98,6 +107,19 @@ export default function CampaignDetailPage({ params: _params }: CampaignDetailPa
           setBusiness(null);
         }
 
+        // Best-effort and read-only: the balance shown in the "how to use it" panel.
+        if (justCreated) {
+          try {
+            const [subscription, usage] = await Promise.all([
+              subscriptionService.getByUserId(user.uid).catch(() => null),
+              usageService.getCurrentPeriod(user.uid).catch(() => null),
+            ]);
+            setCreditsRemaining(computeCreditsRemaining(subscription, usage));
+          } catch {
+            setCreditsRemaining(null);
+          }
+        }
+
         try {
           const staleCheck = await callFunction<
             { campaignId: string; businessId: string },
@@ -119,7 +141,7 @@ export default function CampaignDetailPage({ params: _params }: CampaignDetailPa
       }
     }
     void loadCampaign();
-  }, [user, paramsPromise]);
+  }, [user, paramsPromise, justCreated]);
 
   // Strip `?created=1` from the URL once it's done its job so the success
   // banner doesn't reappear on a later refresh or if the link is shared.
@@ -203,6 +225,14 @@ export default function CampaignDetailPage({ params: _params }: CampaignDetailPa
             className="animate-scene-enter"
           />
         </div>
+      )}
+      {justCreated && campaign.status !== 'failed' && (
+        <CampaignNextSteps
+          assets={assets}
+          category={business?.category}
+          objective={campaign.objective}
+          creditsRemaining={creditsRemaining}
+        />
       )}
       <CampaignDetailContent
         campaign={campaign}

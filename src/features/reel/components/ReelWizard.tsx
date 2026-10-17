@@ -345,7 +345,7 @@ export function ReelWizard() {
         <p className="mt-1 text-sm text-neutral-500">
           Create your first business before making a Reel.
         </p>
-        <Button className="mt-6" onClick={() => router.push('/onboarding/business')}>
+        <Button className="mt-6" onClick={() => router.push('/onboarding')}>
           Create Business
         </Button>
       </div>

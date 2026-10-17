@@ -2,7 +2,7 @@ import { isVisibleTransaction } from './visibleTransactions';
 
 describe('isVisibleTransaction', () => {
   it.each(['pending', 'expired', 'failed'] as const)(
-    'hides an unpaid Paddle checkout (%s) of either kind',
+    'hides an unpaid checkout (%s) of either kind',
     (status) => {
       expect(isVisibleTransaction({ type: 'subscription', status })).toBe(false);
       expect(isVisibleTransaction({ type: 'credit_purchase', status })).toBe(false);

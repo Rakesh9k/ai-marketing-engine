@@ -11,7 +11,7 @@ import { getFirebaseFunctions } from '@/lib/firebase/client';
  * can never actually succeed. This is the only viable, already-existing
  * way to record an analytics event from the browser.
  */
-export type AnalyticsEventName = 'asset_downloaded' | 'whatsapp_clicked';
+export type AnalyticsEventName = 'asset_downloaded' | 'whatsapp_clicked' | 'pricing_page_viewed';
 
 interface TrackEventParams {
   eventName: AnalyticsEventName;

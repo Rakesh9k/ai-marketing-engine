@@ -51,7 +51,8 @@ export const PLANS: PlanDefinition[] = [
     popular: false,
     ctaText: 'Start Free',
     features: [
-      '1 campaign every month: 1 poster, 3 stories and 1 reel concept',
+      '140 free credits to start, once, no card needed: enough for your first full campaign (1 poster, 3 stories and 1 reel concept)',
+      'Free credits do not expire',
       '5 social creatives',
       'AI video reels on paid plans',
       '1 business',

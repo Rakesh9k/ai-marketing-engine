@@ -46,7 +46,7 @@ export default function SalonSolutionPage() {
             <div className="mt-8 flex flex-col gap-3 sm:flex-row">
               <Link href="/signup">
                 <Button size="lg" className="w-full sm:w-auto">
-                  Start Free Salon Trial
+                  Start Free
                 </Button>
               </Link>
               <Link href="/campaigns/new">

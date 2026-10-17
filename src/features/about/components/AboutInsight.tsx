@@ -81,7 +81,7 @@ export function AboutInsight() {
                 </h4>
                 <p className="text-text-secondary text-xs">
                   Mitra retains your business context and automatically generates Instagram Reels,
-                  WhatsApp status offers, Google captions, and poster graphics in seconds.
+                  WhatsApp status offers, Google captions, and poster graphics.
                 </p>
               </div>
             </div>

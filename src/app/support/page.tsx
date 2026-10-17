@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import { BusinessIdentity } from '@/components/shared/BusinessIdentity';
 import { pageMetadata } from '@/lib/seo';
 import Link from 'next/link';
 import { MitraLogo } from '@/components/ui/MitraLogo';
@@ -89,6 +90,7 @@ export default function SupportPage() {
         </Link>
         .
       </p>
+      <BusinessIdentity className="border-border-light mt-10 border-t pt-6" />
     </div>
   );
 }

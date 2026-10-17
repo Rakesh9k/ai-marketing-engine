@@ -10,10 +10,10 @@ import { PLAN_DETAILS } from '@/features/billing/planDetails';
 import { settleRead } from '@/features/billing/readState';
 
 /**
- * Where Paddle sends the customer after a successful checkout (settings.successUrl).
+ * Where the payment partner sends the customer after checkout.
  *
  * This page only REFLECTS state. It never grants anything: plan and credits are applied by the
- * signed Paddle webhook, which usually lands within seconds. We poll the user's own
+ * signed Cashfree webhook, which usually lands within seconds. We poll the user's own
  * subscription/usage for a short while and say plainly when it has not arrived yet, instead of
  * claiming success the server has not recorded.
  */
@@ -146,7 +146,7 @@ export default function WelcomePage() {
             <p className="text-text-secondary mt-3 text-sm" role="status">
               {authStatus === 'unauthenticated'
                 ? 'Sign in to see your plan and credits.'
-                : 'We are confirming your payment with Paddle. This usually takes a few seconds.'}
+                : 'We are confirming your payment with our payment partner. This usually takes a few seconds.'}
             </p>
           </>
         )}

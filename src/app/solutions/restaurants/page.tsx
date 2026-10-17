@@ -10,7 +10,7 @@ export default function RestaurantSolutionPage() {
   const features = [
     {
       title: 'Biryani & Signature Dish Promos',
-      desc: 'Turn dish photos into mouth-watering social posts, weekend festival discounts, and special offers in seconds.',
+      desc: 'Turn dish photos into mouth-watering social posts, weekend festival discounts, and special offers.',
     },
     {
       title: 'Digital Menu Cards & Offers',
@@ -22,7 +22,7 @@ export default function RestaurantSolutionPage() {
     },
     {
       title: 'Hyderabadi & Regional Tone',
-      desc: 'Promote your restaurant in authentic regional styles (Hyderabadi English, Telugu, or Hinglish) that resonate locally.',
+      desc: 'Promote your restaurant in authentic regional styles (Hyderabadi English or Hinglish; Telugu is in beta) that resonate locally.',
     },
   ];
 
@@ -40,13 +40,13 @@ export default function RestaurantSolutionPage() {
               Turn Food Photos into Full Dining Campaigns
             </h1>
             <p className="text-text-secondary mt-6 text-lg">
-              Upload one photo of your Biryani, Thali, or Special Dish → Mitra generates a month of
-              social posts, WhatsApp promos, and offer cards.
+              Upload one photo of your Biryani, Thali, or Special Dish → Mitra generates a campaign
+              pack: social posts, WhatsApp promos, and offer cards.
             </p>
             <div className="mt-8 flex flex-col gap-3 sm:flex-row">
               <Link href="/signup">
                 <Button size="lg" className="w-full sm:w-auto">
-                  Start Free Restaurant Trial
+                  Start Free
                 </Button>
               </Link>
               <Link href="/campaigns/new">
@@ -96,7 +96,7 @@ export default function RestaurantSolutionPage() {
         <div className="bg-brand-600 mt-24 rounded-3xl p-8 text-center text-white shadow-xl sm:p-12">
           <h2 className="text-3xl font-bold sm:text-4xl">Ready to boost restaurant orders?</h2>
           <p className="mx-auto mt-4 max-w-xl text-lg text-white/90">
-            Join hundreds of local food brands using Mitra to market their dishes effortlesly.
+            Create your first campaign free, with no card needed.
           </p>
           <div className="mt-8">
             <Link href="/signup">

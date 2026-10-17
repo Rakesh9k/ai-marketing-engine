@@ -8,6 +8,7 @@
  *  - /cancellation being a redirect to the refund page instead of a real page
  */
 import * as fs from 'fs';
+import { getActiveCatalogue } from '../../functions/src/config/planCatalogue';
 import * as path from 'path';
 import React from 'react';
 import { render, screen } from '@testing-library/react';
@@ -53,12 +54,13 @@ describe('customer-facing billing copy', () => {
     expect(CAMPAIGN_GENERATION_COST).toBe(
       CREDIT_COSTS.BASE_CAMPAIGN + 2 * CREDIT_COSTS.IMAGE_GENERATION
     );
-    const backend = read('functions/src/config/pricing.ts');
-    const num = (key: string) => Number(new RegExp(`${key}:\\s*(\\d+)`).exec(backend)![1]);
-    expect(CREDIT_COSTS.BASE_CAMPAIGN).toBe(num('campaignBaseCredits'));
-    expect(CREDIT_COSTS.IMAGE_GENERATION).toBe(num('imageGenerationCredits'));
-    expect(CREDIT_COSTS.REEL_GENERATION).toBe(num('reelGenerationCredits'));
-    expect(CREDIT_COSTS.REGENERATION).toBe(num('regenerationCredits'));
+    // The backend's prices live in the plan catalogue (functions/src/config/planCatalogue.ts); read the real values
+    // rather than scraping source text.
+    const ops = getActiveCatalogue().operationCredits;
+    expect(CREDIT_COSTS.BASE_CAMPAIGN).toBe(ops.campaign_generation - 2 * ops.image_generation);
+    expect(CREDIT_COSTS.IMAGE_GENERATION).toBe(ops.image_generation);
+    expect(CREDIT_COSTS.REEL_GENERATION).toBe(ops.reel_generation);
+    expect(CREDIT_COSTS.REGENERATION).toBe(ops.regeneration);
     expect(CREDIT_COSTS.IMAGE_GENERATION).toBe(20);
     expect(CREDIT_COSTS.REEL_GENERATION).toBe(80);
     expect(CAMPAIGN_GENERATION_COST).toBe(100);
@@ -77,7 +79,15 @@ describe('Help page', () => {
     ).toBeInTheDocument();
 
     await userEvent.click(screen.getByText(/what happens when i run out of credits/i));
-    expect(await screen.findByText(/do not roll over into the next month/i)).toBeInTheDocument();
+    // Plan credits belong to the PAID PERIOD (30 days, or each monthly allocation of a yearly plan), not the calendar.
+    const answer = await screen.findByText(/do not roll over into the next one/i);
+    expect(answer).toBeInTheDocument();
+    expect(answer.textContent).toMatch(/30-day plan's credits last for its 30 days/i);
+    expect(answer.textContent).toMatch(
+      /at the start of each monthly period of the year \(not all at once\)/i
+    );
+    expect(answer.textContent).toMatch(/free starter credits.*do not expire/i);
+    expect(answer.textContent).not.toMatch(/valid only through the current calendar month/i);
     expect(screen.queryByText(/roll over every billing cycle/i)).not.toBeInTheDocument();
   });
 
@@ -96,35 +106,18 @@ describe('Help page', () => {
   });
 });
 
-// LEGAL REVIEW PENDING (docs/audits/mitra-complete-audit/17-cashfree-legal-fact-sheet.md): the pages below were
-// written for Paddle (Merchant of Record) and automatic renewal. They are NOT changed by engineering because their
-// wording needs an India-qualified adviser. These markers keep the gap visible in every test run.
-describe('legal pages awaiting review for fixed-term prepaid access via Cashfree', () => {
-  it.todo(
-    'Terms: seller identity, Cashfree as payment processor, 30/365-day prepaid terms, no automatic renewal'
-  );
-  it.todo('Cancellation Policy: nothing recurring to cancel; expiry and renewal instead');
-  it.todo(
-    'Refund Policy: BrainWise (not Paddle) handles refunds; effect of a refund on access and credits'
-  );
-  it.todo('Privacy Policy: Cashfree as payment processor instead of Paddle as Merchant of Record');
-});
-
 describe('/cancellation', () => {
-  it('is a real Cancellation Policy page describing the implemented behaviour', () => {
+  it('is a real Plan Expiry Policy page describing the implemented prepaid behaviour', () => {
     const { container } = render(<CancellationPage />);
     expect(
-      screen.getByRole('heading', { level: 1, name: /cancellation policy/i })
+      screen.getByRole('heading', { level: 1, name: /plan expiry policy/i })
     ).toBeInTheDocument();
     const text = (container.textContent ?? '').replace(/\s+/g, ' ');
-    expect(text).toMatch(/stops the next renewal/i);
-    expect(text).toMatch(/does not end your access immediately/i);
-    expect(text).toMatch(/at the end of that period your account moves to the free plan/i);
-    expect(text).toMatch(/does not by itself refund a payment/i);
-    expect(text).toMatch(
-      /switching to a different plan inside an active subscription is not available yet/i
-    );
-    expect(text).toMatch(/there is no free trial/i);
+    expect(text).toMatch(/paid Mitra plans are prepaid for a fixed term/i);
+    expect(text).toMatch(/nothing renews by itself/i);
+    expect(text).toMatch(/at the end of that term, your account moves to the Free plan/i);
+    expect(text).toMatch(/buying the same plan and term again/i);
+    expect(text).toMatch(/different plan or term can be purchased after your current access ends/i);
   });
 
   it('is no longer a re-export of the refund page', () => {

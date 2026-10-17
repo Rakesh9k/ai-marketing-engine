@@ -27,7 +27,7 @@ const TIMELINE_STEPS = [
     year: 'Today',
     icon: '🌟',
     title: 'Growing Together',
-    description: 'Thousands of businesses. Countless campaigns. One unified mission.',
+    description: 'Helping local businesses turn their own facts into campaigns they can use.',
   },
 ];
 
@@ -48,8 +48,8 @@ export function AboutJourney() {
           </h2>
 
           <p className="text-text-secondary text-base leading-relaxed sm:text-lg">
-            What started as a vision is now a platform helping thousands of local businesses create,
-            share, and grow with the power of AI.
+            What started as a vision is now a platform that helps local businesses create and share
+            marketing campaigns with the help of AI.
           </p>
         </div>
 

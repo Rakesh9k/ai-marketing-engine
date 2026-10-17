@@ -725,6 +725,7 @@ export interface Campaign {
   status: CampaignStatus;
   creditsReserved: number;
   creditsUsed?: number;
+  deletedAt?: string;
   error?: {
     code: string;
     message: string;
@@ -943,6 +944,9 @@ export interface Usage {
   periodEnd: string;
   planId: SubscriptionPlan;
   creditsIncluded: number;
+  /** One-time welcome credits in this period (they do not expire and carry into later periods until used). */
+  welcomeCredits?: number;
+  bonusCredits?: number;
   campaignsCreated: number;
   creditsUsed: number;
   imagesGenerated: number;

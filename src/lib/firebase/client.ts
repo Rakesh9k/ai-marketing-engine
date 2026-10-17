@@ -133,11 +133,9 @@ function initializeFirebase(): {
       console.warn('[Firebase] Auth initialization skipped:', err);
     }
 
-    try {
-      db = getFirestore(app);
-    } catch (err) {
-      console.warn('[Firebase] Firestore initialization skipped:', err);
-    }
+    // Firestore initialization deferred to getFirebaseDb() lazy getter.
+    // See getFirebaseDb() JSDoc for why module-evaluation init is fragile.
+    db = undefined;
 
     try {
       storage = getStorage(app);

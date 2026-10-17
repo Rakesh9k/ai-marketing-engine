@@ -81,8 +81,9 @@ export function LanguageSection() {
             Speak to customers the way they speak.
           </h2>
           <p className="text-text-secondary mx-auto mt-4 max-w-2xl text-base sm:text-lg">
-            Generic AI translates word-for-word. Mitra writes in authentic regional tones (Telugu,
-            Hinglish, Tenglish) that build immediate trust with local customers.
+            Mitra writes for local customers in English and Hinglish, with Telugu, Hindi and
+            Tenglish in beta. The examples below are samples of the style, not guaranteed output;
+            always read your campaign before you share it.
           </p>
         </div>
 

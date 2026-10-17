@@ -1,15 +1,11 @@
-'use client';
-
-import { useRouter } from 'next/navigation';
+import Link from 'next/link';
+import { BusinessIdentity } from '@/components/shared/BusinessIdentity';
 import { MitraLogo } from '@/components/ui/MitraLogo';
 
 export function LandingFooter() {
-  const router = useRouter();
-
   const productLinks = [
     { label: 'Create Campaign', href: '/signup' },
     { label: 'Pricing', href: '/pricing' },
-    { label: 'My Business', href: '/business' },
     { label: 'Solutions', href: '/solutions' },
   ];
 
@@ -32,9 +28,9 @@ export function LandingFooter() {
         <div className="grid gap-10 sm:grid-cols-2 md:grid-cols-5">
           {/* BRAND COLUMN */}
           <div className="md:col-span-2">
-            <a href="#top" className="inline-block" aria-label="Mitra by Brainwise Home">
+            <Link href="/" className="inline-block" aria-label="Mitra by Brainwise Home">
               <MitraLogo size="sm" decorative />
-            </a>
+            </Link>
             <p className="text-text-tertiary mt-1 text-xs font-semibold">by Brainwise</p>
             <p className="text-text-secondary mt-4 max-w-sm text-xs leading-relaxed">
               Mitra is an AI marketing partner for small businesses, helping restaurants, salons,
@@ -50,12 +46,12 @@ export function LandingFooter() {
             <ul className="text-text-secondary mt-4 space-y-2.5 text-xs">
               {productLinks.map((link) => (
                 <li key={link.label}>
-                  <button
-                    onClick={() => router.push(link.href)}
+                  <Link
+                    href={link.href}
                     className="hover:text-brand-600 cursor-pointer text-left transition-colors"
                   >
                     {link.label}
-                  </button>
+                  </Link>
                 </li>
               ))}
             </ul>
@@ -69,12 +65,12 @@ export function LandingFooter() {
             <ul className="text-text-secondary mt-4 space-y-2.5 text-xs">
               {companyLinks.map((link) => (
                 <li key={link.label}>
-                  <button
-                    onClick={() => router.push(link.href)}
+                  <Link
+                    href={link.href}
                     className="hover:text-brand-600 cursor-pointer text-left transition-colors"
                   >
                     {link.label}
-                  </button>
+                  </Link>
                 </li>
               ))}
             </ul>
@@ -88,21 +84,26 @@ export function LandingFooter() {
             <ul className="text-text-secondary mt-4 space-y-2.5 text-xs">
               {resourceLinks.map((link) => (
                 <li key={link.label}>
-                  <button
-                    onClick={() => router.push(link.href)}
+                  <Link
+                    href={link.href}
                     className="hover:text-brand-600 cursor-pointer text-left transition-colors"
                   >
                     {link.label}
-                  </button>
+                  </Link>
                 </li>
               ))}
             </ul>
           </div>
         </div>
 
+        <BusinessIdentity className="border-border-light mt-10 border-t pt-8" />
+
         {/* BOTTOM COPYRIGHT BAR */}
         <div className="border-border-light text-text-tertiary mt-12 flex flex-col items-center justify-between gap-4 border-t pt-8 text-xs sm:flex-row">
-          <p>© {new Date().getFullYear()} Mitra by Brainwise. All rights reserved.</p>
+          <p>
+            © {new Date().getFullYear()} Mitra by BrainWise · Brainwise Solutions. All rights
+            reserved.
+          </p>
           <p className="flex items-center gap-1">
             <span>Built with care for Indian local businesses 🇮🇳</span>
           </p>

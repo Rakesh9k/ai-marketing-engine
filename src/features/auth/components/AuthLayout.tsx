@@ -75,7 +75,7 @@ const VIEW_CONFIGS: Record<
     description:
       'Start your free journey with Mitra today and transform your local business marketing.',
     badges: [
-      { icon: '🎁', title: 'Free Credits', sub: 'Get started instantly' },
+      { icon: '🎁', title: 'Free Starter Credits', sub: 'No card needed' },
       { icon: '💳', title: 'No Credit Card', sub: 'Required' },
       { icon: '🔄', title: 'Cancel Anytime', sub: '(Yes, really!)' },
     ],

@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import { BusinessIdentity } from '@/components/shared/BusinessIdentity';
 import { pageMetadata } from '@/lib/seo';
 import Link from 'next/link';
 import { MitraLogo } from '@/components/ui/MitraLogo';
@@ -20,24 +21,17 @@ export default function PrivacyPage() {
 
       <h1 className="text-h1 text-text-primary mb-2 font-bold">Privacy Policy</h1>
       <p className="text-caption text-text-tertiary mb-8">
-        Effective date: {EFFECTIVE_DATE} · Version 0.1 (draft) · Not yet reviewed by legal counsel
+        Effective date: {EFFECTIVE_DATE}
       </p>
-
-      <div className="border-border-light bg-surface mb-8 rounded-2xl border p-4">
-        <p className="text-body text-text-secondary">
-          <strong>Status of this document:</strong> This page describes what personal data Mitra
-          collects and how it is used today. It has not yet been reviewed by legal counsel.
-        </p>
-      </div>
 
       <section className="mb-8">
         <h2 className="text-h3 text-text-primary mb-2 font-semibold">1. Who this policy covers</h2>
         <p className="text-body text-text-secondary">
           This policy covers personal data processed through the Mitra application at
-          brain-wise.com. The Service is provided by <strong>Brainwise Solutions</strong>, a sole
-          proprietorship at Aliabad Jhanda, Charminar, Hyderabad, Telangana – 500053, India
-          (&quot;Mitra by BrainWise&quot;; BrainWise is the brand identity used by Brainwise
-          Solutions).
+          brain-wise.com. The Service is provided by <strong>VISHESH KAKAR</strong> (trading as{' '}
+          <strong>Brainwise Solutions</strong>, a sole proprietorship), with its registered address at
+          Aliabad Jhanda, Charminar, Hyderabad, Telangana – 500053, India (&quot;Mitra by BrainWise&quot;;
+          BrainWise is the brand identity used by Brainwise Solutions).
         </p>
       </section>
 
@@ -103,8 +97,8 @@ export default function PrivacyPage() {
               <td className="py-2 pr-2">Granting credits, showing billing history</td>
               <td className="py-2">
                 Firestore stores plan/status/transaction records only. Card, bank, and UPI details
-                are entered with and processed by Paddle, the Merchant of Record for our orders —
-                Mitra does not receive or store your card or bank account details.
+                are entered through Cashfree Payments' hosted checkout. Mitra does not receive or
+                store your card, bank, or UPI details.
               </td>
             </tr>
             <tr className="border-border-light border-b">
@@ -145,9 +139,9 @@ export default function PrivacyPage() {
             information to generate campaign images.
           </li>
           <li>
-            <strong>Paddle</strong> — Merchant of Record for our orders; receives your payment
-            details directly and confirms payment status to Mitra via a signed server-to-server
-            webhook.
+            <strong>Cashfree Payments</strong> — our payment gateway; processes payment details on
+            its hosted checkout and confirms payment status to Mitra through a signed
+            server-to-server webhook.
           </li>
           <li>
             <strong>Cloud Run (Google Cloud)</strong> — a separate hosted service that renders your
@@ -264,6 +258,7 @@ export default function PrivacyPage() {
         </Link>
         .
       </p>
+      <BusinessIdentity className="border-border-light mt-10 border-t pt-6" />
     </div>
   );
 }

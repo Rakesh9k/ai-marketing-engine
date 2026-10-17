@@ -11,9 +11,9 @@ import {
 const JWT =
   'eyJhbGciOiJSUzI1NiIsImtpZCI6ImFiYzEyMyJ9.eyJ1aWQiOiJ1c2VyXzEyMyIsImVtYWlsIjoieEB5LmNvbSJ9.c2lnbmF0dXJlYnl0ZXNoZXJl';
 const GOOGLE_KEY = 'AIzaSyFAKEFAKEFAKEFAKEFAKEFAKEFAKE12345';
-const PADDLE_KEY = 'pdl_sdbx_apikey_01fakefakefakefake_AbCdEf1234_XyZ789';
-const PADDLE_CLIENT = 'test_0123456789abcdef0123456789';
-const CTM = 'ctm_01fakefakefakefakefakefake';
+const CASHFREE_API_KEY = 'cfsk_ma_test_0123456789abcdef';
+const CASHFREE_WEBHOOK_SECRET = 'cfwh_sec_0123456789abcdef';
+const CUSTOMER_ID = 'ctm_01fakefakefakefakefakefake';
 
 const event = (overrides: Partial<ErrorEvent> = {}): ErrorEvent =>
   ({ type: undefined, ...overrides }) as ErrorEvent;
@@ -73,8 +73,8 @@ describe('scrubString: token-like and personal values in free text', () => {
     ['JWT / Firebase ID token', `fetch failed for ${JWT} on retry`],
     ['Bearer header', 'Authorization: Bearer abcdefghijklmnop1234'],
     ['Google / Firebase API key', `key was ${GOOGLE_KEY}`],
-    ['Paddle API key', `Paddle rejected ${PADDLE_KEY}`],
-    ['Paddle client token', `client token ${PADDLE_CLIENT} invalid`],
+    ['Cashfree API key', `Payment provider rejected ${CASHFREE_API_KEY}`],
+    ['Cashfree webhook secret', `webhook secret ${CASHFREE_WEBHOOK_SECRET} invalid`],
     ['OpenAI-style key', 'using sk-abcdefghijklmnopqrstuvwx'],
     ['Razorpay key', 'rzp_live_ABCDEFGHIJ1234'],
   ])('removes %s', (_label, input) => {
@@ -83,8 +83,8 @@ describe('scrubString: token-like and personal values in free text', () => {
     for (const secret of [
       JWT,
       GOOGLE_KEY,
-      PADDLE_KEY,
-      PADDLE_CLIENT,
+      CASHFREE_API_KEY,
+      CASHFREE_WEBHOOK_SECRET,
       'abcdefghijklmnop1234',
       'sk-abcdefghijklmnopqrstuvwx',
       'rzp_live_ABCDEFGHIJ1234',
@@ -118,11 +118,11 @@ describe('scrubString: token-like and personal values in free text', () => {
     expect(scrubString(text)).toBe(text);
   });
 
-  it('masks Paddle customer ids but keeps subscription and transaction ids', () => {
+  it('masks customer ids but keeps subscription and transaction references', () => {
     const out = scrubString(
-      `customer ${CTM} sub_01abcdefghijklmnopqrstuv txn_01abcdefghijklmnopqrstuv`
+      `customer ${CUSTOMER_ID} sub_01abcdefghijklmnopqrstuv txn_01abcdefghijklmnopqrstuv`
     );
-    expect(out).not.toContain(CTM);
+    expect(out).not.toContain(CUSTOMER_ID);
     expect(out).toContain('ctm_[REDACTED]');
     expect(out).toContain('sub_01abcdefghijklmnopqrstuv');
     expect(out).toContain('txn_01abcdefghijklmnopqrstuv');
@@ -342,20 +342,29 @@ describe('scrubSentryEvent', () => {
   it('scrubs message, logentry, tags, contexts and extra', () => {
     const out = scrubSentryEvent(
       event({
-        message: `retry ${PADDLE_KEY}`,
+        message: `retry ${CASHFREE_API_KEY}`,
         logentry: { message: 'user %s failed', params: ['a@b.in'] },
-        tags: { route: '/billing', customer: CTM },
-        contexts: { paddle: { customerId: CTM, environment: 'sandbox', apiKey: PADDLE_KEY } },
+        tags: { route: '/billing', customer: CUSTOMER_ID },
+        contexts: {
+          payment: {
+            customerId: CUSTOMER_ID,
+            environment: 'sandbox',
+            apiKey: CASHFREE_API_KEY,
+            webhookSecret: CASHFREE_WEBHOOK_SECRET,
+          },
+        },
         extra: { body: { refreshToken: 'r', planId: 'pro' } },
       })
     )!;
     const all = serialized(out);
-    for (const secret of [PADDLE_KEY, CTM, 'a@b.in', '"r"']) expect(all).not.toContain(secret);
+    for (const secret of [CASHFREE_API_KEY, CASHFREE_WEBHOOK_SECRET, CUSTOMER_ID, 'a@b.in', '"r"'])
+      expect(all).not.toContain(secret);
     expect(out.tags?.['route']).toBe('/billing');
-    expect(out.contexts?.['paddle']).toEqual({
+    expect(out.contexts?.['payment']).toEqual({
       customerId: 'ctm_[REDACTED]',
       environment: 'sandbox',
       apiKey: '[REDACTED]',
+      webhookSecret: '[REDACTED]',
     });
     expect((out.extra as Record<string, Record<string, unknown>>)['body']).toEqual({
       refreshToken: '[REDACTED]',

@@ -14,15 +14,12 @@ describe('Environment Configuration Validation (src/lib/config/env.ts)', () => {
 
   it('successfully parses valid public environment configuration', () => {
     process.env['NEXT_PUBLIC_USE_EMULATORS'] = 'true';
-    process.env['NEXT_PUBLIC_PADDLE_ENVIRONMENT'] = 'sandbox';
-
     const env = parsePublicEnv();
     expect(env.NEXT_PUBLIC_USE_EMULATORS).toBe('true');
-    expect(env.NEXT_PUBLIC_PADDLE_ENVIRONMENT).toBe('sandbox');
   });
 
-  it('fails when invalid paddle environment is provided', () => {
-    process.env['NEXT_PUBLIC_PADDLE_ENVIRONMENT'] = 'invalid_env' as any;
+  it('fails when an invalid emulator setting is provided', () => {
+    process.env['NEXT_PUBLIC_USE_EMULATORS'] = 'sometimes';
     expect(() => parsePublicEnv()).toThrow(
       'Invalid client public environment variables configuration'
     );

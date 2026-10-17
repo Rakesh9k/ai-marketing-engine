@@ -33,7 +33,20 @@ export interface PhonePrompt {
   error: string | null;
 }
 
-export function useCashfreeCheckout(onError: (message: string) => void) {
+/** Why checkout could not start. 'unavailable' = the server says payments are not open yet; nobody was charged. */
+export type CheckoutProblemKind = 'error' | 'unavailable';
+
+export const PAYMENTS_UNAVAILABLE_MESSAGE =
+  'Payments are not open yet. You have not been charged. Please try again later.';
+
+export function checkoutProblemKind(error: unknown): CheckoutProblemKind {
+  const code = (error as { details?: { code?: unknown } } | null)?.details?.code;
+  return code === 'PAYMENTS_NOT_APPROVED' ? 'unavailable' : 'error';
+}
+
+export function useCashfreeCheckout(
+  onError: (message: string, kind?: CheckoutProblemKind) => void
+) {
   const [pendingKey, setPendingKey] = useState<string | null>(null);
   const [phonePrompt, setPhonePrompt] = useState<PhonePrompt | null>(null);
   const onErrorRef = useRef(onError);
@@ -72,9 +85,14 @@ export function useCashfreeCheckout(onError: (message: string) => void) {
         setPhonePrompt({ target, error: problem === 'INVALID_PHONE' ? PHONE_HELP : null });
         return;
       }
+      if (checkoutProblemKind(error) === 'unavailable') {
+        onErrorRef.current(PAYMENTS_UNAVAILABLE_MESSAGE, 'unavailable');
+        return;
+      }
       console.error('Cashfree Checkout error:', error);
       onErrorRef.current(
-        error instanceof Error ? error.message : 'Could not start checkout. Please try again.'
+        error instanceof Error ? error.message : 'Could not start checkout. Please try again.',
+        'error'
       );
     }
   }, []);

@@ -3,7 +3,6 @@
 import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { v4 as uuidv4 } from 'uuid';
-import Link from 'next/link';
 import { computeCreditsRemaining } from '@/lib/credits';
 import { motion, AnimatePresence, useReducedMotion } from 'motion/react';
 import {
@@ -45,6 +44,8 @@ import { MagneticWrap } from '@/components/motion/MagneticWrap';
 import { SavedStylePicker } from '@/features/style/components/SavedStylePicker';
 import { describeError } from '@/lib/errors/classifyError';
 import { computeOfferFieldErrors } from '../offerFieldErrors';
+import { describeUnderstanding } from '@/features/activation/understanding';
+import { UpgradePrompt } from '@/features/activation/UpgradePrompt';
 import { applyQuickIdea, quickIdeasFor, type QuickIdea } from '../quickIdeas';
 import {
   defaultLocalizationFor,
@@ -1502,23 +1503,44 @@ export function CampaignWizard({ userId }: CampaignWizardProps) {
                       </div>
                     </div>
 
+                    <div
+                      className="border-border-light bg-bg-secondary rounded-xl border p-3"
+                      data-testid="strategy-understood"
+                    >
+                      <p className="text-text-primary font-semibold">What Mitra understood</p>
+                      <p className="text-text-secondary mt-1">
+                        {describeUnderstanding({
+                          businessName: business.name,
+                          offerHeadline: state.offer.headline,
+                          localities: state.audience.localities,
+                          languageLabel: LANGUAGES.find((l) => l.value === state.primaryLanguage)
+                            ?.label,
+                          ctaLabel: availableCTAs.find((c) => c.value === state.cta)?.label,
+                        })}
+                      </p>
+                    </div>
+
                     <div className="border-brand-200/60 bg-brand-50 rounded-xl border p-3 dark:bg-amber-950/20">
                       <p className="text-text-primary font-semibold">Credits Summary</p>
                       <p className="text-text-secondary">
                         Current: {creditsRemaining ?? '—'} credits | Cost:{' '}
                         {ESTIMATED_CAMPAIGN_GENERATION_CREDITS} credits
                       </p>
-                      {creditsRemaining !== null &&
-                        creditsRemaining < ESTIMATED_CAMPAIGN_GENERATION_CREDITS && (
-                          <p className="text-error-600 mt-1.5 font-medium" role="alert">
-                            You need {ESTIMATED_CAMPAIGN_GENERATION_CREDITS - creditsRemaining} more
-                            credits to generate this campaign.{' '}
-                            <Link href="/billing" className="underline">
-                              Buy credits or upgrade
-                            </Link>
-                          </p>
-                        )}
+                      <p className="text-text-tertiary mt-1">
+                        Reviewing is free. Credits are used only when you press Generate.
+                      </p>
                     </div>
+                    {creditsRemaining !== null &&
+                      creditsRemaining < ESTIMATED_CAMPAIGN_GENERATION_CREDITS && (
+                        <UpgradePrompt
+                          context={{
+                            kind: 'not_enough_credits',
+                            action: 'generate this campaign',
+                            needed: ESTIMATED_CAMPAIGN_GENERATION_CREDITS,
+                            available: creditsRemaining,
+                          }}
+                        />
+                      )}
 
                     {submitError && <p className="text-error-600 font-medium">{submitError}</p>}
                   </div>

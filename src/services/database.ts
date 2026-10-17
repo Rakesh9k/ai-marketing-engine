@@ -15,6 +15,7 @@ import {
   type Firestore,
   type CollectionReference,
   type DocumentReference,
+  type DocumentData,
   serverTimestamp,
   type FirestoreDataConverter,
 } from 'firebase/firestore';
@@ -71,6 +72,13 @@ function getDocRef<T>(
   return doc(getDb(), collectionName, id).withConverter(converter);
 }
 
+function getRawDocRef(
+  collectionName: string,
+  id: string
+): DocumentReference<DocumentData> {
+  return doc(getDb(), collectionName, id);
+}
+
 export const userService = {
   async get(userId: string): Promise<User | null> {
     const ref = getDocRef<User>('users', userId, userConverter);
@@ -84,13 +92,13 @@ export const userService = {
   },
 
   async update(userId: string, data: Partial<User>): Promise<void> {
-    const ref = getDocRef<User>('users', userId, userConverter);
+    const ref = getRawDocRef('users', userId);
     await updateDoc(ref, { ...data, updatedAt: serverTimestamp() });
   },
 
   async delete(userId: string): Promise<void> {
-    const ref = getDocRef<User>('users', userId, userConverter);
-    await updateDoc(ref, { deletedAt: serverTimestamp(), status: 'archived' });
+    const ref = getRawDocRef('users', userId);
+    await updateDoc(ref, { deletedAt: serverTimestamp() });
   },
 };
 
@@ -102,14 +110,46 @@ export const businessService = {
   },
 
   async getByUserId(userId: string): Promise<Business[]> {
-    const q = query(
-      getCollectionRef<Business>('businesses', businessConverter),
-      where('userId', '==', userId),
-      where('status', '!=', 'archived'),
-      orderBy('createdAt', 'desc')
-    );
-    const snap = await getDocs(q);
-    return snap.docs.map((doc) => doc.data());
+    try {
+      const q = query(
+        getCollectionRef<Business>('businesses', businessConverter),
+        where('userId', '==', userId),
+        orderBy('createdAt', 'desc')
+      );
+      const snap = await getDocs(q);
+      return snap.docs
+        .map((doc) => doc.data())
+        .filter((business) => business.status !== 'archived');
+    } catch (err: unknown) {
+      const errorMsg = err instanceof Error ? err.message : String(err);
+      const isIndexError =
+        errorMsg.includes('requires an index') ||
+        (err as { code?: string })?.code === 'failed-precondition';
+      if (isIndexError) {
+        console.warn(
+          'businessService.getByUserId: Composite index missing or building; falling back to unindexed query with client-side sort',
+          err
+        );
+        const fallbackQ = query(
+          getCollectionRef<Business>('businesses', businessConverter),
+          where('userId', '==', userId)
+        );
+        const snap = await getDocs(fallbackQ);
+        return snap.docs
+          .map((doc) => doc.data())
+          .filter((business) => business.status !== 'archived')
+          .sort((a, b) => {
+            const timeA =
+              (a.createdAt as { toMillis?: () => number })?.toMillis?.() ??
+              (a.createdAt ? new Date(a.createdAt as unknown as string).getTime() : 0);
+            const timeB =
+              (b.createdAt as { toMillis?: () => number })?.toMillis?.() ??
+              (b.createdAt ? new Date(b.createdAt as unknown as string).getTime() : 0);
+            return timeB - timeA;
+          });
+      }
+      throw err;
+    }
   },
 
   async create(business: Business): Promise<void> {
@@ -118,12 +158,12 @@ export const businessService = {
   },
 
   async update(businessId: string, data: Partial<Business>): Promise<void> {
-    const ref = getDocRef<Business>('businesses', businessId, businessConverter);
+    const ref = getRawDocRef('businesses', businessId);
     await updateDoc(ref, { ...data, updatedAt: serverTimestamp() });
   },
 
   async archive(businessId: string): Promise<void> {
-    const ref = getDocRef<Business>('businesses', businessId, businessConverter);
+    const ref = getRawDocRef('businesses', businessId);
     await updateDoc(ref, {
       status: 'archived',
       deletedAt: serverTimestamp(),
@@ -136,21 +176,51 @@ export const businessService = {
     lastDoc?: DocumentSnapshot<Business>,
     pageSize = 20
   ): Promise<{ businesses: Business[]; lastDoc: DocumentSnapshot<Business> | null }> {
-    const constraints: QueryConstraint[] = [
-      where('userId', '==', userId),
-      where('status', '!=', 'archived'),
-      orderBy('createdAt', 'desc'),
-      limit(pageSize),
-    ];
-    if (lastDoc) {
-      constraints.push(startAfter(lastDoc));
+    try {
+      const constraints: QueryConstraint[] = [
+        where('userId', '==', userId),
+        orderBy('createdAt', 'desc'),
+        limit(pageSize),
+      ];
+      if (lastDoc) {
+        constraints.push(startAfter(lastDoc));
+      }
+      const q = query(getCollectionRef<Business>('businesses', businessConverter), ...constraints);
+      const snap = await getDocs(q);
+      return {
+        businesses: snap.docs
+          .map((doc) => doc.data())
+          .filter((business) => business.status !== 'archived'),
+        lastDoc: snap.docs[snap.docs.length - 1] || null,
+      };
+    } catch (err: unknown) {
+      const errorMsg = err instanceof Error ? err.message : String(err);
+      const isIndexError =
+        errorMsg.includes('requires an index') ||
+        (err as { code?: string })?.code === 'failed-precondition';
+      if (isIndexError) {
+        const snap = await getDocs(
+          query(getCollectionRef<Business>('businesses', businessConverter), where('userId', '==', userId))
+        );
+        const filtered = snap.docs
+          .map((doc) => doc.data())
+          .filter((business) => business.status !== 'archived')
+          .sort((a, b) => {
+            const timeA =
+              (a.createdAt as { toMillis?: () => number })?.toMillis?.() ??
+              (a.createdAt ? new Date(a.createdAt as unknown as string).getTime() : 0);
+            const timeB =
+              (b.createdAt as { toMillis?: () => number })?.toMillis?.() ??
+              (b.createdAt ? new Date(b.createdAt as unknown as string).getTime() : 0);
+            return timeB - timeA;
+          });
+        return {
+          businesses: filtered.slice(0, pageSize),
+          lastDoc: snap.docs[snap.docs.length - 1] || null,
+        };
+      }
+      throw err;
     }
-    const q = query(getCollectionRef<Business>('businesses', businessConverter), ...constraints);
-    const snap = await getDocs(q);
-    return {
-      businesses: snap.docs.map((doc) => doc.data()),
-      lastDoc: snap.docs[snap.docs.length - 1] || null,
-    };
   },
 };
 
@@ -183,27 +253,137 @@ export const productService = {
     const q = query(
       getCollectionRef<Product>('products', productConverter),
       where('businessId', '==', businessId),
-      where('status', '!=', 'archived'),
       orderBy('sortOrder', 'asc'),
       orderBy('createdAt', 'desc')
     );
     const snap = await getDocs(q);
-    return snap.docs.map((doc) => doc.data());
+    return snap.docs
+      .map((doc) => doc.data())
+      .filter((product) => product.status !== 'archived');
   },
 
-  async create(product: Product): Promise<void> {
-    const ref = getDocRef<Product>('products', product.productId, productConverter);
-    await setDoc(ref, stripUndefined(product));
+  async create(
+    product: Omit<
+      Product,
+      'productId' | 'createdAt' | 'updatedAt' | 'tags' | 'variants' | 'attributes' | 'status'
+    > &
+      Partial<Pick<Product, 'productId' | 'tags' | 'variants' | 'attributes' | 'status'>>
+  ): Promise<Product> {
+    const { callFunction } = await import('@/services/api');
+    const result = await callFunction<
+      {
+        businessId: string;
+        name: string;
+        description?: string;
+        price: number;
+        originalPrice?: number;
+        currency?: 'INR';
+        category?: string;
+        tags?: string[];
+        variants?: Product['variants'];
+        images: Product['images'];
+        attributes?: Product['attributes'];
+        status?: 'active' | 'archived';
+        sortOrder?: number;
+      },
+      { product: Product }
+    >({
+      functionName: 'createProduct',
+      data: {
+        businessId: product.businessId,
+        name: product.name,
+        description: product.description,
+        price: product.price,
+        originalPrice: product.originalPrice,
+        currency: 'INR',
+        category: product.category,
+        tags: product.tags,
+        variants: product.variants,
+        images: product.images,
+        attributes: product.attributes,
+        status: product.status,
+        sortOrder: product.sortOrder,
+      },
+    });
+    return result.product;
   },
 
-  async update(productId: string, data: Partial<Product>): Promise<void> {
-    const ref = getDocRef<Product>('products', productId, productConverter);
-    await updateDoc(ref, { ...stripUndefined(data), updatedAt: serverTimestamp() });
+  async update(
+    productId: string,
+    data: Partial<Product> & { businessId?: string }
+  ): Promise<Product> {
+    const { callFunction } = await import('@/services/api');
+    let businessId = data.businessId;
+    if (!businessId) {
+      const existing = await this.get(productId);
+      if (!existing) {
+        throw new Error(`Product not found: ${productId}`);
+      }
+      businessId = existing.businessId;
+    }
+
+    const result = await callFunction<
+      {
+        productId: string;
+        businessId: string;
+        name?: string;
+        description?: string;
+        price?: number;
+        originalPrice?: number;
+        currency?: 'INR';
+        category?: string;
+        tags?: string[];
+        variants?: Product['variants'];
+        images?: Product['images'];
+        attributes?: Product['attributes'];
+        status?: 'active' | 'archived';
+        sortOrder?: number;
+      },
+      { product: Product }
+    >({
+      functionName: 'updateProduct',
+      data: {
+        productId,
+        businessId,
+        name: data.name,
+        description: data.description,
+        price: data.price,
+        originalPrice: data.originalPrice,
+        currency: 'INR',
+        category: data.category,
+        tags: data.tags,
+        variants: data.variants,
+        images: data.images,
+        attributes: data.attributes,
+        status: data.status,
+        sortOrder: data.sortOrder,
+      },
+    });
+    return result.product;
   },
 
-  async archive(productId: string): Promise<void> {
-    const ref = getDocRef<Product>('products', productId, productConverter);
-    await updateDoc(ref, { status: 'archived', updatedAt: serverTimestamp() });
+  async archive(productId: string, businessId?: string): Promise<Product> {
+    const { callFunction } = await import('@/services/api');
+    let targetBusinessId = businessId;
+    if (!targetBusinessId) {
+      const existing = await this.get(productId);
+      if (!existing) {
+        throw new Error(`Product not found: ${productId}`);
+      }
+      targetBusinessId = existing.businessId;
+    }
+
+    const result = await callFunction<
+      { productId: string; businessId: string },
+      { product: Product }
+    >({
+      functionName: 'archiveProduct',
+      data: {
+        productId,
+        businessId: targetBusinessId,
+      },
+    });
+    return result.product;
   },
 
   async listByBusinessPaginated(
@@ -213,7 +393,6 @@ export const productService = {
   ): Promise<{ products: Product[]; lastDoc: DocumentSnapshot<Product> | null }> {
     const constraints: QueryConstraint[] = [
       where('businessId', '==', businessId),
-      where('status', '!=', 'archived'),
       orderBy('sortOrder', 'asc'),
       orderBy('createdAt', 'desc'),
       limit(pageSize),
@@ -224,7 +403,9 @@ export const productService = {
     const q = query(getCollectionRef<Product>('products', productConverter), ...constraints);
     const snap = await getDocs(q);
     return {
-      products: snap.docs.map((doc) => doc.data()),
+      products: snap.docs
+        .map((doc) => doc.data())
+        .filter((product) => product.status !== 'archived'),
       lastDoc: snap.docs[snap.docs.length - 1] || null,
     };
   },
@@ -321,7 +502,7 @@ export const campaignService = {
   },
 
   async update(campaignId: string, data: Partial<Campaign>): Promise<void> {
-    const ref = getDocRef<Campaign>('campaigns', campaignId, campaignConverter);
+    const ref = getRawDocRef('campaigns', campaignId);
     await updateDoc(ref, { ...data, updatedAt: serverTimestamp() });
   },
 
@@ -330,12 +511,12 @@ export const campaignService = {
     status: Campaign['status'],
     additionalData?: Partial<Campaign>
   ): Promise<void> {
-    const ref = getDocRef<Campaign>('campaigns', campaignId, campaignConverter);
+    const ref = getRawDocRef('campaigns', campaignId);
     await updateDoc(ref, { status, ...additionalData, updatedAt: serverTimestamp() });
   },
 
   async archive(campaignId: string): Promise<void> {
-    const ref = getDocRef<Campaign>('campaigns', campaignId, campaignConverter);
+    const ref = getRawDocRef('campaigns', campaignId);
     await updateDoc(ref, {
       status: 'archived',
       deletedAt: serverTimestamp(),
@@ -433,7 +614,7 @@ export const subscriptionService = {
   },
 
   async update(subscriptionId: string, data: Partial<Subscription>): Promise<void> {
-    const ref = getDocRef<Subscription>('subscriptions', subscriptionId, subscriptionConverter);
+    const ref = getRawDocRef('subscriptions', subscriptionId);
     await updateDoc(ref, { ...data, updatedAt: serverTimestamp() });
   },
 };

@@ -10,8 +10,6 @@ const publicEnvSchema = z.object({
   NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID: z.string().optional(),
   NEXT_PUBLIC_RECAPTCHA_SITE_KEY: z.string().optional(),
   NEXT_PUBLIC_USE_EMULATORS: z.enum(['true', 'false']).optional().default('false'),
-  NEXT_PUBLIC_PADDLE_ENVIRONMENT: z.enum(['sandbox', 'production']).optional().default('sandbox'),
-  NEXT_PUBLIC_PADDLE_CLIENT_TOKEN: z.string().optional(),
 });
 
 const serverEnvSchema = publicEnvSchema.extend({
@@ -41,8 +39,6 @@ export function parsePublicEnv(): PublicEnv {
     NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID: process.env['NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID'],
     NEXT_PUBLIC_RECAPTCHA_SITE_KEY: process.env['NEXT_PUBLIC_RECAPTCHA_SITE_KEY'],
     NEXT_PUBLIC_USE_EMULATORS: process.env['NEXT_PUBLIC_USE_EMULATORS'],
-    NEXT_PUBLIC_PADDLE_ENVIRONMENT: process.env['NEXT_PUBLIC_PADDLE_ENVIRONMENT'],
-    NEXT_PUBLIC_PADDLE_CLIENT_TOKEN: process.env['NEXT_PUBLIC_PADDLE_CLIENT_TOKEN'],
   });
 
   if (!result.success) {

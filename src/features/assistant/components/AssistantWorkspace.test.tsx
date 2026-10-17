@@ -7,6 +7,9 @@ jest.mock('next/navigation', () => ({
   usePathname: () => '/assistant',
   useRouter: () => ({ push: jest.fn() }),
 }));
+jest.mock('@/services/api', () => ({
+  callFunction: jest.fn().mockResolvedValue({ text: 'Strategy response' }),
+}));
 
 const mockUseAuth = useAuth as jest.Mock;
 

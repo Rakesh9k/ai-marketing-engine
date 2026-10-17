@@ -7,7 +7,7 @@ const ROADMAP_STEPS = [
   {
     phase: 'Today',
     title: 'Instant Campaign & Creative Creation',
-    desc: 'Turn business facts & photos into captions, posters, WhatsApp copy, and video scripts in seconds.',
+    desc: 'Turn business facts & photos into captions, posters, WhatsApp copy, and video scripts.',
     status: 'Live & Active',
     badgeClass: 'bg-emerald-100 text-emerald-800',
   },

@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import { BusinessIdentity } from '@/components/shared/BusinessIdentity';
 import { pageMetadata } from '@/lib/seo';
 import Link from 'next/link';
 import { MitraLogo } from '@/components/ui/MitraLogo';
@@ -20,23 +21,16 @@ export default function TermsPage() {
 
       <h1 className="text-h1 text-text-primary mb-2 font-bold">Terms of Service</h1>
       <p className="text-caption text-text-tertiary mb-8">
-        Effective date: {EFFECTIVE_DATE} · Version 0.1 (draft) · Not yet reviewed by legal counsel
+        Effective date: {EFFECTIVE_DATE}
       </p>
-
-      <div className="border-border-light bg-surface mb-8 rounded-2xl border p-4">
-        <p className="text-body text-text-secondary">
-          <strong>Status of this document:</strong> This page describes the Mitra service as it is
-          implemented today. It has not yet been reviewed by legal counsel.
-        </p>
-      </div>
 
       <section className="mb-8">
         <h2 className="text-h3 text-text-primary mb-2 font-semibold">1. Who operates Mitra</h2>
         <p className="text-body text-text-secondary">
-          Mitra ("the Service") is provided at brain-wise.com by{' '}
-          <strong>Brainwise Solutions</strong>, a sole proprietorship, with its address at Aliabad
-          Jhanda, Charminar, Hyderabad, Telangana – 500053, India. "BrainWise" is the brand and
-          product identity used by Brainwise Solutions, and "Mitra by BrainWise" is the name under
+          Mitra (&quot;the Service&quot;) is owned and operated by <strong>VISHESH KAKAR</strong> (trading as{' '}
+          <strong>Brainwise Solutions</strong>, a sole proprietorship), with its registered address at
+          Aliabad Jhanda, Charminar, Hyderabad, Telangana – 500053, India. &quot;BrainWise&quot; is the brand and
+          product identity used by Brainwise Solutions, and &quot;Mitra by BrainWise&quot; is the name under
           which the Service is offered to you.
         </p>
       </section>
@@ -109,43 +103,42 @@ export default function TermsPage() {
 
       <section className="mb-8">
         <h2 className="text-h3 text-text-primary mb-2 font-semibold">
-          7. Credits, subscriptions, and payments
+          7. Credits, prepaid plans, and payments
         </h2>
         <p className="text-body text-text-secondary">
-          Our order process is conducted by our online reseller Paddle.com. Paddle.com is the
-          Merchant of Record for all our orders. Paddle provides all customer service inquiries and
-          handles returns. Payment details are entered with Paddle; Mitra does not receive or store
-          your card or bank details. Paid plans renew automatically at the end of the selected
-          billing interval (monthly or yearly) until you cancel. Credits are granted when a payment
-          is confirmed and are consumed as you generate campaign content. Plan credits are valid
-          through the calendar month in which they apply and do not roll over; credits from a
-          one-time credit pack also do not roll over.
+          Payments are made in Indian rupees (INR) through the hosted checkout of Cashfree Payments,
+          our payment gateway. Payment details are entered on the gateway's checkout page; Mitra
+          does not receive or store your card, bank, or UPI details. Paid plans are prepaid for a
+          fixed term of 30 days (monthly) or 365 days (yearly). Plans do not renew automatically;
+          you are charged again only if you choose to purchase another term. Credits are granted
+          when payment is confirmed and are consumed as you generate campaign content. Plan credits
+          apply to the period purchased and do not roll over. Credits from a one-time credit pack
+          are valid for the calendar month in which you buy them.
         </p>
         <p className="text-body text-text-secondary mt-2">
-          You can cancel your subscription yourself from the Billing page. Cancelling stops future
-          renewal; you keep access through the period you have already paid for, with no immediate
-          downgrade and no automatic refund or credit reversal. Plans cannot be switched in place.
-          See our{' '}
+          There is no recurring subscription to cancel. Your paid access continues until the end of
+          the term you purchased, then your account moves to the Free plan. Buying the same plan and
+          term again before it ends adds the new term after your current end date. A different plan
+          or term can be purchased after your current access ends. A term ending does not by itself
+          trigger a refund or credit reversal. See our{' '}
           <Link href="/cancellation" className="text-brand-600 hover:underline">
-            Cancellation Policy
+            Plan Expiry Policy
           </Link>{' '}
           and{' '}
           <Link href="/refund" className="text-brand-600 hover:underline">
             Refund Policy
           </Link>{' '}
-          for details. Refund requests are reviewed manually (Paddle processes refunds as Merchant
-          of Record), and applicable law and Paddle's terms take precedence. Questions about
-          billing:{' '}
+          for details. Refund requests are reviewed manually and applicable law takes precedence.
+          Questions about billing:{' '}
           <a href="mailto:support@brain-wise.com" className="text-brand-600 hover:underline">
             support@brain-wise.com
           </a>
           .
         </p>
         <p className="text-body text-text-secondary mt-2">
-          Paddle, as Merchant of Record, issues the invoice or receipt for your payment, and handles
-          sales tax on it. Billing, transaction, accounting, tax, and related business records may
-          be retained for as long as required by applicable law and legitimate accounting/business
-          purposes, subject to our{' '}
+          Billing, transaction, accounting, tax, and related business records may be retained for
+          as long as required by applicable law and legitimate accounting/business purposes,
+          subject to our{' '}
           <Link href="/privacy" className="text-brand-600 hover:underline">
             Privacy Policy
           </Link>
@@ -218,6 +211,7 @@ export default function TermsPage() {
         </Link>
         .
       </p>
+      <BusinessIdentity className="border-border-light mt-10 border-t pt-6" />
     </div>
   );
 }

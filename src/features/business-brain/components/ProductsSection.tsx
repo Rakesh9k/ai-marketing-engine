@@ -66,41 +66,37 @@ export function ProductsSection({
 
     try {
       if (editingId === 'new') {
-        const newProduct: Product = {
+        const newProduct = {
           productId: `prod_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
           businessId,
           name,
           description,
           price,
           originalPrice,
-          currency: 'INR',
+          currency: 'INR' as const,
           category,
           tags: [],
           variants: [],
           images: [],
           attributes: {},
-          status: 'active',
+          status: 'active' as const,
           sortOrder: productsList.length,
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString(),
         };
-        await productService.create(newProduct);
-        const updated = [...productsList, newProduct];
+        const saved = await productService.create(newProduct);
+        const updated = [...productsList, saved];
         setProductsList(updated);
         onSaved(updated);
       } else if (editingId) {
-        const updateData: Partial<Product> = {
+        const updateData: Partial<Product> & { businessId?: string } = {
+          businessId,
           name,
           description,
           price,
           originalPrice,
           category,
-          updatedAt: new Date().toISOString(),
         };
-        await productService.update(editingId, updateData);
-        const updated = productsList.map((p) =>
-          p.productId === editingId ? { ...p, ...updateData } : p
-        );
+        const saved = await productService.update(editingId, updateData);
+        const updated = productsList.map((p) => (p.productId === editingId ? saved : p));
         setProductsList(updated);
         onSaved(updated);
       }
@@ -115,7 +111,7 @@ export function ProductsSection({
   const handleDeleteProduct = async (productId: string) => {
     if (!confirm('Are you sure you want to remove this item?')) return;
     try {
-      await productService.archive(productId);
+      await productService.archive(productId, businessId);
       const updated = productsList.filter((p) => p.productId !== productId);
       setProductsList(updated);
       onSaved(updated);

@@ -1,9 +1,10 @@
 import React from 'react';
-import { render, screen, waitFor, within } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import type { Subscription } from '@/types';
 
 const showToastMock = jest.fn();
+jest.mock('@/features/billing/BillingOverviewPanel', () => ({ BillingOverviewPanel: () => null }));
 jest.mock('@/hooks/useToast', () => ({
   useToast: () => ({ showToast: showToastMock }),
 }));
@@ -63,6 +64,16 @@ function cashfreeServerResponse(orderId = 'ord_123', paymentSessionId = 'session
   };
 }
 
+/** Every plan purchase now passes through the confirmation that states the exact amount; confirm it. */
+async function confirmPayment(amount: string) {
+  const dialog = await screen.findByRole('dialog', { name: /confirm your purchase/i });
+  expect(dialog).toHaveTextContent(new RegExp(`${amount}\\s*one time`));
+  expect(dialog).toHaveTextContent(/No automatic renewal/);
+  await userEvent.click(
+    screen.getByRole('button', { name: new RegExp(`pay ${amount} once`, 'i') })
+  );
+}
+
 describe('BillingPage — Cashfree pricing & checkout', () => {
   beforeEach(() => {
     jest.clearAllMocks();
@@ -76,8 +87,9 @@ describe('BillingPage — Cashfree pricing & checkout', () => {
 
   it('shows the price you actually pay for the whole term, in INR, with the no-auto-renewal note', async () => {
     render(<BillingPage />);
+    await userEvent.click(await screen.findByRole('button', { name: /yearly · 365 days/i }));
     expect(await screen.findByRole('heading', { level: 3, name: 'Business' })).toBeInTheDocument();
-    // Yearly is the default view: these are TOTALS for 365 days, not per-month equivalents.
+    // With Yearly chosen: these are TOTALS for 365 days, not per-month equivalents.
     expect(screen.getByText('₹16,990')).toBeInTheDocument(); // Business
     expect(screen.getByText('₹9,990')).toBeInTheDocument(); // Starter
     expect(screen.getByText('₹24,990')).toBeInTheDocument(); // Pro
@@ -91,8 +103,11 @@ describe('BillingPage — Cashfree pricing & checkout', () => {
     callFunctionMock.mockResolvedValueOnce(cashfreeServerResponse());
 
     render(<BillingPage />);
+    await userEvent.click(await screen.findByRole('button', { name: /yearly · 365 days/i }));
     await screen.findByRole('heading', { level: 3, name: 'Business' });
     await userEvent.click(await screen.findByRole('button', { name: /buy 365 days of business/i }));
+    expect(callFunctionMock).not.toHaveBeenCalled(); // nothing is created before the customer confirms
+    await confirmPayment('₹16,990');
 
     await waitFor(() => expect(callFunctionMock).toHaveBeenCalledTimes(1));
     expect(callFunctionMock).toHaveBeenCalledWith({
@@ -120,6 +135,7 @@ describe('BillingPage — Cashfree pricing & checkout', () => {
     expect(await screen.findByText('₹2,999')).toBeInTheDocument(); // Pro, 30 days
 
     await userEvent.click(screen.getByRole('button', { name: /buy 30 days of pro/i }));
+    await confirmPayment('₹2,999');
     await waitFor(() =>
       expect(callFunctionMock).toHaveBeenCalledWith({
         functionName: 'createCashfreeCheckout',
@@ -190,18 +206,21 @@ describe('BillingPage — Cashfree pricing & checkout', () => {
     expect(openCashfreeCheckoutMock).not.toHaveBeenCalled();
   });
 
-  it('failure: createCashfreeCheckout rejecting shows error toast and re-enables button', async () => {
+  it('failure: createCashfreeCheckout rejecting shows the error in the confirmation and allows a retry', async () => {
     callFunctionMock.mockRejectedValueOnce(new Error('Cashfree error'));
 
     render(<BillingPage />);
+    await userEvent.click(await screen.findByRole('button', { name: /yearly · 365 days/i }));
     const businessButton = await screen.findByRole('button', {
       name: /buy 365 days of business/i,
     });
     await userEvent.click(businessButton);
+    await confirmPayment('₹16,990');
 
-    await waitFor(() => expect(showToastMock).toHaveBeenCalledWith('Cashfree error', 'error'));
+    // The problem is shown inside the open confirmation (where the customer is looking), with a retry.
+    expect(await screen.findByRole('alert')).toHaveTextContent('Cashfree error');
     expect(openCashfreeCheckoutMock).not.toHaveBeenCalled();
-    await waitFor(() => expect(businessButton).not.toBeDisabled());
+    expect(screen.getByRole('button', { name: /try again, pay ₹16,990 once/i })).toBeEnabled();
   });
 
   it('?cashfree_order_id= re-fetches, and states the NEW access date only once the webhook has extended access', async () => {
@@ -242,6 +261,163 @@ describe('BillingPage — Cashfree pricing & checkout', () => {
     );
     await waitFor(() => expect(getByUserIdMock.mock.calls.length).toBeGreaterThanOrEqual(2));
     expect(showToastMock).not.toHaveBeenCalledWith(expect.anything(), 'success');
+  });
+
+  describe('the return from the payment page is checked by the SERVER, never trusted', () => {
+    afterEach(() => {
+      jest.useRealTimers();
+    });
+
+    it('asks the server to verify the order, and states success only when the server confirms it', async () => {
+      jest.useFakeTimers({ doNotFake: ['nextTick', 'setImmediate', 'queueMicrotask'] });
+      window.history.replaceState({}, '', '/billing?cashfree_order_id=ord_verify');
+      getByUserIdMock.mockResolvedValue(null);
+      const endsAt = new Date(Date.now() + 30 * 86_400_000).toISOString();
+      callFunctionMock.mockImplementation(async (req: { functionName: string }) =>
+        req.functionName === 'verifyCashfreeOrder'
+          ? { confirmed: true, state: 'fulfilled', message: 'ok', accessEndsAt: endsAt }
+          : cashfreeServerResponse()
+      );
+
+      render(<BillingPage />);
+      expect(callFunctionMock).not.toHaveBeenCalledWith(
+        expect.objectContaining({ functionName: 'verifyCashfreeOrder' })
+      );
+      await act(async () => {
+        jest.advanceTimersByTime(4100);
+      });
+      await waitFor(() =>
+        expect(callFunctionMock).toHaveBeenCalledWith({
+          functionName: 'verifyCashfreeOrder',
+          data: { orderId: 'ord_verify' },
+        })
+      );
+      await waitFor(() =>
+        expect(showToastMock).toHaveBeenCalledWith(
+          `Payment confirmed. Your plan is active until ${formatAccessDate(new Date(endsAt))}.`,
+          'success'
+        )
+      );
+      // The later checks do not repeat the confirmation.
+      await act(async () => {
+        jest.advanceTimersByTime(40_000);
+      });
+      expect(showToastMock.mock.calls.filter(([, kind]) => kind === 'success')).toHaveLength(1);
+    });
+
+    it('an unconfirmed order never produces a success message, however the page was reached', async () => {
+      jest.useFakeTimers({ doNotFake: ['nextTick', 'setImmediate', 'queueMicrotask'] });
+      window.history.replaceState({}, '', '/billing?cashfree_order_id=ord_unpaid');
+      getByUserIdMock.mockResolvedValue(null);
+      callFunctionMock.mockImplementation(async (req: { functionName: string }) =>
+        req.functionName === 'verifyCashfreeOrder'
+          ? {
+              confirmed: false,
+              state: 'payment_pending',
+              message: 'Waiting for payment confirmation',
+            }
+          : cashfreeServerResponse()
+      );
+      render(<BillingPage />);
+      await act(async () => {
+        jest.advanceTimersByTime(35_000);
+      });
+      await waitFor(() =>
+        expect(callFunctionMock).toHaveBeenCalledWith({
+          functionName: 'verifyCashfreeOrder',
+          data: { orderId: 'ord_unpaid' },
+        })
+      );
+      expect(showToastMock).not.toHaveBeenCalledWith(expect.anything(), 'success');
+    });
+  });
+
+  describe('the order status panel shows only what the server says', () => {
+    afterEach(() => {
+      jest.useRealTimers();
+    });
+
+    const returnWith = (orderId: string, verify: Record<string, unknown>) => {
+      jest.useFakeTimers({ doNotFake: ['nextTick', 'setImmediate', 'queueMicrotask'] });
+      window.history.replaceState({}, '', `/billing?cashfree_order_id=${orderId}`);
+      getByUserIdMock.mockResolvedValue(null);
+      callFunctionMock.mockImplementation(async (req: { functionName: string }) =>
+        req.functionName === 'verifyCashfreeOrder' ? verify : cashfreeServerResponse()
+      );
+    };
+
+    it('starts as "checking" (the redirect proves nothing) and never says paid', async () => {
+      returnWith('ord_panel_1', { confirmed: false, state: 'payment_pending', message: 'Waiting' });
+      render(<BillingPage />);
+      const panel = await screen.findByRole('status', { name: /checking your payment/i });
+      expect(panel).toHaveTextContent(/nothing is shown as paid until it confirms/i);
+      expect(panel.textContent).not.toMatch(/payment confirmed/i);
+    });
+
+    it('shows "Payment confirmed" with the access end date once the server confirms', async () => {
+      const endsAt = new Date(Date.now() + 30 * 86_400_000).toISOString();
+      returnWith('ord_panel_2', {
+        confirmed: true,
+        state: 'fulfilled',
+        message: 'ok',
+        accessEndsAt: endsAt,
+      });
+      render(<BillingPage />);
+      await act(async () => {
+        jest.advanceTimersByTime(4100);
+      });
+      const panel = await screen.findByRole('status', { name: /payment confirmed/i });
+      expect(panel).toHaveTextContent(formatAccessDate(new Date(endsAt)));
+      expect(panel).toHaveTextContent(/no automatic renewal/i);
+    });
+
+    it('shows a failed payment as failed, and an expired session as "no payment was taken"', async () => {
+      returnWith('ord_panel_3', {
+        confirmed: false,
+        state: 'payment_failed',
+        message: 'Payment did not go through',
+      });
+      const { unmount } = render(<BillingPage />);
+      await act(async () => {
+        jest.advanceTimersByTime(4100);
+      });
+      expect(
+        await screen.findByRole('status', { name: /payment did not go through/i })
+      ).toBeInTheDocument();
+      unmount();
+
+      returnWith('ord_panel_4', { confirmed: false, state: 'expired', message: 'ended' });
+      render(<BillingPage />);
+      await act(async () => {
+        jest.advanceTimersByTime(4100);
+      });
+      expect(
+        await screen.findByRole('status', { name: /no payment was taken/i })
+      ).toBeInTheDocument();
+    });
+
+    it('a payment under review is described as being checked by our team, and can be re-checked', async () => {
+      returnWith('ord_panel_5', {
+        confirmed: false,
+        state: 'needs_review',
+        message: 'Payment received; our team is checking it',
+      });
+      render(<BillingPage />);
+      await act(async () => {
+        jest.advanceTimersByTime(4100);
+      });
+      expect(
+        await screen.findByRole('status', { name: /our team is checking/i })
+      ).toBeInTheDocument();
+      callFunctionMock.mockClear();
+      fireEvent.click(screen.getByRole('button', { name: /check again/i }));
+      await waitFor(() =>
+        expect(callFunctionMock).toHaveBeenCalledWith({
+          functionName: 'verifyCashfreeOrder',
+          data: { orderId: 'ord_panel_5' },
+        })
+      );
+    });
   });
 
   it('a renewal return states the extended date, not the old one', async () => {
@@ -300,6 +476,7 @@ describe('BillingPage — Cashfree pricing & checkout', () => {
     it('subscription read failure: error panel, no plan shown, purchases disabled', async () => {
       getByUserIdMock.mockRejectedValue(new Error('Firestore not initialized'));
       render(<BillingPage />);
+      await userEvent.click(await screen.findByRole('button', { name: /yearly · 365 days/i }));
 
       expect(await screen.findByRole('alert')).toHaveTextContent(
         /couldn.t load your billing details/i
@@ -381,10 +558,14 @@ describe('BillingPage — Cashfree pricing & checkout', () => {
     it('the Renew button buys the SAME plan and billing period as the live term, whatever the view toggle shows', async () => {
       getByUserIdMock.mockResolvedValue(liveSub({ planId: 'starter', billingCycle: 'monthly' }));
       callFunctionMock.mockResolvedValueOnce(cashfreeServerResponse('ord_renew'));
-      render(<BillingPage />); // the view defaults to Yearly, the term is monthly
+      render(<BillingPage />); // the view shows Yearly, the term is monthly
+      await userEvent.click(await screen.findByRole('button', { name: /yearly · 365 days/i }));
       await userEvent.click(
         await screen.findByRole('button', { name: /^renew starter \(\+30 days\)$/i })
       );
+      const dialog = await screen.findByRole('dialog', { name: /confirm your purchase/i });
+      expect(dialog).toHaveTextContent(/added after your current access ends/i);
+      await userEvent.click(screen.getByRole('button', { name: /pay ₹999 once/i }));
       await waitFor(() =>
         expect(callFunctionMock).toHaveBeenCalledWith({
           functionName: 'createCashfreeCheckout',
@@ -409,6 +590,7 @@ describe('BillingPage — Cashfree pricing & checkout', () => {
       const ended = liveSub({ planId: 'business', billingCycle: 'monthly' }, -3); // status still "active" in the record
       getByUserIdMock.mockResolvedValue(ended);
       render(<BillingPage />);
+      await userEvent.click(await screen.findByRole('button', { name: /yearly · 365 days/i }));
       const end = new Date((ended as unknown as { currentPeriodEnd: string }).currentPeriodEnd);
       expect(
         await screen.findByRole('heading', { level: 2, name: /free plan/i })

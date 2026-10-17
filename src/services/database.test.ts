@@ -72,3 +72,133 @@ describe('usageService.getCurrentPeriod — UTC usage document id', () => {
     expect(requested).toEqual([`usage/${expectedId}`]);
   });
 });
+
+const callFunctionMock = jest.fn();
+jest.mock('@/services/api', () => ({
+  callFunction: (...args: unknown[]) => callFunctionMock(...args),
+}));
+
+import { productService } from '@/services/database';
+
+describe('productService — Cloud Function mutation contracts', () => {
+  beforeEach(() => {
+    callFunctionMock.mockReset();
+    getDocMock.mockReset();
+  });
+
+  describe('create', () => {
+    it('calls createProduct Cloud Function with validated payload', async () => {
+      const mockCreated = {
+        productId: 'prod_123',
+        businessId: 'biz_1',
+        name: 'Cold Brew',
+        price: 250,
+        currency: 'INR' as const,
+        images: [
+          { url: 'https://example.com/img.png', storagePath: 'prod/1.png', isPrimary: true },
+        ],
+        category: 'Beverages',
+        createdAt: '2026-10-12T00:00:00Z',
+        updatedAt: '2026-10-12T00:00:00Z',
+      };
+      callFunctionMock.mockResolvedValueOnce({ product: mockCreated });
+
+      const result = await productService.create({
+        businessId: 'biz_1',
+        name: 'Cold Brew',
+        price: 250,
+        currency: 'INR',
+        images: [
+          { url: 'https://example.com/img.png', storagePath: 'prod/1.png', isPrimary: true },
+        ],
+        category: 'Beverages',
+      });
+
+      expect(callFunctionMock).toHaveBeenCalledTimes(1);
+      expect(callFunctionMock).toHaveBeenCalledWith({
+        functionName: 'createProduct',
+        data: expect.objectContaining({
+          businessId: 'biz_1',
+          name: 'Cold Brew',
+          price: 250,
+          currency: 'INR',
+          category: 'Beverages',
+          images: [
+            { url: 'https://example.com/img.png', storagePath: 'prod/1.png', isPrimary: true },
+          ],
+        }),
+      });
+      expect(result).toEqual(mockCreated);
+    });
+  });
+
+  describe('update', () => {
+    it('calls updateProduct with supplied businessId', async () => {
+      const mockUpdated = {
+        productId: 'prod_123',
+        businessId: 'biz_1',
+        name: 'Updated Cold Brew',
+        price: 280,
+      };
+      callFunctionMock.mockResolvedValueOnce({ product: mockUpdated });
+
+      const result = await productService.update('prod_123', {
+        businessId: 'biz_1',
+        name: 'Updated Cold Brew',
+        price: 280,
+      });
+
+      expect(callFunctionMock).toHaveBeenCalledTimes(1);
+      expect(callFunctionMock).toHaveBeenCalledWith({
+        functionName: 'updateProduct',
+        data: expect.objectContaining({
+          productId: 'prod_123',
+          businessId: 'biz_1',
+          name: 'Updated Cold Brew',
+          price: 280,
+        }),
+      });
+      expect(result).toEqual(mockUpdated);
+    });
+
+    it('fetches existing product to determine businessId if omitted', async () => {
+      getDocMock.mockResolvedValueOnce({
+        exists: () => true,
+        data: () => ({ productId: 'prod_123', businessId: 'biz_auto' }),
+      });
+      const mockUpdated = { productId: 'prod_123', businessId: 'biz_auto', price: 300 };
+      callFunctionMock.mockResolvedValueOnce({ product: mockUpdated });
+
+      const result = await productService.update('prod_123', { price: 300 });
+
+      expect(callFunctionMock).toHaveBeenCalledWith({
+        functionName: 'updateProduct',
+        data: expect.objectContaining({
+          productId: 'prod_123',
+          businessId: 'biz_auto',
+          price: 300,
+        }),
+      });
+      expect(result).toEqual(mockUpdated);
+    });
+  });
+
+  describe('archive', () => {
+    it('calls archiveProduct with target businessId', async () => {
+      const mockArchived = { productId: 'prod_123', businessId: 'biz_1', status: 'archived' };
+      callFunctionMock.mockResolvedValueOnce({ product: mockArchived });
+
+      const result = await productService.archive('prod_123', 'biz_1');
+
+      expect(callFunctionMock).toHaveBeenCalledTimes(1);
+      expect(callFunctionMock).toHaveBeenCalledWith({
+        functionName: 'archiveProduct',
+        data: {
+          productId: 'prod_123',
+          businessId: 'biz_1',
+        },
+      });
+      expect(result).toEqual(mockArchived);
+    });
+  });
+});

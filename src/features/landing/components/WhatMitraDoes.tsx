@@ -72,7 +72,7 @@ export function WhatMitraDoes() {
       num: '03',
       screenId: 'ai_generation' as ScreenId,
       title: 'Mitra creates the campaign',
-      desc: 'Social ad visuals, Instagram Reels scripts, localized captions, and WhatsApp broadcasts generated in seconds.',
+      desc: 'Social ad visuals, Instagram Reels scripts, localized captions, and WhatsApp broadcasts generated for you.',
       icon: (
         <svg
           className="h-6 w-6 text-purple-600"

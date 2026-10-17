@@ -60,7 +60,7 @@ async function reachOfferStep() {
   const view = render(<CampaignWizard userId="user_1" />);
   await screen.findByRole('button', { name: /post/i });
   // Adaptive: on each pass make whatever selection the current step offers, then continue.
-  for (let i = 0; i < 12 && !screen.queryByPlaceholderText('e.g., 299'); i++) {
+  for (let i = 0; i < 30 && !screen.queryByPlaceholderText('e.g., 299'); i++) {
     for (const name of [/^post/i, /weekend/i, /template one/i, /chicken dum biryani/i]) {
       // The objective step also shows quick-idea shortcuts with similar names; only the real option
       // buttons carry aria-pressed.

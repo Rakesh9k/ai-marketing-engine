@@ -7,7 +7,6 @@ import { WhatMitraDoes } from './components/WhatMitraDoes';
 import { CreateContentSection } from './components/CreateContentSection';
 import { LanguageSection } from './components/LanguageSection';
 import { TransformationSection } from './components/TransformationSection';
-import { JournalResourceSection } from './components/JournalResourceSection';
 import { PersonalitySection } from './components/PersonalitySection';
 import { FinalCTASection } from './components/FinalCTASection';
 import { LandingFooter } from './components/LandingFooter';
@@ -47,8 +46,8 @@ export function LandingPage() {
         {/* SECTION 7 — CAMPAIGN TRANSFORMATION & STYLE INTELLIGENCE */}
         <TransformationSection />
 
-        {/* SECTION 10 — DYNAMIC JOURNAL & RESOURCE SECTION (TAG FILTERS + CAMPAIGN ENGINE BANNER) */}
-        <JournalResourceSection />
+        {/* The marketing journal section is not shown: its articles and growth statistics were illustrative, not real
+            customer results (Phase 10 claims audit). The component is kept for when real stories exist. */}
 
         {/* SECTION 11 — MASCOT / PERSONALITY MOMENT */}
         <PersonalitySection />

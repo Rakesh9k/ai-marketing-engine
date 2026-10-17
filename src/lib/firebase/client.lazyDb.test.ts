@@ -1,9 +1,7 @@
 /**
- * Regression: Firestore used to be created once at module evaluation. When the bundler evaluated
- * client.ts before Firestore's service registration, getFirestore() threw "Service firestore is
- * not available", the error was only warned, and getFirebaseDb() returned undefined for the whole
- * session — every Firestore read in the app silently returned nothing (a paying customer saw the
- * Free plan). getFirebaseDb() must recover on a later call and connect the emulator exactly once.
+ * Regression: Firestore initialization is now deferred to getFirebaseDb() lazy getter.
+ * No module-evaluation attempt is made, avoiding "Service firestore is not available" warnings.
+ * getFirebaseDb() must connect the emulator exactly once on first successful call.
  */
 import type * as ClientModule from './client';
 
@@ -47,30 +45,23 @@ describe('getFirebaseDb (lazy Firestore)', () => {
   });
   afterEach(() => jest.restoreAllMocks());
 
-  it('recovers when Firestore was not registered yet at module load', () => {
+  it('succeeds on first getFirebaseDb call when Firestore is registered', () => {
     const db = { type: 'firestore' };
-    getFirestoreMock
-      .mockImplementationOnce(() => {
-        throw new Error('Service firestore is not available'); // module-evaluation attempt
-      })
-      .mockImplementation(() => db);
+    getFirestoreMock.mockImplementation(() => db);
 
     // eslint-disable-next-line @typescript-eslint/no-require-imports
     const { getFirebaseDb } = require('./client') as typeof ClientModule;
 
     expect(getFirebaseDb()).toBe(db);
     expect(getFirebaseDb()).toBe(db); // cached afterwards
-    expect(getFirestoreMock).toHaveBeenCalledTimes(2); // 1 failed at load + 1 lazy success
+    expect(getFirestoreMock).toHaveBeenCalledTimes(1); // only lazy getter call
     expect(connectFirestoreEmulatorMock).toHaveBeenCalledTimes(1);
     expect(connectFirestoreEmulatorMock).toHaveBeenCalledWith(db, 'localhost', 8080);
   });
 
-  it('returns undefined (without throwing) while Firestore is still unavailable, then succeeds', () => {
+  it('retries on failure and succeeds on subsequent getFirebaseDb call', () => {
     const db = { type: 'firestore' };
     getFirestoreMock
-      .mockImplementationOnce(() => {
-        throw new Error('Service firestore is not available');
-      })
       .mockImplementationOnce(() => {
         throw new Error('Service firestore is not available');
       })
@@ -81,6 +72,7 @@ describe('getFirebaseDb (lazy Firestore)', () => {
 
     expect(getFirebaseDb()).toBeUndefined();
     expect(getFirebaseDb()).toBe(db);
+    expect(getFirestoreMock).toHaveBeenCalledTimes(2); // 1 failed lazy + 1 retry success
   });
 
   it('uses the instance created at load when that works, without a second getFirestore call', () => {

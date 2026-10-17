@@ -49,7 +49,7 @@ export function AboutWhyMitra() {
             </div>
             <div className="border-border-light bg-surface rounded-2xl border p-4 shadow-2xs">
               <span className="mb-1 block text-base">⚡</span>
-              <span>Executes campaigns in seconds</span>
+              <span>Builds campaigns from your business facts</span>
             </div>
           </div>
         </div>

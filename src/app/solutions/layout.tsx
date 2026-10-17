@@ -6,7 +6,7 @@ import { pageMetadata } from '@/lib/seo';
 export const metadata: Metadata = pageMetadata({
   title: 'Local Business Solutions — Mitra',
   description:
-    'Marketing built for Indian restaurants, salons and real estate: one photo becomes a month of posts, WhatsApp promos and offers.',
+    'Marketing built for Indian restaurants, salons and real estate: one photo becomes a campaign pack of posts, WhatsApp promos and offers.',
   path: '/solutions',
 });
 

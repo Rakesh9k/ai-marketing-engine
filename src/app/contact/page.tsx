@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import { BusinessIdentity } from '@/components/shared/BusinessIdentity';
 import { pageMetadata } from '@/lib/seo';
 import Link from 'next/link';
 import { MitraLogo } from '@/components/ui/MitraLogo';
@@ -18,9 +19,9 @@ export default function ContactPage() {
 
       <h1 className="text-h1 text-text-primary mb-2 font-bold">Contact</h1>
       <p className="text-body text-text-secondary mb-8">
-        The only verified, monitored contact channel for Mitra today is email. We have not yet
-        established separate dedicated addresses for billing, privacy/grievance, or legal questions
-        — all of those currently go to the same inbox below.
+        Mitra by BrainWise is run by Brainwise Solutions, a sole proprietorship owned by VISHESH
+        KAKAR. Reach us by email or phone below; billing, privacy/grievance and legal questions all
+        go to the same contacts.
       </p>
 
       <section className="border-border-light bg-surface mb-8 rounded-2xl border p-6">
@@ -39,8 +40,7 @@ export default function ContactPage() {
       </section>
 
       <p className="text-caption text-text-tertiary">
-        Whether dedicated billing, privacy, or legal contact addresses should be created separately
-        is a <strong>founder decision</strong>, not yet made. See also our{' '}
+        See also our{' '}
         <Link href="/support" className="text-brand-600 hover:underline">
           Support
         </Link>{' '}
@@ -54,6 +54,7 @@ export default function ContactPage() {
         </Link>
         .
       </p>
+      <BusinessIdentity className="border-border-light mt-10 border-t pt-6" />
     </div>
   );
 }

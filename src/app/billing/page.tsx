@@ -13,6 +13,14 @@ import { PLAN_DETAILS } from '@/features/billing/planDetails';
 import { callFunction } from '@/services/api';
 import { useCashfreeCheckout } from '@/features/billing/useCashfreeCheckout';
 import { CheckoutPhonePrompt } from '@/features/billing/CheckoutPhonePrompt';
+import { BillingOverviewPanel } from '@/features/billing/BillingOverviewPanel';
+import { OrderStatusPanel } from '@/features/billing/OrderStatusPanel';
+import type { VerifiedOrder } from '@/features/billing/orderStatusUi';
+import {
+  CheckoutConfirmDialog,
+  type CheckoutProblem,
+} from '@/features/pricing/CheckoutConfirmDialog';
+import { buildCheckoutSummary } from '@/features/pricing/pricingModel';
 import { CreditPackCards } from '@/features/billing/components/CreditPackCards';
 import { isVisibleTransaction } from '@/features/billing/visibleTransactions';
 import {
@@ -36,7 +44,19 @@ export default function BillingPage() {
   const [businessCount, setBusinessCount] = useState<number>(1);
   const [loading, setLoading] = useState(true);
   const [failedReads, setFailedReads] = useState<string[]>([]);
-  const [billingCycle, setBillingCycle] = useState<BillingCycle>('yearly');
+  const [billingCycle, setBillingCycle] = useState<BillingCycle>('monthly');
+  const [confirmTarget, setConfirmTarget] = useState<{
+    plan: SubscriptionPlan;
+    cycle: BillingCycle;
+  } | null>(null);
+  const confirmTargetRef = useRef(confirmTarget);
+  confirmTargetRef.current = confirmTarget;
+  const [checkoutProblem, setCheckoutProblem] = useState<CheckoutProblem | null>(null);
+  const [orderStatus, setOrderStatus] = useState<{
+    orderId: string;
+    result: VerifiedOrder | null;
+    checking: boolean;
+  } | null>(null);
   const [autoPlan, setAutoPlan] = useState<{ plan: SubscriptionPlan; cycle: BillingCycle } | null>(
     null
   );
@@ -46,7 +66,11 @@ export default function BillingPage() {
     phonePrompt,
     submitPhone,
     cancelPhone,
-  } = useCashfreeCheckout((message) => showToast(message, 'error'));
+  } = useCashfreeCheckout((message, kind) => {
+    // While the confirmation is open, a problem is shown inside it (the customer is looking at it).
+    if (confirmTargetRef.current) setCheckoutProblem({ kind: kind ?? 'error', message });
+    else showToast(message, 'error');
+  });
   const subscriptionRef = useRef<Subscription | null>(null);
   subscriptionRef.current = subscription;
   // Set when the customer returns from Cashfree: the access end date they had BEFORE paying (0 if none).
@@ -101,9 +125,11 @@ export default function BillingPage() {
       ) {
         return;
       }
-      void startCheckout({ kind: 'plan', planId: plan, billingCycle: cycle });
+      // Nothing is charged until the customer has seen the exact amount, term and credits and confirms.
+      setCheckoutProblem(null);
+      setConfirmTarget({ plan, cycle });
     },
-    [subscription, billingCycle, startCheckout]
+    [subscription, billingCycle]
   );
 
   const handleBuyTopUp = useCallback(
@@ -111,6 +137,38 @@ export default function BillingPage() {
       void startCheckout({ kind: 'pack', credits });
     },
     [startCheckout]
+  );
+
+  const verifiedOrderRef = useRef<string | null>(null);
+
+  /** Ask the SERVER to check an order with the payment provider; its answer alone decides what the page says. */
+  const verifyOrder = useCallback(
+    async (orderId: string) => {
+      setOrderStatus((prev) => (prev?.orderId === orderId ? { ...prev, checking: true } : prev));
+      try {
+        const result = await callFunction<{ orderId: string }, VerifiedOrder>({
+          functionName: 'verifyCashfreeOrder',
+          data: { orderId },
+        });
+        setOrderStatus((prev) =>
+          prev?.orderId === orderId ? { orderId, result, checking: false } : prev
+        );
+        if (!result.confirmed || verifiedOrderRef.current === orderId) return;
+        verifiedOrderRef.current = orderId;
+        awaitingPaymentRef.current = null; // this confirmation replaces the one the term-extension check shows
+        void refreshBillingData();
+        showToast(
+          result.accessEndsAt
+            ? `Payment confirmed. Your plan is active until ${formatAccessDate(new Date(result.accessEndsAt))}.`
+            : 'Payment confirmed. Your credits have been added.',
+          'success'
+        );
+      } catch (err) {
+        console.error('Payment check failed (will retry):', err);
+        setOrderStatus((prev) => (prev?.orderId === orderId ? { ...prev, checking: false } : prev));
+      }
+    },
+    [refreshBillingData, showToast]
   );
 
   useEffect(() => {
@@ -133,12 +191,22 @@ export default function BillingPage() {
       );
       void refreshBillingData();
       [3000, 7000, 15000].forEach((ms) => window.setTimeout(() => void refreshBillingData(), ms));
+      // The redirect back from the payment page proves nothing. If the signed webhook has not arrived yet, ask the
+      // SERVER to check the order with Cashfree (it applies a confirmed payment exactly once, like the webhook does).
+      // Only its answer, never the URL, decides what the page says.
+      setOrderStatus({ orderId: cashfreeOrderId, result: null, checking: false });
+      [4000, 12000, 30000].forEach((ms) =>
+        window.setTimeout(() => {
+          if (verifiedOrderRef.current === cashfreeOrderId) return;
+          void verifyOrder(cashfreeOrderId);
+        }, ms)
+      );
       window.history.replaceState({}, '', '/billing');
     } else if (requestedPlan && requestedPlan !== 'free') {
-      setAutoPlan({ plan: requestedPlan, cycle: requestedCycle || 'yearly' });
+      setAutoPlan({ plan: requestedPlan, cycle: requestedCycle || 'monthly' });
       window.history.replaceState({}, '', '/billing');
     }
-  }, [showToast, refreshBillingData]);
+  }, [showToast, refreshBillingData, verifyOrder]);
 
   // Confirm the new paid-through date only once the signed webhook has actually extended access.
   useEffect(() => {
@@ -217,6 +285,36 @@ export default function BillingPage() {
 
   return (
     <div className="bg-bg-primary min-h-screen pb-12">
+      <CheckoutConfirmDialog
+        summary={
+          confirmTarget && !phonePrompt
+            ? buildCheckoutSummary(confirmTarget.plan, confirmTarget.cycle)
+            : null
+        }
+        pending={
+          confirmTarget !== null &&
+          pendingKey === `plan:${confirmTarget.plan}:${confirmTarget.cycle}`
+        }
+        problem={checkoutProblem}
+        liveTermEndsAt={
+          live && confirmTarget?.plan === subscription?.planId && confirmTarget?.cycle === termCycle
+            ? accessEnd
+            : null
+        }
+        onConfirm={() => {
+          if (!confirmTarget) return;
+          setCheckoutProblem(null);
+          void startCheckout({
+            kind: 'plan',
+            planId: confirmTarget.plan,
+            billingCycle: confirmTarget.cycle,
+          });
+        }}
+        onCancel={() => {
+          setConfirmTarget(null);
+          setCheckoutProblem(null);
+        }}
+      />
       <CheckoutPhonePrompt
         prompt={phonePrompt}
         busy={pendingKey !== null}
@@ -224,6 +322,16 @@ export default function BillingPage() {
         onCancel={cancelPhone}
       />
       <div className="mx-auto max-w-5xl px-4 pt-8 sm:px-6">
+        {!entitlementUnknown && <BillingOverviewPanel />}
+        {orderStatus && (
+          <OrderStatusPanel
+            orderId={orderStatus.orderId}
+            result={orderStatus.result}
+            checking={orderStatus.checking}
+            onCheckAgain={() => void verifyOrder(orderStatus.orderId)}
+            onDismiss={() => setOrderStatus(null)}
+          />
+        )}
         <div className="mb-6 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <h1 className="text-2xl font-black text-neutral-900">Billing &amp; Subscription</h1>
@@ -251,9 +359,6 @@ export default function BillingPage() {
               }`}
             >
               <span>Yearly · 365 days</span>
-              <span className="rounded-full bg-amber-400 px-1.5 py-0.5 text-[10px] font-black text-neutral-900 uppercase">
-                Best value
-              </span>
             </button>
           </div>
         </div>
@@ -428,7 +533,7 @@ export default function BillingPage() {
           </div>
 
           {/* Available Subscription Plans */}
-          <div>
+          <div id="subscription-plans">
             <h2 className="mb-4 text-xl font-black text-neutral-900">Subscription Plans</h2>
             {live && currentPlan !== 'free' && (
               <p className="mb-4 text-xs text-neutral-500">
@@ -442,7 +547,6 @@ export default function BillingPage() {
                 const plan = PLAN_DETAILS[planKey];
                 const isCurrent = planKey === currentPlan;
                 const isFree = planKey === 'free';
-                const isPro = planKey === 'pro';
                 const termPrice = termPriceINR(plan, billingCycle);
                 const sameTerm = isCurrent && termCycle === billingCycle;
                 const blockedByLiveTerm = live && currentPlan !== 'free' && !sameTerm;
@@ -451,19 +555,11 @@ export default function BillingPage() {
                   <div
                     key={planKey}
                     className={`relative flex flex-col justify-between rounded-2xl border-2 bg-white p-5 transition-all ${
-                      isPro
-                        ? 'border-brand-500 ring-brand-500/20 shadow-md ring-2'
-                        : isCurrent
-                          ? 'border-emerald-500 ring-2 ring-emerald-500/20'
-                          : 'border-neutral-200 hover:border-neutral-300'
+                      isCurrent
+                        ? 'border-emerald-500 ring-2 ring-emerald-500/20'
+                        : 'border-neutral-200 hover:border-neutral-300'
                     }`}
                   >
-                    {isPro && (
-                      <div className="bg-brand-600 absolute -top-3 left-1/2 -translate-x-1/2 rounded-full px-2.5 py-0.5 text-[10px] font-black text-white uppercase shadow-xs">
-                        MOST POPULAR
-                      </div>
-                    )}
-
                     {!isFree && isCurrent && (
                       <div className="absolute -top-3 left-1/2 -translate-x-1/2 rounded-full bg-emerald-600 px-2.5 py-0.5 text-[10px] font-black text-white uppercase shadow-xs">
                         Current Plan
