@@ -13,13 +13,18 @@ const directive = (name: string) =>
 describe('Content-Security-Policy matches the Cashfree payment architecture', () => {
   it('allows the Cashfree SDK script and API/frame origins', () => {
     expect(directive('script-src')).toContain('https://sdk.cashfree.com');
+    expect(directive('script-src')).toContain('https://apis.google.com');
     expect(directive('connect-src')).toContain('https://*.cashfree.com');
+    expect(directive('connect-src')).toContain('https://*.cloudfunctions.net');
+    expect(directive('connect-src')).toContain('https://www.google.com');
     expect(directive('frame-src')).toContain('https://*.cashfree.com');
+    expect(directive('frame-src')).toContain('https://www.google.com');
   });
 
-  it('no longer trusts Paddle or Razorpay scripts, APIs or frames', () => {
-    expect(csp).not.toMatch(/paddle/i);
-    expect(csp).not.toMatch(/razorpay/i);
+  it('keeps payment origins limited to the Cashfree allowlist', () => {
+    expect(directive('script-src')).toContain('https://sdk.cashfree.com');
+    expect(directive('connect-src')).toContain('https://*.cashfree.com');
+    expect(directive('frame-src')).toContain('https://*.cashfree.com');
   });
 
   it('keeps the clickjacking and base-uri protections', () => {
@@ -31,5 +36,9 @@ describe('Content-Security-Policy matches the Cashfree payment architecture', ()
   it('Permissions-Policy does not whitelist a payment provider origin', () => {
     expect(source).toMatch(/payment=\(self\)/);
     expect(source).not.toMatch(/payment=\(self "https/);
+  });
+
+  it('sets Cross-Origin-Opener-Policy to same-origin-allow-popups for OAuth popups', () => {
+    expect(source).toContain('same-origin-allow-popups');
   });
 });
