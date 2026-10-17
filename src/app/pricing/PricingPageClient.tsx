@@ -1,197 +1,148 @@
 'use client';
 
-import { useState, useEffect, Fragment } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import { Button } from '@/components/ui/Button';
 import { LandingNav } from '@/features/landing/components/LandingNav';
 import { LandingFooter } from '@/features/landing/components/LandingFooter';
-import { Reveal } from '@/components/motion/Reveal';
 import { useAuth } from '@/features/auth/hooks/useAuth';
 import { doc, getDoc } from 'firebase/firestore';
 import { getFirebaseDb } from '@/lib/firebase/client';
-import { PLANS, type SubscriptionPlan, type PlanDefinition } from '@/lib/config/pricing';
-import { useCashfreeCheckout } from '@/features/billing/useCashfreeCheckout';
+import type { BillingTerm } from '@/lib/config/planCatalogue.generated';
+import {
+  useCashfreeCheckout,
+  type CheckoutProblemKind,
+} from '@/features/billing/useCashfreeCheckout';
 import { CheckoutPhonePrompt } from '@/features/billing/CheckoutPhonePrompt';
 import { CreditPackCards } from '@/features/billing/components/CreditPackCards';
+import {
+  CheckoutConfirmDialog,
+  type CheckoutProblem,
+} from '@/features/pricing/CheckoutConfirmDialog';
+import {
+  buildCheckoutSummary,
+  buildCreditExamples,
+  buildFreeView,
+  buildOperationCosts,
+  buildPlanViews,
+  describeAllocation,
+  formatINR,
+  formatPercent,
+  suggestPlan,
+  type PaidPlanId,
+  type PlanView,
+} from '@/features/pricing/pricingModel';
 import { useToast } from '@/hooks/useToast';
+import { useExperiment } from '@/features/experiments/useExperiment';
+import { trackEvent } from '@/lib/analytics/trackEvent';
 
-// ─── Feature Comparison Matrix Data ──────────────────────────────────────────
-interface ComparisonFeature {
-  name: string;
-  tooltip?: string;
-  values: Record<SubscriptionPlan, string | boolean>;
-}
+// ─── Plain-language positioning. Facts (limits, prices) are read from the catalogue; only the wording is here. ──
+const WHO_FOR: Record<PaidPlanId, string> = {
+  starter: 'One business that wants a steady rhythm of campaigns each month.',
+  business: 'One business that wants its brand kit applied and reels included.',
+  pro: 'Owners running a few businesses, or one business that creates a lot.',
+  agency: 'Many branches or client businesses under one login.',
+};
 
-interface FeatureCategory {
-  category: string;
-  features: ComparisonFeature[];
-}
-
-const COMPARISON_MATRIX: FeatureCategory[] = [
+const FAQS: { q: string; a: string }[] = [
   {
-    category: 'Content Creation & Outputs',
-    features: [
-      {
-        name: 'AI Reels / month',
-        tooltip: 'High-converting vertical video concepts with hook, script & B-roll direction',
-        values: { free: '0', starter: '3', business: '10', pro: '20', agency: '40' },
-      },
-      {
-        name: 'Social Creatives / month',
-        tooltip: 'Ready-to-post promotional posters, announcements, and festival visual creatives',
-        values: { free: '5', starter: '15', business: '30', pro: '60', agency: '120' },
-      },
-      {
-        name: 'Story Concepts / month',
-        tooltip: 'Engagement-boosting daily story ideas, polls, and quick updates',
-        values: { free: '0', starter: '9', business: '30', pro: '60', agency: '120' },
-      },
-      {
-        name: 'Captions, Hooks & CTAs',
-        tooltip: 'Platform-optimized copy with trending hashtags and local call-to-actions',
-        values: { free: true, starter: true, business: true, pro: true, agency: true },
-      },
-      {
-        name: 'WhatsApp Broadcast Copy',
-        tooltip: 'Conversational messages engineered for customer broadcast lists',
-        values: { free: true, starter: true, business: true, pro: true, agency: true },
-      },
-    ],
+    q: 'Is this a subscription? Will I be charged again?',
+    a: 'No. Every plan is a one-time payment for a fixed number of days: 30 days or 365 days. Nothing renews by itself and we never charge you again unless you choose to buy another term. There is no free trial. When your term ends you return to the Free plan, and you can buy again from the Billing page whenever you like.',
   },
   {
-    category: 'Marketing Intelligence & Brain',
-    features: [
-      {
-        name: 'Business Brain & Persona',
-        tooltip: 'Remembers your brand tone, offerings, location, and audience preferences',
-        values: {
-          free: 'Standard',
-          starter: 'Standard',
-          business: 'Enhanced',
-          pro: 'Full Intelligence',
-          agency: 'Full + Agency Custom',
-        },
-      },
-      {
-        name: 'Multi-Business Profiles',
-        tooltip: 'Manage separate business entities under a single subscription account',
-        values: {
-          free: '1 Business',
-          starter: '1 Business',
-          business: '1 Business',
-          pro: '3 Businesses',
-          agency: '10 Businesses',
-        },
-      },
-      {
-        name: 'Regional Languages (Telugu, Hindi, etc.)',
-        tooltip: 'Generate content natively adapted to local linguistic nuances',
-        values: { free: false, starter: true, business: true, pro: true, agency: true },
-      },
-      {
-        name: 'Truth Check Fact Validation',
-        tooltip: 'AI fact-checks pricing, offers, and operational details before output',
-        values: { free: false, starter: true, business: true, pro: true, agency: true },
-      },
-    ],
-  },
-  {
-    category: 'Brand Customization & Quality',
-    features: [
-      {
-        name: 'No Watermark on Creatives',
-        tooltip: 'Clean visual downloads ready for commercial distribution',
-        values: { free: false, starter: true, business: true, pro: true, agency: true },
-      },
-      {
-        name: 'Brand Kit & Logo Integration',
-        tooltip: 'Automatic watermark, logo placement, and brand color palette matching',
-        values: { free: false, starter: false, business: true, pro: true, agency: true },
-      },
-      {
-        name: 'Premium Visual Generation & Variations',
-        tooltip: 'Highest-resolution AI graphic rendering with multi-style variations',
-        values: { free: false, starter: false, business: false, pro: true, agency: true },
-      },
-      {
-        name: 'Agency Workspace & Client Management',
-        tooltip: 'Dedicated client folders, asset organization, and white-label tools',
-        values: { free: false, starter: false, business: false, pro: false, agency: true },
-      },
-      {
-        name: 'Priority Generation Queue',
-        tooltip: 'Faster processing times during high-volume server demand',
-        values: {
-          free: 'Standard',
-          starter: 'Standard',
-          business: 'Priority',
-          pro: 'High Priority',
-          agency: 'VIP Immediate',
-        },
-      },
-    ],
-  },
-];
-
-// ─── FAQ Data ─────────────────────────────────────────────────────────────────
-const FAQS = [
-  {
-    q: 'What counts as an AI Reel vs a Social Creative?',
-    a: 'A Social Creative is an eye-catching static poster or image visual paired with high-converting caption copy. An AI Reel is a video concept breakdown complete with attention-grabbing hooks, Scene-by-Scene script, voiceover transcript, and recommended B-roll clips for Instagram Reels or YouTube Shorts.',
-  },
-  {
-    q: 'How does annual billing saving work?',
-    a: 'The yearly option is a single payment for 365 days of access, instead of buying a 30-day term each month. The price you pay for each option is shown on the plan cards above.',
-  },
-  {
-    q: 'Do plans renew automatically? How do I renew or switch plans?',
-    a: 'No. Paid plans are prepaid for a fixed term: 30 days for monthly plans and 365 days for yearly plans. They never renew automatically and you are not charged again unless you choose to buy another term. There is no free trial. When your term ends you return to the Free plan and can buy again from the Billing page. Renewing the same plan and billing period before it ends adds the new term after your current end date. To switch to a different plan or billing period, buy it after your current access ends.',
+    q: 'What do I get for free, and is there a trial?',
+    a: 'There is no trial and no countdown. When you have verified your email and set up your business, Mitra gives you 140 free credits once, with no card needed. They do not expire; they are used after any paid plan credits you have, and what you do not use stays with you. That is enough for your first full campaign (100 credits) plus a few edits.',
   },
   {
     q: 'Do unused credits roll over?',
-    a: "No. A plan's credits are valid through the current calendar month, and unused credits do not roll over into the next month. Credit top-up packs are likewise valid only for the month you buy them in.",
+    a: "Plan credits: no. A plan's credits belong to the period you paid for. A 30-day plan's credits last for its 30 days; a yearly plan adds that month's credits at the start of each monthly period of the year, not all at once. Credits you have not used when a period ends do not roll over into the next one. Credit top-up packs are valid only for the calendar month you buy them in. Your one-time free starter credits do not expire.",
   },
   {
-    q: 'What happens if I reach my monthly reel or creative limit?',
-    a: 'If you use up your credits before the month ends, you can buy a credit top-up pack from your Billing page and keep going. Top-up credits are valid for the month you buy them in.',
+    q: 'What is a credit, and how many campaigns will my plan give me?',
+    a: 'Credits pay for the work Mitra does for you, and different work costs different amounts: creating a campaign costs more than regenerating one item. The cost of each action is listed on this page. Because how you use credits changes what you can make, we do not promise a fixed number of campaigns; the examples above show how credits are spent.',
   },
   {
-    q: 'How does multi-business management work on Pro & Agency plans?',
-    a: 'The Pro plan allows you to manage up to 3 separate business profiles (e.g. main restaurant, cloud kitchen, catering arm) under one login. The Agency plan supports up to 10 client businesses with isolated brand profiles and workspaces.',
+    q: 'Is the yearly option really cheaper?',
+    a: 'We compare it with the thing you would otherwise do: buying the monthly plan twelve times at its current price. The saving shown on each plan is that difference, worked out from the prices on this page. Twelve 30-day purchases cover 360 days, while the yearly term is 365 days. You pay the full yearly amount today, and you receive the credits month by month, not all at once.',
+  },
+  {
+    q: 'Can I buy again before my access ends?',
+    a: 'Yes, for the same plan and the same term length. The new term is added after your current access ends, so you do not lose days. To move to a different plan, buy it after your current term ends. We do not prorate or switch plans in the middle of a term.',
+  },
+  {
+    q: 'What if my payment fails or I am charged and see nothing?',
+    a: 'If a payment fails you are not charged for the plan. If your bank took the money and your plan has not appeared, open Billing: it checks the payment with our payment partner and shows its status. If it still is not resolved, contact support and we will look into it.',
+  },
+  {
+    q: 'What about refunds?',
+    a: 'Our refund policy explains what can be refunded and how to ask. Please read it before you buy.',
   },
   {
     q: 'Are my payments secure?',
-    a: 'Yes. All payment transactions are securely processed over encrypted channels by our payment partner, Cashfree Payments. We never store raw payment details on our servers.',
+    a: 'Yes. Payments are processed over encrypted channels by our payment partner, Cashfree Payments. We never store raw payment details on our servers.',
   },
 ];
 
-export default function PricingPageClient({ countryCode: _countryCode }: { countryCode?: string }) {
+const NOT_YET = [
+  'Scheduling and automatic publishing to social media',
+  'Analytics dashboards for your posts',
+  'Automatic sending of WhatsApp messages (Mitra writes the copy for you to send yourself)',
+];
+
+type Cycle = BillingTerm;
+
+export default function PricingPageClient() {
   const router = useRouter();
   const { showToast } = useToast();
-  // Paddle's localized, pre-formatted prices. countryCode is undefined when the CDN gave us no
-  // usable country - Paddle then auto-detects from the visitor's IP.
+  const { status: authStatus, user } = useAuth();
+
+  const plans = useMemo(() => buildPlanViews(), []);
+  const free = useMemo(() => buildFreeView(), []);
+  const operations = useMemo(() => buildOperationCosts(), []);
+  const examples = useMemo(() => buildCreditExamples(), []);
+  const mainPlans = plans.filter((p) => p.planId !== 'agency');
+  const agency = plans.find((p) => p.planId === 'agency');
+  const reelCost = operations.find((o) => o.operation === 'reel_generation')?.credits ?? 0;
+
+  // Monthly is the default: the annual option is never pre-selected.
+  const [cycle, setCycle] = useState<Cycle>('monthly');
+  const [confirmPlan, setConfirmPlan] = useState<PaidPlanId | null>(null);
+  const [problem, setProblem] = useState<CheckoutProblem | null>(null);
+
   const {
     pendingKey,
     start: startCheckout,
     phonePrompt,
     submitPhone,
     cancelPhone,
-  } = useCashfreeCheckout((message) => showToast(message, 'error'));
+  } = useCashfreeCheckout((message: string, kind?: CheckoutProblemKind) => {
+    if (kind === 'unavailable') {
+      setProblem({ kind: 'unavailable', message });
+    } else if (confirmPlan) {
+      setProblem({ kind: 'error', message });
+    } else {
+      showToast(message, 'error');
+    }
+  });
 
-  // Default billing cycle is YEARLY as requested
-  const [billingCycle, setBillingCycle] = useState<'monthly' | 'yearly'>('yearly');
+  // Activation measurement: a signed-in user looked at the plans. Nothing is sent with it.
+  useEffect(() => {
+    if (authStatus === 'authenticated') trackEvent({ eventName: 'pricing_page_viewed' });
+  }, [authStatus]);
 
-  // ─── Auth & subscription state ──────────────────────────────────────────────
-  const { status: authStatus, user } = useAuth();
-  const [activePlanId, setActivePlanId] = useState<SubscriptionPlan | null>(null);
+  // ─── Auth & subscription state ───────────────────────────────────────────
+  const [activePlanId, setActivePlanId] = useState<string | null>(null);
   // A paid term that has not ended yet: another plan cannot be bought until it does (no proration).
   const [hasLiveSubscription, setHasLiveSubscription] = useState(false);
   const [subLoading, setSubLoading] = useState(false);
+  const [subError, setSubError] = useState(false);
 
   useEffect(() => {
     if (authStatus !== 'authenticated' || !user) {
       setActivePlanId(null);
       setHasLiveSubscription(false);
+      setSubError(false);
       return;
     }
 
@@ -199,6 +150,7 @@ export default function PricingPageClient({ countryCode: _countryCode }: { count
 
     async function fetchSubscription() {
       setSubLoading(true);
+      setSubError(false);
       try {
         const db = getFirebaseDb();
         if (!db || !user) return;
@@ -224,13 +176,14 @@ export default function PricingPageClient({ countryCode: _countryCode }: { count
           const endRaw = subData['currentPeriodEnd'];
           const notEnded = !endRaw || new Date(endRaw as string).getTime() > Date.now();
           const isActive = subData['status'] === 'active' && notEnded;
-          setActivePlanId(isActive ? (subData['planId'] as SubscriptionPlan) : 'free');
+          setActivePlanId(isActive ? (subData['planId'] as string) : 'free');
           setHasLiveSubscription(isActive && subData['planId'] !== 'free');
         } else {
           setActivePlanId('free');
         }
       } catch {
         setActivePlanId(null);
+        setSubError(true);
       } finally {
         if (!cancelled) setSubLoading(false);
       }
@@ -242,43 +195,33 @@ export default function PricingPageClient({ countryCode: _countryCode }: { count
     };
   }, [authStatus, user]);
 
-  // ─── CTA helpers ────────────────────────────────────────────────────────────
-  function getCtaLabel(planId: SubscriptionPlan, planName: string): string {
-    if (planId === 'free') {
-      if (authStatus !== 'authenticated') return 'Get Started Free';
-      return activePlanId === 'free' ? 'Current Plan' : 'Included';
-    }
-    const termWord = billingCycle === 'yearly' ? '365 days' : '30 days';
-    if (authStatus !== 'authenticated') return `Buy ${termWord} of ${planName}`;
-    if (subLoading) return 'Loading…';
-    if (activePlanId === planId) return 'Current Plan';
+  const signedIn = authStatus === 'authenticated';
+  // Presentation-only experiment (none runs unless the reviewed server registry says so): how the saving is framed.
+  const savingVariant = useExperiment(
+    'annual_saving_display',
+    ['amount_only', 'effective_monthly'] as const,
+    signedIn && !hasLiveSubscription
+  );
+  const termWord = cycle === 'yearly' ? '365 days' : '30 days';
+
+  function ctaLabel(plan: PlanView): string {
+    if (!signedIn) return `Buy ${termWord} of ${plan.name}`;
+    if (subLoading) return 'Checking your plan…';
+    if (activePlanId === plan.planId) return 'Current plan';
     if (hasLiveSubscription) return 'Manage in Billing';
-    if (pendingKey === `plan:${planId}:${billingCycle}`) return 'Opening checkout…';
-    return `Buy ${termWord} of ${planName}`;
+    return `Buy ${termWord} of ${plan.name}`;
   }
 
-  function getCtaVariant(planId: SubscriptionPlan): 'primary' | 'outline' | 'ghost' {
-    if (planId === 'free') return 'outline';
-    if (activePlanId === planId) return 'ghost';
-    if (hasLiveSubscription) return 'outline';
-    return planId === 'pro' || planId === 'business' ? 'primary' : 'outline';
-  }
-
-  function isCtaDisabled(planId: SubscriptionPlan): boolean {
-    if (authStatus === 'authenticated' && subLoading) return true;
-    if (planId === 'free') return authStatus === 'authenticated';
-    if (activePlanId === planId) return true;
+  function ctaDisabled(plan: PlanView): boolean {
+    if (signedIn && subLoading) return true;
+    if (activePlanId === plan.planId) return true;
     if (hasLiveSubscription) return false;
     return pendingKey !== null;
   }
 
-  function handleCtaClick(planId: SubscriptionPlan) {
-    if (planId === 'free') {
-      router.push('/signup');
-      return;
-    }
-    if (authStatus !== 'authenticated') {
-      router.push(`/signup?plan=${planId}&cycle=${billingCycle}`);
+  function onChoose(planId: PaidPlanId) {
+    if (!signedIn) {
+      router.push(`/signup?plan=${planId}&cycle=${cycle}`);
       return;
     }
     if (activePlanId === planId) return;
@@ -286,399 +229,691 @@ export default function PricingPageClient({ countryCode: _countryCode }: { count
       router.push('/billing');
       return;
     }
-    void startCheckout({ kind: 'plan', planId, billingCycle });
+    setProblem(null);
+    setConfirmPlan(planId);
   }
+
+  function onConfirmPurchase() {
+    if (!confirmPlan) return;
+    setProblem(null);
+    void startCheckout({ kind: 'plan', planId: confirmPlan, billingCycle: cycle });
+  }
+
+  function closeConfirm() {
+    setConfirmPlan(null);
+    setProblem(null);
+  }
+
+  const summary = confirmPlan && !phonePrompt ? buildCheckoutSummary(confirmPlan, cycle) : null;
+  const confirmPending = confirmPlan !== null && pendingKey === `plan:${confirmPlan}:${cycle}`;
+
+  // ─── "Which plan fits?" helper: an aid, not a recommendation. Nothing is highlighted until it is used. ────
+  const [fitTouched, setFitTouched] = useState(false);
+  const [fitCampaigns, setFitCampaigns] = useState(4);
+  const [fitBusinesses, setFitBusinesses] = useState(1);
+  const [fitReels, setFitReels] = useState(false);
+  const fit = suggestPlan({
+    campaignsPerMonth: fitCampaigns,
+    businesses: fitBusinesses,
+    needsReels: fitReels,
+  });
+  const fitPlanId = fitTouched && fit?.kind === 'plan' ? fit.view.planId : null;
 
   return (
     <div className="bg-bg-primary text-text-primary min-h-screen">
       <LandingNav />
-      <CheckoutPhonePrompt
-        prompt={phonePrompt}
-        busy={pendingKey !== null}
-        onSubmit={submitPhone}
-        onCancel={cancelPhone}
-      />
 
-      {/* pt-28: the landing nav is position:fixed, so content must start below it */}
-      <main className="mx-auto max-w-7xl px-4 pt-28 pb-12 sm:px-6 lg:pt-32 lg:pb-16">
-        {/* ── Hero Header ────────────────────────────────────────────────────── */}
-        <div className="text-center">
-          <div className="border-brand-200 bg-brand-50/80 mb-3 inline-flex items-center gap-2 rounded-full border px-3.5 py-1">
-            <span className="text-brand-700 text-xs font-bold tracking-wider uppercase">
-              SIMPLE, CLEAR, BUILT FOR YOUR GROWTH
-            </span>
-          </div>
-
-          <h1 className="text-text-primary text-4xl font-black tracking-tight sm:text-5xl lg:text-6xl">
-            Choose how much marketing you want <br className="hidden sm:inline" />
-            <span className="from-brand-600 bg-gradient-to-r to-amber-600 bg-clip-text text-transparent">
-              Mitra to handle.
-            </span>
+      <main id="main-content" className="mx-auto max-w-6xl px-4 pt-28 pb-24 sm:px-6 lg:px-8">
+        {/* ── Hero ───────────────────────────────────────────────────────── */}
+        <header className="mx-auto max-w-2xl text-center">
+          <p className="text-brand-700 text-sm font-medium tracking-wide">Pricing</p>
+          <h1 className="text-text-primary mt-3 text-4xl font-semibold tracking-tight sm:text-5xl">
+            Pay once for the days you need.
           </h1>
-          <p className="text-text-secondary mx-auto mt-4 max-w-2xl text-base sm:text-lg">
-            From your first campaign to a complete content engine. Scale up or down seamlessly as
-            your business grows.
+          <p className="text-text-secondary mt-4 text-base leading-relaxed sm:text-lg">
+            Every Mitra plan is a one-time payment for 30 or 365 days. Nothing renews by itself, and
+            you are never charged again unless you choose to buy another term.
           </p>
+        </header>
 
-          {/* ── Billing Cycle Toggle ────────────────────────────────────────── */}
-          <div className="mt-8 flex flex-wrap items-center justify-center gap-4">
-            <div className="border-border-medium bg-bg-secondary inline-flex items-center rounded-2xl border p-1.5 shadow-xs">
-              <button
-                type="button"
-                onClick={() => setBillingCycle('monthly')}
-                className={`rounded-xl px-5 py-2 text-sm font-bold transition-all ${
-                  billingCycle === 'monthly'
-                    ? 'text-text-primary bg-white shadow-xs'
-                    : 'text-text-tertiary hover:text-text-primary'
-                }`}
-              >
-                Monthly · 30 days
-              </button>
-              <button
-                type="button"
-                onClick={() => setBillingCycle('yearly')}
-                className={`flex items-center gap-2 rounded-xl px-5 py-2 text-sm font-bold transition-all ${
-                  billingCycle === 'yearly'
-                    ? 'bg-brand-600 text-white shadow-sm'
-                    : 'text-text-tertiary hover:text-text-primary'
-                }`}
-              >
-                <span>Yearly · 365 days</span>
-                <span
-                  className={`rounded-full px-2 py-0.5 text-[11px] font-extrabold uppercase ${
-                    billingCycle === 'yearly'
-                      ? 'bg-amber-400 text-neutral-900'
-                      : 'bg-brand-100 text-brand-700'
-                  }`}
-                >
-                  Best value
+        {/* ── Term choice ────────────────────────────────────────────────── */}
+        <fieldset className="mx-auto mt-10 max-w-md">
+          <legend className="sr-only">Choose how long to buy for</legend>
+          <div className="border-border-medium bg-bg-secondary grid grid-cols-2 gap-1 rounded-xl border p-1">
+            {(
+              [
+                ['monthly', '30 days', 'Pay each time'],
+                ['yearly', '1 year', 'Pay once'],
+              ] as const
+            ).map(([value, title, sub]) => (
+              <label key={value} className="relative cursor-pointer">
+                <input
+                  type="radio"
+                  name="term"
+                  value={value}
+                  checked={cycle === value}
+                  onChange={() => setCycle(value)}
+                  className="peer sr-only"
+                />
+                <span className="peer-checked:bg-bg-primary peer-checked:text-text-primary text-text-secondary peer-focus-visible:ring-brand-500 peer-checked:border-border-medium flex flex-col items-center rounded-lg border border-transparent px-3 py-2 text-center peer-focus-visible:ring-2">
+                  <span className="text-sm font-semibold">{title}</span>
+                  <span className="text-xs">{sub}</span>
                 </span>
-              </button>
-            </div>
+              </label>
+            ))}
           </div>
-        </div>
+          <p className="text-text-tertiary mt-3 text-center text-xs">
+            One-time payment. No automatic renewal. Prices are in Indian rupees.
+          </p>
+        </fieldset>
 
         {hasLiveSubscription && (
-          <p className="text-text-secondary mx-auto mt-6 max-w-xl text-center text-xs">
-            You already have access to a paid plan. Open Billing to see when it ends and to renew
-            it; to switch plans, buy the new one after your access ends.
+          <p className="text-text-secondary mx-auto mt-6 max-w-xl text-center text-sm">
+            You already have access to a paid plan. Open{' '}
+            <Link href="/billing" className="text-brand-700 underline">
+              Billing
+            </Link>{' '}
+            to see when it ends and to renew it; to switch plans, buy the new one after your access
+            ends.
+          </p>
+        )}
+        {subError && (
+          <p
+            role="status"
+            className="text-text-secondary mx-auto mt-6 max-w-xl text-center text-sm"
+          >
+            We could not check your current plan just now. You can still choose a plan; we check
+            again before you pay.
           </p>
         )}
 
-        {/* ── 5 Plan Cards Grid ──────────────────────────────────────────────── */}
-        <div className="mt-12 grid gap-6 sm:grid-cols-2 lg:grid-cols-5 lg:items-stretch">
-          {PLANS.map((plan: PlanDefinition, planIdx: number) => {
-            const isYearly = billingCycle === 'yearly';
-            const period = isYearly ? '/ 365 days' : '/ 30 days';
-            const isCurrent =
-              authStatus === 'authenticated' && !subLoading && activePlanId === plan.id;
-            const isPro = plan.id === 'pro';
+        {/* ── Which plan fits ────────────────────────────────────────────── */}
+        <section
+          aria-labelledby="fit-heading"
+          className="border-border-light bg-surface mx-auto mt-10 max-w-3xl rounded-2xl border p-5 sm:p-6"
+        >
+          <h2 id="fit-heading" className="text-text-primary text-lg font-semibold">
+            Not sure which plan fits?
+          </h2>
+          <p className="text-text-secondary mt-1 text-sm">
+            Tell us roughly how much you create. This only compares credits and limits; it is not a
+            promise of what you will make.
+          </p>
+          <div className="mt-4 grid gap-4 sm:grid-cols-3">
+            <label className="text-sm">
+              <span className="text-text-primary block font-medium">Campaigns per month</span>
+              <input
+                type="number"
+                min={0}
+                max={60}
+                inputMode="numeric"
+                value={fitCampaigns}
+                onChange={(e) => {
+                  setFitTouched(true);
+                  setFitCampaigns(Math.min(60, Math.max(0, Number(e.target.value) || 0)));
+                }}
+                className="border-border-medium bg-bg-primary focus-visible:ring-brand-500 mt-1 w-full rounded-lg border px-3 py-2 focus-visible:ring-2 focus-visible:outline-none"
+              />
+            </label>
+            <label className="text-sm">
+              <span className="text-text-primary block font-medium">Businesses</span>
+              <input
+                type="number"
+                min={1}
+                max={20}
+                inputMode="numeric"
+                value={fitBusinesses}
+                onChange={(e) => {
+                  setFitTouched(true);
+                  setFitBusinesses(Math.min(20, Math.max(1, Number(e.target.value) || 1)));
+                }}
+                className="border-border-medium bg-bg-primary focus-visible:ring-brand-500 mt-1 w-full rounded-lg border px-3 py-2 focus-visible:ring-2 focus-visible:outline-none"
+              />
+            </label>
+            <label className="flex items-end gap-2 pb-2 text-sm">
+              <input
+                type="checkbox"
+                checked={fitReels}
+                onChange={(e) => {
+                  setFitTouched(true);
+                  setFitReels(e.target.checked);
+                }}
+                className="accent-brand-600 h-4 w-4"
+              />
+              <span className="text-text-primary font-medium">I want reels</span>
+            </label>
+          </div>
+          <p
+            aria-live="polite"
+            className="text-text-secondary mt-4 text-sm"
+            data-testid="fit-result"
+          >
+            {fit?.kind === 'plan' && (
+              <>
+                <strong className="text-text-primary">{fit.view.name}</strong> has enough credits
+                for {fitCampaigns} {fitCampaigns === 1 ? 'campaign' : 'campaigns'} a month (
+                {fit.campaignCredits.toLocaleString('en-IN')} of{' '}
+                {fit.view.creditsPerPeriod.toLocaleString('en-IN')} credits), leaving{' '}
+                {fit.leftoverCredits.toLocaleString('en-IN')} credits for changes, images
+                {fitReels ? ' and reels' : ''}.
+              </>
+            )}
+            {fit?.kind === 'beyond' && fit.reason === 'credits' && (
+              <>
+                That is more than one {fit.largest.name} period of credits (
+                {fit.largest.creditsPerPeriod.toLocaleString('en-IN')}). You can add top-up packs
+                below.
+              </>
+            )}
+            {fit?.kind === 'beyond' && fit.reason === 'businesses' && (
+              <>
+                {fit.largest.name} supports up to {fit.largest.maxBusinesses} businesses. For more,
+                please contact us.
+              </>
+            )}
+          </p>
+        </section>
 
-            return (
-              <Reveal key={plan.id} index={planIdx} className="flex">
-                <div
-                  className={`card-interactive relative flex w-full flex-col justify-between rounded-2xl border p-6 shadow-xs transition-all duration-200 ${
-                    isPro
-                      ? 'border-brand-500 ring-brand-500 bg-gradient-to-b from-amber-50/40 via-white to-orange-50/30 shadow-xl ring-2'
-                      : plan.popular
-                        ? 'border-brand-300 bg-bg-primary ring-brand-300 ring-1'
-                        : 'border-border-light bg-bg-primary hover:border-border-medium'
-                  } ${isCurrent ? 'ring-2 ring-emerald-500' : ''}`}
+        {/* ── Plans ──────────────────────────────────────────────────────── */}
+        <section aria-labelledby="plans-heading" className="mt-12">
+          <h2 id="plans-heading" className="sr-only">
+            Plans
+          </h2>
+          <ul className="grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
+            {/* Free */}
+            <li className="border-border-light bg-bg-primary flex flex-col rounded-2xl border p-6">
+              <h3 className="text-text-primary text-xl font-semibold">Free</h3>
+              <p className="text-text-secondary mt-1 min-h-[3rem] text-sm">
+                Try Mitra on your own business before you pay anything.
+              </p>
+              <p className="mt-4">
+                <span className="text-text-primary text-4xl font-semibold tracking-tight">₹0</span>
+              </p>
+              <p className="text-text-tertiary mt-1 text-xs">No card needed</p>
+              <p className="text-text-primary mt-4 text-sm font-medium">
+                {free.welcomeCredits} credits, once
+              </p>
+              <p className="text-text-secondary mt-1 text-xs">
+                {free.neverExpire
+                  ? 'They do not expire. Whatever you do not use stays with you.'
+                  : 'They expire if unused.'}
+              </p>
+              <FeatureList
+                items={[
+                  [
+                    true,
+                    `${free.maxBusinesses} business ${free.maxBusinesses === 1 ? 'profile' : 'profiles'}`,
+                  ],
+                  [free.brandKit, 'Brand kit'],
+                  [free.reels, 'Reels'],
+                ]}
+              />
+              <div className="mt-auto pt-6">
+                <Button
+                  variant="outline"
+                  fullWidth
+                  disabled={signedIn}
+                  onClick={() => router.push('/signup')}
                 >
-                  {/* Badge header */}
-                  {isPro && (
-                    <div className="from-brand-600 absolute -top-3.5 left-1/2 -translate-x-1/2 rounded-full bg-gradient-to-r to-amber-600 px-3.5 py-1 text-[11px] font-black tracking-wider text-white uppercase shadow-sm">
-                      MOST POPULAR
-                    </div>
-                  )}
+                  {!signedIn ? 'Start free' : activePlanId === 'free' ? 'Current plan' : 'Included'}
+                </Button>
+              </div>
+            </li>
 
-                  {isCurrent && (
-                    <div className="absolute -top-3.5 left-1/2 -translate-x-1/2 rounded-full bg-emerald-600 px-3.5 py-1 text-[11px] font-bold tracking-wider text-white uppercase shadow-sm">
-                      Current Plan
-                    </div>
-                  )}
-
-                  <div>
-                    {/* Header */}
-                    <div className="flex items-center justify-between">
-                      <h3 className="text-text-primary text-xl font-bold">{plan.name}</h3>
-                      {plan.maxBusinesses > 1 && (
-                        <span className="bg-brand-100 text-brand-800 rounded-md px-2 py-0.5 text-[10px] font-bold">
-                          {plan.maxBusinesses} Brands
-                        </span>
-                      )}
-                    </div>
-                    <p className="text-text-tertiary mt-1 min-h-[32px] text-xs font-medium">
-                      {plan.tagline}
+            {mainPlans.map((plan) => {
+              const term = cycle === 'yearly' ? plan.yearly : plan.monthly;
+              const isCurrent = signedIn && !subLoading && activePlanId === plan.planId;
+              const fits = fitPlanId === plan.planId;
+              return (
+                <li
+                  key={plan.planId}
+                  className={`bg-bg-primary relative flex flex-col rounded-2xl border p-6 ${
+                    fits ? 'border-brand-500 ring-brand-500 ring-1' : 'border-border-light'
+                  }`}
+                >
+                  {fits && (
+                    <p className="bg-brand-50 text-brand-800 absolute -top-3 left-5 rounded-full px-3 py-0.5 text-xs font-medium">
+                      Fits your answers
                     </p>
-
-                    {/* Price display - Canonical INR prices */}
-                    <div className="border-border-light mt-5 border-t pt-4">
-                      {plan.id === 'free' ? (
-                        <div className="flex items-baseline gap-1">
-                          <span className="text-text-primary text-3xl font-black">Free</span>
-                          <span className="text-text-tertiary text-xs">forever</span>
-                        </div>
-                      ) : (
-                        <div>
-                          <div className="flex items-baseline gap-1">
-                            <span className="text-text-primary text-3xl font-black">
-                              ₹
-                              {(isYearly ? plan.yearlyPrice : plan.monthlyPrice).toLocaleString(
-                                'en-IN'
-                              )}
-                            </span>
-                            <span className="text-text-tertiary text-xs">{period}</span>
-                          </div>
-                          <p className="text-text-tertiary mt-1 text-[11px]">
-                            One-time payment. Does not renew automatically.
-                          </p>
-                        </div>
-                      )}
-                    </div>
-
-                    {/* Pro positioning highlight */}
-                    {isPro && (
-                      <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50/80 p-2.5 text-center">
-                        <p className="text-xs font-extrabold text-amber-900">
-                          &quot;Run your marketing for an entire year with Mitra.&quot;
-                        </p>
-                      </div>
-                    )}
-
-                    {/* Output allowances pill group */}
-                    <div className="bg-bg-secondary mt-5 space-y-2 rounded-xl p-3 text-xs">
-                      <div className="text-text-primary flex items-center justify-between font-bold">
-                        <span>🎬 AI Reels</span>
-                        <span
-                          className={
-                            plan.monthlyReels > 0 ? 'text-brand-600' : 'text-text-tertiary'
-                          }
-                        >
-                          {plan.monthlyReels}/mo
-                        </span>
-                      </div>
-                      <div className="text-text-primary flex items-center justify-between font-bold">
-                        <span>🎨 Social Creatives</span>
-                        <span className="text-brand-600">{plan.monthlyCreatives}/mo</span>
-                      </div>
-                      <div className="text-text-primary flex items-center justify-between font-bold">
-                        <span>📲 Story Concepts</span>
-                        <span
-                          className={
-                            plan.monthlyStories > 0 ? 'text-brand-600' : 'text-text-tertiary'
-                          }
-                        >
-                          {plan.monthlyStories}/mo
-                        </span>
-                      </div>
-                    </div>
-
-                    {/* Feature check list */}
-                    <ul className="mt-5 space-y-2.5">
-                      {plan.features.map((feature: string) => (
-                        <li
-                          key={feature}
-                          className="text-text-secondary flex items-start gap-2 text-xs"
-                        >
-                          <svg
-                            className="mt-0.5 h-4 w-4 shrink-0 text-emerald-600"
-                            fill="none"
-                            viewBox="0 0 24 24"
-                            stroke="currentColor"
-                          >
-                            <path
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              strokeWidth={2.5}
-                              d="M5 13l4 4L19 7"
-                            />
-                          </svg>
-                          <span>{feature}</span>
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-
-                  {/* CTA button */}
-                  <div className="border-border-light mt-6 border-t pt-4">
+                  )}
+                  {isCurrent && (
+                    <p className="text-success-600 absolute -top-3 right-5 rounded-full bg-white px-3 py-0.5 text-xs font-medium">
+                      Your current plan
+                    </p>
+                  )}
+                  <h3 className="text-text-primary text-xl font-semibold">{plan.name}</h3>
+                  <p className="text-text-secondary mt-1 min-h-[3rem] text-sm">
+                    {WHO_FOR[plan.planId]}
+                  </p>
+                  <p className="mt-4">
+                    <span className="text-text-primary text-4xl font-semibold tracking-tight">
+                      {formatINR(term.priceINR)}
+                    </span>
+                  </p>
+                  <p className="text-text-tertiary mt-1 text-xs">
+                    for {term.termDays} days, paid once. No automatic renewal.
+                  </p>
+                  <p className="text-text-primary mt-4 text-sm font-medium">
+                    {describeAllocation(term)}
+                  </p>
+                  <FeatureList
+                    items={[
+                      [
+                        true,
+                        `${plan.maxBusinesses} business ${plan.maxBusinesses === 1 ? 'profile' : 'profiles'}`,
+                      ],
+                      [plan.brandKit, 'Brand kit'],
+                      [plan.reels, `Reels (${reelCost} credits each)`],
+                    ]}
+                  />
+                  <AnnualNote plan={plan} cycle={cycle} variant={savingVariant} />
+                  <div className="mt-auto pt-6">
                     <Button
+                      variant={hasLiveSubscription || isCurrent ? 'outline' : 'primary'}
                       fullWidth
-                      size="md"
-                      variant={getCtaVariant(plan.id)}
-                      disabled={isCtaDisabled(plan.id)}
-                      onClick={() => handleCtaClick(plan.id)}
-                      className={
-                        isPro
-                          ? 'bg-brand-600 hover:bg-brand-700 font-bold text-white shadow-sm'
-                          : ''
-                      }
+                      disabled={ctaDisabled(plan)}
+                      onClick={() => onChoose(plan.planId)}
                     >
-                      {getCtaLabel(plan.id, plan.name)}
+                      {ctaLabel(plan)}
                     </Button>
-                    {plan.id !== 'free' && (
-                      <p className="text-text-tertiary mt-2 text-center text-[11px]">
-                        You choose whether to buy another term when it ends.
-                      </p>
-                    )}
                   </div>
-                </div>
-              </Reveal>
-            );
-          })}
-        </div>
+                </li>
+              );
+            })}
+          </ul>
 
-        {/* ── Credit packs (one-time) ───────────────────────────────────────── */}
-        <section className="mt-16" aria-labelledby="credit-packs-heading">
-          <div className="text-center">
-            <h2 id="credit-packs-heading" className="text-text-primary text-2xl font-extrabold">
-              Need a little extra? Top up credits.
+          {agency && (
+            <div className="border-border-light bg-bg-secondary mt-5 flex flex-col gap-4 rounded-2xl border p-6 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <h3 className="text-text-primary text-lg font-semibold">
+                  {agency.name}: more than {mainPlans[mainPlans.length - 1]?.maxBusinesses ?? 3}{' '}
+                  businesses
+                </h3>
+                <p className="text-text-secondary mt-1 text-sm">
+                  Up to {agency.maxBusinesses} business profiles, with{' '}
+                  {(cycle === 'yearly'
+                    ? agency.yearly
+                    : agency.monthly
+                  ).creditsPerPeriod.toLocaleString('en-IN')}{' '}
+                  credits per monthly period.{agency.brandKit ? ' Brand kit included.' : ''}
+                  {agency.reels ? ' Reels included.' : ''}
+                </p>
+                <p className="text-text-primary mt-2 text-sm">
+                  <strong>
+                    {formatINR((cycle === 'yearly' ? agency.yearly : agency.monthly).priceINR)}
+                  </strong>{' '}
+                  for {termWord}, paid once.
+                </p>
+                <AnnualNote plan={agency} cycle={cycle} variant={savingVariant} />
+              </div>
+              <Button
+                variant="outline"
+                className="shrink-0 whitespace-nowrap"
+                disabled={ctaDisabled(agency)}
+                onClick={() => onChoose(agency.planId)}
+              >
+                {ctaLabel(agency)}
+              </Button>
+            </div>
+          )}
+        </section>
+
+        {/* ── Credits explained ──────────────────────────────────────────── */}
+        <section aria-labelledby="credits-heading" className="mt-20">
+          <div className="max-w-2xl">
+            <h2 id="credits-heading" className="text-text-primary text-2xl font-semibold">
+              What credits pay for
             </h2>
-            <p className="text-text-secondary mt-2 text-sm">
-              One-time packs that work alongside any plan, including Free. No subscription. Pack
-              credits are valid for the calendar month you buy them in.
+            <p className="text-text-secondary mt-2 text-sm leading-relaxed">
+              Credits are not all worth the same. Each action costs the number of credits below, so
+              what a plan lets you make depends on what you choose to do with it.
             </p>
           </div>
+          <div className="mt-6 grid gap-8 lg:grid-cols-2">
+            <table className="w-full text-left text-sm">
+              <caption className="sr-only">Credits each action costs</caption>
+              <thead>
+                <tr className="border-border-medium border-b">
+                  <th scope="col" className="text-text-tertiary py-2 pr-4 font-medium">
+                    Action
+                  </th>
+                  <th scope="col" className="text-text-tertiary py-2 text-right font-medium">
+                    Credits
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="divide-border-light divide-y">
+                {operations.map((op) => (
+                  <tr key={op.operation}>
+                    <th scope="row" className="text-text-primary py-2.5 pr-4 font-normal">
+                      {op.label}
+                    </th>
+                    <td className="text-text-primary py-2.5 text-right font-medium">
+                      {op.credits}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            <div>
+              <h3 className="text-text-primary text-base font-semibold">
+                Examples of how they add up
+              </h3>
+              <ul className="mt-3 space-y-3">
+                {examples.map((ex) => (
+                  <li key={ex.id} className="border-border-light rounded-xl border p-4 text-sm">
+                    <p className="text-text-primary font-medium">{ex.title}</p>
+                    <p className="text-text-secondary mt-1">
+                      {ex.lines.map((l) => `${l.count} ${l.label} (${l.credits})`).join(' + ')} ={' '}
+                      <strong className="text-text-primary">{ex.totalCredits} credits</strong>
+                    </p>
+                  </li>
+                ))}
+              </ul>
+              <p className="text-text-tertiary mt-3 text-xs leading-relaxed">
+                These are illustrations built from the costs above, not a promise of any number of
+                campaigns.
+              </p>
+            </div>
+          </div>
+        </section>
+
+        {/* ── Expiry and renewal ─────────────────────────────────────────── */}
+        <section aria-labelledby="terms-heading" className="mt-20">
+          <h2 id="terms-heading" className="text-text-primary text-2xl font-semibold">
+            How access and credits end
+          </h2>
+          <dl className="mt-6 grid gap-6 sm:grid-cols-3">
+            <div>
+              <dt className="text-text-primary font-medium">Manual renewal</dt>
+              <dd className="text-text-secondary mt-1 text-sm leading-relaxed">
+                Each purchase is one payment for one term. There is no automatic renewal. When your
+                access ends you return to Free, and you buy again if you want to continue.
+              </dd>
+            </div>
+            <div>
+              <dt className="text-text-primary font-medium">Plan credits expire</dt>
+              <dd className="text-text-secondary mt-1 text-sm leading-relaxed">
+                A 30-day plan&apos;s credits last for its 30 days. A yearly plan adds each
+                month&apos;s credits at the start of that monthly period. Unused plan credits do not
+                roll over.
+              </dd>
+            </div>
+            <div>
+              <dt className="text-text-primary font-medium">Free credits do not expire</dt>
+              <dd className="text-text-secondary mt-1 text-sm leading-relaxed">
+                Your one-time {free.welcomeCredits} free credits stay until you use them. They are
+                spent after your paid plan credits. Top-up packs are valid for the calendar month
+                you buy them in.
+              </dd>
+            </div>
+          </dl>
+          <div className="border-border-light mt-8 rounded-xl border p-5">
+            <h3 className="text-text-primary text-base font-semibold">Not available yet</h3>
+            <ul className="text-text-secondary mt-2 list-inside list-disc space-y-1 text-sm">
+              {NOT_YET.map((item) => (
+                <li key={item}>{item}</li>
+              ))}
+            </ul>
+            <p className="text-text-tertiary mt-3 text-xs">
+              We list these so you do not buy a plan expecting them.
+            </p>
+          </div>
+        </section>
+
+        {/* ── Comparison table ───────────────────────────────────────────── */}
+        <section aria-labelledby="compare-heading" className="mt-20">
+          <h2 id="compare-heading" className="text-text-primary text-2xl font-semibold">
+            Compare plans side by side
+          </h2>
+          <div className="border-border-light mt-6 overflow-x-auto rounded-2xl border">
+            <table className="w-full min-w-[40rem] text-left text-sm">
+              <caption className="sr-only">
+                Comparison of Free, {plans.map((p) => p.name).join(', ')}: price, credits, limits
+                and included features
+              </caption>
+              <thead>
+                <tr className="border-border-medium bg-bg-secondary border-b">
+                  <th scope="col" className="text-text-primary p-4 font-medium">
+                    <span className="sr-only">Feature</span>
+                  </th>
+                  <th scope="col" className="text-text-primary p-4 font-semibold">
+                    Free
+                  </th>
+                  {plans.map((p) => (
+                    <th key={p.planId} scope="col" className="text-text-primary p-4 font-semibold">
+                      {p.name}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody className="divide-border-light divide-y">
+                <CompareRow
+                  label="Price for 30 days"
+                  free="₹0"
+                  cells={plans.map((p) => formatINR(p.monthly.priceINR))}
+                />
+                <CompareRow
+                  label="Price for 365 days"
+                  free="Not sold"
+                  cells={plans.map((p) => formatINR(p.yearly.priceINR))}
+                />
+                <CompareRow
+                  label="Yearly saving vs twelve 30-day purchases"
+                  free="Not applicable"
+                  cells={plans.map(
+                    (p) =>
+                      `${formatINR(p.annual.savingINR)} (${formatPercent(p.annual.savingPercent)})`
+                  )}
+                />
+                <CompareRow
+                  label="Credits"
+                  free={`${free.welcomeCredits}, once`}
+                  cells={plans.map(
+                    (p) => `${p.creditsPerPeriod.toLocaleString('en-IN')} per monthly period`
+                  )}
+                />
+                <CompareRow
+                  label="Credits in a yearly term"
+                  free="Not applicable"
+                  cells={plans.map(
+                    (p) => `${p.yearly.totalCredits.toLocaleString('en-IN')}, released monthly`
+                  )}
+                />
+                <CompareRow
+                  label="Business profiles"
+                  free={String(free.maxBusinesses)}
+                  cells={plans.map((p) => String(p.maxBusinesses))}
+                />
+                <CompareRow
+                  label="Brand kit"
+                  free={free.brandKit ? 'Included' : 'Not included'}
+                  cells={plans.map((p) => (p.brandKit ? 'Included' : 'Not included'))}
+                />
+                <CompareRow
+                  label="Reels"
+                  free={free.reels ? 'Included' : 'Not included'}
+                  cells={plans.map((p) => (p.reels ? 'Included' : 'Not included'))}
+                />
+                <CompareRow
+                  label="When credits expire"
+                  free="Never"
+                  cells={plans.map(() => 'End of each period, no rollover')}
+                />
+                <CompareRow
+                  label="Renewal"
+                  free="Not applicable"
+                  cells={plans.map(() => 'Manual. No automatic renewal')}
+                />
+              </tbody>
+            </table>
+          </div>
+          <p className="text-text-tertiary mt-3 text-xs">
+            Every plan, including Free, includes Truth Check, Business Brain and your own exports.
+            English and Hinglish are supported; Hindi and Telugu are in beta.
+          </p>
+        </section>
+
+        {/* ── Credit packs (one-time) ───────────────────────────────────── */}
+        <section className="mt-20" aria-labelledby="credit-packs-heading">
+          <h2 id="credit-packs-heading" className="text-text-primary text-2xl font-semibold">
+            Need a little extra? Top up credits.
+          </h2>
+          <p className="text-text-secondary mt-2 max-w-2xl text-sm">
+            One-time packs that work alongside any plan, including Free. No subscription. Pack
+            credits are valid for the calendar month you buy them in.
+          </p>
           <div className="mt-6">
-            {authStatus === 'authenticated' ? (
+            {signedIn ? (
               <CreditPackCards
                 pendingKey={pendingKey}
                 onBuy={(credits) => void startCheckout({ kind: 'pack', credits })}
               />
             ) : (
-              <div className="text-center">
-                <Button variant="outline" onClick={() => router.push('/signup')}>
-                  Sign up to buy credits
-                </Button>
-              </div>
+              <Button variant="outline" onClick={() => router.push('/signup')}>
+                Sign up to buy credits
+              </Button>
             )}
           </div>
         </section>
 
-        {/* ── Feature Comparison Table ────────────────────────────────────────── */}
-        <section className="border-border-medium mt-20 border-t pt-12">
-          <div className="text-center">
-            <h2 className="text-text-primary text-2xl font-extrabold sm:text-3xl">
-              Compare All Features &amp; Entitlements Side-by-Side
-            </h2>
-            <p className="text-text-secondary mt-2 text-sm">
-              Everything you need to know about what each plan includes.
-            </p>
-          </div>
-
-          <div className="border-border-light bg-bg-primary mt-8 overflow-x-auto rounded-2xl border shadow-xs">
-            <table className="w-full text-left text-xs sm:text-sm">
-              <thead>
-                <tr className="border-border-medium bg-bg-secondary text-text-primary border-b">
-                  <th className="min-w-[200px] p-4 font-bold">Features</th>
-                  <th className="p-4 text-center font-bold">Free</th>
-                  <th className="p-4 text-center font-bold">Starter</th>
-                  <th className="p-4 text-center font-bold">Business</th>
-                  <th className="text-brand-600 bg-amber-50/50 p-4 text-center font-bold">Pro</th>
-                  <th className="p-4 text-center font-bold">Agency</th>
-                </tr>
-              </thead>
-              <tbody className="divide-border-light divide-y">
-                {COMPARISON_MATRIX.map((cat) => (
-                  <Fragment key={cat.category}>
-                    <tr className="bg-bg-secondary/60">
-                      <td
-                        colSpan={6}
-                        className="text-brand-700 p-3 text-[11px] font-extrabold tracking-wider uppercase"
-                      >
-                        {cat.category}
-                      </td>
-                    </tr>
-                    {cat.features.map((feat) => (
-                      <tr key={feat.name} className="hover:bg-bg-secondary/30 transition-colors">
-                        <td className="text-text-primary p-4 font-medium">
-                          <div>
-                            {feat.name}
-                            {feat.tooltip && (
-                              <p className="text-text-tertiary mt-0.5 text-[11px] font-normal">
-                                {feat.tooltip}
-                              </p>
-                            )}
-                          </div>
-                        </td>
-                        {(
-                          ['free', 'starter', 'business', 'pro', 'agency'] as SubscriptionPlan[]
-                        ).map((planKey) => {
-                          const val = feat.values[planKey];
-                          const isProCol = planKey === 'pro';
-                          return (
-                            <td
-                              key={planKey}
-                              className={`p-4 text-center font-semibold ${
-                                isProCol ? 'text-brand-900 bg-amber-50/20' : 'text-text-secondary'
-                              }`}
-                            >
-                              {typeof val === 'boolean' ? (
-                                val ? (
-                                  <span className="text-base font-bold text-emerald-600">✓</span>
-                                ) : (
-                                  <span className="text-text-tertiary">—</span>
-                                )
-                              ) : (
-                                val
-                              )}
-                            </td>
-                          );
-                        })}
-                      </tr>
-                    ))}
-                  </Fragment>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </section>
-
-        {/* ── FAQ Section ────────────────────────────────────────────────────── */}
-        <section className="border-border-medium mt-20 border-t pt-12">
-          <div className="text-center">
-            <h2 className="text-text-primary text-2xl font-extrabold sm:text-3xl">
-              Frequently Asked Questions
-            </h2>
-            <p className="text-text-secondary mt-2 text-sm">
-              Got questions about billing, outputs, or plan limits? We have answers.
-            </p>
-          </div>
-
-          <div className="mt-10 grid gap-6 sm:grid-cols-2">
+        {/* ── FAQ ────────────────────────────────────────────────────────── */}
+        <section aria-labelledby="faq-heading" className="mx-auto mt-20 max-w-3xl">
+          <h2 id="faq-heading" className="text-text-primary text-2xl font-semibold">
+            Questions people ask before paying
+          </h2>
+          <div className="divide-border-light border-border-light mt-6 divide-y border-y">
             {FAQS.map((faq) => (
-              <div
-                key={faq.q}
-                className="border-border-light bg-bg-primary rounded-2xl border p-6 shadow-2xs"
-              >
-                <h3 className="text-text-primary text-base font-bold">{faq.q}</h3>
-                <p className="text-text-secondary mt-2.5 text-xs leading-relaxed sm:text-sm">
+              <details key={faq.q} className="group py-4">
+                <summary className="text-text-primary focus-visible:ring-brand-500 flex cursor-pointer list-none items-center justify-between gap-4 rounded font-medium focus-visible:ring-2 focus-visible:outline-none">
+                  {faq.q}
+                  <span aria-hidden="true" className="text-text-tertiary group-open:rotate-45">
+                    +
+                  </span>
+                </summary>
+                <p className="text-text-secondary mt-3 text-sm leading-relaxed">
                   {faq.a}
+                  {faq.q === 'What about refunds?' && (
+                    <>
+                      {' '}
+                      <Link href="/refund-policy" className="text-brand-700 underline">
+                        Read the refund policy
+                      </Link>
+                      .
+                    </>
+                  )}
                 </p>
-              </div>
+              </details>
             ))}
           </div>
         </section>
 
-        {/* ── Guarantee & Security section ──────────────────────────────────── */}
-        <div className="border-border-light bg-bg-secondary mt-16 rounded-2xl border p-8 text-center shadow-xs">
-          <h2 className="text-text-primary text-xl font-bold">
-            Trusted &amp; Secure Payment Guarantee
-          </h2>
-          <p className="text-text-secondary mx-auto mt-2 max-w-2xl text-xs sm:text-sm">
-            Payments are processed securely by Cashfree Payments. Plans are prepaid for a fixed term
-            (30 days or 365 days) and do not renew automatically: you are not charged again unless
-            you choose to buy another term.
-          </p>
-          <div className="text-text-tertiary mt-6 flex flex-wrap justify-center gap-6 text-xs font-semibold">
-            <span>✓ Instant Output Entitlement</span>
-            <span>✓ No automatic renewals</span>
-            <span>✓ Encrypted Checkout</span>
-          </div>
-        </div>
+        <p className="text-text-tertiary mx-auto mt-12 max-w-2xl text-center text-xs">
+          Payments are processed securely by Cashfree Payments. Plans are prepaid for a fixed term
+          (30 days or 365 days) and do not renew automatically: you are not charged again unless you
+          choose to buy another term.
+        </p>
       </main>
+
+      <CheckoutConfirmDialog
+        summary={summary}
+        pending={confirmPending}
+        problem={problem}
+        onConfirm={onConfirmPurchase}
+        onCancel={closeConfirm}
+      />
+      <CheckoutPhonePrompt
+        prompt={phonePrompt}
+        busy={pendingKey !== null}
+        onSubmit={(phone) => void submitPhone(phone)}
+        onCancel={cancelPhone}
+      />
 
       <LandingFooter />
     </div>
+  );
+}
+
+function FeatureList({ items }: { items: [boolean, string][] }) {
+  return (
+    <ul className="text-text-secondary mt-4 space-y-1.5 text-sm">
+      {items.map(([included, label]) => (
+        <li key={label} className="flex gap-2">
+          <span aria-hidden="true" className={included ? 'text-success-600' : 'text-text-tertiary'}>
+            {included ? '✓' : '–'}
+          </span>
+          <span>
+            {label}
+            {!included && <span className="sr-only">: not included</span>}
+            {included && <span className="sr-only">: included</span>}
+          </span>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+/**
+ * The annual price against twelve monthly purchases at the actual monthly price, with the 360 vs 365 day note.
+ * Experiment variants change only HOW the saving is framed. Every variant states the same true prices, that the
+ * full yearly amount is paid up front, and the same term; none invents a price or hides the upfront amount.
+ */
+export type SavingVariant = 'control' | 'amount_only' | 'effective_monthly';
+
+function AnnualNote({
+  plan,
+  cycle,
+  variant = 'control',
+}: {
+  plan: PlanView;
+  cycle: Cycle;
+  variant?: SavingVariant;
+}) {
+  const a = plan.annual;
+  const saving =
+    variant === 'amount_only'
+      ? formatINR(a.savingINR)
+      : `${formatINR(a.savingINR)} (${formatPercent(a.savingPercent)})`;
+  const effectiveMonthly = formatINR(Math.round(a.yearlyINR / 12));
+  return (
+    <p className="text-text-secondary mt-4 border-t border-dashed pt-3 text-xs leading-relaxed">
+      {cycle === 'yearly' ? (
+        <>
+          Twelve 30-day purchases at {formatINR(plan.monthly.priceINR)} would cost{' '}
+          {formatINR(a.twelveMonthlyINR)}. The year costs {formatINR(a.yearlyINR)}: you save{' '}
+          {saving}.
+          {variant === 'effective_monthly' && (
+            <> That works out to about {effectiveMonthly} a month, paid once, up front.</>
+          )}{' '}
+          You pay the full {formatINR(a.yearlyINR)} today.
+        </>
+      ) : (
+        <>
+          Paying for a year at once costs {formatINR(a.yearlyINR)} instead of{' '}
+          {formatINR(a.twelveMonthlyINR)} for twelve 30-day purchases: a saving of {saving}.
+          {variant === 'effective_monthly' && (
+            <> That works out to about {effectiveMonthly} a month, paid once, up front.</>
+          )}{' '}
+          Twelve 30-day purchases cover {a.monthlyCoverageDays} days; the year covers {a.yearlyDays}
+          .
+        </>
+      )}
+    </p>
+  );
+}
+
+function CompareRow({ label, free, cells }: { label: string; free: string; cells: string[] }) {
+  return (
+    <tr>
+      <th scope="row" className="text-text-primary p-4 font-medium">
+        {label}
+      </th>
+      <td className="text-text-secondary p-4">{free}</td>
+      {cells.map((value, i) => (
+        <td key={i} className="text-text-secondary p-4">
+          {value}
+        </td>
+      ))}
+    </tr>
   );
 }
