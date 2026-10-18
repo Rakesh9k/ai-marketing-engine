@@ -1,9 +1,7 @@
 /**
- * Phase 9 — catalog parity. The backend (functions/src/config/pricing.ts) is the single
- * source of truth: scripts/setup-paddle-catalog.mjs creates the Paddle prices from it and
- * the webhook grants credits from it. The frontend keeps two hand-maintained display
- * mirrors; these tests fail the moment any of them drifts. No Paddle IDs appear here —
- * IDs are environment configuration, validated by src/lib/paddle/paddle.lib.test.ts.
+ * Catalog parity. The backend (functions/src/config/pricing.ts) is the single source of
+ * truth for the prices used by Cashfree checkout. These tests fail when frontend display
+ * mirrors drift from the server configuration.
  */
 import {
   PRICING,
@@ -17,7 +15,6 @@ import {
   CREDIT_PACKS,
 } from '@/lib/config/pricing';
 import { PLAN_DETAILS } from '@/features/billing/planDetails';
-import { CREDIT_PACK_SIZES } from '@/lib/paddle/catalog';
 import { ESTIMATED_CAMPAIGN_GENERATION_CREDITS } from '@/features/campaign/constants';
 
 const backendPlans = Object.entries(PRICING.subscriptionTiers);
@@ -88,10 +85,6 @@ describe('credit pack and credit-cost parity', () => {
     );
   });
 
-  it('frontend pack sizes equal backend topUpPacks (the three Paddle pack prices)', () => {
-    expect([...CREDIT_PACK_SIZES]).toEqual(PRICING.topUpPacks.map((p) => p.credits));
-  });
-
   it('no pack costs more rupees than the credits it grants (1 credit = ₹1)', () => {
     for (const p of PRICING.topUpPacks) {
       expect(p.priceINR).toBeLessThanOrEqual(p.credits * PRICING.creditValueINR);
@@ -125,13 +118,16 @@ describe('credit pack and credit-cost parity', () => {
     }
   });
 
-  it('the Free plan card states what Free delivers: 1 campaign, 3 stories, 140 credits, no AI video', () => {
+  it('the Free plan card states what Free delivers: one-time 140 credits (no trial, no monthly refill), 3 stories, no AI video', () => {
     const free = PLAN_DETAILS.free;
     expect(free.stories).toBe(3);
     expect(free.reels).toBe(0);
     expect(free.credits).toBe(140);
     const copy = free.features.join(' | ');
-    expect(copy).toMatch(/1 campaign every month: 1 poster, 3 stories and 1 reel concept/);
+    expect(copy).toMatch(/140 free credits to start, once, no card needed/);
+    expect(copy).toMatch(/1 poster, 3 stories and 1 reel concept/);
+    expect(copy).toMatch(/Free credits do not expire/);
+    expect(copy).not.toMatch(/every month|trial|7[- ]day|seven/i);
     expect(copy).toMatch(/AI video reels on paid plans/);
     expect(copy).not.toMatch(/0 AI reels/);
   });
