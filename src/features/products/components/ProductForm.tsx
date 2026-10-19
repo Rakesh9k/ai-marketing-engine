@@ -78,17 +78,21 @@ export function ProductForm({ businessId, initialProduct, onSuccess, onCancel }:
     if (isBestseller) tags.push('Bestseller');
     if (isPopular) tags.push('Popular');
 
-    const images = imageUrl ? [{ url: imageUrl, storagePath: '', isPrimary: true }] : [];
+    const cleanName = name.trim();
+    const cleanCategory = category.trim() || 'Biryani & Rice';
+    const cleanDescription = description.trim() || undefined;
+    const cleanOriginalPrice = originalPrice && originalPrice > 0 ? originalPrice : undefined;
+    const images = imageUrl.trim() ? [{ url: imageUrl.trim(), storagePath: '', isPrimary: true }] : [];
 
     try {
       if (isEditing && initialProduct) {
         const updateData: Partial<Product> & { businessId?: string } = {
           businessId,
-          name,
-          category,
+          name: cleanName,
+          category: cleanCategory,
           price,
-          originalPrice,
-          description,
+          originalPrice: cleanOriginalPrice,
+          description: cleanDescription,
           tags,
           images,
           attributes: {
@@ -102,12 +106,12 @@ export function ProductForm({ businessId, initialProduct, onSuccess, onCancel }:
       } else {
         const productInput = {
           businessId,
-          name,
-          category,
+          name: cleanName,
+          category: cleanCategory,
           price,
-          originalPrice,
+          originalPrice: cleanOriginalPrice,
           currency: 'INR' as const,
-          description,
+          description: cleanDescription,
           tags,
           variants: [],
           images,
@@ -121,9 +125,14 @@ export function ProductForm({ businessId, initialProduct, onSuccess, onCancel }:
         if (onSuccess) onSuccess(saved);
         else router.push('/products');
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error('Failed to save product:', err);
-      setError("We couldn't save this product. Please check the details and try again.");
+      const details = err?.details?.fields ? ` Check fields: ${err.details.fields.join(', ')}` : '';
+      setError(
+        err?.message && err.message !== 'Invalid input'
+          ? err.message
+          : `We couldn't save this product.${details} Please check the details and try again.`
+      );
     } finally {
       setSaving(false);
     }
@@ -284,9 +293,17 @@ export function ProductForm({ businessId, initialProduct, onSuccess, onCancel }:
         />
 
         {imageUrl ? (
-          <div className="relative aspect-[4/3] max-w-sm overflow-hidden rounded-xl border border-neutral-200">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={imageUrl} alt="Preview" className="h-full w-full object-cover" />
+          <div className="space-y-3">
+            <div className="relative aspect-[4/3] max-w-sm overflow-hidden rounded-xl border border-neutral-200">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={imageUrl} alt="Preview" className="h-full w-full object-cover" />
+            </div>
+            <div className="flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50/70 p-3 text-xs text-amber-800">
+              <span className="font-bold">⚠️ Experimental:</span>
+              <span>
+                Automatic AI product extraction & studio relighting is currently in preview. For best results in posters and reels, ensure the photo has clear contrast between the product and background.
+              </span>
+            </div>
           </div>
         ) : (
           <div className="rounded-xl border border-dashed border-neutral-300 bg-neutral-50/50 p-8 text-center">

@@ -12,21 +12,17 @@ const updateProductSchema = z.object({
   productId: z.string().min(1),
   businessId: z.string().min(1),
   name: z.string().min(1).max(100).optional(),
-  description: z.string().max(500).optional(),
-  price: z.number().positive().optional(),
-  originalPrice: z.number().positive().optional(),
+  description: z.string().max(1000).optional(),
+  price: z.coerce.number().positive().optional(),
+  originalPrice: z.coerce.number().positive().optional(),
   currency: z.literal('INR').optional(),
-  category: z
-    .enum(['starter', 'main', 'dessert', 'beverage', 'combo', 'service', 'package'])
-    .optional(),
-  tags: z
-    .array(z.enum(['signature', 'bestseller', 'new', 'seasonal', 'vegetarian', 'spicy']))
-    .optional(),
+  category: z.string().min(1).max(100).optional(),
+  tags: z.array(z.string().max(50)).optional(),
   variants: z
     .array(
       z.object({
         name: z.string().min(1),
-        price: z.number().positive(),
+        price: z.coerce.number().positive(),
         attributes: z.record(z.unknown()).optional(),
       })
     )
@@ -34,9 +30,9 @@ const updateProductSchema = z.object({
   images: z
     .array(
       z.object({
-        url: z.string().url(),
-        storagePath: z.string(),
-        isPrimary: z.boolean(),
+        url: z.string(),
+        storagePath: z.string().default(''),
+        isPrimary: z.boolean().default(false),
       })
     )
     .optional(),
@@ -49,6 +45,7 @@ const updateProductSchema = z.object({
       deliveryOnly: z.boolean().optional(),
       dineInOnly: z.boolean().optional(),
     })
+    .passthrough()
     .optional(),
   status: z.enum(['active', 'archived']).optional(),
   sortOrder: z.number().optional(),
@@ -64,7 +61,7 @@ export const updateProduct = onCall(
     });
 
     try {
-      const { productId, businessId, ...updateData } = data;
+      const { productId, businessId, images, ...updateData } = data;
       await verifyBusinessAccess(context.userId, businessId);
 
       const existingProduct = await getProductDoc(productId);
@@ -79,6 +76,15 @@ export const updateProduct = onCall(
       const updatedProduct: Product = {
         ...existingProduct,
         ...updateData,
+        ...(images
+          ? {
+              images: images.map((img) => ({
+                url: img.url,
+                storagePath: img.storagePath || '',
+                isPrimary: Boolean(img.isPrimary),
+              })),
+            }
+          : {}),
         updatedAt: new Date().toISOString(),
       };
 

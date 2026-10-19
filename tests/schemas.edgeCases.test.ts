@@ -339,15 +339,13 @@ describe('arrays', () => {
     expect(ok(createCampaignInputSchema, np(6))).toBe(false);
   });
 
-  it('product requires at least one image', () => {
-    expect(failedPaths(createProductInputSchema, { ...product(), images: [] })).toContain('images');
+  it('product allows empty images array', () => {
+    expect(ok(createProductInputSchema, { ...product(), images: [] })).toBe(true);
   });
 
-  it('product tags accept only known values; unknown tag fails with the index in the path', () => {
+  it('product tags accept custom tag strings', () => {
     expect(ok(createProductInputSchema, { ...product(), tags: ['signature', 'spicy'] })).toBe(true);
-    expect(
-      failedPaths(createProductInputSchema, { ...product(), tags: ['signature', 'halal'] })
-    ).toContain('tags.1');
+    expect(ok(createProductInputSchema, { ...product(), tags: ['signature', 'halal'] })).toBe(true);
   });
 
   it('product variants require name and positive price', () => {

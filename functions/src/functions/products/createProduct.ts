@@ -12,19 +12,17 @@ import type { Product } from '../../types';
 const createProductSchema = z.object({
   businessId: z.string().min(1),
   name: z.string().min(1).max(100),
-  description: z.string().max(500).optional(),
-  price: z.number().positive(),
-  originalPrice: z.number().positive().optional(),
+  description: z.string().max(1000).optional(),
+  price: z.coerce.number().positive(),
+  originalPrice: z.coerce.number().positive().optional(),
   currency: z.literal('INR').default('INR'),
-  category: z.enum(['starter', 'main', 'dessert', 'beverage', 'combo', 'service', 'package']),
-  tags: z
-    .array(z.enum(['signature', 'bestseller', 'new', 'seasonal', 'vegetarian', 'spicy']))
-    .default([]),
+  category: z.string().min(1).max(100).default('Main Course'),
+  tags: z.array(z.string().max(50)).default([]),
   variants: z
     .array(
       z.object({
         name: z.string().min(1),
-        price: z.number().positive(),
+        price: z.coerce.number().positive(),
         attributes: z.record(z.unknown()).optional(),
       })
     )
@@ -32,12 +30,12 @@ const createProductSchema = z.object({
   images: z
     .array(
       z.object({
-        url: z.string().url(),
-        storagePath: z.string(),
-        isPrimary: z.boolean(),
+        url: z.string(),
+        storagePath: z.string().default(''),
+        isPrimary: z.boolean().default(false),
       })
     )
-    .min(1),
+    .default([]),
   attributes: z
     .object({
       veg: z.boolean().optional(),
@@ -47,7 +45,9 @@ const createProductSchema = z.object({
       deliveryOnly: z.boolean().optional(),
       dineInOnly: z.boolean().optional(),
     })
-    .optional(),
+    .passthrough()
+    .optional()
+    .default({}),
   status: z.enum(['active', 'archived']).default('active'),
   sortOrder: z.number().optional(),
 });
@@ -77,10 +77,14 @@ export const createProduct = onCall(
         price: data.price,
         originalPrice: data.originalPrice,
         currency: data.currency || 'INR',
-        category: data.category,
+        category: data.category || 'Main Course',
         tags: data.tags || [],
         variants: data.variants || [],
-        images: data.images,
+        images: (data.images || []).map((img) => ({
+          url: img.url,
+          storagePath: img.storagePath || '',
+          isPrimary: Boolean(img.isPrimary),
+        })),
         attributes: data.attributes || {},
         status: data.status || 'active',
         sortOrder: data.sortOrder ?? maxSortOrder + 1,

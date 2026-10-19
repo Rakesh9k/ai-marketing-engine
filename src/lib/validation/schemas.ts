@@ -203,14 +203,12 @@ export const productSchema = z.object({
   productId: z.string().min(1),
   businessId: z.string().min(1),
   name: z.string().min(1).max(100),
-  description: z.string().max(500).optional(),
+  description: z.string().max(1000).optional(),
   price: z.number().positive(),
   originalPrice: z.number().positive().optional(),
   currency: z.literal('INR').default('INR'),
-  category: z.enum(['starter', 'main', 'dessert', 'beverage', 'combo', 'service', 'package']),
-  tags: z
-    .array(z.enum(['signature', 'bestseller', 'new', 'seasonal', 'vegetarian', 'spicy']))
-    .default([]),
+  category: z.string().min(1).max(100),
+  tags: z.array(z.string().max(50)).default([]),
   variants: z
     .array(
       z.object({
@@ -223,12 +221,12 @@ export const productSchema = z.object({
   images: z
     .array(
       z.object({
-        url: z.string().url(),
-        storagePath: z.string(),
-        isPrimary: z.boolean(),
+        url: z.string(),
+        storagePath: z.string().default(''),
+        isPrimary: z.boolean().default(false),
       })
     )
-    .min(1),
+    .default([]),
   attributes: z
     .object({
       veg: z.boolean().optional(),
@@ -238,12 +236,13 @@ export const productSchema = z.object({
       deliveryOnly: z.boolean().optional(),
       dineInOnly: z.boolean().optional(),
     })
+    .passthrough()
     .optional()
     .default({}),
   status: z.enum(['active', 'archived']).default('active'),
   sortOrder: z.number().optional(),
-  createdAt: z.string().datetime(),
-  updatedAt: z.string().datetime(),
+  createdAt: z.string(),
+  updatedAt: z.string(),
 }) as z.ZodType<Product>;
 
 export const campaignSchema: z.ZodType<Campaign> = z.object({
@@ -586,17 +585,15 @@ export const createBrandKitInputSchema = z.object({
 });
 
 export const createProductInputSchema = z.object({
-  productId: z.string().min(1),
+  productId: z.string().min(1).optional(),
   businessId: z.string().min(1),
   name: z.string().min(1).max(100),
-  description: z.string().max(500).optional(),
+  description: z.string().max(1000).optional(),
   price: z.number().positive(),
   originalPrice: z.number().positive().optional(),
   currency: z.literal('INR').default('INR'),
-  category: z.enum(['starter', 'main', 'dessert', 'beverage', 'combo', 'service', 'package']),
-  tags: z
-    .array(z.enum(['signature', 'bestseller', 'new', 'seasonal', 'vegetarian', 'spicy']))
-    .default([]),
+  category: z.string().min(1).max(100).default('Main Course'),
+  tags: z.array(z.string().max(50)).default([]),
   variants: z
     .array(
       z.object({
@@ -610,11 +607,11 @@ export const createProductInputSchema = z.object({
     .array(
       z.object({
         url: z.string().url(),
-        storagePath: z.string(),
-        isPrimary: z.boolean(),
+        storagePath: z.string().default(''),
+        isPrimary: z.boolean().default(false),
       })
     )
-    .min(1),
+    .default([]),
   attributes: z
     .object({
       veg: z.boolean().optional(),
@@ -624,6 +621,7 @@ export const createProductInputSchema = z.object({
       deliveryOnly: z.boolean().optional(),
       dineInOnly: z.boolean().optional(),
     })
+    .passthrough()
     .optional()
     .default({}),
   status: z.enum(['active', 'archived']).default('active'),

@@ -65,16 +65,21 @@ export function ProductsSection({
     setError(null);
 
     try {
+      const cleanName = name.trim();
+      const cleanCategory = category.trim() || 'Main Course';
+      const cleanDescription = description.trim() || undefined;
+      const cleanOriginalPrice = originalPrice && originalPrice > 0 ? originalPrice : undefined;
+
       if (editingId === 'new') {
         const newProduct = {
           productId: `prod_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
           businessId,
-          name,
-          description,
+          name: cleanName,
+          description: cleanDescription,
           price,
-          originalPrice,
+          originalPrice: cleanOriginalPrice,
           currency: 'INR' as const,
-          category,
+          category: cleanCategory,
           tags: [],
           variants: [],
           images: [],
@@ -89,11 +94,11 @@ export function ProductsSection({
       } else if (editingId) {
         const updateData: Partial<Product> & { businessId?: string } = {
           businessId,
-          name,
-          description,
+          name: cleanName,
+          description: cleanDescription,
           price,
-          originalPrice,
-          category,
+          originalPrice: cleanOriginalPrice,
+          category: cleanCategory,
         };
         const saved = await productService.update(editingId, updateData);
         const updated = productsList.map((p) => (p.productId === editingId ? saved : p));
@@ -101,8 +106,9 @@ export function ProductsSection({
         onSaved(updated);
       }
       setEditingId(null);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to save product.');
+    } catch (err: any) {
+      const details = err?.details?.fields ? ` (Check fields: ${err.details.fields.join(', ')})` : '';
+      setError((err instanceof Error ? err.message : 'Failed to save product.') + details);
     } finally {
       setSaving(false);
     }
