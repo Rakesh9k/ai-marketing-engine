@@ -95,14 +95,14 @@ export function HeroSection({ onGetStarted }: { onGetStarted: () => void }) {
     <section
       ref={heroRef}
       onMouseMove={handleMouseMove}
-      className="relative overflow-hidden pt-20 pb-12 select-none sm:pt-24 sm:pb-16 lg:pt-28 lg:pb-20"
+      className="relative overflow-hidden pt-20 pb-8 select-none sm:pt-24 sm:pb-12 lg:pt-24 lg:pb-16"
     >
-      {/* Background Marquee Ticker */}
-      <div className="pointer-events-auto absolute top-16 right-0 left-0 opacity-80">
+      {/* Background Marquee Ticker - Positioned clearly below fixed header */}
+      <div className="pointer-events-auto relative mt-2 mb-4 w-full opacity-90 sm:mt-3 sm:mb-6">
         <MarqueeTicker />
       </div>
 
-      <div className="mx-auto max-w-7xl px-4 pt-12 sm:px-6 lg:px-8">
+      <div className="mx-auto max-w-7xl px-4 pt-2 sm:px-6 lg:px-8">
         {/* ==========================================
             HERO HEADER CONTENT (KINETIC & BOLD)
             ========================================== */}
@@ -112,34 +112,33 @@ export function HeroSection({ onGetStarted }: { onGetStarted: () => void }) {
             initial={reduceMotion ? { opacity: 1 } : { opacity: 0, y: -10 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.5 }}
-            className="border-border-light bg-surface/90 inline-flex items-center gap-2 rounded-full border px-4 py-1.5 shadow-xs backdrop-blur-md"
+            className="border-border-light bg-surface/90 inline-flex items-center gap-2 rounded-full border px-3.5 py-1 shadow-xs backdrop-blur-md"
           >
             <span className="text-brand-600 text-xs font-bold">
               One photo. A month of marketing.
             </span>
           </motion.div>
 
-          {/* Main Headline per Positioning */}
+          {/* Main Headline strictly in 2 lines */}
           <motion.h1
             initial={reduceMotion ? { opacity: 1 } : { opacity: 0, y: -10 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.5, delay: 0.1 }}
-            className="text-text-primary text-3xl leading-tight font-black tracking-tight sm:text-5xl md:text-6xl"
+            className="text-text-primary mt-2 text-2xl leading-tight font-black tracking-tight sm:text-4xl md:text-5xl lg:text-[52px]"
           >
-            Your next marketing campaign <br className="hidden sm:inline" />
-            <span className="text-brand-500">starts with one photo.</span>
+            <span className="block whitespace-normal sm:whitespace-nowrap">Your next marketing campaign</span>
+            <span className="text-brand-500 block whitespace-normal sm:whitespace-nowrap">starts with one photo.</span>
           </motion.h1>
 
-          {/* Supporting Message */}
+          {/* Supporting Message - Concise and crisp */}
           <motion.p
             initial={reduceMotion ? { opacity: 1 } : { opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.5, delay: 0.2 }}
-            className="text-text-secondary mx-auto mt-4 max-w-2xl text-base leading-relaxed font-normal sm:text-lg"
+            className="text-text-secondary mx-auto mt-3 max-w-2xl text-sm leading-snug font-normal sm:text-base sm:leading-relaxed"
           >
-            Give Mitra a photo, an offer, or simply tell it what&apos;s happening in your business.
-            Mitra turns it into posts, reels and campaign ideas ready to use.
-            <span className="mt-2 block font-semibold">
+            Give Mitra a photo or an offer — it instantly turns into ready-to-use posts, reels, and captions.
+            <span className="mt-1 block font-semibold text-text-primary">
               Tell Mitra about your business once. It remembers what matters.
             </span>
           </motion.p>
@@ -149,13 +148,13 @@ export function HeroSection({ onGetStarted }: { onGetStarted: () => void }) {
             initial={reduceMotion ? { opacity: 1 } : { opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.5, delay: 0.3 }}
-            className="mt-8 flex flex-col items-center justify-center gap-3 sm:flex-row"
+            className="mt-5 flex flex-col items-center justify-center gap-3 sm:flex-row"
           >
             <Magnetic strength={0.3} className="w-full sm:w-auto">
               <Button
                 size="lg"
                 onClick={onGetStarted}
-                className="shadow-brand-500/30 bg-brand-500 hover:bg-brand-600 hover:shadow-brand-500/40 w-full cursor-pointer rounded-full px-8 py-4 text-base font-bold text-white shadow-lg transition-all sm:w-auto"
+                className="shadow-brand-500/30 bg-brand-500 hover:bg-brand-600 hover:shadow-brand-500/40 w-full cursor-pointer rounded-full px-8 py-3.5 text-base font-bold text-white shadow-lg transition-all sm:w-auto"
               >
                 Try Mitra
               </Button>
@@ -165,19 +164,19 @@ export function HeroSection({ onGetStarted }: { onGetStarted: () => void }) {
               <Button
                 size="lg"
                 variant="outline"
-                className="border-border-medium text-text-primary hover:bg-surface-hover hover:border-brand-500 w-full cursor-pointer rounded-full px-7 py-4 text-sm font-bold transition-all sm:w-auto"
+                className="border-border-medium text-text-primary hover:bg-surface-hover hover:border-brand-500 w-full cursor-pointer rounded-full px-7 py-3.5 text-sm font-bold transition-all sm:w-auto"
               >
                 See how it works
               </Button>
             </a>
           </motion.div>
 
-          <p className="text-text-tertiary mt-3 text-xs font-medium">
+          <p className="text-text-tertiary mt-2 text-xs font-medium">
             ✨ No technical experience required • Takes less than 2 minutes
           </p>
 
           {/* Business Type Quick Switcher Chips */}
-          <div className="mt-4 flex flex-wrap items-center justify-center gap-1.5">
+          <div className="mt-2.5 flex flex-wrap items-center justify-center gap-1.5">
             <span className="text-text-tertiary text-[11px] font-semibold">
               Try sample context:
             </span>
@@ -200,7 +199,7 @@ export function HeroSection({ onGetStarted }: { onGetStarted: () => void }) {
         {/* ==========================================
             HERO VISUAL STAGE (MASCOT & FLOATING CARDS)
             ========================================== */}
-        <div className="relative mx-auto mt-6 min-h-[380px] w-full max-w-5xl sm:min-h-[440px] lg:min-h-[480px]">
+        <div className="relative mx-auto mt-4 min-h-[360px] w-full max-w-5xl sm:min-h-[420px] lg:min-h-[450px]">
           {/* Animated Connecting SVG Lines */}
           <div className="hidden sm:block">
             <ConnectingLines />
