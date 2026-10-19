@@ -42,11 +42,13 @@ describe('Creative Studio Modules', () => {
     getCurrentPeriodMock.mockResolvedValue(null);
   });
 
-  it('renders CreativeStudioDashboard with hero title and quick create options', async () => {
+  it('renders CreativeStudioDashboard with hero title, quick create options, and dynamic 140 credits display', async () => {
+    getCurrentPeriodMock.mockResolvedValue({ creditsIncluded: 140, creditsUsed: 0 });
     render(<CreativeStudioDashboard userId="user_1" />);
     expect(await screen.findByText(/Turn Your Ideas into/i)).toBeInTheDocument();
     expect(screen.getByText(/Image Generator/i)).toBeInTheDocument();
     expect(screen.getByText(/Poster Generator/i)).toBeInTheDocument();
+    expect(screen.getByText(/140 \/ 140 Credits/i)).toBeInTheDocument();
   });
 
   it('renders ImageGeneratorStudio with prompt input and format selector', async () => {

@@ -495,7 +495,7 @@ describe('BillingPage — Cashfree pricing & checkout', () => {
       );
     });
 
-    it('usage read failure is also "unknown", not 0 / 100 credits', async () => {
+    it('usage read failure is also "unknown", not 0 / 140 credits', async () => {
       getByUserIdMock.mockResolvedValue({ planId: 'starter', status: 'active' });
       database().usageService.getCurrentPeriod.mockRejectedValueOnce(new Error('unavailable'));
       render(<BillingPage />);

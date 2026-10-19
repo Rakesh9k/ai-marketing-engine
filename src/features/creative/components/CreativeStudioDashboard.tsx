@@ -16,6 +16,7 @@ import type { Business, CampaignAsset } from '@/types';
 import { CREATIVE_FORMATS, POPULAR_TEMPLATES } from '../constants';
 import { PageSkeleton } from '@/components/motion/PageSkeleton';
 import type { CreativeFormat } from '../types';
+import { computeCreditsRemaining } from '@/lib/credits';
 
 interface CreativeStudioDashboardProps {
   userId: string;
@@ -29,7 +30,8 @@ export function CreativeStudioDashboard({ userId }: CreativeStudioDashboardProps
   const [businessId, setBusinessId] = useState<string | null>(null);
   const [assets, setAssets] = useState<CampaignAsset[]>([]);
   const [loading, setLoading] = useState(true);
-  const [creditsRemaining, setCreditsRemaining] = useState<number | null>(320);
+  const [creditsRemaining, setCreditsRemaining] = useState<number | null>(null);
+  const [totalCredits, setTotalCredits] = useState<number | null>(null);
 
   const [activeFormat, setActiveFormat] = useState<CreativeFormat | 'all'>('all');
   const [magicPrompt, setMagicPrompt] = useState('');
@@ -58,9 +60,10 @@ export function CreativeStudioDashboard({ userId }: CreativeStudioDashboardProps
           ]);
           if (!cancelled) {
             setAssets(assetList);
-            const included = subscription?.creditsIncluded ?? 500;
-            const used = usage?.creditsUsed ?? 180;
-            setCreditsRemaining(included - used);
+            const remaining = computeCreditsRemaining(subscription, usage);
+            const included = usage?.creditsIncluded ?? subscription?.creditsIncluded ?? 140;
+            setCreditsRemaining(remaining);
+            setTotalCredits(included);
           }
         }
       } catch (err) {
@@ -135,7 +138,11 @@ export function CreativeStudioDashboard({ userId }: CreativeStudioDashboardProps
           <div className="flex items-center gap-1.5 rounded-full border border-amber-500/30 bg-amber-500/10 px-3 py-1.5 text-xs font-semibold text-amber-600 dark:text-amber-300">
             <span>⚡</span>
             <span>
-              {creditsRemaining !== null ? `${creditsRemaining} / 500 Credits` : '320 Credits'}
+              {creditsRemaining !== null
+                ? totalCredits !== null
+                  ? `${creditsRemaining} / ${totalCredits} Credits`
+                  : `${creditsRemaining} Credits`
+                : '— Credits'}
             </span>
           </div>
         </div>

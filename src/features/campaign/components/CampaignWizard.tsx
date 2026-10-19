@@ -1542,10 +1542,17 @@ export function CampaignWizard({ userId }: CampaignWizardProps) {
                     <div className="border-brand-200/60 bg-brand-50 rounded-xl border p-3 dark:bg-amber-950/20">
                       <p className="text-text-primary font-semibold">Credits Summary</p>
                       <p className="text-text-secondary">
-                        Current: {creditsRemaining ?? '—'} credits | Cost:{' '}
+                        Current Balance: {creditsRemaining ?? '—'} credits | Campaign Generation Cost:{' '}
                         {ESTIMATED_CAMPAIGN_GENERATION_CREDITS} credits
                       </p>
-                      <p className="text-text-tertiary mt-1">
+                      {creditsRemaining !== null &&
+                        creditsRemaining >= ESTIMATED_CAMPAIGN_GENERATION_CREDITS && (
+                          <p className="text-success-600 dark:text-emerald-400 mt-1 text-xs font-medium">
+                            ✓ You will have {creditsRemaining - ESTIMATED_CAMPAIGN_GENERATION_CREDITS} credits
+                            remaining after generation for revisions and edits.
+                          </p>
+                        )}
+                      <p className="text-text-tertiary mt-1 text-xs">
                         Reviewing is free. Credits are used only when you press Generate.
                       </p>
                     </div>
@@ -1560,7 +1567,7 @@ export function CampaignWizard({ userId }: CampaignWizardProps) {
                                     🎁 140 Free Starter Credits Available
                                   </p>
                                   <p className="text-slate-300 mt-1">
-                                    Every new verified Mitra account receives 140 free welcome credits to create their first full campaign.
+                                    Every new verified Mitra account receives 140 free welcome credits to create their first full campaign (100 credits) with 40 credits left for revisions.
                                   </p>
                                 </div>
                                 <Button

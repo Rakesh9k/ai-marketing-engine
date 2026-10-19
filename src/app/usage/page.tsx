@@ -59,7 +59,13 @@ function StatCard({
   );
 }
 
-function PlanDetails({ subscription }: { subscription: Subscription | null }) {
+function PlanDetails({
+  subscription,
+  usage,
+}: {
+  subscription: Subscription | null;
+  usage: Usage | null;
+}) {
   // Campaigns per month mirrors PLAN_ENTITLEMENTS.campaignsPerMonth in
   // functions/src/services/entitlements.ts (the server-enforced quota; pinned by
   // entitlements.pricingParity.test.ts in functions). Names, prices and credits come from
@@ -74,7 +80,11 @@ function PlanDetails({ subscription }: { subscription: Subscription | null }) {
 
   const currentPlan: SubscriptionPlan = subscription?.planId || 'free';
   const planDetails = PLAN_DETAILS[currentPlan] ?? PLAN_DETAILS.free;
-  const limits = { campaigns: planCampaigns[currentPlan] ?? 1, credits: planDetails.credits };
+  const creditsIncluded =
+    usage?.creditsIncluded ?? subscription?.creditsIncluded ?? planDetails.credits;
+  const limits = { campaigns: planCampaigns[currentPlan] ?? 1, credits: creditsIncluded };
+  const creditsUsed = usage?.creditsUsed || 0;
+  const campaignsCreated = usage?.campaignsCreated || 0;
 
   return (
     <div className="rounded-lg border border-neutral-200 bg-white p-6">
@@ -98,8 +108,8 @@ function PlanDetails({ subscription }: { subscription: Subscription | null }) {
         <div>
           <h4 className="mb-2 font-medium text-neutral-900">Monthly Limits</h4>
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            <ProgressBar value={0} max={limits.campaigns} label="Campaigns" />
-            <ProgressBar value={0} max={limits.credits} label="Credits" />
+            <ProgressBar value={campaignsCreated} max={limits.campaigns} label="Campaigns" />
+            <ProgressBar value={creditsUsed} max={limits.credits} label="Credits" />
           </div>
         </div>
 
@@ -107,8 +117,8 @@ function PlanDetails({ subscription }: { subscription: Subscription | null }) {
           <h4 className="mb-2 font-medium text-neutral-900">Plan Details</h4>
           <dl className="space-y-2 text-sm">
             <div className="flex justify-between">
-              <dt className="text-neutral-500">Monthly Credits</dt>
-              <dd className="font-medium text-neutral-900">{limits.credits}</dd>
+              <dt className="text-neutral-500">Plan Credit Allowance</dt>
+              <dd className="font-medium text-neutral-900">{limits.credits} Credits</dd>
             </div>
             <div className="flex justify-between">
               <dt className="text-neutral-500">Campaigns per Month</dt>
@@ -119,8 +129,8 @@ function PlanDetails({ subscription }: { subscription: Subscription | null }) {
               <dd className="font-medium text-neutral-900">1 Credit = ₹1</dd>
             </div>
             <div className="flex justify-between">
-              <dt className="text-neutral-500">Base Campaign Cost</dt>
-              <dd className="font-medium text-neutral-900">100 Credits</dd>
+              <dt className="text-neutral-500">Campaign Generation Cost</dt>
+              <dd className="font-medium text-neutral-900">100 Credits (60 base + 40 images)</dd>
             </div>
             <div className="flex justify-between">
               <dt className="text-neutral-500">Asset Regeneration</dt>
@@ -131,6 +141,12 @@ function PlanDetails({ subscription }: { subscription: Subscription | null }) {
               <dd className="font-medium text-neutral-900">20 Credits per image</dd>
             </div>
           </dl>
+          {currentPlan === 'free' && (
+            <p className="mt-3 text-xs text-neutral-500">
+              Your 140 free starter credits cover your first full campaign (100 credits) with 40
+              credits left for revisions.
+            </p>
+          )}
         </div>
       </div>
     </div>
@@ -257,9 +273,10 @@ export default function UsagePage() {
 
   const currentUsage = usage;
   const currentSubscription = subscription;
-  const creditsIncluded = currentSubscription?.creditsIncluded || PLAN_DETAILS.free.credits;
+  const creditsIncluded =
+    currentUsage?.creditsIncluded ?? currentSubscription?.creditsIncluded ?? PLAN_DETAILS.free.credits;
   const creditsUsed = currentUsage?.creditsUsed || 0;
-  const creditsRemaining = creditsIncluded - creditsUsed;
+  const creditsRemaining = Math.max(0, creditsIncluded - creditsUsed);
   const __campaignsCreated = currentUsage?.campaignsCreated || 0;
   void __campaignsCreated;
 
@@ -366,7 +383,7 @@ export default function UsagePage() {
 
       <div className="mb-8 grid grid-cols-1 gap-6 lg:grid-cols-3">
         <div className="lg:col-span-2">
-          <PlanDetails subscription={subscription} />
+          <PlanDetails subscription={subscription} usage={usage} />
         </div>
         <div>
           <div className="rounded-lg border border-neutral-200 bg-white p-6">
