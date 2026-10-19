@@ -9,6 +9,7 @@ process.env['NEXT_PUBLIC_USE_EMULATORS'] = 'true';
 process.env['NEXT_PUBLIC_FIREBASE_PROJECT_ID'] = 'demo-project';
 
 const getFirestoreMock = jest.fn();
+const initializeFirestoreMock = jest.fn();
 const connectFirestoreEmulatorMock = jest.fn();
 
 jest.mock('firebase/app', () => ({
@@ -20,6 +21,7 @@ jest.mock('firebase/auth', () => ({
   connectAuthEmulator: jest.fn(),
 }));
 jest.mock('firebase/firestore', () => ({
+  initializeFirestore: (...args: unknown[]) => initializeFirestoreMock(...args),
   getFirestore: (...args: unknown[]) => getFirestoreMock(...args),
   connectFirestoreEmulator: (...args: unknown[]) => connectFirestoreEmulatorMock(...args),
 }));
@@ -40,6 +42,7 @@ describe('getFirebaseDb (lazy Firestore)', () => {
   beforeEach(() => {
     jest.resetModules();
     jest.clearAllMocks();
+    initializeFirestoreMock.mockImplementation((app) => getFirestoreMock(app));
     jest.spyOn(console, 'error').mockImplementation(() => undefined);
     jest.spyOn(console, 'warn').mockImplementation(() => undefined);
   });

@@ -1,6 +1,6 @@
 import { initializeApp, getApps, type FirebaseApp } from 'firebase/app';
 import { getAuth, type Auth } from 'firebase/auth';
-import { getFirestore, type Firestore } from 'firebase/firestore';
+import { getFirestore, initializeFirestore, type Firestore } from 'firebase/firestore';
 import { getStorage, type FirebaseStorage } from 'firebase/storage';
 import { getFunctions, type Functions, connectFunctionsEmulator } from 'firebase/functions';
 import { connectAuthEmulator } from 'firebase/auth';
@@ -233,7 +233,20 @@ export function getFirebaseDb(): Firestore | undefined {
   if (typeof window === 'undefined' || !firebaseApp) return undefined;
 
   try {
-    const instance = getFirestore(firebaseApp);
+    let instance: Firestore;
+    try {
+      instance = initializeFirestore(firebaseApp, {
+        experimentalAutoDetectLongPolling: true,
+      });
+    } catch (initErr: unknown) {
+      // Only fall back to getFirestore if initializeFirestore failed because it was ALREADY initialized
+      const msg = initErr instanceof Error ? initErr.message : String(initErr);
+      if (msg.includes('already been called') || msg.includes('already exists')) {
+        instance = getFirestore(firebaseApp);
+      } else {
+        throw initErr;
+      }
+    }
     if (process.env['NEXT_PUBLIC_USE_EMULATORS'] === 'true') {
       try {
         connectFirestoreEmulator(instance, 'localhost', 8080);
