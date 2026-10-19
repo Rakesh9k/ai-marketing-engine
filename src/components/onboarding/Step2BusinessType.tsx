@@ -49,9 +49,9 @@ const CATEGORIES = [
     title: 'Other',
     subtitle: 'Custom Business',
     icon: '✨',
-    bg: 'from-slate-50 to-neutral-100',
-    border: 'border-neutral-200',
-    activeRing: 'ring-neutral-500/30 border-[#E84D1A]',
+    bg: 'from-[#FFFDF9] to-[#FBF6EF]',
+    border: 'border-amber-200/60',
+    activeRing: 'ring-amber-500/30 border-[#E84D1A]',
     desc: 'Retail, Services, Agencies & More',
   },
 ] as const;

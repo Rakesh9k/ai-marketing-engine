@@ -181,17 +181,17 @@ export function ReelGeneratorStudio({ userId: _userId }: ReelGeneratorStudioProp
             <div className="flex gap-2 pt-2">
               <Button
                 size="sm"
-                className="flex-1 bg-purple-600 text-xs font-bold text-white hover:bg-purple-700"
+                className="flex-1 bg-brand-600 text-xs font-bold text-white hover:bg-brand-700"
               >
                 Regenerate Scene {activeScene?.sceneNumber}
               </Button>
             </div>
           </div>
 
-          <div className="flex items-center gap-4 rounded-3xl border border-slate-200 bg-gradient-to-r from-purple-500/10 to-amber-500/10 p-4 dark:border-slate-800">
+          <div className="flex items-center gap-4 rounded-3xl border border-amber-200/60 bg-gradient-to-r from-amber-50/60 via-orange-50/40 to-amber-50/60 p-4 dark:border-slate-800">
             <Mascot state="directing" size="sm" animated />
             <div className="text-xs">
-              <span className="block font-bold tracking-wider text-purple-600 uppercase dark:text-purple-400">
+              <span className="block font-bold tracking-wider text-brand-600 uppercase dark:text-brand-400">
                 Director Mitra
               </span>
               <p className="text-slate-700 dark:text-slate-300">

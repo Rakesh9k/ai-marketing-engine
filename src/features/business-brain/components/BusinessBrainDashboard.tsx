@@ -183,7 +183,12 @@ export function BusinessBrainDashboard({
       </div>
 
       {/* Hero Banner with Mascot */}
-      <div className="to-brand-950 relative overflow-hidden rounded-3xl border border-neutral-800 bg-gradient-to-r from-neutral-900 via-neutral-800 p-6 text-white shadow-xl sm:p-8">
+      <div className="relative overflow-hidden rounded-3xl border border-neutral-800/80 bg-gradient-to-r from-[#171412] via-[#1C1815] to-[#251B14] p-6 text-white shadow-xl sm:p-8">
+        {/* Warm Ambient Brand Glows (eliminates the washed-out white/gray gradient) */}
+        <div className="pointer-events-none absolute -right-16 -top-16 h-72 w-72 rounded-full bg-brand-500/15 blur-3xl" />
+        <div className="pointer-events-none absolute -bottom-16 right-1/4 h-56 w-56 rounded-full bg-amber-500/10 blur-3xl" />
+        <div className="pointer-events-none absolute -left-12 -bottom-12 h-48 w-48 rounded-full bg-brand-600/10 blur-2xl" />
+
         <div className="relative z-10 flex flex-col gap-6 md:flex-row md:items-center md:justify-between">
           <div className="max-w-2xl space-y-4">
             <div className="text-brand-300 inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/10 px-3.5 py-1.5 text-xs font-medium backdrop-blur-md">
@@ -208,7 +213,7 @@ export function BusinessBrainDashboard({
             </div>
           </div>
 
-          {/* Mascot Illustration with Glowing Speech Bubble */}
+          {/* Mascot Illustration with Clean Elevated Speech Bubble */}
           <div className="relative flex items-center justify-center md:justify-end">
             <motion.div
               initial={reduceMotion ? false : { scale: 0.9, opacity: 0 }}
@@ -216,13 +221,17 @@ export function BusinessBrainDashboard({
               transition={{ duration: 0.5 }}
               className="relative flex items-center"
             >
-              {/* Speech bubble */}
-              <div className="absolute -top-4 -left-12 hidden max-w-[180px] animate-bounce rounded-2xl border border-neutral-200 bg-white p-3 text-xs font-bold text-neutral-900 shadow-lg lg:block">
-                "The more you share, the smarter I get!"
-                <div className="absolute right-4 -bottom-2 h-3 w-3 rotate-45 border-r border-b border-neutral-200 bg-white" />
+              {/* Elevated, elegant Speech Bubble */}
+              <div className="absolute -top-3 -left-16 z-20 hidden max-w-[200px] rounded-2xl border border-white/15 bg-neutral-900/95 p-3 text-xs font-medium text-neutral-200 shadow-xl backdrop-blur-md lg:block">
+                <span className="text-brand-400 font-bold">“</span>
+                The more you share, the smarter I get!
+                <span className="text-brand-400 font-bold">”</span>
+                <div className="absolute right-6 -bottom-1.5 h-3 w-3 rotate-45 border-r border-b border-white/15 bg-neutral-900/95" />
               </div>
 
-              <div className="bg-brand-500/20 relative rounded-full p-4 backdrop-blur-md">
+              {/* Mascot container with soft warm lighting */}
+              <div className="relative flex items-center justify-center rounded-2xl p-2">
+                <div className="absolute inset-0 rounded-full bg-gradient-to-tr from-brand-500/25 via-amber-500/15 to-transparent blur-xl" />
                 <MitraMascot pose="remembering" size="xl" animated />
               </div>
             </motion.div>
@@ -560,7 +569,7 @@ export function BusinessBrainDashboard({
               </div>
 
               {/* Mascot Story Banner */}
-              <div className="from-brand-500 flex items-center justify-between rounded-2xl bg-gradient-to-r to-amber-500 p-5 text-white shadow-md">
+              <div className="flex items-center justify-between rounded-2xl bg-gradient-to-r from-brand-600 to-amber-600 p-5 text-white shadow-md">
                 <div className="space-y-1">
                   <h4 className="text-base font-extrabold">Mitra is learning every day!</h4>
                   <p className="text-brand-100 text-xs">

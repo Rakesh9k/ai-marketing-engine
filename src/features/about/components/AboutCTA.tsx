@@ -10,9 +10,9 @@ export function AboutCTA() {
   return (
     <section className="bg-surface border-border-light relative overflow-hidden border-t py-20">
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-        <div className="border-brand-300 relative overflow-hidden rounded-3xl border bg-gradient-to-r from-neutral-900 via-neutral-900 to-neutral-800 p-8 text-white shadow-2xl sm:p-14">
+        <div className="relative overflow-hidden rounded-3xl border border-neutral-800/80 bg-gradient-to-r from-[#171412] via-[#1C1815] to-[#251B14] p-8 text-white shadow-2xl sm:p-14">
           {/* Subtle background glow */}
-          <div className="bg-brand-500/20 pointer-events-none absolute -top-20 -right-20 h-80 w-80 rounded-full blur-3xl" />
+          <div className="bg-brand-500/15 pointer-events-none absolute -top-20 -right-20 h-80 w-80 rounded-full blur-3xl" />
 
           <div className="grid grid-cols-1 items-center gap-8 lg:grid-cols-12">
             {/* Left Column: Mascot & Speech Note */}

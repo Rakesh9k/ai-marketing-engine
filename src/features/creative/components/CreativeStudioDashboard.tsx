@@ -426,11 +426,11 @@ export function CreativeStudioDashboard({ userId }: CreativeStudioDashboardProps
           </div>
 
           {/* Need Something Else Callout with Cheering Mascot */}
-          <div className="flex flex-col items-center justify-between gap-4 rounded-3xl border border-purple-500/20 bg-gradient-to-r from-purple-500/10 via-amber-500/10 to-orange-500/10 p-5 sm:flex-row sm:p-6">
+          <div className="flex flex-col items-center justify-between gap-4 rounded-3xl border border-amber-200/80 bg-gradient-to-r from-[#FFF9F5] via-[#FFFDF9] to-[#FEF3EB] p-5 sm:flex-row sm:p-6 dark:border-amber-500/20 dark:bg-neutral-900/80">
             <div className="flex items-center gap-4">
               <Mascot state="proud" size="md" shadow animated />
               <div>
-                <span className="text-[10px] font-bold tracking-wider text-purple-600 uppercase dark:text-purple-400">
+                <span className="text-[10px] font-bold tracking-wider text-brand-600 uppercase dark:text-brand-400">
                   🚀 Launch a Campaign
                 </span>
                 <h4 className="text-base font-bold text-slate-900 dark:text-white">

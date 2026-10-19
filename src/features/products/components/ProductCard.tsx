@@ -39,7 +39,7 @@ export function ProductCard({ product, isSelected, onSelect, onCreateCreative }:
             className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
           />
         ) : (
-          <div className="flex h-full w-full flex-col items-center justify-center bg-gradient-to-br from-neutral-50 to-neutral-100 text-neutral-400">
+          <div className="flex h-full w-full flex-col items-center justify-center bg-[#FDFBF8] text-[#8C827A]">
             <CameraIllustration size={32} />
             <span className="mt-2 text-xs font-medium">No photo added</span>
           </div>

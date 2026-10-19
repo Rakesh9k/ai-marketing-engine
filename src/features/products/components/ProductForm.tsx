@@ -173,7 +173,7 @@ export function ProductForm({ businessId, initialProduct, onSuccess, onCancel }:
       )}
 
       {/* Marketing Readiness Progress Card */}
-      <div className="to-brand-50/40 space-y-3 rounded-2xl border border-neutral-200 bg-gradient-to-r from-neutral-50 p-5">
+      <div className="space-y-3 rounded-2xl border border-amber-200/60 bg-gradient-to-r from-[#FFF9F5] via-[#FFFDF9] to-[#FFF4ED] p-5 shadow-xs">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             <span className="text-lg">✨</span>

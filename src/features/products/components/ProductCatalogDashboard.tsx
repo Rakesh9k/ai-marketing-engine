@@ -179,7 +179,7 @@ export function ProductCatalogDashboard({ userId }: ProductCatalogDashboardProps
       </div>
 
       {/* Hero Banner with Mascot */}
-      <div className="to-brand-50 relative overflow-hidden rounded-3xl border border-amber-200/80 bg-gradient-to-r from-amber-50 via-orange-50 p-6 shadow-sm sm:p-8">
+      <div className="relative overflow-hidden rounded-3xl border border-amber-200/60 bg-gradient-to-r from-[#FFF7ED] via-[#FFFDF9] to-[#FEF3EB] p-6 shadow-sm sm:p-8">
         <div className="relative z-10 flex flex-col gap-6 md:flex-row md:items-center md:justify-between">
           <div className="max-w-2xl space-y-4">
             <div className="bg-brand-500/10 text-brand-700 border-brand-500/20 inline-flex items-center gap-2 rounded-full border px-3.5 py-1.5 text-xs font-bold">
@@ -246,12 +246,15 @@ export function ProductCatalogDashboard({ userId }: ProductCatalogDashboardProps
               transition={{ duration: 0.5 }}
               className="relative flex items-center"
             >
-              <div className="absolute -top-4 -left-12 hidden max-w-[180px] rounded-2xl border border-neutral-200 bg-white p-3 text-xs font-bold text-neutral-900 shadow-lg lg:block">
-                "Good food brings people together!"
-                <div className="absolute right-4 -bottom-2 h-3 w-3 rotate-45 border-r border-b border-neutral-200 bg-white" />
+              <div className="absolute -top-3 -left-16 z-20 hidden max-w-[200px] rounded-2xl border border-amber-200/80 bg-white/95 p-3 text-xs font-medium text-neutral-800 shadow-md backdrop-blur-sm lg:block">
+                <span className="text-brand-500 font-bold">“</span>
+                Good food brings people together!
+                <span className="text-brand-500 font-bold">”</span>
+                <div className="absolute right-6 -bottom-1.5 h-3 w-3 rotate-45 border-r border-b border-amber-200/80 bg-white" />
               </div>
 
-              <div className="bg-brand-500/10 relative rounded-full p-4">
+              <div className="relative flex items-center justify-center p-2">
+                <div className="absolute inset-0 rounded-full bg-brand-500/10 blur-xl" />
                 <MitraMascot pose="creating" size="xl" />
               </div>
             </motion.div>
