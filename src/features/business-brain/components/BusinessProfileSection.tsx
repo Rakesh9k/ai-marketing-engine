@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import type { Business } from '@/types';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
@@ -31,6 +31,19 @@ export function BusinessProfileSection({
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [savedNotice, setSavedNotice] = useState<string | null>(null);
+
+  useEffect(() => {
+    setName(business.name || '');
+    setDescription(business.description || '');
+    setCity(business.location?.city || '');
+    setState(business.location?.state || '');
+    setLocality(business.location?.locality || '');
+    setAddress(business.location?.address || '');
+    setPhone(business.contact?.phone || '');
+    setWhatsapp(business.contact?.whatsapp || '');
+    setWebsite(business.contact?.website || '');
+    setInstagram(business.contact?.instagram || '');
+  }, [business.businessId, business.name, business.description, business.location, business.contact]);
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();

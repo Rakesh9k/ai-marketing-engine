@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import type { Business } from '@/types';
 import { Button } from '@/components/ui/Button';
 import { callFunction } from '@/services/api';
@@ -30,6 +30,10 @@ export function PreferencesSection({ business, onSaved, onCancel }: PreferencesS
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [savedNotice, setSavedNotice] = useState<string | null>(null);
+
+  useEffect(() => {
+    setOperatingMode(business.businessBrain?.businessRules?.operatingMode || 'dine-in');
+  }, [business.businessId, business.businessBrain?.businessRules?.operatingMode]);
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();

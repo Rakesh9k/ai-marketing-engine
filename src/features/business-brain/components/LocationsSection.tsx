@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import type { Business } from '@/types';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
@@ -28,6 +28,15 @@ export function LocationsSection({ business, onSaved, onCancel }: LocationsSecti
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [savedNotice, setSavedNotice] = useState<string | null>(null);
+
+  useEffect(() => {
+    setCity(business.location?.city || '');
+    setState(business.location?.state || '');
+    setLocality(business.location?.locality || '');
+    setAddress(business.location?.address || '');
+    const currentRadius = business.businessBrain?.businessRules?.deliveryRadiusKm;
+    setDeliveryRadiusKm(currentRadius !== undefined ? String(currentRadius) : '');
+  }, [business.businessId, business.location, business.businessBrain?.businessRules?.deliveryRadiusKm]);
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();

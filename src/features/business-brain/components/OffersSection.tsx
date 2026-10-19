@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import type { Business } from '@/types';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
@@ -30,6 +30,13 @@ export function OffersSection({ business, onSaved, onCancel }: OffersSectionProp
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [savedNotice, setSavedNotice] = useState<string | null>(null);
+
+  useEffect(() => {
+    setOfferValidityRules(business.businessBrain?.businessRules?.offerValidityRules || '');
+    setPricingRules(business.businessBrain?.businessRules?.pricingRules || '');
+    const currentMin = business.businessBrain?.businessRules?.minimumOrder;
+    setMinimumOrder(currentMin !== undefined ? String(currentMin) : '');
+  }, [business.businessId, business.businessBrain?.businessRules]);
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();

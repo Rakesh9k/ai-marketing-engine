@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import type { Business } from '@/types';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
@@ -31,6 +31,15 @@ export function AudienceSection({ business, onSaved, onCancel }: AudienceSection
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [savedNotice, setSavedNotice] = useState<string | null>(null);
+
+  useEffect(() => {
+    const aud = business.businessBrain?.audience;
+    setTargetCustomer(aud?.targetCustomer || '');
+    setMinAge(aud?.ageRange?.min || 18);
+    setMaxAge(aud?.ageRange?.max || 55);
+    setLocalitiesText((aud?.localities || []).join(', '));
+    setPreferences(aud?.preferences || '');
+  }, [business.businessId, business.businessBrain?.audience]);
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();

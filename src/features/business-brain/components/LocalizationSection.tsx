@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import type { Business } from '@/types';
 import { Button } from '@/components/ui/Button';
 import { callFunction } from '@/services/api';
@@ -57,6 +57,16 @@ export function LocalizationSection({ business, onSaved, onCancel }: Localizatio
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [savedNotice, setSavedNotice] = useState<string | null>(null);
+
+  useEffect(() => {
+    const l = business.businessBrain?.localization;
+    if (l) {
+      setPrimaryLanguage(l.primaryLanguage || 'en');
+      setSecondaryLanguage(l.secondaryLanguage || 'en');
+      setRegionalStyle(l.regionalStyle || 'neutral');
+      setSlangIntensity(l.slangIntensity || 'light');
+    }
+  }, [business.businessId, business.businessBrain?.localization]);
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();

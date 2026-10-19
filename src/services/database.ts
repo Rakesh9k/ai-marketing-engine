@@ -231,14 +231,24 @@ export const brandKitService = {
     return snap.exists() ? snap.data() : null;
   },
 
-  async upsert(brandKit: BrandKit): Promise<void> {
-    const ref = getDocRef<BrandKit>('brand_kits', brandKit.businessId, brandKitConverter);
-    await setDoc(ref, brandKit, { merge: true });
+  async upsert(brandKit: BrandKit): Promise<BrandKit> {
+    const { callFunction } = await import('@/services/api');
+    const existing = await this.get(brandKit.businessId).catch(() => null);
+    const functionName = existing ? 'updateBrandKit' : 'createBrandKit';
+    const result = await callFunction<Partial<BrandKit>, { brandKit: BrandKit }>({
+      functionName,
+      data: brandKit,
+    });
+    return result.brandKit;
   },
 
-  async update(businessId: string, data: Partial<BrandKit>): Promise<void> {
-    const ref = getDocRef<BrandKit>('brand_kits', businessId, brandKitConverter);
-    await updateDoc(ref, { ...data, updatedAt: serverTimestamp() });
+  async update(businessId: string, data: Partial<BrandKit>): Promise<BrandKit> {
+    const { callFunction } = await import('@/services/api');
+    const result = await callFunction<Partial<BrandKit> & { businessId: string }, { brandKit: BrandKit }>({
+      functionName: 'updateBrandKit',
+      data: { businessId, ...data },
+    });
+    return result.brandKit;
   },
 };
 

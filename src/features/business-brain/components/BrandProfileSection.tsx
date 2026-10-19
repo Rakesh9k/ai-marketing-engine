@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import type { BrandKit } from '@/types';
 import { Button } from '@/components/ui/Button';
 import { brandKitService } from '@/services/database';
@@ -44,6 +44,21 @@ export function BrandProfileSection({
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [savedNotice, setSavedNotice] = useState<string | null>(null);
+
+  // Sync state if brandKit prop updates (e.g. from parent re-fetch)
+  useEffect(() => {
+    if (brandKit) {
+      setTone(brandKit.tone || 'friendly');
+      setPersonality(brandKit.personality || '');
+      setVisualPreferences(brandKit.visualPreferences || '');
+      setTargetAudience(brandKit.targetAudience || '');
+      setColorPrimary(brandKit.colors?.primary || '#E84D1A');
+      setColorSecondary(brandKit.colors?.secondary || '#1F2126');
+      setColorAccent(brandKit.colors?.accent || '#FFD700');
+      setFontHeading(brandKit.fonts?.heading || 'Montserrat');
+      setFontBody(brandKit.fonts?.body || 'Inter');
+    }
+  }, [brandKit]);
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();

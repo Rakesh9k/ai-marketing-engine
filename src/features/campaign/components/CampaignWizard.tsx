@@ -588,19 +588,12 @@ export function CampaignWizard({ userId }: CampaignWizardProps) {
           </div>
         </div>
 
-        {/* Quick Campaign Starter Pills */}
-        <div className="mt-4 flex flex-wrap items-center gap-2 border-t border-slate-800/80 pt-3">
-          <span className="text-xs font-medium text-slate-400">Quick Ideas:</span>
-          {quickIdeasFor(business?.category).map((idea) => (
-            <button
-              key={idea.id}
-              type="button"
-              onClick={() => startFromIdea(idea)}
-              className="rounded-full border border-slate-700 bg-slate-800/80 px-3 py-1 text-xs text-slate-300 transition-colors hover:border-amber-500/50 hover:bg-slate-700 hover:text-white"
-            >
-              {idea.label}
-            </button>
-          ))}
+        {/* Quick Campaign Starter Bar */}
+        <div className="mt-4 flex flex-wrap items-center justify-between gap-2 border-t border-slate-800/80 pt-3 text-xs text-slate-400">
+          <div className="flex items-center gap-1.5">
+            <span className="text-amber-400">⚡</span>
+            <span>Speed Mode: Select a 1-tap Quick Idea in Step 1 to auto-fill your campaign in &lt;60s</span>
+          </div>
         </div>
 
         {/* Horizontal Workflow Stepper */}
@@ -651,9 +644,35 @@ export function CampaignWizard({ userId }: CampaignWizardProps) {
               >
                 {/* STEP 1: Creative Type */}
                 {state.step === 1 && (
-                  <div className="space-y-4">
+                  <div className="space-y-5">
+                    {/* Fast Track Quick Ideas Banner */}
+                    <div className="rounded-xl border border-amber-500/20 bg-gradient-to-r from-amber-500/10 via-amber-500/5 to-transparent p-4">
+                      <div className="flex items-center gap-2">
+                        <span className="text-base">⚡</span>
+                        <h4 className="text-sm font-bold text-amber-500 dark:text-amber-400">
+                          Short on time? Start with a 1-tap preset
+                        </h4>
+                      </div>
+                      <p className="mt-1 text-xs text-text-secondary">
+                        Pre-fills proven copy, objectives, and CTAs tailored for your {business?.category || 'business'} in under 60 seconds:
+                      </p>
+                      <div className="mt-3 flex flex-wrap gap-2">
+                        {quickIdeasFor(business?.category).map((idea) => (
+                          <button
+                            key={idea.id}
+                            type="button"
+                            onClick={() => startFromIdea(idea)}
+                            className="inline-flex items-center gap-1.5 rounded-lg border border-amber-500/30 bg-white/80 px-3 py-1.5 text-xs font-semibold text-text-primary shadow-xs transition hover:border-amber-500 hover:bg-amber-50 dark:bg-slate-800 dark:hover:bg-slate-700"
+                          >
+                            <span>🎯</span>
+                            <span>{idea.label}</span>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
                     <p className="text-text-secondary text-sm">
-                      Select the format for your campaign.
+                      Or select your custom campaign format to build from scratch:
                     </p>
                     <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                       <button
@@ -1532,17 +1551,73 @@ export function CampaignWizard({ userId }: CampaignWizardProps) {
                     </div>
                     {creditsRemaining !== null &&
                       creditsRemaining < ESTIMATED_CAMPAIGN_GENERATION_CREDITS && (
-                        <UpgradePrompt
-                          context={{
-                            kind: 'not_enough_credits',
-                            action: 'generate this campaign',
-                            needed: ESTIMATED_CAMPAIGN_GENERATION_CREDITS,
-                            available: creditsRemaining,
-                          }}
-                        />
+                        <div className="space-y-3">
+                          {creditsRemaining === 0 && (
+                            <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-4 text-xs">
+                              <div className="flex items-center justify-between">
+                                <div>
+                                  <p className="font-bold text-amber-300">
+                                    🎁 140 Free Starter Credits Available
+                                  </p>
+                                  <p className="text-slate-300 mt-1">
+                                    Every new verified Mitra account receives 140 free welcome credits to create their first full campaign.
+                                  </p>
+                                </div>
+                                <Button
+                                  type="button"
+                                  size="sm"
+                                  className="shrink-0 bg-amber-500 text-slate-950 hover:bg-amber-400 font-semibold"
+                                  onClick={async () => {
+                                    try {
+                                      const res = await callFunction<Record<string, never>, any>({
+                                        functionName: 'claimWelcomeCredits',
+                                        data: {},
+                                      });
+                                      if (res.status === 'granted' || res.status === 'already_granted') {
+                                        showToast('Welcome credits claimed successfully!', 'success');
+                                        await refreshCredits();
+                                      } else if (res.reasons?.includes('email_not_verified')) {
+                                        showToast('Please verify your email address to claim your 140 free credits.', 'warning');
+                                      } else {
+                                        showToast('Could not claim free credits automatically. Please check Billing.', 'info');
+                                      }
+                                    } catch {
+                                      showToast('Could not claim credits. Please visit Billing or verify email.', 'error');
+                                    }
+                                  }}
+                                >
+                                  Claim 140 Credits
+                                </Button>
+                              </div>
+                            </div>
+                          )}
+                          <UpgradePrompt
+                            context={{
+                              kind: 'not_enough_credits',
+                              action: 'generate this campaign',
+                              needed: ESTIMATED_CAMPAIGN_GENERATION_CREDITS,
+                              available: creditsRemaining,
+                            }}
+                          />
+                        </div>
                       )}
 
-                    {submitError && <p className="text-error-600 font-medium">{submitError}</p>}
+                    {submitError && (
+                      <div
+                        role="alert"
+                        aria-live="polite"
+                        className="rounded-xl border border-error-200 bg-error-50/70 p-3.5 text-left text-xs space-y-1.5"
+                      >
+                        <div className="flex items-center gap-1.5 font-semibold text-error-900">
+                          <span aria-hidden="true">⚠️</span>
+                          <span>Generation Could Not Start</span>
+                        </div>
+                        <p className="text-error-700 leading-relaxed">{submitError}</p>
+                        <p className="text-text-secondary pt-0.5 border-t border-error-200/60 font-normal">
+                          Retrying this action will only deduct credits if campaign generation successfully completes.
+                        </p>
+                      </div>
+                    )}
                   </div>
                 )}
 
