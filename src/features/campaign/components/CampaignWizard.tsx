@@ -18,10 +18,11 @@ import { Button } from '@/components/ui/Button';
 import { ImageUploader } from '@/features/asset/components/ImageUploader';
 import type { Asset } from '@/features/asset/services/assetService';
 import { GenerationProgress } from './GenerationProgress';
+import { ConversationalCampaignCreator } from './ConversationalCampaignCreator';
 import { ConceptSelectorModal, type SelectedConcept } from './ConceptSelectorModal';
 import { trackCreativeEvent } from '@/lib/analytics/trackEvent';
 import type { CampaignWizardState } from '../types';
-import { createInitialWizardState } from '../types';
+import { createInitialWizardState } from '../state'; // Fixed import path after refactor
 import { buildCampaignInput as buildCampaignInputPure } from '../buildCampaignInput';
 import {
   OBJECTIVES,
@@ -168,6 +169,18 @@ export function CampaignWizard({ userId }: CampaignWizardProps) {
       console.error('Failed to refresh credit balance:', err);
     }
   }, [userId]);
+
+  // Creation mode: 'conversational' | 'guided'
+  const [creationMode, setCreationMode] = useState<'conversational' | 'guided'>('conversational');
+
+  const handleConversationalComplete = useCallback((conversationalState: CampaignWizardState) => {
+    setState((prev) => ({
+      ...prev,
+      ...conversationalState,
+      step: 1,
+    }));
+    setCreationMode('guided');
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -592,7 +605,9 @@ export function CampaignWizard({ userId }: CampaignWizardProps) {
         <div className="mt-4 flex flex-wrap items-center justify-between gap-2 border-t border-slate-800/80 pt-3 text-xs text-slate-400">
           <div className="flex items-center gap-1.5">
             <span className="text-amber-400">⚡</span>
-            <span>Speed Mode: Select a 1-tap Quick Idea in Step 1 to auto-fill your campaign in &lt;60s</span>
+            <span>
+              Speed Mode: Select a 1-tap Quick Idea in Step 1 to auto-fill your campaign in &lt;60s
+            </span>
           </div>
         </div>
 
@@ -653,8 +668,9 @@ export function CampaignWizard({ userId }: CampaignWizardProps) {
                           Short on time? Start with a 1-tap preset
                         </h4>
                       </div>
-                      <p className="mt-1 text-xs text-text-secondary">
-                        Pre-fills proven copy, objectives, and CTAs tailored for your {business?.category || 'business'} in under 60 seconds:
+                      <p className="text-text-secondary mt-1 text-xs">
+                        Pre-fills proven copy, objectives, and CTAs tailored for your{' '}
+                        {business?.category || 'business'} in under 60 seconds:
                       </p>
                       <div className="mt-3 flex flex-wrap gap-2">
                         {quickIdeasFor(business?.category).map((idea) => (
@@ -662,7 +678,7 @@ export function CampaignWizard({ userId }: CampaignWizardProps) {
                             key={idea.id}
                             type="button"
                             onClick={() => startFromIdea(idea)}
-                            className="inline-flex items-center gap-1.5 rounded-lg border border-amber-500/30 bg-white/80 px-3 py-1.5 text-xs font-semibold text-text-primary shadow-xs transition hover:border-amber-500 hover:bg-amber-50 dark:bg-slate-800 dark:hover:bg-slate-700"
+                            className="text-text-primary inline-flex items-center gap-1.5 rounded-lg border border-amber-500/30 bg-white/80 px-3 py-1.5 text-xs font-semibold shadow-xs transition hover:border-amber-500 hover:bg-amber-50 dark:bg-slate-800 dark:hover:bg-slate-700"
                           >
                             <span>🎯</span>
                             <span>{idea.label}</span>
@@ -1542,13 +1558,14 @@ export function CampaignWizard({ userId }: CampaignWizardProps) {
                     <div className="border-brand-200/60 bg-brand-50 rounded-xl border p-3 dark:bg-amber-950/20">
                       <p className="text-text-primary font-semibold">Credits Summary</p>
                       <p className="text-text-secondary">
-                        Current Balance: {creditsRemaining ?? '—'} credits | Campaign Generation Cost:{' '}
-                        {ESTIMATED_CAMPAIGN_GENERATION_CREDITS} credits
+                        Current Balance: {creditsRemaining ?? '—'} credits | Campaign Generation
+                        Cost: {ESTIMATED_CAMPAIGN_GENERATION_CREDITS} credits
                       </p>
                       {creditsRemaining !== null &&
                         creditsRemaining >= ESTIMATED_CAMPAIGN_GENERATION_CREDITS && (
-                          <p className="text-success-600 dark:text-emerald-400 mt-1 text-xs font-medium">
-                            ✓ You will have {creditsRemaining - ESTIMATED_CAMPAIGN_GENERATION_CREDITS} credits
+                          <p className="text-success-600 mt-1 text-xs font-medium dark:text-emerald-400">
+                            ✓ You will have{' '}
+                            {creditsRemaining - ESTIMATED_CAMPAIGN_GENERATION_CREDITS} credits
                             remaining after generation for revisions and edits.
                           </p>
                         )}
@@ -1566,30 +1583,47 @@ export function CampaignWizard({ userId }: CampaignWizardProps) {
                                   <p className="font-bold text-amber-300">
                                     🎁 140 Free Starter Credits Available
                                   </p>
-                                  <p className="text-slate-300 mt-1">
-                                    Every new verified Mitra account receives 140 free welcome credits to create their first full campaign (100 credits) with 40 credits left for revisions.
+                                  <p className="mt-1 text-slate-300">
+                                    Every new verified Mitra account receives 140 free welcome
+                                    credits to create their first full campaign (100 credits) with
+                                    40 credits left for revisions.
                                   </p>
                                 </div>
                                 <Button
                                   type="button"
                                   size="sm"
-                                  className="shrink-0 bg-amber-500 text-slate-950 hover:bg-amber-400 font-semibold"
+                                  className="shrink-0 bg-amber-500 font-semibold text-slate-950 hover:bg-amber-400"
                                   onClick={async () => {
                                     try {
                                       const res = await callFunction<Record<string, never>, any>({
                                         functionName: 'claimWelcomeCredits',
                                         data: {},
                                       });
-                                      if (res.status === 'granted' || res.status === 'already_granted') {
-                                        showToast('Welcome credits claimed successfully!', 'success');
+                                      if (
+                                        res.status === 'granted' ||
+                                        res.status === 'already_granted'
+                                      ) {
+                                        showToast(
+                                          'Welcome credits claimed successfully!',
+                                          'success'
+                                        );
                                         await refreshCredits();
                                       } else if (res.reasons?.includes('email_not_verified')) {
-                                        showToast('Please verify your email address to claim your 140 free credits.', 'warning');
+                                        showToast(
+                                          'Please verify your email address to claim your 140 free credits.',
+                                          'warning'
+                                        );
                                       } else {
-                                        showToast('Could not claim free credits automatically. Please check Billing.', 'info');
+                                        showToast(
+                                          'Could not claim free credits automatically. Please check Billing.',
+                                          'info'
+                                        );
                                       }
                                     } catch {
-                                      showToast('Could not claim credits. Please visit Billing or verify email.', 'error');
+                                      showToast(
+                                        'Could not claim credits. Please visit Billing or verify email.',
+                                        'error'
+                                      );
                                     }
                                   }}
                                 >
@@ -1613,15 +1647,16 @@ export function CampaignWizard({ userId }: CampaignWizardProps) {
                       <div
                         role="alert"
                         aria-live="polite"
-                        className="rounded-xl border border-error-200 bg-error-50/70 p-3.5 text-left text-xs space-y-1.5"
+                        className="border-error-200 bg-error-50/70 space-y-1.5 rounded-xl border p-3.5 text-left text-xs"
                       >
-                        <div className="flex items-center gap-1.5 font-semibold text-error-900">
+                        <div className="text-error-900 flex items-center gap-1.5 font-semibold">
                           <span aria-hidden="true">⚠️</span>
                           <span>Generation Could Not Start</span>
                         </div>
                         <p className="text-error-700 leading-relaxed">{submitError}</p>
-                        <p className="text-text-secondary pt-0.5 border-t border-error-200/60 font-normal">
-                          Retrying this action will only deduct credits if campaign generation successfully completes.
+                        <p className="text-text-secondary border-error-200/60 border-t pt-0.5 font-normal">
+                          Retrying this action will only deduct credits if campaign generation
+                          successfully completes.
                         </p>
                       </div>
                     )}

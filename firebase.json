@@ -5,15 +5,20 @@
       "codebase": "default",
       "ignore": [
         "node_modules",
+        "node_modules/**",
         ".git",
-        "firebase-debug.log",
-        "firebase-debug.*.log",
+        ".git/**",
         "*.local",
-        "firebase-debug.log",
-        "firebase-debug.*.log",
-        ".runtimeconfig.json",
-        "firebase-debug.log",
-        "firebase-debug.*.log",
+        "*.log",
+        "*.test.ts",
+        "*.spec.ts",
+        "**/__tests__/**",
+        "coverage",
+        "coverage/**",
+        "test-results",
+        "test-results/**",
+        "test-output-reel",
+        "test-output-reel/**",
         ".runtimeconfig.json"
       ],
       "predeploy": ["npm --prefix functions run build"]
@@ -24,19 +29,43 @@
     "rootDir": "/",
     "ignore": [
       "node_modules",
-      "functions/node_modules",
-      "functions/lib",
+      "node_modules/**",
+      "functions",
+      "functions/**",
+      "services/reel-renderer",
+      "services/reel-renderer/**",
       ".git",
+      ".git/**",
       ".next",
+      ".next/**",
       ".env*",
       ".firebase",
+      ".firebase/**",
       ".vercel",
+      ".vercel/**",
+      ".agent",
+      ".agent/**",
+      ".agents",
+      ".agents/**",
+      ".claude",
+      ".claude/**",
+      "coverage",
+      "coverage/**",
+      "docs",
+      "docs/**",
+      "scratch",
+      "scratch/**",
+      "tests",
+      "tests/**",
       "playwright-report",
+      "playwright-report/**",
       "test-results",
-      "services/reel-renderer",
-      "public/brand/mascot/mascot-*.png",
-      "firebase-debug.log",
-      "firebase-debug.*.log"
+      "test-results/**",
+      "MITRA_CREATIVE_REFERENCE_LIBRARY",
+      "MITRA_CREATIVE_REFERENCE_LIBRARY/**",
+            "public/brand/mascot/mascot-*.png",
+      "*.log",
+      "*.md"
     ],
     "alwaysDeployFromSource": true
   },
@@ -64,8 +93,10 @@
     "indexes": "firestore.indexes.json",
     "database": "(default)"
   },
-  "storage": {
-    "rules": "storage.rules",
-    "bucket": "brainwise-ai-marketing-engine.firebasestorage.app"
-  }
+  "storage": [
+    {
+      "rules": "storage.rules",
+      "bucket": "brainwise-ai-marketing-engine.firebasestorage.app"
+    }
+  ]
 }
